@@ -15,6 +15,12 @@
  *   go_around:CS           CS went around
  *   landed_before:A:B      A touched down, and B had not touched down earlier
  *   handled:>=N | handled:N   score.aircraftHandled
+ *   handled:CS             CS was handled (arrival shut down at parking; IFR departure handed off, instructed and out of the area)
+ *   approach:CS            an approach clearance (APPROACH) was accepted for CS without an improper-geometry flag (intercept angle, inside the FAF)
+ *   established:CS         CS reported established on the approach (or reached FINAL after an approach clearance)
+ *   ifr_request:CS         CS called Clearance Delivery asking for its IFR clearance
+ *   ifr_clearance:CS       an IFR clearance (IFR_CLEARANCE) was accepted for CS
+ *   departed_ifr:CS        CS took off with an IFR clearance and was handed to Departure (APP/DEP frequency) after takeoff
  *   score:>=N              score.score
  *   no_incursions | no_unsafe | no_separation | no_conflicts
  *   active_runway:31       the active runway configuration lists runway end 31 for both landing and departing
@@ -49,6 +55,9 @@ function indexOf(state: SimulationState): EventIndex {
   };
   /** callsign -> runway id it touched down on */
   const landedOn = new Map<string, string>();
+  const approachCleared = new Set<string>();
+  /** frequency position by MHz, to recognise the handoff to Departure */
+  const posByMhz = new Map<number, string>((state.airport?.frequencies ?? []).map((f) => [Math.round(f.mhz * 1000), f.position]));
   const runwayOfEnd = (end: string): string | undefined => state.airport.runways.find((r) => r.ends.some((x) => x.id === end))?.id;
   for (const e of ev) {
     const cs = e.callsign?.toUpperCase();
@@ -62,14 +71,27 @@ function indexOf(state: SimulationState): EventIndex {
         }
         break;
       case 'PHASE_CHANGE':
-        if (typeof d.to === 'string') put(`phase:${cs}:${d.to}`, e.timeSec);
+        if (typeof d.to === 'string') {
+          put(`phase:${cs}:${d.to}`, e.timeSec);
+          if (d.to === 'FINAL' && approachCleared.has(cs)) put(`established:${cs}`, e.timeSec);
+        }
         break;
       case 'COMMAND_ACCEPTED':
-        if (typeof d.kind === 'string' && !d.unsafe && d.correction !== true) put(`cmd:${d.kind}:${cs}`, e.timeSec);
+        if (typeof d.kind === 'string' && !d.unsafe && d.correction !== true) {
+          put(`cmd:${d.kind}:${cs}`, e.timeSec);
+          if (d.kind === 'IFR_CLEARANCE') put(`ifr_clearance:${cs}`, e.timeSec);
+          if (d.kind === 'APPROACH' && !d.commError) {
+            put(`approach:${cs}`, e.timeSec);
+            approachCleared.add(cs);
+          }
+        }
         break;
-      case 'HANDOFF':
+      case 'HANDOFF': {
         put(`handoff:${cs}`, e.timeSec);
+        const pos = typeof e.frequencyMhz === 'number' ? posByMhz.get(Math.round(e.frequencyMhz * 1000)) : undefined;
+        if (facts.has(`phase:${cs}:INITIAL_CLIMB`) && (pos === 'DEP' || pos === 'APP')) put(`dep_handoff:${cs}`, e.timeSec);
         break;
+      }
       case 'GO_AROUND':
         put(`go_around:${cs}`, e.timeSec);
         break;
@@ -87,6 +109,8 @@ function indexOf(state: SimulationState): EventIndex {
         break;
       case 'TRANSMISSION':
         if (e.speaker === 'PILOT' && typeof d.request === 'string') {
+          if (d.request === 'IFR_CLEARANCE') put(`ifr_request:${cs}`, e.timeSec);
+          if (d.request === 'FREQUENCY_CHANGE' && /, established /i.test(e.text)) put(`established:${cs}`, e.timeSec);
           if (d.request === 'CROSSING') put(`crossing_request:${cs}`, e.timeSec);
           else if ((d.request === 'DEPARTURE' || d.request === 'FREQUENCY_CHANGE') && /holding short runway/i.test(e.text)) put(`holding_short:${cs}`, e.timeSec);
         }
@@ -112,7 +136,7 @@ const num = (s: string | undefined): number | undefined => {
 
 const KNOWN = new Set([
   'cmd', 'takeoff', 'landed', 'vacated', 'parked', 'taxied', 'holding_short', 'crossing_request', 'crossed', 'handoff', 'go_around',
-  'landed_before', 'handled', 'score', 'no_incursions', 'no_unsafe', 'no_separation', 'no_conflicts', 'active_runway', 'always',
+  'landed_before', 'handled', 'approach', 'established', 'ifr_request', 'ifr_clearance', 'departed_ifr', 'score', 'no_incursions', 'no_unsafe', 'no_separation', 'no_conflicts', 'active_runway', 'always',
 ]);
 
 export function isKnownCheck(check: string): boolean {
@@ -164,8 +188,19 @@ export function evaluateCheck(state: SimulationState, check: string): boolean {
       const b = facts.get(`phase:${parts[2]?.toUpperCase()}:ROLLOUT`);
       return b === undefined || a <= b;
     }
+    case 'approach':
+      return facts.has(`approach:${cs}`);
+    case 'established':
+      return facts.has(`established:${cs}`);
+    case 'ifr_request':
+      return facts.has(`ifr_request:${cs}`);
+    case 'ifr_clearance':
+      return facts.has(`ifr_clearance:${cs}`);
+    case 'departed_ifr':
+      return facts.has(`ifr_clearance:${cs}`) && facts.has(`dep_handoff:${cs}`);
     case 'handled': {
       const raw = parts[1] ?? '';
+      if (raw !== '' && num(raw) === undefined) return facts.has(`handled:${cs}`); // a callsign
       const n = num(raw) ?? 1;
       return raw.startsWith('>=') || raw === '' ? s.aircraftHandled >= n : s.aircraftHandled === n;
     }

@@ -168,3 +168,106 @@ test('live weather: uses the live METAR when the backend can provide one (or say
   if (/Live METAR/.test(source ?? '')) await expect(notice).toHaveCount(0);
   else await expect(notice).toContainText('Live weather unavailable');
 });
+
+// ------------------------------------------------------------------------------------------------------------------
+// IFR positions: Approach, Clearance Delivery, strips and the radar procedure display
+// ------------------------------------------------------------------------------------------------------------------
+
+test('IFR free play with All positions: the arrival checks in on Approach and the ILS clearance is read back', async ({ page }) => {
+  await page.goto('/');
+  await expect(page.getByTestId('setup-screen')).toBeVisible();
+  await page.getByTestId('weather-select').selectOption('preset:clear');
+  await page.getByTestId('ifr-flows').check();
+  // IFR flows adopt the full position set; arrivals are routed to the ILS 13 fixes when 13 is the landing runway.
+  await expect(page.getByTestId('position-ALL')).toHaveAttribute('aria-checked', 'true');
+  await page.getByLabel('Landing runway').selectOption('13');
+  await page.getByLabel('Departing runway').selectOption('13');
+  await page.getByTestId('seed-input').fill('11');
+  await page.getByTestId('start-session').click();
+  await expect(page.getByTestId('sim-screen')).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByTestId('position-select')).toHaveValue('ALL');
+  // Every active frequency is listed (APP and DEP share 124.6).
+  for (const f of ['120.300', '121.900', '127.850', '124.600']) await expect(page.getByTestId(`freq-${f}`)).toBeVisible();
+
+  const request = page.locator('[data-testid="request-badge"][data-kind="APPROACH"]').first();
+  await expect(request).toBeVisible({ timeout: 20_000 });
+  await expect(request).toHaveText('REQ APPROACH');
+  const strip = page.locator('[data-testid^="strip-"]', { has: page.locator('[data-kind="APPROACH"]') }).first();
+  const callsign = ((await strip.getAttribute('data-testid')) ?? '').replace('strip-', '');
+  expect(callsign).toMatch(/^[A-Z0-9]+$/);
+  await strip.click();
+  await expect(page.getByTestId('detail-callsign')).toHaveText(callsign);
+  await expect(page.getByTestId('detail-rules')).toHaveText('IFR');
+  await expect(page.getByTestId('detail-squawk')).toHaveText(/^[0-7]{4}$/);
+  await expect(page.getByTestId('detail-route')).toContainText('CARYL');
+
+  const log = page.getByTestId('comms-log');
+  await expect(log.getByTestId('log-pilot').filter({ hasText: 'Approach' })).toHaveCount(1);
+  // The call came in on Approach: its frequency is lit.
+  await expect(page.getByTestId('freq-124.600')).toHaveAttribute('data-last', 'true');
+
+  await sendCommand(page, `${callsign}, cleared ILS runway one three approach`);
+  await expect(page.getByTestId('last-result')).toContainText('Issued');
+  await expect(log.getByTestId('log-pilot').filter({ hasText: /Cleared ILS runway one three approach/ })).toHaveCount(1);
+  await expect(page.getByTestId('detail-approach')).toContainText('Cleared ILS 13 approach');
+  await expect(page.getByTestId('detail-nav')).toContainText('Approach ILS 13');
+
+  // Radar contact is informational: logged as ATC only, the pilot says nothing.
+  const pilotLines = await log.getByTestId('log-pilot').count();
+  await sendCommand(page, `${callsign}, radar contact`);
+  await expect(log.getByTestId('log-atc').filter({ hasText: 'radar contact' })).toHaveCount(1);
+  await expect(page.getByTestId('detail-radar')).toHaveText('IDENTIFIED');
+  await page.waitForTimeout(400);
+  expect(await log.getByTestId('log-pilot').count()).toBe(pilotLines);
+});
+
+test('Clearance Delivery: the IFR clearance is read back with the departure and squawk; later calls on another frequency are "not on frequency"', async ({ page }) => {
+  await startScenario(page, { mode: 'training', scenario: 'train-08-ifr-clearance' });
+  await expect(page.getByTestId('position-select')).toHaveValue('CLNC');
+  await expect(page.getByTestId('freq-127.850')).toBeVisible();
+  await page.getByTestId('speed-4').click();
+  const request = page.getByTestId('strip-NKS451').getByTestId('request-badge');
+  await expect(request).toHaveText('REQ IFR CLNC', { timeout: 30_000 });
+
+  await sendCommand(page, 'Spirit four fifty one, cleared to Philadelphia airport via the Atlantic City Three departure, radar vectors, maintain two thousand, expect one zero thousand one zero minutes after departure, departure frequency one two four point six, squawk four two one five');
+  await expect(page.getByTestId('last-result')).toContainText('Issued');
+  const readback = page.getByTestId('comms-log').getByTestId('log-pilot').filter({ hasText: 'Atlantic City Three departure' });
+  await expect(readback).toHaveCount(1);
+  await expect(readback).toContainText(/squawk/i);
+  await expect(readback).toContainText('Philadelphia');
+
+  await page.getByTestId('strip-NKS451').click();
+  const clearance = page.getByTestId('detail-ifr-clearance');
+  await expect(clearance).toContainText('KPHL');
+  await expect(clearance).toContainText('ATLANTIC CITY THREE');
+  await expect(clearance).toContainText('4215');
+  await expect(page.getByTestId('detail-squawk')).toHaveText('4215');
+
+  // After the readback the pilot tunes Ground by itself: the player works Clearance Delivery only.
+  await expect(page.getByTestId('strip-NKS451')).toContainText('GND', { timeout: 30_000 });
+  await sendCommand(page, 'Spirit four fifty one, hold position');
+  await expect(page.getByTestId('last-result')).toContainText('Not on frequency');
+  await expect(page.getByTestId('last-result')).toHaveAttribute('data-off-frequency', 'true');
+});
+
+test('the Strips tab lists traffic by frequency and the radar offers 60 NM and All fixes', async ({ page }) => {
+  await startScenario(page, { mode: 'training', scenario: 'train-08-ifr-clearance' });
+  await page.getByTestId('tab-strips').click();
+  const bay = page.getByTestId('bay-127.850');
+  await expect(bay).toBeVisible();
+  await expect(bay.getByTestId('fps-NKS451')).toContainText('IFR');
+  await expect(bay.getByTestId('fps-NKS451')).toContainText('KACY → KPHL');
+  await page.getByTestId('fps-NKS451').click();
+  await page.getByTestId('tab-list').click();
+  await expect(page.getByTestId('strip-NKS451')).toHaveAttribute('aria-pressed', 'true');
+
+  await page.getByTestId('tab-radar').click();
+  await page.getByRole('button', { name: '60 NM' }).click();
+  await expect(page.getByRole('button', { name: '60 NM' })).toHaveAttribute('aria-pressed', 'true');
+  const allFixes = page.getByTestId('radar-all-fixes');
+  await expect(allFixes).toHaveAttribute('aria-pressed', 'false');
+  await allFixes.click();
+  await expect(allFixes).toHaveAttribute('aria-pressed', 'true');
+  await page.waitForTimeout(400);
+  expect((await litPixels(page, 'radar-canvas')).lit).toBeGreaterThan(1500);
+});

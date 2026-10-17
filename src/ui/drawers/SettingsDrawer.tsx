@@ -3,15 +3,13 @@ import { VoiceSettingsForm } from '../components/VoiceSettingsForm';
 import { Toggle } from '../components/ui';
 import { Drawer } from './Drawer';
 import type { SurfaceLayers } from '../display/surfaceRenderer';
+import { RADAR_LAYER_LABELS } from '../display/radarRenderer';
 import type { RadarLayers } from '../display/radarRenderer';
 
 const SURFACE: Record<keyof SurfaceLayers, string> = {
   labels: 'Aircraft data labels', taxiwayIds: 'Taxiway identifiers', routes: 'Planned taxi routes', trails: 'Movement trails', parking: 'Parking positions', unnamed: 'Unnamed taxi lanes',
 };
-const RADAR: Record<keyof RadarLayers, string> = {
-  rings: 'Range rings', compass: 'Compass rose', approachPaths: 'Approach paths', navaids: 'Navaids', fixes: 'Approach fixes', allFixes: 'All fixes',
-  labels: 'Data blocks', history: 'History dots', groundTargets: 'Ground targets', sweep: 'Sweep line (cosmetic)',
-};
+const RADAR = RADAR_LAYER_LABELS;
 
 export function SettingsDrawer({ onClose }: { onClose: () => void }) {
   const sl = useUiStore((s) => s.surfaceLayers);

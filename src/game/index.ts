@@ -31,6 +31,14 @@ export interface FreePlayOptions {
   difficulty?: 'easy' | 'normal' | 'hard';
   aircraftTypes?: string[];                    // e.g. ['C172','A320']
   startingScenario?: 'quiet' | 'busy_departures' | 'busy_arrivals' | 'mixed';
+  /**
+   * IFR flows: airline arrivals appear over the published approach fix on the Approach frequency (ILS 13 via CARYL, ILS 31 via STEVV,
+   * RNAV 22 via KOPCE, RNAV 4 via JEDOB) and airline departures are parked IFR departures that call Clearance Delivery first. GA stays VFR.
+   * Default: on when the session's controller positions include APP (arrivals) or CLNC (departures), off for Tower/Ground sessions, which keep
+   * arrivals on final already cleared for the approach. Passing a boolean forces both flows on/off and, when true, lists CLNC/APP/DEP in
+   * `controllerPositions`. Free-play builds list only TWR and GND, so a UI that offers other positions should pass this option.
+   */
+  ifrFlows?: boolean;
 }
 
 export interface DebriefReport {

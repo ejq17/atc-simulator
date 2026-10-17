@@ -55,6 +55,14 @@ export interface GameScenarioExtras {
   careerStep?: number;
   /** Longer briefing text (description is the short form). */
   briefing?: string;
+  /**
+   * IFR flows of the traffic generator (see ifr.ts `resolveIfrFlows`): airline arrivals as `at_fix` arrivals on the published procedure and
+   * airline departures as parked IFR departures with a flight plan. `ifrArrivals` / `ifrDepartures` override `ifrFlows` for one side;
+   * all unset = decided from `controllerPositions` (APP -> arrivals, CLNC -> departures).
+   */
+  ifrFlows?: boolean;
+  ifrArrivals?: boolean;
+  ifrDepartures?: boolean;
   /** Which spawns are the *scripted* ones (traffic generator must not reuse their callsigns). */
   training?: { steps: TrainingStepSpec[] };
 }

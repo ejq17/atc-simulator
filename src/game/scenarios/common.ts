@@ -5,6 +5,7 @@ import { makeSimulatedWeather } from '../../weather/presets';
 import type { GameScenario } from '../types';
 import { bearingTo, fullLengthHold, holdOn, inboundFromBearing, onDownwind, onFinal } from '../world';
 import type { NeighbourId } from '../world';
+import { arrivalAtFix, arrivalProcedure, ifrFlightPlan } from '../ifr';
 
 export interface ScenarioDef {
   summary: ScenarioSummary;
@@ -91,3 +92,34 @@ export function arrivalInPattern(
     isDeparture: false, initialFrequencyId: o.freq ?? 'TWR', initialRequest: 'LANDING',
   };
 }
+
+/** Parked A320 (or Cessna) IFR departure that starts on Clearance Delivery, with a fixed destination and cruise altitude. */
+export function ifrDeparture(
+  airport: Airport, callsign: string, type: string, parkingId: string, atSec: number, destination: string, cruiseAltitudeFt: number,
+): ScenarioAircraftSpawn {
+  return {
+    atSec, callsign, type, flightRules: 'IFR', start: { kind: 'parked', parkingId }, isDeparture: true,
+    initialFrequencyId: 'CLNC', initialRequest: 'IFR_CLEARANCE',
+    flightPlan: ifrFlightPlan(airport, () => 0, type, { destination, cruiseAltitudeFt }),
+  };
+}
+
+/**
+ * IFR arrival over a fix of the published procedure for `endId` (ILS 13: CARYL, or VCN via CARYL with `fromFeeder`), on the Approach frequency.
+ * The fixes are read from `airport.procedures`; the builder throws if the runway has no procedure.
+ */
+export function ifrArrival(
+  airport: Airport, callsign: string, type: string, endId: string, atSec: number,
+  o: { fromFeeder?: boolean; altitudeFt?: number; speedKt?: number } = {},
+): ScenarioAircraftSpawn {
+  const proc = arrivalProcedure(airport, endId);
+  if (!proc) throw new Error(`No arrival procedure for runway ${endId}`);
+  return {
+    atSec, callsign, type, flightRules: 'IFR',
+    start: arrivalAtFix(airport, proc, { altitudeFt: o.altitudeFt ?? 3000, speedKt: o.speedKt ?? 180, fromFeeder: o.fromFeeder }),
+    isDeparture: false, initialFrequencyId: 'APP', initialRequest: 'APPROACH',
+  };
+}
+
+/** Everything but the player's choice of position: Tower + Ground + Clearance Delivery + Departure (career steps 7, 9). */
+export const IFR_DEPARTURE_POSITIONS: ControllerPositionId[] = ['TWR', 'GND', 'CLNC', 'DEP'];

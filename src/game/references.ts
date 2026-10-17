@@ -5,6 +5,9 @@
  * (https://www.faa.gov/air_traffic/publications/atpubs/atc_html/, edition shown on the site: JO 7110.65BB) and
  * reading the paragraph heading on the page named in `url`. Text is paraphrased, never quoted. Only paragraphs
  * listed here may be cited elsewhere in src/game.
+ *
+ * IFR additions (4-2-1, 4-3-2, 4-8-1, 5-9-1, 5-9-2, 5-9-4) were confirmed the same way on 2026-10-16 (chapter 4 sections 2, 3 and 8, chapter 5
+ * section 9, fetched with a browser User-Agent; headings read from the page, edition JO 7110.65BB).
  */
 export interface FaaReference {
   /** Paragraph number, e.g. "3-9-10". */
@@ -26,6 +29,12 @@ export const REFERENCES = {
   '2-4-20': ref('2-4-20', 'Aircraft Identification', 'chap2_section_4'),
   '3-1-3': ref('3-1-3', 'Use of Active Runways', 'chap3_section_1'),
   '3-1-12': ref('3-1-12', 'Visually Scanning Runways', 'chap3_section_1'),
+  '4-2-1': ref('4-2-1', 'Clearance Items', 'chap4_section_2'),
+  '4-3-2': ref('4-3-2', 'Departure Clearances', 'chap4_section_3'),
+  '4-8-1': ref('4-8-1', 'Approach Clearance', 'chap4_section_8'),
+  '5-9-1': ref('5-9-1', 'Vectors to Final Approach Course', 'chap5_section_9'),
+  '5-9-2': ref('5-9-2', 'Final Approach Course Interception', 'chap5_section_9'),
+  '5-9-4': ref('5-9-4', 'Arrival Instructions', 'chap5_section_9'),
   '3-7-1': ref('3-7-1', 'Ground Traffic Movement', 'chap3_section_7'),
   '3-7-2': ref('3-7-2', 'Taxi and Ground Movement Operations', 'chap3_section_7'),
   '3-8-1': ref('3-8-1', 'Sequence/Spacing Application', 'chap3_section_8'),

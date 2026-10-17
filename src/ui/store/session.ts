@@ -136,6 +136,8 @@ export function startSession(p: SessionParams): Session {
   syncMonitored();
 
   p.pilotSink.handler = (t) => {
+    // Informational instructions (RADAR_CONTACT) have an empty readback: nothing is said, so nothing is queued or spoken.
+    if (!t.text || !t.text.trim()) return;
     // Only audible on a frequency the controller is working; the engine already logged the text.
     if (!monitoredMhz().some((m) => sameFrequency(m, t.frequencyMhz))) return;
     transcript.add({ text: `${t.callsign}: ${t.text}`, source: 'pilot' });

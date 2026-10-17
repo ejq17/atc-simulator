@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { useSimStore } from '../store/simStore';
 import { useUiStore, viewBus } from '../store/uiStore';
 import { TopBar } from '../components/TopBar';
+import { FlightStrips } from '../components/FlightStrips';
 import { AircraftPanel } from '../components/AircraftPanel';
 import { AircraftDetails } from '../components/AircraftDetails';
 import { RadioPanel } from '../components/RadioPanel';
@@ -58,6 +59,8 @@ export function SimScreen() {
   const setView = useUiStore((s) => s.setView);
   const drawer = useUiStore((s) => s.drawer);
   const setDrawer = useUiStore((s) => s.setDrawer);
+  const sideTab = useUiStore((s) => s.sideTab);
+  const setSideTab = useUiStore((s) => s.setSideTab);
   useShortcuts();
   const close = () => setDrawer(null);
   return (
@@ -85,13 +88,25 @@ export function SimScreen() {
           </div>
         </div>
         <aside className="flex w-[380px] shrink-0 flex-col border-l border-atc-border bg-atc-panel xl:w-[400px]">
-          <AircraftPanel />
+          <div className="flex h-8 shrink-0 items-center justify-between border-b border-atc-border bg-atc-panel px-2">
+            <Segmented
+              size="xs"
+              value={sideTab}
+              onChange={setSideTab}
+              options={[
+                { value: 'list', label: <span data-testid="tab-list">Aircraft</span> },
+                { value: 'strips', label: <span data-testid="tab-strips">Strips</span> },
+              ]}
+            />
+            <span className="font-sans text-[10px] uppercase tracking-wider text-atc-muted">{sideTab === 'list' ? 'requests first' : 'one bay per frequency'}</span>
+          </div>
+          {sideTab === 'list' ? <AircraftPanel /> : <FlightStrips />}
           <div className="max-h-[62%] shrink-0 overflow-y-auto border-t border-atc-border">
             <AircraftDetails />
           </div>
         </aside>
       </div>
-      <div className="flex h-[262px] shrink-0 border-t border-atc-border">
+      <div className="flex h-[290px] shrink-0 border-t border-atc-border">
         <div className="flex min-w-0 flex-1 flex-col">
           <AlertsStrip />
           <div className="min-h-0 flex-1"><CommsLog /></div>

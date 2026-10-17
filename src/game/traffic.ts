@@ -11,6 +11,11 @@
  *    3 nm of another arrival (5 nm when a faster aircraft would sit behind a slower one on the same final),
  *  - departures on a free parking position (GA ramp / FBO for C172, gates for A320); A320 departures only when the
  *    active departure runway is long enough for it (not 4/22),
+ *  - IFR flows (`resolveIfrFlows`, ifr.ts): airline arrivals appear over the fix of the procedure serving the landing runway (ILS 13 via
+ *    CARYL, ILS 31 via STEVV, RNAV 22 via KOPCE, RNAV 4 via JEDOB; sometimes from the first feeder such as VCN) at 3,000-5,000 ft on the Approach
+ *    frequency, never within 5 nm of another airborne aircraft and never less than 90 s after the previous arrival on the same procedure; airline
+ *    departures are parked IFR departures with a flight plan that call Clearance Delivery. GA stays VFR. Without APP (Tower-only sessions) arrivals
+ *    keep appearing on final and airline departures keep calling Ground,
  *  - unique callsigns (never one already used in the scenario or session, never one that sounds like an active aircraft).
  *
  * The generator keeps all its state in the closure; `update(state)` is called every engine tick, so the fast path is
@@ -21,12 +26,24 @@ import type { SpawnSpec, TrafficGenerator } from '../sim/traffic';
 import { createNullTrafficGenerator } from '../sim/traffic';
 import { mulberry32 } from '../sim/rng';
 import type { Rng } from '../sim/rng';
-import { callsignTail, randomAirlineCallsign, randomNNumber, runwayLongEnoughFor } from './world';
+import { NM, callsignTail, randomAirlineCallsign, randomNNumber, runwayLongEnoughFor } from './world';
 import { pickArrivalStart, pickParking } from './placement';
 import type { AirbornePoint } from './placement';
 import type { Difficulty, GameScenario } from './types';
+import { arrivalJoinNm, arrivalProcedure, ifrArrivalSpawn, ifrDepartureSpawn, resolveIfrFlows } from './ifr';
+import { alongCross, findRunwayEnd } from '../sim/runways';
+import { mToNm } from '../sim/geo';
+import { findNavFix } from '../sim/navigation';
 
 export const MIN_SPAWN_SPACING_SEC = 45;
+/** IFR arrivals on the same procedure: at least this long apart in time ... */
+export const IFR_ARRIVAL_SPACING_SEC = 90;
+/** ... and this far from any other airborne aircraft at the moment they appear. */
+export const IFR_ARRIVAL_SPACING_NM = 5;
+/** Share of generated IFR arrivals that start at the first feeder (VCN for ILS 13) instead of the initial fix, when the procedure has one. */
+export const IFR_FEEDER_START_SHARE = 0.25;
+/** Minimum distance (nm along the course) between the engine's in-trail measuring point for a new IFR arrival and any other arrival of the runway. */
+export const IFR_JOIN_CLEAR_NM = 3.5;
 
 /** Intensity ramp: multiplier on the hourly rates, rising linearly from `start` to `end` over `rampSec`, then flat. */
 export const DIFFICULTY_RAMP: Record<Difficulty, { start: number; end: number; rampSec: number }> = {
@@ -53,6 +70,7 @@ export function createTrafficGenerator(scenario: Scenario, airport: Airport): Tr
   const allowJet = types.includes('A320');
   const gaFraction = allowGA && allowJet ? cfg.gaFraction : allowGA ? 1 : 0;
   const towerOnly = !scenario.controllerPositions.includes('GND');
+  const flows = resolveIfrFlows(gs);
   const arrivalFreq = scenario.controllerPositions.includes('TWR') || !scenario.controllerPositions.includes('APP') ? 'TWR' : 'APP';
   const departureFreq = towerOnly ? 'TWR' : 'GND';
 
@@ -64,6 +82,8 @@ export function createTrafficGenerator(scenario: Scenario, airport: Airport): Tr
   let lastSpawnAt = -Infinity;
   let lastKind: 'arr' | 'dep' = 'dep';
   let retryAt = 0;
+  /** runway end -> time of the last IFR arrival generated for its procedure. */
+  const lastIfrArrival = new Map<string, number>();
   const used = new Set<string>(scenario.spawns.map((s) => s.callsign.toUpperCase()));
   /** parking id -> time reserved; released once an aircraft stands there or after 20 s. */
   const reserved = new Map<string, number>();
@@ -96,6 +116,7 @@ export function createTrafficGenerator(scenario: Scenario, airport: Airport): Tr
     const ga = rng!() < gaFraction;
     const type = ga ? 'C172' : 'A320';
     const endId = ends[Math.min(ends.length - 1, Math.floor(rng!() * ends.length))];
+    if (!ga && flows.arrivals && arrivalProcedure(airport, endId)) return trySpawnIfrArrival(state, type, endId);
     const others: AirbornePoint[] = Object.values(state.aircraft)
       .filter((a) => !a.onGround)
       .map((a) => ({ pos: a.pos, type: a.type, runwayEnd: a.isDeparture ? undefined : a.assignedRunwayEnd }));
@@ -105,6 +126,36 @@ export function createTrafficGenerator(scenario: Scenario, airport: Airport): Tr
       atSec: state.clock.timeSec, callsign: callsignFor(ga, state), type, flightRules: ga ? 'VFR' : 'IFR', start,
       isDeparture: false, initialFrequencyId: arrivalFreq, initialRequest: 'LANDING',
     };
+  };
+
+  /** An airline arrival over the procedure fix, or undefined while spacing does not allow one (the caller retries). */
+  const trySpawnIfrArrival = (state: Readonly<SimulationState>, type: string, endId: string): SpawnSpec | undefined => {
+    const proc = arrivalProcedure(airport, endId)!;
+    const now = state.clock.timeSec;
+    const last = lastIfrArrival.get(endId);
+    if (last !== undefined && now - last < IFR_ARRIVAL_SPACING_SEC) return undefined;
+    // Candidate start points: the initial fix and (when the procedure has one) the first feeder. A candidate is usable when every other airborne
+    // aircraft is 5 nm away and no arrival of this runway sits within 3.5 nm of the point where the engine will measure the new aircraft's
+    // in-trail gap (see `arrivalJoinNm`), so an approach clearance at check-in is never flagged as an unsafe clearance.
+    const g = findRunwayEnd(airport, endId);
+    const usable = (fromFeeder: boolean): boolean => {
+      const fixPos = findNavFix(airport, fromFeeder ? proc.feederFix : proc.ifFix)?.pos;
+      if (!fixPos || !g) return false;
+      const join = arrivalJoinNm(proc, fromFeeder);
+      for (const a of Object.values(state.aircraft)) {
+        if (a.onGround) continue;
+        if (Math.hypot(a.pos.x - fixPos.x, a.pos.y - fixPos.y) / NM < IFR_ARRIVAL_SPACING_NM) return false;
+        if (!a.isDeparture && a.assignedRunwayEnd === endId && Math.abs(join - mToNm(-alongCross(g, a.pos).along)) < IFR_JOIN_CLEAR_NM) return false;
+      }
+      return true;
+    };
+    const options = [false, ...(proc.feederFix ? [true] : [])].filter(usable);
+    if (!options.length) return undefined;
+    const fromFeeder = options.length > 1 ? rng!() < IFR_FEEDER_START_SHARE : options[0];
+    const spec = ifrArrivalSpawn(airport, rng!, { callsign: callsignFor(false, state), type, runwayEnd: endId, atSec: now, fromFeeder });
+    if (!spec) return undefined;
+    lastIfrArrival.set(endId, now);
+    return spec;
   };
 
   const trySpawnDeparture = (state: Readonly<SimulationState>): SpawnSpec | undefined => {
@@ -123,6 +174,9 @@ export function createTrafficGenerator(scenario: Scenario, airport: Airport): Tr
     const parking = pickParking(airport, type, rng!, occupied, new Set(reserved.keys()));
     if (!parking) return undefined;
     reserved.set(parking.id, state.clock.timeSec);
+    if (!ga && flows.departures) {
+      return ifrDepartureSpawn(airport, rng!, { callsign: callsignFor(false, state), type, parkingId: parking.id, atSec: state.clock.timeSec });
+    }
     return {
       atSec: state.clock.timeSec, callsign: callsignFor(ga, state), type, flightRules: ga ? 'VFR' : 'IFR',
       start: { kind: 'parked', parkingId: parking.id }, isDeparture: true, initialFrequencyId: departureFreq, initialRequest: 'TAXI',

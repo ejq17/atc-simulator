@@ -9,7 +9,7 @@
  *   (paragraph numbers and titles verified 2026-10-16; see docs/FAA-REFERENCES.md)
  */
 import type { Aircraft, ConflictAlert, ParsedCommand, SimulationState } from './types';
-import { dist, mToNm, nmToM, pointInPolygon } from './geo';
+import { dist, headingDiff, ktToMps, mToNm, nmToM, pointInPolygon } from './geo';
 import { alongCross, crossingRunways, findRunway, findRunwayEnd, isOnFinal } from './runways';
 import { assessApproach } from './approach';
 import { computeRunwayActivity } from './runwayOccupancy';
@@ -85,17 +85,24 @@ function assessApproachSeparation(state: SimulationState, ac: Aircraft, cmd: Par
   if (!g || !cmd.approachType || ac.onGround) return { safe: true, issues };
   const a = assessApproach(state, ac, cmd.approachType, g);
   if (a.kind !== 'ok') return { safe: true, issues };
+  // In-trail spacing at the moment the follower joins the course: the follower is measured at its own position when it
+  // is already on the course, else at the projected join point; the leader is advanced by its groundspeed over the
+  // time the follower needs to get there (floor 0).
   const mine = a.plan.joinDM;
+  const tJoinSec = a.plan.joinTravelM / Math.max(ktToMps(ac.groundSpeedKt), ktToMps(40));
   for (const o of Object.values(state.aircraft)) {
-    if (o.id === ac.id || o.onGround || o.assignedRunwayEnd !== g.end.id) continue;
-    const established = o.phase === 'FINAL' || o.phase === 'LANDING' || (o.nav?.mode === 'approach' && isOnFinal(g, o.pos, o.headingDeg, 30));
+    if (o.id === ac.id || o.onGround || o.isDeparture || o.assignedRunwayEnd !== g.end.id) continue;
+    const { along, cross } = alongCross(g, o.pos);
+    const aligned = isOnFinal(g, o.pos, o.headingDeg, 30) && Math.abs(cross) <= nmToM(0.5) && Math.abs(headingDiff(o.headingDeg, g.headingDeg)) < 30;
+    const established = o.phase === 'FINAL' || o.phase === 'LANDING' || aligned;
     if (!established) continue;
-    const theirs = -alongCross(g, o.pos).along;
-    const gapNm = mToNm(Math.abs(mine - theirs));
+    const theirsNow = -along;
+    const theirsAtJoin = Math.max(0, theirsNow - ktToMps(o.groundSpeedKt) * tJoinSec);
+    const gapNm = mToNm(Math.abs(mine - theirsAtJoin));
     if (gapNm < APPROACH_IN_TRAIL_NM) {
       issues.push({
         kind: 'AIRBORNE_PROXIMITY',
-        text: `Approach clearance for ${ac.callsign} to runway ${g.end.id} puts it ${gapNm.toFixed(1)} nm from ${o.callsign}, established on the same final`,
+        text: `Approach clearance for ${ac.callsign} to runway ${g.end.id} puts it ${gapNm.toFixed(1)} nm in trail of ${o.callsign}, established on the same final (${mToNm(theirsNow).toFixed(1)} nm out now)`,
         reference: REF_RADAR_SEPARATION,
         aircraftIds: [ac.id, o.id],
         runwayId: g.runway.id,

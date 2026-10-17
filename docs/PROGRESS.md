@@ -11,7 +11,15 @@ Honest status as of 2026-10-16. "Done" means it runs and is covered by tests.
 - AWC API shape verified; CORS confirmed absent (backend proxy required).
 - FAA JO 7110.65 paragraph numbers/titles verified (`docs/FAA-REFERENCES.md`).
 
-**Simulation engine** — `src/sim`, `src/radio` (116 tests)
+**IFR operations (added 2026-10-17)** — `src/sim/navigation.ts`, `approach.ts`, `ifr.ts`; parser `rules-ifr.ts`; game `ifr.ts`; UI positions/strips
+- Clearance Delivery: IFR departures request and read back a full clearance ("cleared to Philadelphia, Atlantic City Three departure, radar vectors, maintain two thousand, expect ... ten minutes after departure, departure one two four point six, squawk ...") with the DP name taken from the d-TPP data; the aircraft then retunes to Ground on its own. Takeoff without an IFR clearance is refused in training and scored otherwise.
+- Departure: runway heading, climb to 2000 per the ATLANTIC CITY THREE, Tower handoff to Departure, check-in, radar contact, vectors, climbs, direct-to-fix (VCN/SIE/CYN by name), resume own navigation, exit of the area.
+- Approach: arrivals fly verified fix routes (VCN→CARYL→MAYBN for ILS 13, STEVV→PRSTY for ILS 31, KOPCE→FLDER→EFEWY for RNAV 22, JEDOB→FASEN→TEMVE for RNAV 4); approach clearances validated against published procedures (no ILS on 4/22), intercept angle ≤ 30°, outside the FAF, visual only in VMC; "established" report, handoff to Tower, missed approach back to Approach, 3 nm in-trail check.
+- Gameplay: career step 8 is a real IMC ILS session; steps 7/9/11 include IFR departures; lessons train-08 (IFR clearance) and train-09 (vectors to the ILS); free-play IFR flows option; objectives and debrief advice for IFR mistakes; 7110.65 chapter 4/5 references verified.
+- UI: Clearance Delivery / Approach / Departure / combined position sets, per-aircraft frequency routing of transmissions, flight strips by frequency, procedure fixes and final approach course on the radar, squawk/nav mode in data blocks, 60 nm range.
+- Voice: on-device Whisper provider (no cloud, audio never leaves the machine) and an automated fake-microphone browser test that speaks a real clearance into the push-to-talk pipeline and verifies the aircraft departs (see `e2e/voice.spec.ts`). Observed transcript: "Cessna 723 Echo Juliet runway 1 3 cleared for takeoff", ~1.3 s from key release to transcript.
+
+**Simulation engine** — `src/sim`, `src/radio` (200 tests)
 - Fixed-step deterministic loop, seeded PRNG, event log, subscribers.
 - Taxi pathfinding with ordered `via`, hold-short stops, explicit runway crossing clearances, spacing, parking.
 - Takeoff roll, climb, bank-limited turns, wind, 3° approach, flare, rollout, exit selection by type, automatic go-around without landing clearance, pattern basics.
@@ -28,12 +36,14 @@ Honest status as of 2026-10-16. "Done" means it runs and is covered by tests.
 
 **Gameplay** — `src/game` (140 tests): 12 career steps, 7 training lessons with step tracking and references, 5 free-play presets with full option set, seeded traffic generator (rates, spacing, max aircraft, no spawn conflicts), scripted events (wind shift, emergency call), objectives, debrief with grade and improvement text, career progress persistence.
 
-**UI** — `src/ui`, `e2e/` (74 unit tests, 11 Playwright flows): setup, simulator (surface + radar canvases with interpolation, aircraft list/details, radio panel with PTT and typed input, comms log, alerts, charts/navaids/ATIS/weather/settings drawers, training banner), debrief. Screenshots in `docs/screenshots/`.
+**UI** — `src/ui`, `e2e/` (see `src/ui/README.md`): setup (mode / scenario / weather / runways / **controller positions** with per-position explanations, the positions each scenario needs and an **IFR flows** option), simulator (surface + radar canvases with interpolation, aircraft list and **Strips** tab, aircraft details, radio panel with PTT, typed input and one live RX/TX chip per active frequency, comms log, alerts, charts/navaids/ATIS/weather/settings drawers, training banner), debrief. IFR support: eight position sets (CLNC, GND, TWR, TWR+GND, APP+DEP, DEP, APP+TWR, All) with each call applied on the addressed aircraft's frequency and a clear "Not on frequency" rejection; `fixes` passed to the parser; flight rules, squawk, route, navigation mode, IFR clearance, approach clearance / established state and request badges (REQ IFR CLNC, REQ APPROACH, CHECK-IN, REQ TAXI, ...) in the panels; radar with 60 NM range, procedure fixes and final course of the active landing runways, dashed selected-aircraft route, All fixes, squawk and V/R/A letters in data blocks; empty readbacks (radar contact) are never spoken. Screenshots in `docs/screenshots/` (`sim`, `radar`, `approach`, `strips`, `setup-ifr`, ...).
 
-Totals: 1031 vitest tests in 55 files, 11 Playwright tests, type-check clean.
+Totals: 1347 vitest tests in 67 files, 19 Playwright tests (14 chromium flows + 5 fake-microphone voice flows), type-check clean. Verified by the orchestrator on 2026-10-17.
 
 ## Known issues
-- Real microphone speech and the Deepgram path were not exercised in automation (headless has no microphone, no Deepgram key available). Web Speech API behaviour in Chrome was reasoned from the spec; verify with a headset.
+- The microphone path is proven with Chromium's fake audio device and the on-device Whisper provider (five automated tests). A physical headset, the Chrome Web Speech service, and the Deepgram path (no key available) were not exercised; Web Speech is unavailable in headless Chromium and the app degrades gracefully there.
+- Whisper decoding runs on the main thread (WASM), so the page can stutter for about a second after releasing push-to-talk; a Web Worker would fix that. The first use downloads ~40 MB of model files from huggingface.co. `vite build` copies a 27 MB ONNX runtime `.wasm` into `dist/assets` that is not used at runtime.
+- A session without a Ground position strands landed aircraft at the runway exit (pilots told to contact an unworked frequency wait there); choose a position set that includes Ground, or Tower + Ground.
 - Browser TTS cannot be routed through WebAudio, so the radio filter applies only to clicks/static, not the pilot voice.
 - Career step 1 completes as soon as the takeoff clearance is accepted.
 - Holding-position locations are derived (250 ft from centreline), not charted; OSM taxiway accuracy beyond runway endpoints is unassessed.
@@ -41,7 +51,7 @@ Totals: 1031 vitest tests in 55 files, 11 Playwright tests, type-check clean.
 - Lint: 3 non-blocking warnings.
 
 ## Not yet implemented (goal.md phases 5–6 and beyond)
-- Clearance Delivery and Approach positions have frequencies but no IFR clearance or radar-vector workflow behind them; arrivals are spawned on final or inbound bearings, not flown from STAR/fix to fix. Departures leave the area after handoff.
+- IFR simplifications: no STARs (arrivals appear over the published IAF/IF such as CARYL, STEVV, KOPCE, JEDOB), no holding patterns, no per-fix altitude restrictions or published minimums, final approach course equals runway heading, missed-approach altitude fixed at 2000 ft, in-trail separation uses a single 3 nm figure.
 - Additional aircraft types (regional jets, helicopters, ANG F-16s), emergencies beyond a scripted pan-pan call, holding patterns, takeoff cancellation, LAHSO operations, wake-turbulence timing.
 - Radio congestion/blocked transmissions beyond the controller stepping on a pilot; pilot clarification requests.
 - Session replay from recorded events; 3D tower view; desktop (Tauri) packaging; additional airports (architecture allows it: everything airport-specific comes from the `Airport` object).

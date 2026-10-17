@@ -374,15 +374,31 @@ describe('flying approaches to touchdown', () => {
   });
 });
 
-describe('APPROACH clearance and separation (radar separation minima, 3 nm in trail)', () => {
-  const setup = (mode: 'training' | 'free_play') => {
-    const e = makeEngine({ scenario: ifrScenario([AT_FIX('AAL100', 'FX13A', ['FX13A', 'FX13B'], '13', {}, 3000), AT_FIX('NKS451', 'TARR', ROUTE, '13', {}, 4000)], { mode }) });
-    expect(say(e, appr('AAL100', 'ILS', '13'), 'APP').status).toBe('accepted');
-    return e;
+describe('APPROACH clearance and separation (radar separation minima, 3 nm in trail at the moment of joining)', () => {
+  /** Put an aircraft on the extended 13 centreline `dNm` before the threshold (`crossNm` right of it) on `headingTrue`. */
+  const place = (e: SimulationEngine, cs: string, dNm: number, crossNm = 0, headingTrue = g13.headingDeg) => {
+    const ac = find(e, cs);
+    ac.pos = { x: g13.end.threshold.x - g13.dir.x * nmToM(dNm) + g13.right.x * nmToM(crossNm), y: g13.end.threshold.y - g13.dir.y * nmToM(dNm) + g13.right.y * nmToM(crossNm) };
+    ac.headingDeg = headingTrue;
+    ac.trackDeg = headingTrue;
+    return ac;
   };
+  /** Follower over the IF (FX13A, 10.66 nm out) on the route to the FAF; leader established `leaderNm` out (A320 at 160 kt). */
+  const overIf = (mode: 'training' | 'free_play', leaderNm: number) =>
+    makeEngine({ scenario: ifrScenario([ARRIVING('AAL100', '13', leaderNm, 'A320', 'APP'), AT_FIX('NKS451', 'FX13A', ['FX13A', 'FX13B'], '13', {}, 3000)], { mode }) });
 
-  it('training: refuses a clearance that would put the aircraft within 3 nm of one established on the same final', () => {
-    const e = setup('training');
+  it('follower over the IF with the leader on 5 nm final (about 5.7 nm apart): accepted', () => {
+    const e = overIf('training', 5);
+    expect(find(e, 'AAL100').phase).toBe('FINAL');
+    const r = say(e, appr('NKS451', 'ILS', '13'), 'APP');
+    expect(r.status).toBe('accepted');
+    expect(find(e, 'NKS451').nav?.mode).toBe('approach');
+    run(e, 1);
+    expect(e.getState().score.unsafeInstructions).toBe(0);
+  });
+
+  it('follower over the IF with the leader on course 9 nm out (about 1.7 nm ahead): training refuses, citing radar separation minima', () => {
+    const e = overIf('training', 9);
     const r = say(e, appr('NKS451', 'ILS', '13'), 'APP');
     expect(r.status).toBe('rejected');
     if (r.status === 'rejected') {
@@ -397,19 +413,42 @@ describe('APPROACH clearance and separation (radar separation minima, 3 nm in tr
     expect(find(e, 'NKS451').nav?.mode).toBe('route');
   });
 
-  it('other modes: accepted, flagged UNSAFE_CLEARANCE and scored', () => {
-    const e = setup('free_play');
+  it('other modes accept it, flag UNSAFE_CLEARANCE and score it', () => {
+    const e = overIf('free_play', 9);
     expect(say(e, appr('NKS451', 'ILS', '13'), 'APP').status).toBe('accepted');
     run(e, 1);
     expect(e.getState().score.unsafeInstructions).toBe(1);
     expect(e.getState().conflicts.some((c) => c.kind === 'UNSAFE_CLEARANCE')).toBe(true);
   });
 
-  it('is fine once the leader has moved on (> 3 nm apart at the join point)', () => {
-    const e = setup('training');
-    run(e, 150);
-    expect(dToThreshold(e, 'AAL100')).toBeLessThan(7);
+  it('a follower still far from the course is projected to the join point: the leader will have moved on', () => {
+    // Follower at TARR (13 nm of track to the IF), leader just inside the IF: by the time it joins the leader is long gone
+    const e = makeEngine({ scenario: ifrScenario([ARRIVING('AAL100', '13', 9, 'A320', 'APP'), AT_FIX('NKS451', 'TARR', ROUTE, '13', {}, 4000)], { mode: 'training' }) });
     expect(say(e, appr('NKS451', 'ILS', '13'), 'APP').status).toBe('accepted');
-    expect(e.getState().score.unsafeInstructions).toBe(0);
+  });
+
+  it('vectored follower joining at 8 nm with the leader on 6 nm final: unsafe', () => {
+    const mk = (mode: 'training' | 'free_play') => {
+      const e = makeEngine({ scenario: ifrScenario([ARRIVING('AAL100', '13', 6, 'A320', 'APP'), AT_FIX('NKS451', 'TARR', ROUTE, '13', {}, 3000)], { mode }) });
+      // 8.5 nm out, 0.4 nm right of the course, 25 degrees to it -> intercepts about 1 nm later at roughly 7.6 nm
+      place(e, 'NKS451', 8.5, 0.4, g13.headingDeg - 25);
+      expect(say(e, cmd('HEADING', 'NKS451', { headingDeg: ((g13.headingDeg - 25 + 12) + 360) % 360 }), 'APP').status).toBe('accepted');
+      return e;
+    };
+    const t = mk('training');
+    const r = say(t, appr('NKS451', 'ILS', '13'), 'APP');
+    expect(r.status).toBe('rejected');
+    if (r.status === 'rejected') expect(r.unsafe).toBe(true);
+    const f = mk('free_play');
+    expect(say(f, appr('NKS451', 'ILS', '13'), 'APP').status).toBe('accepted');
+    run(f, 1);
+    expect(f.getState().score.unsafeInstructions).toBe(1);
+  });
+
+  it('vectored follower joining at 8 nm with the leader on 3 nm final is fine', () => {
+    const e = makeEngine({ scenario: ifrScenario([ARRIVING('AAL100', '13', 3, 'A320', 'APP'), AT_FIX('NKS451', 'TARR', ROUTE, '13', {}, 3000)], { mode: 'training' }) });
+    place(e, 'NKS451', 9.5, 0.4, g13.headingDeg - 25);
+    say(e, cmd('HEADING', 'NKS451', { headingDeg: ((g13.headingDeg - 25 + 12) + 360) % 360 }), 'APP');
+    expect(say(e, appr('NKS451', 'ILS', '13'), 'APP').status).toBe('accepted');
   });
 });

@@ -11,14 +11,20 @@ import { worldToScreen } from './viewTransform';
 import type { View } from './viewTransform';
 import { M_PER_NM, deg2rad, headingVec } from '../lib/geom';
 import { altHundreds, magHeading, phaseShort, trendArrow } from '../lib/format';
+import { navLetter } from '../lib/ifr';
+import { procedureGeometry } from '../lib/procedures';
 
-export const RADAR_RANGES_NM = [5, 10, 20, 40] as const;
+export const RADAR_RANGES_NM = [5, 10, 20, 40, 60] as const;
 export type RadarRangeNm = (typeof RADAR_RANGES_NM)[number];
 
 export interface RadarLayers {
   rings: boolean;
   compass: boolean;
   approachPaths: boolean;
+  /** Instrument-procedure fixes (IF/FAF...) of the active landing runways and their final approach course. */
+  procedures: boolean;
+  /** Active route of the selected aircraft (dashed). */
+  routes: boolean;
   navaids: boolean;
   fixes: boolean;
   allFixes: boolean;
@@ -29,8 +35,14 @@ export interface RadarLayers {
 }
 
 export const DEFAULT_RADAR_LAYERS: RadarLayers = {
-  rings: true, compass: true, approachPaths: true, navaids: true, fixes: true, allFixes: false,
+  rings: true, compass: true, approachPaths: true, procedures: true, routes: true, navaids: true, fixes: true, allFixes: false,
   labels: true, history: true, groundTargets: true, sweep: true,
+};
+
+export const RADAR_LAYER_LABELS: Record<keyof RadarLayers, string> = {
+  rings: 'Range rings', compass: 'Compass rose', approachPaths: 'Approach paths', procedures: 'Procedure fixes (landing rwy)',
+  routes: 'Selected aircraft route', navaids: 'Navaids', fixes: 'Approach fixes', allFixes: 'All fixes',
+  labels: 'Data blocks', history: 'History dots', groundTargets: 'Ground targets', sweep: 'Sweep line (cosmetic)',
 };
 
 /** The approach fixes the product brief calls out; others appear under "all fixes". */
@@ -49,6 +61,8 @@ export const RAD = {
   airborne: '#7bf08f',
   arrival: '#39c5e8',
   sweep: '57,211,83',
+  route: '#c58cff',
+  procFix: '#4fb3cf',
   text: '#c9ded0',
 } as const;
 
@@ -59,7 +73,7 @@ export function radarScale(rangeNm: number, width: number, height: number, margi
 
 /** Ring spacing (nm) for a range: aims for 4-5 rings. */
 export function ringSpacingNm(rangeNm: number): number {
-  return rangeNm <= 5 ? 1 : rangeNm <= 10 ? 2 : rangeNm <= 20 ? 5 : 10;
+  return rangeNm <= 5 ? 1 : rangeNm <= 10 ? 2 : rangeNm <= 20 ? 5 : 10; // 40 and 60 NM: 10 NM rings
 }
 
 export interface DataBlock { lines: string[] }
@@ -67,11 +81,12 @@ export interface DataBlock { lines: string[] }
 /** Radar data block text for an airborne target. Altitude in hundreds of feet, heading magnetic. */
 export function dataBlock(ac: Aircraft, variationDeg: number, groundSpeedKt = ac.groundSpeedKt, altitudeFt = ac.altitudeFt, headingDeg = ac.headingDeg): DataBlock {
   const arrow = trendArrow(ac.verticalSpeedFpm);
+  const mode = navLetter(ac);
   return {
     lines: [
       `${ac.callsign} ${ac.type}`,
-      `${altHundreds(altitudeFt)}${arrow || ' '}${String(Math.round(groundSpeedKt)).padStart(3, ' ')}`,
-      `H${magHeading(headingDeg, variationDeg)} ${phaseShort(ac.phase)}`,
+      `${altHundreds(altitudeFt)}${arrow || ' '}${String(Math.round(groundSpeedKt)).padStart(3, ' ')}${ac.squawk ? ` ${ac.squawk}` : ''}`,
+      `H${magHeading(headingDeg, variationDeg)} ${phaseShort(ac.phase)}${mode ? ` ${mode}` : ''}`,
     ],
   };
 }
@@ -167,12 +182,14 @@ function drawAirport(ctx: CanvasRenderingContext2D, v: View, airport: Airport): 
   }
 }
 
-function drawApproachPaths(ctx: CanvasRenderingContext2D, v: View, airport: Airport, landing: readonly string[], rangeNm: number): void {
+function drawApproachPaths(ctx: CanvasRenderingContext2D, v: View, airport: Airport, landing: readonly string[], rangeNm: number, layers: RadarLayers): void {
   ctx.font = `10px ${FONT_MONO}`;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   for (const id of landing) {
-    const ap = approachPath(airport, id, Math.min(10, Math.max(5, rangeNm)));
+    // Out to the IF of the published procedure (at least 10 NM, never past the scope).
+    const ifNm = layers.procedures ? Math.ceil(procedureGeometry(airport, id)?.ifNm ?? 0) : 0;
+    const ap = approachPath(airport, id, Math.min(40, Math.max(10, ifNm, Math.min(10, rangeNm))));
     if (!ap) continue;
     const a = toScr(v, ap.start);
     const b = toScr(v, ap.end);
@@ -204,7 +221,8 @@ function drawApproachPaths(ctx: CanvasRenderingContext2D, v: View, airport: Airp
     }
     ctx.fillStyle = RAD.approach;
     ctx.textAlign = 'left';
-    ctx.fillText(`RWY ${id}`, b.x + 6, b.y);
+    // The far end of the course carries the published procedure name when there is one ("ILS 13"), else the runway.
+    ctx.fillText(layers.procedures ? (procedureGeometry(airport, id)?.label ?? `RWY ${id}`) : `RWY ${id}`, b.x + 6, b.y);
     ctx.textAlign = 'center';
   }
 }
@@ -213,13 +231,13 @@ function inRange(p: Vec2, rangeNm: number): boolean {
   return Math.hypot(p.x, p.y) <= rangeNm * M_PER_NM;
 }
 
-function drawNavaids(ctx: CanvasRenderingContext2D, v: View, airport: Airport, rangeNm: number, layers: RadarLayers): void {
+function drawNavaids(ctx: CanvasRenderingContext2D, v: View, airport: Airport, rangeNm: number, layers: RadarLayers, skip: ReadonlySet<string>): void {
   ctx.font = `10px ${FONT_MONO}`;
   ctx.textBaseline = 'middle';
   ctx.textAlign = 'left';
   const keyFix = new Set<string>(KEY_APPROACH_FIXES);
   for (const n of airport.navaids as NavigationAid[]) {
-    if (!inRange(n.pos, rangeNm)) continue;
+    if (!inRange(n.pos, rangeNm) || skip.has(n.id)) continue;
     const s = toScr(v, n.pos);
     if (n.type === 'VORTAC' || n.type === 'VOR' || n.type === 'VOR/DME') {
       if (!layers.navaids) continue;
@@ -253,6 +271,112 @@ function drawNavaids(ctx: CanvasRenderingContext2D, v: View, airport: Airport, r
       ctx.fillText(n.id, s.x + 8, s.y);
     }
   }
+}
+
+function navaidPos(airport: Airport, id: string): Vec2 | undefined {
+  return airport.navaids.find((n) => n.id === id)?.pos;
+}
+
+function fixSymbol(ctx: CanvasRenderingContext2D, x: number, y: number, color: string, filled: boolean): void {
+  ctx.strokeStyle = color;
+  ctx.fillStyle = color;
+  ctx.lineWidth = 1.25;
+  ctx.beginPath();
+  ctx.moveTo(x, y - 6);
+  ctx.lineTo(x + 5.5, y + 4);
+  ctx.lineTo(x - 5.5, y + 4);
+  ctx.closePath();
+  if (filled) ctx.fill();
+  else ctx.stroke();
+}
+
+/** Ids of the on-course approach fixes for the active landing runways (drawn by `drawProcedures`). */
+function procedureFixIds(airport: Airport, landing: readonly string[]): Set<string> {
+  const ids = new Set<string>();
+  for (const end of landing) for (const f of procedureGeometry(airport, end)?.onCourse ?? []) ids.add(f.id);
+  return ids;
+}
+
+/** Published approach fixes of the active landing runways: on-course fixes with the IF/FAF tag and procedure name. */
+function drawProcedures(ctx: CanvasRenderingContext2D, v: View, airport: Airport, landing: readonly string[], rangeNm: number): void {
+  ctx.font = `10px ${FONT_MONO}`;
+  ctx.textBaseline = 'middle';
+  for (const end of landing) {
+    const g = procedureGeometry(airport, end);
+    const re = airport.runways.flatMap((r) => r.ends).find((e) => e.id === end);
+    if (!g || !re || g.onCourse.length === 0) continue;
+    const t = toScr(v, re.threshold);
+    g.onCourse.forEach((f, i) => {
+      if (!inRange(f.pos, rangeNm)) return;
+      const s = toScr(v, f.pos);
+      fixSymbol(ctx, s.x, s.y, RAD.procFix, true);
+      // The course's distance numerals sit on one side of the line; the fix name goes on the other.
+      const dx = s.x - t.x;
+      const dy = s.y - t.y;
+      const len = Math.hypot(dx, dy) || 1;
+      const ox = (dy / len) * 11;
+      const oy = (-dx / len) * 11;
+      ctx.textAlign = ox < 0 ? 'right' : 'left';
+      ctx.fillStyle = RAD.procFix;
+      ctx.fillText(f.id, s.x + ox, s.y + oy - 5);
+      // Tags: the farthest on-course fix is the IF, the nearest one at least 3 NM out is the FAF.
+      const last = i === g.onCourse.length - 1;
+      const faf = !last && f.alongNm >= 3 && g.onCourse.findIndex((x) => x.alongNm >= 3) === i;
+      if (last || faf) {
+        ctx.fillStyle = RAD.approach;
+        ctx.fillText(last ? 'IF' : 'FAF', s.x + ox, s.y + oy + 6);
+      }
+    });
+  }
+  ctx.textAlign = 'left';
+}
+
+/** Ids on the selected aircraft's active route. */
+function routeFixIds(frame: Frame): string[] {
+  const ac = frame.selectedId ? frame.state.aircraft[frame.selectedId] : undefined;
+  if (!ac?.nav || ac.onGround) return [];
+  return ac.nav.fixes.slice(Math.min(ac.nav.index, ac.nav.fixes.length));
+}
+
+/** Dashed line from the selected aircraft through the fixes it is flying to; fainter when it is on vectors. */
+function drawRoute(ctx: CanvasRenderingContext2D, v: View, frame: Frame, labelled: ReadonlySet<string>): void {
+  const ac = frame.selectedId ? frame.state.aircraft[frame.selectedId] : undefined;
+  if (!ac?.nav || ac.onGround) return;
+  const airport = frame.state.airport;
+  const ids = routeFixIds(frame);
+  const pts: { id: string; p: Vec2 }[] = [];
+  for (const id of ids) {
+    const p = navaidPos(airport, id);
+    if (p) pts.push({ id, p });
+  }
+  if (pts.length === 0) return;
+  const vectors = ac.nav.mode === 'vectors';
+  const pose = frame.pose(ac);
+  const start = toScr(v, { x: pose.x, y: pose.y });
+  ctx.save();
+  ctx.strokeStyle = RAD.route;
+  ctx.fillStyle = RAD.route;
+  ctx.globalAlpha = vectors ? 0.35 : 0.9;
+  ctx.lineWidth = 1.5;
+  ctx.setLineDash([7, 5]);
+  ctx.beginPath();
+  ctx.moveTo(start.x, start.y);
+  for (const q of pts) {
+    const s = toScr(v, q.p);
+    ctx.lineTo(s.x, s.y);
+  }
+  ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.font = `10px ${FONT_MONO}`;
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'middle';
+  pts.forEach((q, i) => {
+    if (labelled.has(q.id)) return; // already drawn (and tagged) as a procedure fix
+    const s = toScr(v, q.p);
+    fixSymbol(ctx, s.x, s.y, RAD.route, i === 0);
+    ctx.fillText(q.id, s.x + 9, s.y - 2);
+  });
+  ctx.restore();
 }
 
 function drawSweep(ctx: CanvasRenderingContext2D, v: View, rangeNm: number, nowMs: number): void {
@@ -321,6 +445,11 @@ function drawTargets(ctx: CanvasRenderingContext2D, v: View, frame: Frame, layer
       ctx.strokeStyle = color;
       ctx.lineWidth = 1.5;
       ctx.strokeRect(x - 4, y - 4, 8, 8);
+      if (ac.radarIdentified) {
+        // Radar-identified: the target square carries a centre dot.
+        ctx.fillStyle = color;
+        ctx.fillRect(x - 1.5, y - 1.5, 3, 3);
+      }
       // heading tick (velocity vector, 60 s of ground speed would be long: use a fixed short stub)
       const hv = headingVec(frame.pose(ac).headingDeg);
       ctx.beginPath();
@@ -415,9 +544,15 @@ export function drawRadar(ctx: CanvasRenderingContext2D, frame: Frame, v: View, 
   drawRings(ctx, v, rangeNm, layers);
   if (layers.compass) drawCompassRose(ctx, v, rangeNm, airport.magneticVariationDeg);
   if (layers.sweep) drawSweep(ctx, v, rangeNm, frame.nowMs);
-  if (layers.approachPaths) drawApproachPaths(ctx, v, airport, state.activeRunways.landing, rangeNm);
+  if (layers.approachPaths) drawApproachPaths(ctx, v, airport, state.activeRunways.landing, rangeNm, layers);
   drawAirport(ctx, v, airport);
-  drawNavaids(ctx, v, airport, rangeNm, layers);
+  const skip = new Set<string>();
+  const procIds = layers.procedures ? procedureFixIds(airport, state.activeRunways.landing) : new Set<string>();
+  for (const id of procIds) skip.add(id);
+  if (layers.routes) for (const id of routeFixIds(frame)) skip.add(id);
+  drawNavaids(ctx, v, airport, rangeNm, layers, skip);
+  if (layers.procedures) drawProcedures(ctx, v, airport, state.activeRunways.landing, rangeNm);
+  if (layers.routes) drawRoute(ctx, v, frame, procIds);
   drawConflictLines(ctx, v, frame);
   drawTargets(ctx, v, frame, layers);
   drawCaption(ctx, v, rangeNm, airport);

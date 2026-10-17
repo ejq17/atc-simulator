@@ -1,8 +1,9 @@
 # src/game - gameplay layer
 
 Scenarios, traffic generation, free play, career progression, training mode, objectives, scoring debrief. Pure TypeScript,
-no DOM. The UI depends only on `index.ts` (`GameApi` and the related interfaces, unchanged) plus a few extra exports from
-`game.ts` listed below. Nothing in `src/sim` was modified; the engine is driven through its public API only.
+no DOM. The UI depends only on `index.ts` (`GameApi` and the related interfaces; `FreePlayOptions.ifrFlows` is the only addition, optional) plus a few extra exports from
+`game.ts` listed below. Nothing in `src/sim` was modified; the engine is driven through its public API only (the IFR flows also import the engine's
+read-only helpers `analyzeProcedure` / `matchingProcedures` / `findNavFix` so the fixes always come from `airport.procedures` and `airport.navaids`).
 
 ```ts
 import { game, createScenarioEventRunner, scenarioWeatherSchedule, TRAINING_DISCLAIMER } from '../game';
@@ -22,7 +23,8 @@ engine.subscribe((s) => { runner.update(); training?.update(s); if (game.isScena
 | `types.ts` | `GameScenario` = `Scenario` + optional extension fields (`events`, `difficulty`, `aircraftTypes`, `careerStep`, `briefing`, richer `training.steps`). All plain JSON. |
 | `world.ts` | KACY helpers: runway-end geometry (TRUE heading, sin/cos from the threshold), holds, taxi-route planning that mirrors the engine, crossing detection, parking pools, callsign generators. |
 | `scenarios/career.ts` | The 12 career steps. |
-| `scenarios/training.ts` | 7 training lessons. |
+| `scenarios/training.ts` | 9 training lessons (8 and 9 are IFR). |
+| `ifr.ts` | IFR flows: `arrivalProcedure(airport, runwayEnd)` (ILS 13 -> CARYL/VCN, ILS 31 -> STEVV, RNAV 22 -> KOPCE, RNAV 4 -> JEDOB, read from the data), `ifrFlightPlan`, `ifrArrivalSpawn`, `ifrDepartureSpawn`, `resolveIfrFlows`. |
 | `scenarios/freeplay.ts` | `buildFreePlay`, weather/runway resolution, initial population. |
 | `scenarios/events.ts` | `scenarioWeatherSchedule`, `scenarioEvents`, `createScenarioEventRunner`. |
 | `scenarios/index.ts`, `common.ts` | Catalogue + spawn builders. |
@@ -47,16 +49,22 @@ Career (mode `career`, ids `career-NN-*`, ordered by `difficulty`; `careerStep` 
 | 4 | `career-04-multiple-departures` | Two C172 at the 13 holds (Bravo, Charlie) + NKS608 from Gate 4 at 60 s. |
 | 5 | `career-05-ground-taxi` | Ground only: N301AC (GA-1 -> 13), N77RK (GA-2 -> 22 via Alpha, **crosses 13/31 at Alpha**), N620G (FBO-1 -> 13 via Bravo, **crosses 4/22 at Bravo**). Routes are computed from the graph and the builder throws if the Alpha crossing is not real. |
 | 6 | `career-06-pattern` | Two C172 joining the 13 pattern (left, then right downwind). |
-| 7 | `career-07-arrivals-departures` | 3 arrivals (NKS712 final, N35DM from Millville, AAL1201 from Philadelphia) + 2 departures. |
-| 8 | `career-08-ifr` | IMC preset, three A320 on the ILS to 13, one A320 departure, GA grounded. |
-| 9 | `career-09-mixed-performance` | Fast A320 12 nm behind a slow C172 on the same final; two departures. |
+| 7 | `career-07-arrivals-departures` | 3 arrivals (NKS712 final, N35DM from Millville, AAL1201 from Philadelphia) + 2 departures, **NKS329 is an IFR departure to KPHL** (cruise 10,000; positions TWR, GND, CLNC, DEP). Objectives `ifr_clearance:NKS329`, `takeoff:`, `handled:NKS329`. |
+| 8 | `career-08-ifr` | IMC preset, GA grounded, positions APP, DEP, TWR, GND. **Three A320 `at_fix` arrivals on the ILS 13 procedure**: NKS244 over CARYL, AAL1672 and NKS377 (6 min later) over VCN (route VCN, CARYL, MAYBN), plus NKS890 holding short on Tower. Objectives `approach:CS`, `landed:CS` per arrival, `takeoff:NKS890`, `no_conflicts`. |
+| 9 | `career-09-mixed-performance` | Fast A320 12 nm behind a slow C172 on the same final; two departures, **NKS540 is an IFR departure to KEWR** (cruise 14,000). Objectives `ifr_clearance:NKS540`, `handled:NKS540`. |
 | 10 | `career-10-runway-change` | Wind shifts to 300/14 at 600 s (`events`); post-shift traffic is placed for runway 31. Objective `active_runway:31`. |
-| 11 | `career-11-complex` | Free-play density: 6 initial aircraft, 20+20 ops/h, max 14, hard ramp, crosswind. Objective: handle >= 10. |
+| 11 | `career-11-complex` | Free-play density: 6 initial aircraft, 20+20 ops/h, max 14, hard ramp, crosswind. Positions TWR, GND, CLNC, DEP: **airline departures are IFR** (initial and generated), arrivals stay on final for Tower. Objective: handle >= 10. |
 | 12 | `career-12-emergency` | Scripted pan-pan from NKS1180; objective: it lands before AAL1590 and N305SP. |
 
 Training (mode `training`): `train-01-phraseology` (line up / takeoff / handoff), `train-02-taxi`, `train-03-runway-safety`,
-`train-04-crossing` (hold-short readback, KACY diagram note), `train-05-sequencing`, `train-06-pattern`, `train-07-go-around`.
+`train-04-crossing` (hold-short readback, KACY diagram note), `train-05-sequencing`, `train-06-pattern`, `train-07-go-around`,
+`train-08-ifr-clearance` (Clearance Delivery: wait for NKS451's call, read "cleared to Philadelphia airport via the Atlantic City Three departure, radar vectors, maintain two thousand, expect one zero thousand one zero minutes after departure, departure frequency one two four point six, squawk ...", expected command `IFR_CLEARANCE`; the explanation walks through each element in the order of 7110.65 4-2-1 / 4-3-2; the lesson ends when the pilot switches to Ground by itself),
+`train-09-approach` (Approach: NKS451 over VCN at 4,000 ft, 4.3 nm right of the ILS 13 course; vector it to intercept at <= 30 degrees (`HEADING`), "maintain two thousand until established, cleared ILS runway one three approach" (`APPROACH`), wait for `established:NKS451`, hand it to Tower (`CONTACT_FREQUENCY`); explains the intercept angle, the FAF (MAYBN) and the simulator's simplification of the approach gate; the heading in the prompt is computed from the airport geometry).
 Free play: `free-play`, `free-play-quiet`, `free-play-mixed`, `free-play-busy-departures`, `free-play-busy-arrivals`.
+
+IFR career conventions: fixes and routes of IFR arrivals come from `airport.procedures` (`common.ts` `ifrArrival`, which throws when a runway has no procedure); an IFR departure is a
+parked A320 with `flightPlan` (destination KPHL/KEWR/KBOS..., cruise 10,000-23,000 ft; C172 IFR 4,000-6,000 ft via `ifrFlightPlan`) that starts on `CLNC`; the player needs Ground whenever aircraft land or
+taxi (an aircraft told to contact an unstaffed Ground frequency stays on the exit and blocks the next arrival), which is why step 8 lists GND.
 
 Design rules every scenario follows (and `scenarios.test.ts` enforces): ids resolve against `loadKacy()`; only C172 and A320;
 no helicopters (USCG) or fighters (ANG); an A320 never sits on a hold it cannot depart from (the engine needs 6,500 ft:
@@ -73,7 +81,12 @@ to the 13 threshold, and taxiway Alpha crosses 13/31 on the way to runway 22 (bo
 a `Weather`), `activeRunways` (else `recommendRunways`, limited to A320-capable ends when jets are in play, preferred order 13, 31, 22, 4),
 `aircraftCount` (initial parked departures + inbound arrivals, distinct parking, arrivals >= 3 nm apart, jets placed nearer than Cessnas),
 `arrivalsPerHour`/`departuresPerHour`/`gaFraction`/`maxAircraft`, `difficulty` (default rates, max aircraft and the traffic ramp),
-`aircraftTypes`, `startingScenario` (`quiet`, `busy_departures`, `busy_arrivals`, `mixed`).
+`aircraftTypes`, `startingScenario` (`quiet`, `busy_departures`, `busy_arrivals`, `mixed`), `ifrFlows`.
+
+**`FreePlayOptions.ifrFlows?: boolean`** switches the IFR flows (below). `true`: the scenario lists `TWR, GND, CLNC, APP, DEP`, the opening population has the airline arrivals over the procedure fix on `APP` (the first at 0 s, the others 270 s apart so
+each leader is about to land when the next checks in; Cessna arrivals are left to the generator in that case) and the airline departures as parked IFR departures on `CLNC`. `false`: classic Tower/Ground behaviour even if the positions include APP/CLNC.
+Unset (default): free-play builds list only `TWR, GND` and behave classically; the **traffic generator** then decides from `scenario.controllerPositions` when it is created (APP -> IFR arrivals, CLNC -> IFR departures, independently),
+so a UI that lets the player pick other positions either passes `ifrFlows: true` or sets `scenario.controllerPositions` before `createTrafficGenerator`. Scenario-level fields `ifrFlows` / `ifrArrivals` / `ifrDepartures` (`GameScenarioExtras`) carry the decision (career 11 uses departures only).
 `scenario.weather === 'live'` stays `'live'`: **the engine substitutes calm default weather for `'live'`**, so the UI must fetch the METAR and call `engine.setWeather`.
 
 ## Traffic generator
@@ -86,6 +99,18 @@ never above `maxAircraft`. Arrivals: 10-12 nm from the threshold of an active la
 `TWR` (or `APP` if the scenario has APP but not TWR). Departures: free parking (GA ramp/FBO for C172, gates for A320), initial frequency `GND`,
 request `TAXI`; A320 departures are replaced by C172 (or skipped) when the active departure runway is 4/22. Callsigns: N-numbers in three formats and Spirit (80 %) / American flight numbers,
 unique for the whole session and never ending in the same three characters as an active aircraft.
+
+### IFR flows (`ifr.ts`, applied by the generator and the free-play builder)
+
+Active when `resolveIfrFlows(scenario)` says so (see `ifrFlows` above). GA C172 traffic is never IFR. Without APP (Tower or Tower + Ground sessions) arrivals keep appearing on final already inside the approach (Tower only issues landing clearances).
+* **Arrivals**: airline (A320) arrivals are `at_fix` spawns on the procedure matching the active landing runway, read from `airport.procedures` / `navaids` through the engine's `analyzeProcedure`: ILS 13 via CARYL (or from the feeder VCN: route VCN, CARYL, MAYBN),
+  ILS 31 via STEVV (STEVV, PRSTY), RNAV 22 via KOPCE (or PIDVE), RNAV 4 via JEDOB (or WYLEA); ILS is preferred, then RNAV. 3,000 ft (50 %), 4,000 (30 %), 5,000 (20 %), feeder starts +1,000 ft; 180 kt; initial frequency `APP`, request `APPROACH`; 25 % of the starts use the feeder when it is usable.
+  Spacing: >= 90 s after the previous IFR arrival on the same runway end, >= 5 nm from every other airborne aircraft at the spawn fix, **and** no arrival of the runway within 3.5 nm (along the course) of the point where the engine measures the new aircraft's in-trail gap
+  (`arrivalJoinNm`: the next straight-in fix for an IF start - MAYBN for ILS 13 - or the IF for a feeder start). The last rule works around the engine (below) so that an approach clearance at check-in is never flagged unsafe; it means a procedure without a feeder (ILS 31) admits the next arrival only when the leader is about to land.
+* **Departures**: airline departures are parked IFR departures with a `flightPlan` (KPHL cruise 10-12,000, KBWI 14-16,000, KDCA 16-18,000, KEWR 12-14,000, KJFK 13-15,000, KBOS 21-23,000; exit fix CYN / ENO / COL when it exists in the dataset), initial frequency `CLNC`, request `IFR_CLEARANCE`.
+  They call Clearance Delivery, then Ground by themselves after the clearance, and after takeoff Tower hands them to Departure.
+* **Engine limitation worked around**: `assessApproachSeparation` (src/sim/conflicts.ts) measures an aircraft on a route at its *next fix* (`joinDM`), not at its own position. A follower that has just appeared over CARYL is measured at MAYBN (4.6 nm), so clearing it
+  while a leader is established 2-7 nm out is flagged `UNSAFE_CLEARANCE` although they are 4-6 nm apart. Fixing it in the engine (use the aircraft's own distance when it is already on the course) would let the generator drop the 3.5 nm rule.
 
 ## Scenario events (wind shifts, emergency)
 
@@ -105,6 +130,9 @@ aircraft normally (it still makes the engine's own inbound call) and the runner 
 `Scenario.objectives[].check` strings are evaluated by `evaluateCheck(state, check)` (`objectives.ts` header lists them all): `cmd:KIND:CS`, `takeoff:CS`, `landed:CS`,
 `vacated:CS` (left the landing runway, not merely the intersecting one), `parked:CS`, `taxied:CS`, `holding_short:CS`, `crossing_request:CS`, `crossed:CS:13/31`, `handoff:CS`,
 `go_around:CS`, `landed_before:A:B`, `handled:>=N`, `score:>=N`, `no_incursions`, `no_unsafe`, `no_separation`, `no_conflicts`, `active_runway:31`, `always`.
+IFR checks: `handled:CS` (a callsign instead of a number: that aircraft was handled - IFR departures count after handoff, an altitude/direct instruction and leaving the area), `approach:CS` (an `APPROACH` was accepted without
+`commError`/`unsafe`: a clearance flagged for intercept angle or inside the FAF does not count, a corrected one does), `established:CS` (the pilot's "established ILS runway ..." call, or FINAL reached after an accepted approach clearance), `ifr_request:CS` (the pilot called Clearance Delivery),
+`ifr_clearance:CS` (`IFR_CLEARANCE` accepted), `departed_ifr:CS` (took off with an IFR clearance and a `HANDOFF` to a DEP/APP frequency followed).
 They read `state.events` (engine log, capped at 2,000) and the score card. `allObjectivesDone` ignores scenarios whose only objectives are "guards" (`no_*`, `score:`)
 so a clean-sheet objective cannot complete a scenario at t = 0.
 
@@ -121,13 +149,16 @@ Only paragraphs in `references.ts` are cited. Each was confirmed on 2026-10-16 o
 2-4-3 Pilot Acknowledgment/Read Back; 2-4-20 Aircraft Identification; 3-1-3 Use of Active Runways; 3-1-12 Visually Scanning Runways; 3-7-1 Ground Traffic Movement;
 3-7-2 Taxi and Ground Movement Operations; 3-8-1 Sequence/Spacing Application; 3-9-4 Line Up and Wait (LUAW); 3-9-6 Same Runway Separation;
 3-9-8 Intersecting Runway/Intersecting Flight Path Operations; 3-9-10 Takeoff Clearance; 3-10-3 Same Runway Separation; 3-10-5 Landing Clearance;
-3-10-8 Withholding Landing Clearance; 3-10-9 Runway Exiting; 10-1-1 Emergency Determinations. Text is paraphrased, never quoted.
+3-10-8 Withholding Landing Clearance; 3-10-9 Runway Exiting; 10-1-1 Emergency Determinations; IFR additions (same method, chapters 4 and 5, fetched with a browser User-Agent, 2026-10-16): 4-2-1 Clearance Items, 4-3-2 Departure Clearances, 4-8-1 Approach Clearance,
+5-9-1 Vectors to Final Approach Course, 5-9-2 Final Approach Course Interception, 5-9-4 Arrival Instructions. Text is paraphrased, never quoted.
 `TRAINING_DISCLAIMER` (not ATC training) is exported and used in the training debrief and the completion step.
 
 ## Debrief and career
 
 `buildDebrief(state, startedAtSec = 0)`: grade A >= 90, B >= 80, C >= 70, D >= 60, else F; any runway incursion caps at C. `improvements` are derived from the counters and events
 (unsafe takeoff/line-up/landing/crossing/intersecting-runway clearances with the right paragraph, incursions, separation, missed readbacks, communication errors by cause, go-arounds without clearance, waits, unfinished objectives).
+IFR advice: approach clearances refused (training) or flagged (other modes) for the intercept angle (5-9-2, 5-9-1), inside / intercepting inside the FAF (5-9-4, 5-9-1, 4-8-1), not heading for the course or the course > 10 nm ahead, a route that does not join the procedure; an approach clearance that
+put an aircraft within 3 nm in trail (no paragraph cited: the 3 nm is a simplification); takeoff without an IFR clearance (4-2-1, 4-3-2); an IFR departure still on Tower more than 2 minutes after takeoff (`IFR_DEPARTURE_HANDOFF_LIMIT_SEC`).
 `timeline` = warnings/critical + command accepted/rejected + clarifications + handoffs + go-arounds + scenario events, times relative to `startedAtSec`. `completed` = all objectives
 (or the engine's `scenarioCompleted` when there are none).
 `saveCareerResult` stores best score per scenario and, for `career-NN-*` ids with `completed` and grade A/B/C, marks the step complete and unlocks the next (max 12). Key `kacy.career`;
@@ -136,8 +167,9 @@ every storage access is try/caught and falls back to an in-memory copy (Node, pr
 
 ## Tests
 
-`npm test -- src/game` - catalogue/spawn validation and a 120 s engine run of every scenario, 10-minute robustness run, scripted career steps 1 and 3 (and 2, 4, 5, 6, 12) through `parseTransmission`,
-all 7 training lessons completed in the engine, traffic generator rules over 30 simulated minutes, free play options, objectives, debrief, career persistence (fake `localStorage`), scenario events.
+`npm test -- src/game` - catalogue/spawn validation and a 120 s engine run of every scenario, 10-minute robustness run, scripted career steps 1 and 3 (and 2, 4, 5, 6, 12) through `parseTransmission` (`testkit.ts` passes `ctx.fixes` from `airport.navaids`),
+all 9 training lessons completed in the engine (`ifrCareer.test.ts`: lessons 8 and 9 use the example transmissions printed in their prompts, plus refusal paths), career step 8 played end to end (Approach, Tower, Ground), traffic generator rules over 30 simulated minutes,
+`ifrFlows.test.ts` (IFR flows for landing runways 13, 31, 22 and 4: fixes, altitudes, 90 s / 5 nm / 3.5 nm spacing, Cessnas stay VFR, determinism, positions-based defaults and `ifrFlows: false`, generated aircraft worked through the parser without unsafe approach clearances, free play with `ifrFlows`, career 7 IFR departure through Clearance Delivery, Ground, Tower and Departure to `handled:`, the new objective checks on fabricated logs, debrief advice for each IFR mistake), free play options, objectives, debrief, career persistence (fake `localStorage`), scenario events.
 Scripted tests pass `readbackErrorRate: 0`; with the default 8 % a pilot occasionally misreads a clearance and the controller has to correct it.
 
 ## Known limitations
@@ -146,4 +178,7 @@ Scripted tests pass `readbackErrorRate: 0`; with the default 8 % a pilot occasio
 * `scenario.weather === 'live'` is not resolved here (see Free play). Winds in career scenarios are simulated.
 * Objectives and the debrief read the engine's event log, which keeps the last 2,000 events; very long free-play sessions lose early timeline entries (score counters are unaffected).
 * `GameScenario` extension fields (`events`, `difficulty`, `aircraftTypes`, richer training steps) survive JSON round trips but are lost if a caller rebuilds a `Scenario` from selected fields (the generator then assumes `normal` difficulty and both types).
-* Helicopters (USCG) and fighters (ANG) are not spawned; there is no clearance-delivery or approach/departure position gameplay beyond frequency handoffs.
+* Helicopters (USCG) and fighters (ANG) are not spawned.
+* IFR: aircraft that nobody clears fly the route to the last fix and then hold that heading (they leave the area; they do not hold); no STARs, so arrivals appear over the approach fix rather than at an arrival fix; the 3 nm in-trail rule and the "approach gate" are the engine's simplifications (the lesson says so).
+* A session without a Ground position strands landed aircraft on the exit (the pilot switches to an unstaffed Ground frequency); career 8 therefore lists GND, and the free-play default positions for IFR flows list it too.
+* IFR flows in the opening population: Cessna arrivals are skipped when airline arrivals appear at fixes, and the later jets appear 270 s apart (a result of the engine's in-trail check, see above).

@@ -2,14 +2,16 @@ import { useEffect, useMemo, useState } from 'react';
 import { game } from '../../game';
 import type { FreePlayOptions, ScenarioSummary } from '../../game';
 import { loadKacy } from '../../airport';
-import type { GameMode, Weather } from '../../sim/types';
+import type { ControllerPositionId, GameMode, Weather } from '../../sim/types';
 import { fetchLiveMetar } from '../../weather/liveWeather';
 import { WEATHER_PRESETS, WEATHER_PRESET_IDS, getPresetWeather } from '../../weather/presets';
 import type { WeatherPresetId } from '../../weather/presets';
 import { formatMhz, windText } from '../lib/format';
 import { summariseProvenance } from '../lib/provenance';
-import { recommendedRunways, suggestPosition, useSimStore } from '../store/simStore';
-import type { PositionChoice, StartOptions, WeatherChoice } from '../store/simStore';
+import { recommendedRunways, useSimStore } from '../store/simStore';
+import type { StartOptions, WeatherChoice } from '../store/simStore';
+import { POSITION_CHOICES, POSITION_LABEL, POSITION_NOTE, POSITION_ORDER, POSITION_WORD, frequencyRows, rowLabel, suggestPosition } from '../lib/positions';
+import type { PositionChoice } from '../lib/positions';
 import { AirportGlyph } from '../components/AirportGlyph';
 import { VoiceSettingsForm } from '../components/VoiceSettingsForm';
 import { Btn, Field, INPUT, LABEL, SELECT, Segmented } from '../components/ui';
@@ -60,9 +62,27 @@ export function SetupScreen() {
   const dismiss = useSimStore((s) => s.dismissNotice);
   const prev = useSimStore((s) => s.startOptions);
 
+  const [ifrFlows, setIfrFlows] = useState<boolean>(!!prev?.freePlay.ifrFlows);
   const scenarios = useMemo(() => game.listScenarios(), []);
   const progress = useMemo(() => game.loadCareerProgress(), []);
   const prov = useMemo(() => summariseProvenance(airport), [airport]);
+  /** Controller positions each ready-made scenario calls for (`scenario.controllerPositions`). */
+  const needs = useMemo(() => {
+    const m = new Map<string, ControllerPositionId[]>();
+    for (const sc of scenarios) {
+      try {
+        m.set(sc.id, game.buildScenario(sc.id, airport, { seed: 1, ...(sc.mode === 'free_play' ? { ifrFlows } : {}) }).controllerPositions);
+      } catch {
+        /* unknown / unbuildable scenario: no positions shown */
+      }
+    }
+    try {
+      m.set(CUSTOM, game.buildFreePlay(airport, { seed: 1, ifrFlows }).controllerPositions);
+    } catch {
+      /* ignore */
+    }
+    return m;
+  }, [scenarios, airport, ifrFlows]);
 
   const [mode, setMode] = useState<GameMode>(prev?.mode ?? 'free_play');
   const [scenarioId, setScenarioId] = useState<string>(prev?.scenarioId ?? CUSTOM);
@@ -113,11 +133,8 @@ export function SetupScreen() {
     }
     if (!scenarioId) return;
     setWeatherKey('scenario');
-    try {
-      setPosition(suggestPosition(game.buildScenario(scenarioId, airport, { seed: 1 }).controllerPositions));
-    } catch {
-      /* unknown scenario: keep the current position */
-    }
+    const wanted = needs.get(scenarioId);
+    if (wanted) setPosition(suggestPosition(wanted));
     // eslint-disable-next-line react-hooks/exhaustive-deps -- only when the selected scenario changes
   }, [scenarioId, isCustom]);
 
@@ -135,6 +152,7 @@ export function SetupScreen() {
   const start = () => {
     const seed = seedText.trim() === '' ? undefined : Number(seedText);
     const freePlay: FreePlayOptions = {
+      ifrFlows,
       difficulty,
       aircraftCount,
       arrivalsPerHour: DENSITY[density].arrivalsPerHour,
@@ -156,14 +174,13 @@ export function SetupScreen() {
     void startSession(opts);
   };
 
-  const freqOf = (pos: string) => airport.frequencies.find((f) => f.position === pos);
-  const POSITIONS: { value: PositionChoice; label: string; freq: string; note: string }[] = [
-    { value: 'TWR', label: 'Tower', freq: formatMhz(freqOf('TWR')?.mhz ?? 0), note: 'Runway clearances, sequencing, handoffs to Ground and Departure.' },
-    { value: 'GND', label: 'Ground', freq: formatMhz(freqOf('GND')?.mhz ?? 0), note: 'Taxi routes, hold-short points, runway crossings.' },
-    { value: 'TWR+GND', label: 'Tower + Ground', freq: `${formatMhz(freqOf('TWR')?.mhz ?? 0)} + ${formatMhz(freqOf('GND')?.mhz ?? 0)}`, note: 'Both frequencies at once: each call goes out on the addressed aircraft’s frequency.' },
-    { value: 'APP', label: 'Approach / Departure', freq: formatMhz(freqOf('APP')?.mhz ?? 0), note: 'Airborne traffic. Surface movement is not controlled from here.' },
-    { value: 'CLNC', label: 'Clearance Delivery', freq: formatMhz(freqOf('CLNC')?.mhz ?? 0), note: 'Frequency only: the simulator has no IFR clearance workflow yet.' },
-  ];
+  const scenarioNeeds: ControllerPositionId[] | undefined = needs.get(isCustom ? CUSTOM : scenarioId);
+  const suggested: PositionChoice | undefined = scenarioNeeds ? suggestPosition(scenarioNeeds) : undefined;
+  const POSITIONS = POSITION_ORDER.map((value) => {
+    const rows = frequencyRows(airport, POSITION_CHOICES[value]);
+    const covers = scenarioNeeds ? scenarioNeeds.every((p) => POSITION_CHOICES[value].includes(p)) : true;
+    return { value, label: POSITION_LABEL[value], rows, note: POSITION_NOTE[value], covers };
+  });
 
   return (
     <div className="atc-grid-bg h-full overflow-y-auto" data-testid="setup-screen">
@@ -173,7 +190,7 @@ export function SetupScreen() {
             <div className="font-sans text-[11px] uppercase tracking-[0.34em] text-atc-cyan">Atlantic City International · KACY</div>
             <h1 className="mt-2 font-sans text-[34px] font-bold uppercase leading-none tracking-[0.12em] text-atc-text">KACY ATC Simulator</h1>
             <p className="mt-3 max-w-xl font-sans text-[13px] leading-relaxed text-atc-muted">
-              Work Tower and Ground at Atlantic City with real FAA runway and taxiway data. Speak or type your clearances; pilots read back, taxi, line up and fly.
+              Work Clearance Delivery, Ground, Tower, Departure and Approach at Atlantic City with real FAA runway, taxiway and procedure data. Speak or type your clearances; pilots read back, taxi, line up and fly.
               Entertainment and learning software, not ATC training.
             </p>
           </div>
@@ -212,7 +229,7 @@ export function SetupScreen() {
               <SectionTitle n={2}>{mode === 'free_play' ? 'Scenario' : mode === 'career' ? 'Career step' : 'Lesson'}</SectionTitle>
               <div className="flex flex-col gap-2" role="radiogroup" aria-label="Scenario">
                 {mode === 'free_play' && (
-                  <ScenarioCard id={CUSTOM} selected={scenarioId === CUSTOM} onSelect={() => setScenarioId(CUSTOM)} title="Custom free play" description="Generated traffic around the settings in step 3: a standing sandbox for Tower and Ground." meta="Open-ended" />
+                  <ScenarioCard id={CUSTOM} selected={scenarioId === CUSTOM} onSelect={() => setScenarioId(CUSTOM)} title="Custom free play" description="Generated traffic around the settings in step 3: a standing sandbox for whichever positions you work." meta="Open-ended" />
                 )}
                 {list.map((s) => (
                   <ScenarioCard
@@ -223,12 +240,35 @@ export function SetupScreen() {
                     locked={!isUnlocked(s)}
                     title={s.careerStep ? `${s.careerStep}. ${s.name}` : s.name}
                     description={s.description}
-                    meta={s.estimatedMinutes ? `~${s.estimatedMinutes} min` : undefined}
+                    meta={[needs.get(s.id)?.length ? needs.get(s.id)!.join(' · ') : '', s.estimatedMinutes ? `~${s.estimatedMinutes} min` : ''].filter(Boolean).join('  ·  ') || undefined}
                     difficulty={s.difficulty}
                     done={s.careerStep ? progress.completedSteps.includes(s.careerStep) : false}
                     best={progress.bestScores[s.id]}
                   />
                 ))}
+                {mode === 'free_play' && (
+                  <label className="flex cursor-pointer items-start gap-2.5 border border-atc-border bg-atc-panel p-3" data-testid="ifr-flows-option">
+                    <input
+                      type="checkbox"
+                      className="mt-0.5 accent-[#39c5e8]"
+                      checked={ifrFlows}
+                      aria-label="IFR flows"
+                      data-testid="ifr-flows"
+                      onChange={(e) => {
+                        setIfrFlows(e.target.checked);
+                        // IFR flows span Clearance Delivery to Approach: offer the full set unless the player already picked one that covers it.
+                        if (e.target.checked && !POSITION_CHOICES[position].includes('CLNC')) setPosition('ALL');
+                      }}
+                    />
+                    <span>
+                      <span className="block text-[13px] font-semibold text-atc-text">IFR flows</span>
+                      <span className="block text-[11.5px] leading-snug text-atc-muted">
+                        Airline departures call Clearance Delivery for an IFR clearance first, and arrivals check in with Approach at a fix and wait for vectors and an approach clearance.
+                        Works best with All positions (or Approach + Tower).
+                      </span>
+                    </span>
+                  </label>
+                )}
                 {mode !== 'free_play' && list.length === 0 && (
                   <div className="border border-atc-border bg-atc-panel p-4 text-xs text-atc-muted">No {mode} scenarios are available yet.</div>
                 )}
@@ -319,6 +359,12 @@ export function SetupScreen() {
 
             <section>
               <SectionTitle n={isCustom ? 5 : 4}>Controller position</SectionTitle>
+              {scenarioNeeds && (
+                <p className="mb-2 text-[11.5px] leading-snug text-atc-muted" data-testid="position-needs">
+                  {isCustom ? 'Custom free play uses' : 'This scenario needs'}: <b className="text-atc-text">{scenarioNeeds.map((p) => POSITION_WORD[p]).join(', ')}</b>.
+                  {' '}Working fewer positions leaves aircraft on the others unheard (&ldquo;not on frequency&rdquo;).
+                </p>
+              )}
               <div className="flex flex-col gap-1.5" role="radiogroup" aria-label="Controller position">
                 {POSITIONS.map((p) => (
                   <button
@@ -328,13 +374,24 @@ export function SetupScreen() {
                     aria-checked={position === p.value}
                     data-testid={`position-${p.value}`}
                     onClick={() => setPosition(p.value)}
-                    className={`flex items-center justify-between gap-3 border px-3 py-2 text-left transition-colors ${position === p.value ? 'border-atc-cyan bg-atc-cyan/10' : 'border-atc-border bg-atc-panel hover:border-atc-muted'}`}
+                    className={`flex items-start justify-between gap-3 border px-3 py-2 text-left transition-colors ${position === p.value ? 'border-atc-cyan bg-atc-cyan/10' : 'border-atc-border bg-atc-panel hover:border-atc-muted'} ${p.covers ? '' : 'opacity-70'}`}
                   >
-                    <span>
-                      <span className={`block text-[13px] font-semibold ${position === p.value ? 'text-atc-cyan' : 'text-atc-text'}`}>{p.label}{p.value === 'TWR' && <span className="ml-2 font-sans text-[9.5px] font-normal uppercase tracking-wider text-atc-muted">default</span>}</span>
+                    <span className="min-w-0">
+                      <span className={`block text-[13px] font-semibold ${position === p.value ? 'text-atc-cyan' : 'text-atc-text'}`}>
+                        {p.label}
+                        {p.value === suggested && <span className="ml-2 font-sans text-[9.5px] font-normal uppercase tracking-wider text-atc-green">suggested</span>}
+                        {p.value === 'TWR' && !scenarioNeeds && <span className="ml-2 font-sans text-[9.5px] font-normal uppercase tracking-wider text-atc-muted">default</span>}
+                        {scenarioNeeds && !p.covers && <span className="ml-2 font-sans text-[9.5px] font-normal uppercase tracking-wider text-atc-amber">missing {scenarioNeeds.filter((n) => !POSITION_CHOICES[p.value].includes(n)).join(' ')}</span>}
+                      </span>
                       <span className="block text-[11px] leading-snug text-atc-muted">{p.note}</span>
                     </span>
-                    <span className="shrink-0 text-[15px] font-semibold tabular-nums text-atc-green">{p.freq}</span>
+                    <span className="flex shrink-0 flex-col items-end text-right leading-tight">
+                      {p.rows.map((r) => (
+                        <span key={r.mhz} className="whitespace-nowrap text-[13px] font-semibold tabular-nums text-atc-green">
+                          <span className="mr-1.5 text-[9.5px] font-normal text-atc-muted">{rowLabel(r)}</span>{formatMhz(r.mhz)}
+                        </span>
+                      ))}
+                    </span>
                   </button>
                 ))}
               </div>

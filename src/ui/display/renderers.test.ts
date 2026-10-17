@@ -5,7 +5,7 @@ import type { Scenario } from '../../sim/types';
 import { loadKacy, runwayEntryNodes } from '../../airport';
 import { getPresetWeather } from '../../weather/presets';
 import { drawSurface, DEFAULT_SURFACE_LAYERS, labelLines, runwayTint } from './surfaceRenderer';
-import { DEFAULT_RADAR_LAYERS, approachPath, dataBlock, drawRadar, radarScale, ringSpacingNm } from './radarRenderer';
+import { DEFAULT_RADAR_LAYERS, RADAR_RANGES_NM, approachPath, dataBlock, drawRadar, radarScale, ringSpacingNm } from './radarRenderer';
 import { hitTestAircraft } from './hitTest';
 import { fitBounds, worldToScreen } from './viewTransform';
 import { buildSurfaceStatic } from './surfaceStatic';
@@ -114,6 +114,37 @@ describe('radar renderer', () => {
     expect(b.lines[0]).toBe('NKS451 A320');
     expect(b.lines[1]).toMatch(/^025↓\s*160$/); // 2,480 ft -> 025
     expect(b.lines[2]).toMatch(/^H128 /); // true 118 -> magnetic 128
+  });
+
+  it('data block shows the squawk once assigned and a V / R / A mode letter', () => {
+    const engine = makeEngine();
+    const ac = Object.values(engine.getState().aircraft).find((a) => a.callsign === 'NKS451')!;
+    const plain = dataBlock(ac, airport.magneticVariationDeg);
+    expect(plain.lines[1]).not.toMatch(/\d{4}/);
+    const route = dataBlock({ ...ac, squawk: '4215', nav: { fixes: ['CARYL'], index: 0, mode: 'route' } }, airport.magneticVariationDeg);
+    expect(route.lines[1]).toMatch(/ 4215$/);
+    expect(route.lines[2]).toMatch(/ R$/);
+    expect(dataBlock({ ...ac, nav: { fixes: [], index: 0, mode: 'vectors' } }, airport.magneticVariationDeg).lines[2]).toMatch(/ V$/);
+    expect(dataBlock({ ...ac, nav: { fixes: [], index: 0, mode: 'approach' } }, airport.magneticVariationDeg).lines[2]).toMatch(/ A$/);
+  });
+
+  it('draws the procedure fixes of the landing runway, the selected route and every fix on request; 60 NM is a range', () => {
+    const engine = makeEngine();
+    const st = engine.getState();
+    const nks = Object.values(st.aircraft).find((a) => a.callsign === 'NKS451')!;
+    nks.nav = { fixes: ['VCN', 'CARYL', 'MAYBN'], index: 0, mode: 'route' };
+    const v = { cx: 0, cy: 0, scale: radarScale(60, 1000, 700), width: 1000, height: 700 };
+    const a = stubContext();
+    drawRadar(a.ctx, frameOf(engine, nks.id), v, 60, DEFAULT_RADAR_LAYERS);
+    const texts = a.calls.filter((c) => c.startsWith('fillText:')).map((c) => c.slice('fillText:'.length));
+    for (const t of ['VCN', 'CARYL', 'MAYBN', 'ILS 13', '60 NM']) expect(texts).toContain(t);
+    expect(texts.filter((t) => t === 'CARYL')).toHaveLength(1); // procedure and route draw it once
+    expect(a.calls.some((c) => c.startsWith('setLineDash:'))).toBe(true);
+    expect(texts).not.toContain('ZUKER');
+    const all = stubContext();
+    drawRadar(all.ctx, frameOf(engine, nks.id), v, 60, { ...DEFAULT_RADAR_LAYERS, allFixes: true });
+    expect(all.calls.filter((c) => c.startsWith('fillText:')).map((c) => c.slice('fillText:'.length))).toContain('ZUKER');
+    expect(RADAR_RANGES_NM).toContain(60);
   });
 
   it('scale fits the range inside the shorter canvas axis; rings step with the range', () => {

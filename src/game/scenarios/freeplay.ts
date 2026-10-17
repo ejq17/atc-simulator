@@ -10,8 +10,12 @@
  *  difficulty       easy | normal | hard: default rates, max aircraft and the intensity ramp over time.
  *  aircraftTypes    subset of ['C172', 'A320'].
  *  startingScenario quiet | busy_departures | busy_arrivals | mixed: initial mix and default rates.
+ *  ifrFlows         true: airline arrivals start over the published approach fix on the Approach frequency (staggered 270 s apart; Cessna arrivals are left to the generator) and airline
+ *                   departures are parked IFR departures calling Clearance Delivery; the scenario lists CLNC/APP/DEP positions. false/undefined:
+ *                   the classic Tower/Ground session (arrivals on final, no flight plans). The traffic generator applies the same switch
+ *                   (or, when it is unset, the controller positions) to the aircraft it creates later - see ../ifr.ts.
  */
-import type { Airport, Scenario, Vec2, Weather } from '../../sim/types';
+import type { Airport, ControllerPositionId, Scenario, Vec2, Weather } from '../../sim/types';
 import type { FreePlayOptions } from '../index';
 import { mulberry32 } from '../../sim/rng';
 import type { Rng } from '../../sim/rng';
@@ -22,6 +26,8 @@ import type { GameScenario } from '../types';
 import { randomAirlineCallsign, randomNNumber, runwayIdOf, runwayLongEnoughFor, callsignTail } from '../world';
 import { pickArrivalStart, pickParking } from '../placement';
 import type { AirbornePoint } from '../placement';
+import { arrivalProcedure, ifrArrivalSpawn, ifrDepartureSpawn } from '../ifr';
+import { findNavFix } from '../../sim/navigation';
 
 type Start = NonNullable<FreePlayOptions['startingScenario']>;
 type Diff = NonNullable<FreePlayOptions['difficulty']>;
@@ -61,7 +67,14 @@ export function recommendConfig(airport: Airport, weather: Weather | 'live', jet
   return { departing: [rec.primary], landing: [rec.primary] };
 }
 
-export function buildFreePlay(airport: Airport, options: FreePlayOptions = {}): GameScenario {
+/** Builder-internal overrides (career steps): which IFR flows the initial population uses and the positions the scenario lists. */
+export interface FreePlayInternal {
+  ifrArrivals?: boolean;
+  ifrDepartures?: boolean;
+  controllerPositions?: ControllerPositionId[];
+}
+
+export function buildFreePlay(airport: Airport, options: FreePlayOptions = {}, internal: FreePlayInternal = {}): GameScenario {
   const seed = (options.seed ?? 1) >>> 0;
   const rng = mulberry32(seed ^ 0x5eed1234);
   const start: Start = options.startingScenario ?? 'mixed';
@@ -82,9 +95,12 @@ export function buildFreePlay(airport: Airport, options: FreePlayOptions = {}): 
   const departuresPerHour = Math.max(0, options.departuresPerHour ?? Math.round(prof.dep * dprof.rate));
   const count = Math.max(0, Math.min(maxAircraft, Math.round(options.aircraftCount ?? prof.count)));
 
+  const ifrArrivals = internal.ifrArrivals ?? options.ifrFlows === true;
+  const ifrDepartures = internal.ifrDepartures ?? options.ifrFlows === true;
   const spawns = initialAircraft(airport, rng, {
-    count, depShare: prof.depShare, gaFraction, jets, ga, active, departureFreq: 'GND', arrivalFreq: 'TWR',
+    count, depShare: prof.depShare, gaFraction, jets, ga, active, departureFreq: 'GND', arrivalFreq: 'TWR', ifrArrivals, ifrDepartures,
   });
+  const positions: ControllerPositionId[] = internal.controllerPositions ?? (options.ifrFlows === true ? ['TWR', 'GND', 'CLNC', 'APP', 'DEP'] : ['TWR', 'GND']);
 
   const presetId = options.startingScenario ? `free-play-${start.replace('_', '-')}` : 'free-play';
   const sc: GameScenario = {
@@ -96,11 +112,14 @@ export function buildFreePlay(airport: Airport, options: FreePlayOptions = {}): 
     seed,
     weather,
     activeRunways: { departing: [...active.departing], landing: [...active.landing] },
-    controllerPositions: ['TWR', 'GND'],
+    controllerPositions: positions,
     spawns,
     traffic: { enabled: true, arrivalsPerHour, departuresPerHour, gaFraction, maxAircraft },
     difficulty,
     aircraftTypes: types,
+    ...(options.ifrFlows !== undefined ? { ifrFlows: options.ifrFlows } : {}),
+    ...(internal.ifrArrivals !== undefined ? { ifrArrivals: internal.ifrArrivals } : {}),
+    ...(internal.ifrDepartures !== undefined ? { ifrDepartures: internal.ifrDepartures } : {}),
   };
   return sc;
 }
@@ -108,7 +127,15 @@ export function buildFreePlay(airport: Airport, options: FreePlayOptions = {}): 
 interface InitialOpts {
   count: number; depShare: number; gaFraction: number; jets: boolean; ga: boolean;
   active: { departing: string[]; landing: string[] }; departureFreq: string; arrivalFreq: string;
+  /** IFR flows for the initial population (see ../ifr.ts). */
+  ifrArrivals?: boolean; ifrDepartures?: boolean;
 }
+
+/**
+ * Initial IFR arrivals on one procedure start this far apart in time, all at the initial fix: long enough for the leader to be about to land
+ * when the next one checks in, so clearing the follower at check-in is never an unsafe in-trail clearance (see ../ifr.ts `arrivalJoinNm`).
+ */
+export const INITIAL_IFR_ARRIVAL_STAGGER_SEC = 270;
 
 /**
  * Initial population: parked departures on distinct parking spots plus arrivals placed at least 3 nm apart
@@ -152,6 +179,10 @@ export function initialAircraft(airport: Airport, rng: Rng, o: InitialOpts): Sce
     if (!p) continue;
     reserved.add(p.id);
     occupied.push(p.pos);
+    if (type === 'A320' && o.ifrDepartures) {
+      out.push(ifrDepartureSpawn(airport, rng, { callsign: callsign(false), type, parkingId: p.id, atSec: 0 }));
+      continue;
+    }
     out.push({
       atSec: 0, callsign: callsign(type === 'C172'), type, flightRules: type === 'C172' ? 'VFR' : 'IFR',
       start: { kind: 'parked', parkingId: p.id }, isDeparture: true, initialFrequencyId: o.departureFreq, initialRequest: 'TAXI',
@@ -161,8 +192,25 @@ export function initialAircraft(airport: Airport, rng: Rng, o: InitialOpts): Sce
   // Arrivals: decide types, put jets nearest the field, then place outward.
   const arrTypes = Array.from({ length: nArr }, chooseType).sort((a, b) => (a === b ? 0 : a === 'A320' ? -1 : 1));
   const placed: AirbornePoint[] = [];
+  const ifrFixes: Vec2[] = [];
+  const ifrCount = new Map<string, number>();
   arrTypes.forEach((type, i) => {
     const endId = landingEnds[i % landingEnds.length];
+    if (type === 'A320' && o.ifrArrivals && arrivalProcedure(airport, endId)) {
+      const k = ifrCount.get(endId) ?? 0;
+      const spec = ifrArrivalSpawn(airport, rng, { callsign: callsign(false), type, runwayEnd: endId, atSec: k * INITIAL_IFR_ARRIVAL_STAGGER_SEC });
+      if (spec && spec.start.kind === 'at_fix') {
+        ifrCount.set(endId, k + 1);
+        const pos = findNavFix(airport, spec.start.fix)!.pos;
+        ifrFixes.push(pos);
+        placed.push({ pos, type, runwayEnd: endId });
+        out.push(spec);
+      }
+      return;
+    }
+    // With IFR arrivals in the opening population the Cessnas stay out (they would sit inside the in-trail window of the first jet and be
+    // overtaken by the later ones); the generator brings Cessnas in once the jets are established.
+    if (ifrFixes.length) return;
     const minNm = 7 + i * 4;
     const st = pickArrivalStart(airport, endId, type, rng, placed, { minNm, maxNm: minNm + 2, tries: 60, forceFinal: i === 0 });
     if (!st) return;

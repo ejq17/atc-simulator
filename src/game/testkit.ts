@@ -12,6 +12,7 @@ export function parseContext(state: SimulationState): ParseContext {
     taxiways: [...taxiways],
     runwayEnds: state.airport.runways.flatMap((r) => r.ends.map((e) => e.id)),
     frequencies: state.airport.frequencies.map((f) => ({ id: f.id, mhz: f.mhz })),
+    fixes: state.airport.navaids.map((n) => ({ id: n.id, ...(n.name ? { name: n.name } : {}) })),
   };
 }
 

@@ -12,12 +12,15 @@
  * - One `transmissionId` is shared by all commands of a transmission so the engine logs the ATC call once.
  * - The engine already emits the pilot's readback / "say again" through `onPilotTransmission`; this module never
  *   speaks anything itself, so there is no double speech.
- * - Combined positions (Tower + Ground): each command is applied with whichever of the controller's positions
- *   matches the addressed aircraft's current frequency.
+ * - Combined positions (Tower + Ground, Approach + Tower, All positions): each command is applied with whichever of
+ *   the controller's positions matches the addressed aircraft's current frequency (positions sharing a frequency,
+ *   like KACY Approach and Departure, are interchangeable: the earlier one in the set carries the call). An aircraft
+ *   on a frequency the player does not work is sent to the primary position, so the engine answers "Not on frequency".
+ * - The parse context carries every fix and navaid (`fixes`) so "proceed direct Cedar Lake / MAYBN" resolves.
  * - Processing stops at the first `clarify` (the controller must repeat), but not at a `rejected` command.
  */
 import { parseTransmission } from '../../commands';
-import type { AircraftRef } from '../../commands';
+import type { AircraftRef, FixInfo } from '../../commands';
 import type { SimulationEngine } from '../../sim/api';
 import type { Aircraft, CommandOutcome, ControllerPositionId, ParsedCommand, SimulationState } from '../../sim/types';
 import { frequencyForPosition, sameFrequency } from '../../radio/frequencies';
@@ -46,6 +49,10 @@ export interface TransmitResult {
   message: string;
   /** Set when processing stopped at a clarification. */
   clarification?: string;
+  /** True when the first rejection was "Not on frequency" (the aircraft is on a frequency the player does not work). */
+  offFrequency?: boolean;
+  /** Frequency (MHz) of the position that carried the first command, for the Radio panel's TX indicator. */
+  txMhz?: number;
 }
 
 let seq = 0;
@@ -70,6 +77,20 @@ export function taxiwayNames(state: Pick<SimulationState, 'airport'>): string[] 
   return [...names].filter((n) => !n.startsWith('RWY')).sort();
 }
 
+/**
+ * Every fix and navaid of the airport data, for DIRECT_FIX / "until <fix>" resolution. Names come from the data
+ * ("CEDAR LAKE"); fixes without a name are matched by identifier or phonetically.
+ */
+export function fixList(state: Pick<SimulationState, 'airport'>): FixInfo[] {
+  const out: FixInfo[] = [];
+  for (const n of state.airport.navaids) {
+    // Localizer / glideslope / DME ids ("I-PVO") are not places a controller sends an aircraft to.
+    if (n.type === 'ILS' || n.type === 'LOC' || n.type === 'DME') continue;
+    out.push(n.name ? { id: n.id, name: n.name } : { id: n.id });
+  }
+  return out;
+}
+
 export function buildParseContext(state: SimulationState, aircraft: Aircraft[] = Object.values(state.aircraft)) {
   const ends = state.airport.runways.flatMap((r) => r.ends.map((e) => e.id));
   return {
@@ -77,6 +98,7 @@ export function buildParseContext(state: SimulationState, aircraft: Aircraft[] =
     taxiways: taxiwayNames(state),
     runwayEnds: ends,
     frequencies: state.airport.frequencies.map((f) => ({ id: f.id, mhz: f.mhz })),
+    fixes: fixList(state),
   };
 }
 
@@ -165,5 +187,7 @@ export function transmit(input: TransmitInput): TransmitResult {
       ? `Issued: ${accepted.map((r) => describe(r.command)).join(', ')}`
       : `Pilot repeated last transmission${results[0]?.command.callsign ? ` (${results[0].command.callsign})` : ''}.`;
   }
-  return { transmissionId, text, source, commands: parsed.commands, results, summary, message, clarification };
+  const offFrequency = rejected.some((r) => (r.outcome as Extract<CommandOutcome, { status: 'rejected' }>).reason.startsWith('Not on frequency'));
+  const txMhz = results[0] ? frequencyForPosition(engine.getState().airport, results[0].position)?.mhz : undefined;
+  return { transmissionId, text, source, commands: parsed.commands, results, summary, message, clarification, offFrequency, txMhz };
 }

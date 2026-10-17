@@ -28,5 +28,7 @@ export { REFERENCES, TRAINING_DISCLAIMER, KACY_READBACK_NOTE, refText } from './
 export type { FaaReference } from './references';
 export { evaluateCheck, evaluateObjectives, allObjectivesDone } from './objectives';
 export { gradeFor } from './debrief';
+export { arrivalProcedure, resolveIfrFlows, ifrFlightPlan } from './ifr';
+export type { ArrivalProcedure, IfrFlowSwitches } from './ifr';
 export { careerStepOf, CAREER_STORAGE_KEY } from './career';
 export type { GameScenario, ScenarioEvent, TrainingStepSpec, Difficulty } from './types';

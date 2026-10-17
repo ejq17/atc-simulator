@@ -46,8 +46,9 @@ KACY METAR or a preset), runway configuration and controller position, then Star
 * **1 / 2** switch Surface and Radar views; **+ / −** zoom; **Esc** deselects.
 * Charts, Navaids, ATIS, Weather & Runways and Settings open from the top bar.
 
-Speech recognition providers: the browser Web Speech API (zero setup; Chrome/Edge send
-audio to Google/Microsoft) or Deepgram streaming (set `DEEPGRAM_API_KEY` in `.env`,
+Speech recognition providers: **Local Whisper** (on-device via transformers.js, no cloud,
+~40 MB model downloaded once; proven end to end by the automated fake-microphone test),
+the browser Web Speech API (zero setup; Chrome/Edge send audio to Google/Microsoft), or Deepgram streaming (set `DEEPGRAM_API_KEY` in `.env`,
 see `.env.example`; about $0.0048 per audio minute at the time of writing). The key never
 reaches the browser: the backend mints short-lived tokens. No recordings are stored.
 Pilot voices use the browser's speech synthesis with per-aircraft voice/pitch variation.
@@ -56,7 +57,7 @@ Pilot voices use the browser's speech synthesis with per-aircraft voice/pitch va
 
 ```bash
 npm test          # vitest: engine, parser, airport data, weather, charts, voice, game, ui
-npm run test:e2e  # playwright: real browser flows (starts dev server + backend)
+npm run test:e2e  # playwright: 14 browser flows + 5 fake-microphone voice flows (starts dev server + backend)
 npm run typecheck
 npm run lint
 npx tsx scripts/build-kacy-airport.ts   # regenerate the airport dataset from data/sources
@@ -83,7 +84,10 @@ See `docs/ARCHITECTURE.md` (module map and contracts) and `docs/PROGRESS.md`
 Taxi (with via routes and hold-short), hold position, hold short, cross runway, line up
 and wait, cleared for takeoff, cleared to land (incl. option / touch-and-go / low
 approach), go around, continue approach, contact/monitor frequency, headings, altitudes,
-speeds, pattern entries. 300+ parser test transmissions in `src/commands`.
+speeds, pattern entries, IFR clearances (Clearance Delivery), approach clearances
+(ILS/LOC/RNAV/VOR/visual), direct-to-fix, resume own navigation, radar contact.
+430+ parser test transmissions in `src/commands`. Positions: Clearance Delivery,
+Ground, Tower, Approach/Departure, or any combination.
 
 ## Layout
 

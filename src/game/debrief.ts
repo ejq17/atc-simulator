@@ -28,8 +28,9 @@ const TIMELINE_KINDS: ReadonlySet<SimEvent['kind']> = new Set([
   'SEPARATION_VIOLATION', 'READBACK_ERROR', 'SCENARIO',
 ]);
 
-function classifyUnsafe(text: string): 'takeoff' | 'lineup' | 'landing' | 'crossing' | 'intersecting' | 'other' {
+function classifyUnsafe(text: string): 'approach' | 'takeoff' | 'lineup' | 'landing' | 'crossing' | 'intersecting' | 'other' {
   const t = text.toLowerCase();
+  if (t.includes('approach clearance for')) return 'approach';
   if (t.includes('intersecting runway')) return 'intersecting';
   if (t.includes('takeoff clearance')) return 'takeoff';
   if (t.includes('line up and wait')) return 'lineup';
@@ -37,6 +38,103 @@ function classifyUnsafe(text: string): 'takeoff' | 'lineup' | 'landing' | 'cross
   if (t.includes('crossing clearance')) return 'crossing';
   return 'other';
 }
+
+const names = (cs: (string | undefined)[]): string => [...new Set(cs.filter(Boolean))].join(', ');
+
+/** Approach clearances the engine refused (training) or accepted as improper (other modes), by what was wrong. */
+function approachProblems(events: SimEvent[]): Map<'angle' | 'faf' | 'heading' | 'far' | 'route' | 'other', SimEvent[]> {
+  const groups = new Map<'angle' | 'faf' | 'heading' | 'far' | 'route' | 'other', SimEvent[]>();
+  const add = (k: 'angle' | 'faf' | 'heading' | 'far' | 'route' | 'other', e: SimEvent): void => {
+    groups.set(k, [...(groups.get(k) ?? []), e]);
+  };
+  for (const e of events) {
+    const isApproach = e.data?.kind === 'APPROACH';
+    const refused = e.kind === 'COMMAND_REJECTED' && isApproach && e.data?.commError;
+    const improper = e.kind === 'INFO' && e.data?.improper === true && isApproach;
+    if (!refused && !improper) continue;
+    const t = e.text.toLowerCase();
+    if (t.includes('intercept angle')) add('angle', e);
+    else if (t.includes('inside the final approach fix') || t.includes('intercept point is inside')) add('faf', e);
+    else if (t.includes('not on a heading that intercepts')) add('heading', e);
+    else if (/final approach course is \d+ nm ahead/.test(t)) add('far', e);
+    else if (t.includes('not on a route that joins')) add('route', e);
+    else if (e.kind === 'COMMAND_REJECTED' && t.includes('not on frequency')) continue; // reported with the other frequency errors
+    else add('other', e);
+  }
+  return groups;
+}
+
+/** IFR-specific advice: approach clearance geometry, takeoff without an IFR clearance, late handoff to Departure. */
+function ifrImprovements(events: SimEvent[], state: SimulationState): string[] {
+  const out: string[] = [];
+  const bad = approachProblems(events);
+  const list = (k: 'angle' | 'faf' | 'heading' | 'far' | 'route' | 'other'): SimEvent[] => bad.get(k) ?? [];
+  if (list('angle').length) {
+    out.push(
+      `${plural(list('angle').length, 'approach clearance')} (${names(list('angle').map((e) => e.callsign))}) failed on the intercept angle: the heading you assigned meets the final approach course at more than 30 degrees. ` +
+      `Vector the aircraft to intercept at 30 degrees or less, then clear it for the approach ${cite('5-9-2', '5-9-1')}.`,
+    );
+  }
+  if (list('faf').length) {
+    out.push(
+      `${plural(list('faf').length, 'approach clearance')} (${names(list('faf').map((e) => e.callsign))}) came too late: the aircraft was inside the final approach fix (FAF) or would have intercepted the course inside it. ` +
+      `Issue the position, the vector and the approach clearance before the aircraft reaches the FAF, with an altitude to maintain until established ${cite('5-9-4', '5-9-1', '4-8-1')}.`,
+    );
+  }
+  if (list('heading').length || list('far').length) {
+    out.push(
+      `${plural(list('heading').length + list('far').length, 'approach clearance')} (${names([...list('heading'), ...list('far')].map((e) => e.callsign))}) was given while the aircraft was not heading for the final approach course, or the course was still more than 10 nm ahead. ` +
+      `Turn it to an intercept heading first and clear the approach once the intercept is close ${cite('5-9-1', '5-9-4')}.`,
+    );
+  }
+  if (list('route').length) {
+    out.push(
+      `${plural(list('route').length, 'approach clearance')} (${names(list('route').map((e) => e.callsign))}) went to an aircraft whose route does not join the procedure. Send it direct to a fix of the approach (for ILS 13: CARYL) or vector it onto the course ${cite('4-8-1')}.`,
+    );
+  }
+  if (list('other').length) {
+    out.push(`${plural(list('other').length, 'approach clearance')} could not be flown (${list('other')[0].text.replace(/^Improper instruction accepted: /, '')}) - check the approach type, the runway and the aircraft's distance first.`);
+  }
+
+  const noClr = events.filter(
+    (e) => (e.kind === 'COMMAND_REJECTED' || (e.kind === 'INFO' && e.data?.improper === true)) && e.data?.kind === 'TAKEOFF' && /no IFR clearance/i.test(e.text),
+  );
+  if (noClr.length) {
+    out.push(
+      `${plural(noClr.length, 'takeoff clearance')} (${names(noClr.map((e) => e.callsign))}) went to an IFR aircraft that had no IFR clearance. ` +
+      `Work Clearance Delivery first: read the clearance (limit, departure procedure or vectors, altitude, expected altitude, departure frequency, squawk) ${cite('4-2-1', '4-3-2')}, then Ground, then Tower.`,
+    );
+  }
+
+  // Late handoff to Departure: IFR departures still on the Tower frequency 2 minutes after they left the ground.
+  const ifr = new Set<string>();
+  for (const e of events) if (e.callsign && e.kind === 'COMMAND_ACCEPTED' && e.data?.kind === 'IFR_CLEARANCE') ifr.add(e.callsign.toUpperCase());
+  for (const e of noClr) if (e.callsign) ifr.add(e.callsign.toUpperCase());
+  for (const a of Object.values(state.aircraft)) if (a.isDeparture && a.flightPlan?.flightRules === 'IFR') ifr.add(a.callsign.toUpperCase());
+  const posByMhz = new Map((state.airport?.frequencies ?? []).map((f) => [Math.round(f.mhz * 1000), f.position]));
+  const late: string[] = [];
+  for (const cs of ifr) {
+    const up = events.find((e) => e.kind === 'PHASE_CHANGE' && e.callsign?.toUpperCase() === cs && e.data?.to === 'INITIAL_CLIMB');
+    if (!up) continue;
+    const ho = events.find((e) => {
+      if (e.kind !== 'HANDOFF' || e.callsign?.toUpperCase() !== cs || e.timeSec < up.timeSec) return false;
+      const pos = typeof e.frequencyMhz === 'number' ? posByMhz.get(Math.round(e.frequencyMhz * 1000)) : undefined;
+      return pos === 'DEP' || pos === 'APP';
+    });
+    const gone = events.find((e) => e.kind === 'DESPAWN' && e.callsign?.toUpperCase() === cs && e.timeSec >= up.timeSec);
+    const until = ho?.timeSec ?? gone?.timeSec ?? state.clock.timeSec;
+    if (until - up.timeSec > IFR_DEPARTURE_HANDOFF_LIMIT_SEC) late.push(cs);
+  }
+  if (late.length) {
+    out.push(
+      `${late.join(', ')} ${late.length === 1 ? 'was' : 'were'} airborne for more than ${IFR_DEPARTURE_HANDOFF_LIMIT_SEC / 60} minutes before being handed to Departure. ` +
+      'Tower hands an IFR departure to Departure (124.6 at KACY) soon after takeoff; until then nobody can climb, turn or route it.',
+    );
+  }
+  return out;
+}
+
+export const IFR_DEPARTURE_HANDOFF_LIMIT_SEC = 120;
 
 export function buildImprovements(state: SimulationState, events: SimEvent[]): string[] {
   const s = state.score;
@@ -70,8 +168,13 @@ export function buildImprovements(state: SimulationState, events: SimEvent[]): s
     if (g('intersecting')) {
       out.push(`You used intersecting runways 13/31 and 4/22 at the same time ${g('intersecting') === 1 ? 'once' : g('intersecting') + ' times'} - separate operations on intersecting runways ${cite('3-9-8')}.`);
     }
+    if (g('approach')) {
+      out.push(`You issued ${plural(g('approach'), 'approach clearance')} that put an aircraft within 3 nm in trail of one already established on the same final (the simulator uses 3 nm as a simplification) - space arrivals with speed or vectors before clearing the next one ${cite('5-9-1')}.`);
+    }
     if (g('other')) out.push(`${plural(g('other'), 'other unsafe clearance')} recorded; open the timeline for details.`);
   }
+
+  out.push(...ifrImprovements(events, state));
 
   if (s.separationViolations > 0) {
     const pairs = events.filter((e) => e.kind === 'SEPARATION_VIOLATION').slice(0, 3).map((e) => e.text);

@@ -12,7 +12,7 @@ import { game, createScenarioEventRunner } from '../../game';
 import type { CareerProgress, DebriefReport, FreePlayOptions, TrainingStepState } from '../../game';
 import { loadKacy } from '../../airport';
 import { createEngine } from '../../sim/engine';
-import type { Airport, ControllerPositionId, GameMode, Scenario, SimEvent, SimulationState, Weather } from '../../sim/types';
+import type { Airport, GameMode, Scenario, SimEvent, SimulationState, Weather } from '../../sim/types';
 import { fetchLiveMetar } from '../../weather/liveWeather';
 import { getPresetWeather } from '../../weather/presets';
 import type { WeatherPresetId } from '../../weather/presets';
@@ -20,6 +20,8 @@ import { recommendRunways } from '../../weather/runwaySelection';
 import type { SimulatedAtis } from '../../weather/atis';
 import type { VoiceStatus } from '../../voice';
 import type { TransmitResult, ControllerSetup } from '../commands/transmit';
+import { POSITION_CHOICES, choiceFromPositions } from '../lib/positions';
+import type { PositionChoice } from '../lib/positions';
 import { createPilotSink, startSession as startEngineSession } from './session';
 import type { Session } from './session';
 
@@ -27,7 +29,12 @@ export type Screen = 'setup' | 'sim' | 'debrief';
 
 export type WeatherChoice = { kind: 'live' } | { kind: 'preset'; id: WeatherPresetId } | { kind: 'scenario' };
 
-export type PositionChoice = 'TWR' | 'GND' | 'APP' | 'CLNC' | 'TWR+GND';
+export type { PositionChoice } from '../lib/positions';
+export { POSITION_CHOICES, suggestPosition } from '../lib/positions';
+
+export function choiceFromSetup(setup: ControllerSetup): PositionChoice {
+  return choiceFromPositions(setup.positions);
+}
 
 export interface StartOptions {
   mode: GameMode;
@@ -45,25 +52,6 @@ export interface Notice {
   id: number;
   level: 'info' | 'warn' | 'error';
   text: string;
-}
-
-export const POSITION_CHOICES: Record<PositionChoice, ControllerPositionId[]> = {
-  TWR: ['TWR'], GND: ['GND'], APP: ['APP'], CLNC: ['CLNC'], 'TWR+GND': ['TWR', 'GND'],
-};
-
-export function choiceFromSetup(setup: ControllerSetup): PositionChoice {
-  const key = setup.positions.join('+');
-  return (Object.keys(POSITION_CHOICES) as PositionChoice[]).find((k) => POSITION_CHOICES[k].join('+') === key) ?? 'TWR';
-}
-
-/** Controller-position choice that covers the positions a scenario lists (Tower is the default). */
-export function suggestPosition(positions: readonly ControllerPositionId[]): PositionChoice {
-  const has = (p: ControllerPositionId) => positions.includes(p);
-  if (has('TWR') && has('GND')) return 'TWR+GND';
-  if (has('GND') && !has('TWR')) return 'GND';
-  if (has('APP') || has('DEP')) return has('TWR') ? 'TWR' : 'APP';
-  if (has('CLNC') && positions.length === 1) return 'CLNC';
-  return 'TWR';
 }
 
 /** Runway configuration recommended for a weather snapshot (best headwind end, used for both arrivals and departures). */

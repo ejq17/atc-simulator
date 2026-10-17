@@ -3,19 +3,14 @@ import type { PointerEvent as RPointerEvent } from 'react';
 import { useSimStore } from '../store/simStore';
 import { useUiStore, viewBus } from '../store/uiStore';
 import { useCanvasLoop } from './useCanvasLoop';
-import { drawRadar, radarScale, RADAR_RANGES_NM } from './radarRenderer';
-import type { RadarLayers, RadarRangeNm } from './radarRenderer';
+import { drawRadar, radarScale, RADAR_LAYER_LABELS, RADAR_RANGES_NM } from './radarRenderer';
+import type { RadarRangeNm } from './radarRenderer';
 import { panBy } from './viewTransform';
 import type { View } from './viewTransform';
 import { hitTestAircraft } from './hitTest';
 import type { Frame } from './frame';
 import { LayerMenu, OverlayBar, OVL_BTN } from './DisplayChrome';
 import { lerp } from '../lib/geom';
-
-const LAYER_LABELS: Record<keyof RadarLayers, string> = {
-  rings: 'Range rings', compass: 'Compass rose', approachPaths: 'Approach paths', navaids: 'Navaids', fixes: 'Approach fixes',
-  allFixes: 'All fixes (not only key)', labels: 'Data blocks', history: 'History dots', groundTargets: 'Ground targets', sweep: 'Sweep line (cosmetic)',
-};
 
 export function RadarDisplay() {
   const range = useUiStore((s) => s.radarRangeNm);
@@ -135,9 +130,12 @@ export function RadarDisplay() {
         ))}
       </OverlayBar>
       <OverlayBar className="left-3 top-3">
-        <LayerMenu layers={layers} labels={LAYER_LABELS} onToggle={toggle} />
+        <LayerMenu layers={layers} labels={RADAR_LAYER_LABELS} onToggle={toggle} />
         <button type="button" className={`${OVL_BTN} ${follow ? '!border-atc-cyan !text-atc-cyan' : ''}`} aria-pressed={follow} onClick={() => useUiStore.getState().setFollow(!follow)}>
           Follow
+        </button>
+        <button type="button" className={`${OVL_BTN} ${layers.allFixes ? '!border-atc-cyan !text-atc-cyan' : ''}`} aria-pressed={layers.allFixes} data-testid="radar-all-fixes" title="Show every fix in the airport data, not only the approach fixes" onClick={() => toggle('allFixes')}>
+          All fixes
         </button>
         <button type="button" className={OVL_BTN} onClick={() => viewBus.emit({ type: 'fit' })}>Centre</button>
       </OverlayBar>

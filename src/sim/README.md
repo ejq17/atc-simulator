@@ -222,10 +222,13 @@ information alpha."*, pending request `APPROACH`.
   that does not converge on the course, intercept point inside the FAF, or the course more than 10 nm ahead. Training:
   refused ("intercept angle too large", "inside the final approach fix"); other modes: accepted, an INFO event and a
   communication error (not credited as a correct clearance).
-* **Separation** (`conflicts.ts`): the clearance must not put the aircraft within 3 nm in trail (distance along the course at
-  the join point vs. every aircraft established on the same final) -> `UNSAFE_CLEARANCE` (training refuses, other modes flag
-  and score). The reference text says only "radar separation minima" (FAA JO 7110.65): no paragraph is cited because none is
-  verified in `docs/FAA-REFERENCES.md`; 3 nm is a simplification.
+* **Separation** (`conflicts.ts`): 3 nm in trail *at the moment of joining* between the follower and every aircraft
+  established on the same final (FINAL / LANDING, or aligned within 0.5 nm and 30 degrees). The follower is measured at its own
+  distance to the threshold when it is already on (or within the on-course tolerance of) the course, otherwise at the projected
+  join point (intercept point, or the first on-course fix it will fly). The leader is advanced by `groundspeed x
+  (distance still to fly to the join point / follower groundspeed)`, floor 0. Too close -> `UNSAFE_CLEARANCE` (training refuses,
+  other modes flag and score). The reference text says only "radar separation minima" (FAA JO 7110.65): no paragraph is cited
+  because none is verified in `docs/FAA-REFERENCES.md`; 3 nm is a simplification.
 
 Procedure geometry (all relative to the runway end; no airport knowledge): *on-course* fixes (1-40 nm out, `|cross| <= 0.2 d +
 0.3 nm`) form the straight-in segment (farthest = IF/IAF, the one closest but >= 3 nm out = FAF); fixes listed *before* the

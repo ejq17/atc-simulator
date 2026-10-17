@@ -4,8 +4,11 @@
  */
 import { refText, refTexts, KACY_READBACK_NOTE } from '../references';
 import type { TrainingStepSpec } from '../types';
-import { planDepartureTaxi } from '../world';
-import { GROUND_AND_TOWER, TOWER_AND_GROUND, arrivalInPattern, arrivalOnFinal, holdingShort, parkedDeparture, vfrWeather } from './common';
+import { NM, endOf, norm360, planDepartureTaxi } from '../world';
+import { arrivalProcedure } from '../ifr';
+import { findNavFix } from '../../sim/navigation';
+import { GROUND_AND_TOWER, TOWER_AND_GROUND, arrivalInPattern, arrivalOnFinal, holdingShort, ifrDeparture, parkedDeparture, vfrWeather } from './common';
+import type { Airport } from '../../sim/types';
 import type { ScenarioDef } from './common';
 
 const calm = () => vfrWeather(110, 6);
@@ -16,6 +19,32 @@ function def(
   build: ScenarioDef['build'],
 ): ScenarioDef {
   return { summary: { id, name, description: `${description} Topic: ${topic}.`, mode: 'training', difficulty, estimatedMinutes: minutes }, build };
+}
+
+const DIGIT_WORDS = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine'];
+const digits = (n: number, width = 3): string => String(Math.round(n)).padStart(width, '0').split('').map((d) => DIGIT_WORDS[Number(d)]).join(' ');
+
+/** Where `fixId` lies relative to the final approach course of `endId`: distance out, lateral offset (+ = right of the course) and the heading that intercepts at `angleDeg`. */
+function interceptGeometry(airport: Airport, fixId: string, endId: string, angleDeg: number): { alongNm: number; crossNm: number; turn: 'left' | 'right'; headingMag: number; angleDeg: number } {
+  const e = endOf(airport, endId);
+  const p = findNavFix(airport, fixId)!.pos;
+  const h = (e.trueHeadingDeg * Math.PI) / 180;
+  const dir = { x: Math.sin(h), y: Math.cos(h) };
+  const dx = p.x - e.threshold.x;
+  const dy = p.y - e.threshold.y;
+  const alongNm = -(dx * dir.x + dy * dir.y) / NM;
+  const crossNm = (dx * dir.y - dy * dir.x) / NM; // + = right of the inbound course
+  const turn: 'left' | 'right' = crossNm > 0 ? 'left' : 'right';
+  const sign = turn === 'left' ? -1 : 1;
+  const courseMag = norm360(e.trueHeadingDeg - airport.magneticVariationDeg);
+  // Round to 5 degrees, never steeper than 30 degrees against the course.
+  let headingMag = Math.round(norm360(courseMag + sign * angleDeg) / 5) * 5;
+  let eff = Math.abs(((headingMag - courseMag + 540) % 360) - 180);
+  if (eff > 29) {
+    headingMag = norm360(headingMag - sign * 5);
+    eff = Math.abs(((headingMag - courseMag + 540) % 360) - 180);
+  }
+  return { alongNm, crossNm, turn, headingMag: headingMag % 360 || 360, angleDeg: eff };
 }
 
 export const TRAINING_SCENARIOS: ScenarioDef[] = [
@@ -302,4 +331,109 @@ export const TRAINING_SCENARIOS: ScenarioDef[] = [
       },
       durationSec: 900,
     })),
+
+  // ---------------------------------------------------------------- 8
+  def('train-08-ifr-clearance', 'Training 8: IFR clearance delivery', 4, 8, 'Read an IFR departure clearance to a Spirit A320 on Clearance Delivery, item by item.', 'clearance requirements and communication procedures',
+    (airport, o) => ({
+      id: 'train-08-ifr-clearance', name: 'Training 8: IFR clearance delivery', mode: 'training', seed: o?.seed ?? 208,
+      description: 'Spirit 451 is at Gate 1, IFR to Philadelphia, and will call Clearance Delivery (127.85) in a few seconds. You are the Clearance Delivery controller: read the clearance with every element in order. The pilot reads it back and then calls Ground by itself.',
+      weather: calm(), activeRunways: { departing: ['13'], landing: ['13'] }, controllerPositions: ['CLNC'],
+      spawns: [ifrDeparture(airport, 'NKS451', 'A320', 'GATE-1', 0, 'KPHL', 10000)],
+      objectives: [{ id: 'clearance', text: 'Issue NKS451 its IFR clearance', check: 'ifr_clearance:NKS451' }],
+      training: {
+        steps: [
+          {
+            id: 'wait-call', callsign: 'NKS451', check: 'ifr_request:NKS451', reference: refText('4-3-2'),
+            prompt: 'Wait for NKS451 to call Clearance Delivery. Do not read the clearance until the pilot has asked for it.',
+            explanation: 'An IFR clearance is issued on request: the pilot calls with the aircraft identification, the destination and the ATIS letter, and then writes the clearance down ("ready to copy"). Reading it before the call gets a "we have not called for our clearance" answer.',
+            mistakes: ['Issuing the clearance before the pilot has called.'],
+          },
+          {
+            id: 'clearance', callsign: 'NKS451', expectCommand: 'IFR_CLEARANCE', reference: refTexts('4-2-1', '4-3-2'),
+            prompt: 'NKS451 is ready to copy. Issue the IFR clearance: cleared to Philadelphia, the Atlantic City Three departure with radar vectors, maintain two thousand, expect 10,000 ten minutes after departure, departure frequency 124.6, and a squawk code of your choice.',
+            example: 'Spirit four fifty one, cleared to Philadelphia airport via the Atlantic City Three departure, radar vectors, maintain two thousand, expect one zero thousand one zero minutes after departure, departure frequency one two four point six, squawk four two one five.',
+            explanation:
+              'Give the items in this order. (1) The aircraft identification, so the right pilot answers. (2) The clearance limit: "cleared to Philadelphia airport" - when the limit is an airport, the word "airport" follows the name. ' +
+              '(3) The departure procedure or vectors: "via the Atlantic City Three departure, radar vectors" - at KACY the departure procedure is published and Departure will vector the aircraft. ' +
+              '(4) The route, here covered by radar vectors (otherwise the filed route or "as filed"). (5) The altitude data in the order flown: "maintain two thousand" is the initial altitude, "expect one zero thousand one zero minutes after departure" is the cruise altitude the pilot should plan for. ' +
+              '(6) The departure frequency, 124.6 (Approach and Departure share it at KACY), and (7) the transponder code: four digits, each 0 to 7, never 0000, 1200, 7500, 7600 or 7700, and not a code another aircraft already uses. The pilot reads the whole clearance back; the aircraft then switches to Ground by itself and asks for taxi.',
+            mistakes: [
+              'Leaving out "cleared to <destination>" - the destination is the clearance limit.',
+              'A squawk code with an 8 or a 9, or a reserved or duplicate code.',
+              'Giving the clearance on Ground: IFR aircraft call Clearance Delivery first (127.85).',
+              'Dropping the departure frequency, so the pilot cannot call Departure after takeoff.',
+            ],
+          },
+          {
+            id: 'wait-ground', callsign: 'NKS451', check: 'handoff:NKS451', reference: refText('4-3-2'),
+            prompt: 'Wait. The pilot reads the clearance back, then tunes Ground on its own and asks for taxi. Clearance Delivery is finished.',
+            explanation: 'The pilot is now cleared. In a full session it goes Ground (taxi), Tower (takeoff clearance, then a handoff to Departure) and Departure (radar contact, climb, direct to the first fix). Takeoff without this clearance is refused in training and counted as a communication error in other modes.',
+            mistakes: ['Telling the aircraft to contact Ground yourself - it does that itself after the readback.'],
+          },
+        ] satisfies TrainingStepSpec[],
+      },
+      durationSec: 600,
+    })),
+
+  // ---------------------------------------------------------------- 9
+  def('train-09-approach', 'Training 9: Vectors to the ILS and approach clearance', 5, 10, 'Vector a Spirit A320 to the ILS 13 final, clear it for the approach and hand it to Tower.', 'sequencing and clearance requirements',
+    (airport, o) => {
+      const proc = arrivalProcedure(airport, '13');
+      if (!proc?.feederFix || proc.approachType !== 'ILS') throw new Error('train-09: runway 13 has no ILS with a feeder fix');
+      const g = interceptGeometry(airport, proc.feederFix, '13', 28);
+      const hdg = digits(g.headingMag);
+      const faf = proc.fafFix ? `${proc.fafFix}, ${proc.fafNm?.toFixed(1)} nm from the threshold` : 'the final approach fix';
+      return {
+        id: 'train-09-approach', name: 'Training 9: Vectors to the ILS and approach clearance', mode: 'training', seed: o?.seed ?? 209,
+        description: `Spirit 451 has checked in on Approach (124.6) over ${proc.feederFix} at 4,000 ft, about ${Math.round(g.alongNm)} nm from the runway 13 threshold and ${Math.abs(g.crossNm).toFixed(1)} nm ${g.crossNm > 0 ? 'right' : 'left'} of the final approach course. ` +
+          'Turn it onto an intercept heading, clear it for the ILS, then hand it to Tower once it reports established.',
+        weather: calm(), activeRunways: { departing: ['13'], landing: ['13'] }, controllerPositions: ['APP', 'DEP', 'TWR'],
+        spawns: [{
+          atSec: 0, callsign: 'NKS451', type: 'A320', flightRules: 'IFR', isDeparture: false, initialFrequencyId: 'APP', initialRequest: 'APPROACH',
+          start: { kind: 'at_fix', fix: proc.feederFix, altitudeFt: 4000, speedKt: 180, route: [proc.feederFix], runwayEnd: '13' },
+        }],
+        objectives: [
+          { id: 'approach', text: 'Clear NKS451 for the ILS 13 approach', check: 'approach:NKS451' },
+          { id: 'established', text: 'NKS451 is established on the ILS', check: 'established:NKS451' },
+          { id: 'tower', text: 'Hand NKS451 off to Tower', check: 'handoff:NKS451' },
+        ],
+        training: {
+          steps: [
+            {
+              id: 'vector', callsign: 'NKS451', expectCommand: 'HEADING', reference: refTexts('5-9-2', '5-9-1'),
+              prompt: `Vector NKS451 to intercept the runway 13 final approach course: turn ${g.turn} to a heading that meets the course at no more than 30 degrees. About ${Math.round(g.angleDeg)} degrees (heading ${String(g.headingMag).padStart(3, '0')}) works here: the aircraft is ${Math.abs(g.crossNm).toFixed(1)} nm off the course, so it intercepts about ${(Math.abs(g.crossNm) / Math.sin((g.angleDeg * Math.PI) / 180)).toFixed(0)} nm later.`,
+              example: `Spirit four fifty one, turn ${g.turn} heading ${hdg}.`,
+              explanation:
+                `The heading must meet the final approach course at no more than 30 degrees (7110.65 allows 30 when the intercept is 2 miles or more outside the approach gate, 20 closer in), and the intercept has to be outside the final approach fix. ` +
+                `In the simulator that means: intercept angle 30 degrees or less, intercept point outside the FAF (${faf}), and the course no more than 10 nm ahead of the aircraft when you clear it. ` +
+                `Here the course is on your ${g.turn === 'left' ? 'left' : 'right'}, so turn ${g.turn}. A bigger angle ("turn left heading zero zero zero") would be refused as too steep.`,
+              mistakes: ['An intercept angle above 30 degrees.', 'A heading that does not converge on the course (turning away from it).', 'Waiting until the aircraft is inside the FAF: the approach clearance is then refused.'],
+            },
+            {
+              id: 'clear', callsign: 'NKS451', expectCommand: 'APPROACH', reference: refTexts('5-9-4', '4-8-1'),
+              prompt: 'Clear NKS451 for the ILS runway 13 approach with an altitude to maintain until it is established: "maintain two thousand until established, cleared ILS runway one three approach".',
+              example: 'Spirit four fifty one, maintain two thousand until established, cleared ILS runway one three approach.',
+              explanation:
+                'Before the aircraft reaches the approach gate the controller gives its position, the vector to the course and the approach clearance. The altitude is held "until established" on the localizer (a segment of the published approach) so the aircraft stays above terrain and below the glidepath until it can follow it. ' +
+                'The clearance names the approach as published (ILS runway 13), and the pilot reads it back with the runway and callsign. The simulator checks the geometry: inside the FAF or an intercept steeper than 30 degrees is refused in training.',
+              mistakes: ['"Cleared approach" without naming the ILS and the runway.', 'Forgetting the altitude to maintain until established.', 'Clearing the approach after the aircraft is already inside the FAF.'],
+            },
+            {
+              id: 'wait-established', callsign: 'NKS451', check: 'established:NKS451', reference: refText('5-9-2'),
+              prompt: 'Wait. NKS451 turns onto the localizer, intercepts the glidepath from below and reports established on the ILS runway 13.',
+              explanation: 'After the interception, watch the track: if the aircraft is not converging, ask its position and intentions. The pilot reports "established" when it is on the course inside the final approach segment, and stays on your frequency until you hand it off.',
+              mistakes: ['Handing the aircraft to Tower before it has reported established (it is not yet on the final).'],
+            },
+            {
+              id: 'handoff', callsign: 'NKS451', expectCommand: 'CONTACT_FREQUENCY',
+              prompt: 'NKS451 is established. Hand it to Tower on 120.3.',
+              example: 'Spirit four fifty one, contact tower one two zero point three.',
+              explanation: 'Once the aircraft is established on the final and no longer needs vectors, Approach transfers it to Tower; the pilot checks in with its distance from the runway and Tower issues the landing clearance. (No 7110.65 paragraph is cited here: the handoff wording was not verified for this lesson.)',
+              mistakes: ['Keeping the aircraft on Approach until the last mile.', 'Forgetting the frequency.'],
+            },
+          ] satisfies TrainingStepSpec[],
+        },
+        durationSec: 900,
+      };
+    }),
 ];

@@ -1,8 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
 import type { KeyboardEvent } from 'react';
-import { frequencyForPosition } from '../../radio/frequencies';
-import { useSimState, useSimStore, POSITION_CHOICES, choiceFromSetup } from '../store/simStore';
+import { sameFrequency } from '../../radio/frequencies';
+import type { SimulationState } from '../../sim/types';
+import { useSimState, useSimStore, choiceFromSetup } from '../store/simStore';
 import type { PositionChoice } from '../store/simStore';
+import { POSITION_LABEL, POSITION_ORDER, frequencyRows, rowLabel } from '../lib/positions';
+import type { FrequencyRow } from '../lib/positions';
 import { useUiStore } from '../store/uiStore';
 import { useVoiceSettings } from '../store/voiceSettings';
 import { describeVoiceStatus, keyLabel } from '../lib/voiceStatus';
@@ -18,9 +21,23 @@ const TONE_CLASS = {
   off: 'text-atc-muted border-atc-border',
 } as const;
 
-const POSITION_NAMES: Record<PositionChoice, string> = {
-  TWR: 'Tower', GND: 'Ground', APP: 'Approach / Departure', CLNC: 'Clearance Delivery', 'TWR+GND': 'Tower + Ground',
-};
+/** How long (sim seconds) the RX / TX lamp of a frequency stays lit after a call. */
+const LAMP_SEC = 6;
+
+export interface FrequencyActivity { dir: 'RX' | 'TX'; callsign?: string; timeSec: number }
+
+/** The most recent pilot (RX) or controller (TX) call on each of the controller's frequencies. */
+export function lastActivity(state: Pick<SimulationState, 'events'>, rows: readonly FrequencyRow[]): Map<number, FrequencyActivity> {
+  const out = new Map<number, FrequencyActivity>();
+  const ev = state.events;
+  for (let i = ev.length - 1; i >= 0 && out.size < rows.length && i > ev.length - 500; i--) {
+    const e = ev[i];
+    if (e.frequencyMhz === undefined || (e.speaker !== 'PILOT' && e.speaker !== 'ATC')) continue;
+    const row = rows.find((r) => sameFrequency(r.mhz, e.frequencyMhz!));
+    if (row && !out.has(row.mhz)) out.set(row.mhz, { dir: e.speaker === 'PILOT' ? 'RX' : 'TX', callsign: e.callsign, timeSec: e.timeSec });
+  }
+  return out;
+}
 
 export function RadioPanel() {
   const state = useSimState();
@@ -55,12 +72,14 @@ export function RadioPanel() {
 
   if (!state || !session) return null;
   const choice = choiceFromSetup(controller);
-  const freqs = controller.positions
-    .map((p) => frequencyForPosition(state.airport, p))
-    .filter((f): f is NonNullable<typeof f> => !!f);
+  const rows = frequencyRows(state.airport, controller.positions);
+  const activity = lastActivity(state, rows);
+  const newest = [...activity.entries()].sort((a, b) => b[1].timeSec - a[1].timeSec)[0];
   const status = describeVoiceStatus(voice.status, settings.providerId, voice.message, keyLabel(settings.pttKey));
   const pttDisabled = settings.providerId === 'none' || voice.status === 'unsupported' || voice.status === 'permission_denied';
   const provider = STT_PROVIDER_NOTES[settings.providerId];
+  /** With voice off the badge already says so; the status and Heard lines only appear when there is a microphone path. */
+  const voiceOn = settings.providerId !== 'none';
 
   const submit = () => {
     const text = draft.trim();
@@ -112,26 +131,39 @@ export function RadioPanel() {
       }
     >
       <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto px-3 py-2">
-        <div className="flex items-stretch gap-2">
-          <select
-            aria-label="Controller position"
-            data-testid="position-select"
-            value={choice}
-            onChange={(e) => setChoice(e.target.value as PositionChoice)}
-            className={`${INPUT} h-[38px] flex-1 appearance-none`}
-          >
-            {(Object.keys(POSITION_CHOICES) as PositionChoice[]).map((k) => (
-              <option key={k} value={k}>{POSITION_NAMES[k]}</option>
-            ))}
-          </select>
-          <div className="flex min-w-[118px] flex-col items-end justify-center border border-atc-border bg-atc-bg px-2" data-testid="frequency">
-            {freqs.map((f) => (
-              <div key={f.id} className="flex items-baseline gap-2 leading-tight">
-                <span className="text-[10px] text-atc-muted">{f.id}</span>
-                <span className={`${freqs.length > 1 ? 'text-[13px]' : 'text-[18px]'} font-semibold tabular-nums text-atc-green`}>{formatMhz(f.mhz)}</span>
+        <select
+          aria-label="Controller position"
+          data-testid="position-select"
+          value={choice}
+          onChange={(e) => setChoice(e.target.value as PositionChoice)}
+          className={`${INPUT} h-8 shrink-0 appearance-none`}
+        >
+          {POSITION_ORDER.map((k) => (
+            <option key={k} value={k}>{POSITION_LABEL[k]}{k === 'APP' ? ' (124.6)' : ''}</option>
+          ))}
+        </select>
+        <div className="grid shrink-0 gap-1" style={{ gridTemplateColumns: rows.length > 1 ? 'repeat(2, minmax(0, 1fr))' : '1fr' }} data-testid="frequency">
+          {rows.map((r) => {
+            const act = activity.get(r.mhz);
+            const lit = !!act && state.clock.timeSec - act.timeSec <= LAMP_SEC;
+            const isLast = newest?.[0] === r.mhz;
+            const lamp = lit ? (act!.dir === 'RX' ? 'bg-atc-green' : 'bg-atc-cyan') : 'bg-atc-border';
+            return (
+              <div
+                key={r.mhz}
+                data-testid={`freq-${r.mhz.toFixed(3)}`}
+                data-lit={lit ? act!.dir : 'off'}
+                data-last={isLast ? 'true' : 'false'}
+                title={act ? `Last ${act.dir === 'RX' ? 'call received' : 'transmission'}${act.callsign ? ` · ${act.callsign}` : ''}` : 'No traffic yet'}
+                className={`flex h-[26px] items-center gap-1.5 border px-2 leading-none ${lit ? (act!.dir === 'RX' ? 'border-atc-green bg-atc-green/10' : 'border-atc-cyan bg-atc-cyan/10') : isLast ? 'border-atc-muted' : 'border-atc-border'} bg-atc-bg`}
+              >
+                <span className={`inline-block h-2 w-2 shrink-0 ${lamp}`} />
+                <span className="w-[52px] shrink-0 truncate text-[10px] text-atc-muted">{rowLabel(r)}</span>
+                <span className="flex-1 text-[13.5px] font-semibold tabular-nums text-atc-green">{formatMhz(r.mhz)}</span>
+                <span className={`shrink-0 text-right text-[9.5px] font-semibold ${lit ? (act!.dir === 'RX' ? 'text-atc-green' : 'text-atc-cyan') : 'text-atc-muted'}`}>{lit ? act!.dir : isLast ? `last ${act!.dir}` : ''}</span>
               </div>
-            ))}
-          </div>
+            );
+          })}
         </div>
 
         <div className="flex items-center gap-2">
@@ -149,11 +181,15 @@ export function RadioPanel() {
           </button>
           <span data-testid="mic-badge" className={`border px-2 py-1.5 font-sans text-[10px] font-semibold uppercase tracking-wider ${TONE_CLASS[status.tone]}`}>{status.badge}</span>
         </div>
-        <div className="line-clamp-2 min-h-[30px] text-[11px] leading-snug text-atc-muted" data-testid="mic-status" title={status.text}>{status.text}</div>
-        <div className="flex items-baseline gap-2 text-[11.5px]">
-          <span className={LABEL}>Heard</span>
-          <span className="min-w-0 flex-1 truncate text-atc-text" data-testid="partial">{voice.partial || <span className="text-atc-muted/60">—</span>}</span>
-        </div>
+        {voiceOn && (
+          <>
+            <div className="truncate text-[11px] leading-snug text-atc-muted" data-testid="mic-status" title={status.text}>{status.text}</div>
+            <div className="flex items-baseline gap-2 text-[11.5px]">
+              <span className={LABEL}>Heard</span>
+              <span className="min-w-0 flex-1 truncate text-atc-text" data-testid="partial">{voice.partial || <span className="text-atc-muted/60">—</span>}</span>
+            </div>
+          </>
+        )}
 
         <div className="flex flex-col gap-1">
           <div className="flex gap-1.5">
@@ -172,7 +208,7 @@ export function RadioPanel() {
             <Btn tone="cyan" data-testid="command-send" onClick={submit} disabled={!draft.trim()}>Send</Btn>
           </div>
           <div className="flex items-center justify-between gap-2">
-            <span className={`min-h-4 min-w-0 flex-1 truncate text-[11px] ${resultTone}`} data-testid="last-result" title={last?.message}>
+            <span className={`min-h-4 min-w-0 flex-1 line-clamp-2 text-[11px] leading-snug ${last?.offFrequency ? 'font-semibold text-atc-red' : resultTone}`} data-testid="last-result" data-off-frequency={last?.offFrequency ? 'true' : undefined} title={last?.message}>
               {last ? last.message : <span className="text-atc-muted">Spoken and typed calls use the same parser.</span>}
             </span>
             <span className="shrink-0 text-[10px] text-atc-muted"><Kbd>Enter</Kbd> focus · <Kbd>↑</Kbd><Kbd>↓</Kbd> history</span>

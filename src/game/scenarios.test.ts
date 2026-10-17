@@ -88,9 +88,13 @@ describe('catalogue', () => {
             const a = tAir[i];
             const b = tAir[j];
             const d = Math.hypot(a.p.x - b.p.x, a.p.y - b.p.y);
-            const aAir = a.s.start.kind === 'airborne';
-            const bAir = b.s.start.kind === 'airborne';
+            const aFix = a.s.start.kind === 'at_fix';
+            const bFix = b.s.start.kind === 'at_fix';
+            const aAir = a.s.start.kind === 'airborne' || aFix;
+            const bAir = b.s.start.kind === 'airborne' || bFix;
             if (aAir && bAir && Math.abs(a.s.atSec - b.s.atSec) < 60) expect(d / NM, `${a.s.callsign}/${b.s.callsign}`).toBeGreaterThanOrEqual(3);
+            // IFR arrivals over a fix: 5 nm apart when spawned less than 90 s apart (two at the same fix need the time gap).
+            if (aFix && bFix && Math.abs(a.s.atSec - b.s.atSec) < 90) expect(d / NM, `${a.s.callsign}/${b.s.callsign} at fixes`).toBeGreaterThanOrEqual(5);
             if (!aAir && !bAir) expect(d, `${a.s.callsign}/${b.s.callsign} on the ground`).toBeGreaterThan(20);
           }
         }

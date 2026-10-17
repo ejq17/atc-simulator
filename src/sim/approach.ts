@@ -19,9 +19,10 @@
  */
 import type { Aircraft, Airport, ApproachType, InstrumentProcedure, SimulationState, Weather } from './types';
 import { deg2rad, dist, headingDiff, mToNm, nmToM } from './geo';
+import type { Vec2 } from './types';
 import { alongCross, normalizeRunwayEndId } from './runways';
 import type { RunwayEndGeom } from './runways';
-import { findNavFix } from './navigation';
+import { findNavFix, fixPosition } from './navigation';
 import { spokenRunway } from '../radio/spoken';
 
 export const APPROACH_RANGE_NM = 30;
@@ -115,8 +116,14 @@ export interface ApproachPlan {
   /** Fixes of the straight-in segment (farthest first). */
   onCourse: string[];
   fafDM: number;
-  /** Distance before the threshold (m) where the aircraft will be established on the course. */
+  /**
+   * Distance before the threshold (m) where the aircraft is (or will be) established on the course: its own
+   * distance when it is already on / within the on-course tolerance of the course, else the projected join point
+   * (intercept point, or the first on-course fix it will fly).
+   */
   joinDM: number;
+  /** Distance (m) the aircraft still has to fly to reach `joinDM` (0 when already on the course); used to project spacing to the moment of joining. */
+  joinTravelM: number;
   /** Distance before the threshold (m) of the outermost on-course fix (IF / IAF of the straight-in segment). */
   ifDM?: number;
   interceptDM?: number;
@@ -126,6 +133,19 @@ export interface ApproachPlan {
 export type ApproachAssessment =
   | { kind: 'hard'; reason: string; pilot: string }
   | { kind: 'ok'; plan: ApproachPlan; geometry?: { reason: string; pilot: string } };
+
+/** Length (m) of the path from `from` through the given fixes (unknown fixes are skipped). */
+function pathLengthM(airport: Airport, from: Vec2, ids: string[]): number {
+  let len = 0;
+  let prev = from;
+  for (const id of ids) {
+    const p = fixPosition(airport, id);
+    if (!p) continue;
+    len += dist(prev, p);
+    prev = p;
+  }
+  return len;
+}
 
 const typeWord = (t: ApproachType): string => (t === 'LOC' ? 'localizer' : t === 'VISUAL' ? 'visual' : t);
 
@@ -159,7 +179,7 @@ export function assessApproach(
     if (!v.ok) {
       return { kind: 'hard', reason: `A visual approach needs VFR/MVFR weather with a ceiling of at least ${VISUAL_MIN_CEILING_FT} ft and ${VISUAL_MIN_VISIBILITY_SM} sm visibility: ${v.why}.`, pilot: `we can't accept a visual approach, we're not in visual conditions` };
     }
-    return { kind: 'ok', plan: { mode: 'auto', fixes: [], onCourse: [], fafDM: nmToM(FALLBACK_FAF_NM), joinDM: Math.max(0, d) } };
+    return { kind: 'ok', plan: { mode: 'auto', fixes: [], onCourse: [], fafDM: nmToM(FALLBACK_FAF_NM), joinDM: Math.max(0, d), joinTravelM: 0 } };
   }
 
   const cands = matchingProcedures(airport, type, g.end.id);
@@ -174,7 +194,7 @@ export function assessApproach(
   const best = [...infos].sort((a, b) => b.onCourse.length - a.onCourse.length)[0];
 
   if (o.autoNav) {
-    return { kind: 'ok', plan: { mode: 'auto', procedureId: best.procedure.id, fixes: [], onCourse: best.onCourse.map((f) => f.id), fafDM: best.faf?.dM ?? nmToM(FALLBACK_FAF_NM), joinDM: Math.max(0, d) } };
+    return { kind: 'ok', plan: { mode: 'auto', procedureId: best.procedure.id, fixes: [], onCourse: best.onCourse.map((f) => f.id), fafDM: best.faf?.dM ?? nmToM(FALLBACK_FAF_NM), joinDM: Math.max(0, d), joinTravelM: 0 } };
   }
 
   const nav = ac.nav;
@@ -189,8 +209,14 @@ export function assessApproach(
       const fixes = fe.includes(j) ? [...info.feeders.slice(fe.indexOf(j)), ...info.onCourse.map((f) => f.id)] : info.onCourse.slice(on.indexOf(j)).map((f) => f.id);
       const joinFix = info.onCourse.find((f) => f.id.toUpperCase() === j) ?? info.onCourse[0];
       const fafDM = info.faf?.dM ?? nmToM(FALLBACK_FAF_NM);
+      // Already on (or within the tolerance of) the course: measured at its own position. Otherwise at the first on-course fix it will fly.
+      const onNow = d > 0 && isOnCourse(mToNm(d), mToNm(cross));
+      const firstOn = fixes.findIndex((f) => on.includes(f.toUpperCase()));
       const plan: ApproachPlan = {
-        mode: 'route', procedureId: info.procedure.id, fixes, onCourse: info.onCourse.map((f) => f.id), fafDM, joinDM: joinFix ? joinFix.dM : Math.max(0, d), ifDM: info.onCourse[0]?.dM,
+        mode: 'route', procedureId: info.procedure.id, fixes, onCourse: info.onCourse.map((f) => f.id), fafDM,
+        joinDM: onNow ? d : joinFix ? joinFix.dM : Math.max(0, d),
+        joinTravelM: onNow ? 0 : pathLengthM(airport, ac.pos, fixes.slice(0, (firstOn < 0 ? fixes.length - 1 : firstOn) + 1)),
+        ifDM: info.onCourse[0]?.dM,
       };
       const inside = (joinFix && on.includes(j) && joinFix.dM < fafDM - 1) || (d > 0 && d < fafDM - 100 && Math.abs(cross) < nmToM(2));
       return inside
@@ -217,7 +243,7 @@ export function assessApproach(
   const ahead = (limit: number) => info.onCourse.filter((f) => f.dM < limit - 200).map((f) => f.id);
   const plan: ApproachPlan = {
     mode: 'intercept', procedureId: info.procedure.id, fixes: Number.isFinite(dInt) ? ahead(dInt) : [], onCourse: info.onCourse.map((f) => f.id), fafDM,
-    joinDM: Number.isFinite(dInt) ? Math.max(0, dInt) : Math.max(0, d), ifDM: info.onCourse[0]?.dM, interceptDM: Number.isFinite(dInt) ? dInt : undefined, interceptAngleDeg: angle,
+    joinDM: Number.isFinite(dInt) ? Math.max(0, dInt) : Math.max(0, d), joinTravelM: Number.isFinite(dInt) && !established ? tM : 0, ifDM: info.onCourse[0]?.dM, interceptDM: Number.isFinite(dInt) ? dInt : undefined, interceptAngleDeg: angle,
   };
   const bad = (reason: string, pilot: string): ApproachAssessment => ({ kind: 'ok', plan, geometry: { reason: `Unable: ${reason}`, pilot } });
   if (d > 0 ? d < fafDM : true) {

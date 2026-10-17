@@ -12,7 +12,8 @@ import { planDepartureTaxi, routeWords } from '../world';
 import type { ScenarioEvent } from '../types';
 import { buildFreePlay } from './freeplay';
 import {
-  GROUND_AND_TOWER, TOWER_AND_GROUND, WX_RWY13, arrivalFrom, arrivalInPattern, arrivalOnFinal, holdingShort, parkedDeparture, vfrWeather,
+  GROUND_AND_TOWER, IFR_DEPARTURE_POSITIONS, TOWER_AND_GROUND, WX_RWY13, arrivalFrom, arrivalInPattern, arrivalOnFinal, holdingShort, ifrArrival, ifrDeparture,
+  parkedDeparture, vfrWeather,
 } from './common';
 import type { ScenarioDef } from './common';
 
@@ -183,19 +184,20 @@ const step6 = def(
 // 7. Multiple arrivals and departures
 // ---------------------------------------------------------------------------
 const step7 = def(
-  { id: 'career-07-arrivals-departures', name: '7. Multiple arrivals and departures', description: 'Interleave three arrivals and two departures on runway 13.', mode: 'career', difficulty: 4, careerStep: 7, estimatedMinutes: 15 },
+  { id: 'career-07-arrivals-departures', name: '7. Multiple arrivals and departures', description: 'Interleave three arrivals and two departures on runway 13, one of them an IFR departure that starts at Clearance Delivery.', mode: 'career', difficulty: 4, careerStep: 7, estimatedMinutes: 20 },
   (airport, o) => ({
     id: 'career-07-arrivals-departures', name: '7. Multiple arrivals and departures', mode: 'career', careerStep: 7, seed: o?.seed ?? 107,
     description:
       'One runway, five movements. Spirit 712 is on a 9 nm final, a Cessna is holding short for departure, Cessna N35DM is coming in from Millville, a Spirit departure will call from the gate, ' +
       'and American 1201 arrives from the Philadelphia direction later. Get the departures out in the gaps between arrivals, give landing aircraft clearances in order and send each to Ground.' +
+      ' Spirit 329 is IFR to Philadelphia (cruise 10,000): it calls Clearance Delivery (127.85) first. Read the clearance, then it asks Ground for taxi by itself; after takeoff hand it to Departure (124.6), answer its check-in with "radar contact" and climb it or send it direct (for example direct Coyle) to finish the handling.' +
       ' The A320 needs about 6,500 ft of runway: send it to the full-length hold on Bravo (or Charlie), not the Alpha intersection - the simulator will refuse the takeoff.',
-    weather: WX_RWY13(), activeRunways: { departing: ['13'], landing: ['13'] }, controllerPositions: TOWER_AND_GROUND,
+    weather: WX_RWY13(), activeRunways: { departing: ['13'], landing: ['13'] }, controllerPositions: IFR_DEPARTURE_POSITIONS,
     spawns: [
       arrivalOnFinal(airport, 'NKS712', 'A320', '13', 9, 0),
       holdingShort(airport, 'N214BQ', 'C172', '13', 0),
       arrivalFrom(airport, 'N35DM', 'C172', '13', 'KMIV', 14, 90),
-      parkedDeparture('NKS329', 'A320', 'GATE-2', 120),
+      ifrDeparture(airport, 'NKS329', 'A320', 'GATE-2', 120, 'KPHL', 10000),
       arrivalFrom(airport, 'AAL1201', 'A320', '13', 'KPHL', 24, 400, { altitudeFt: 4000 }),
     ],
     objectives: [
@@ -203,40 +205,46 @@ const step7 = def(
       obj('arr-2', 'N35DM lands', 'landed:N35DM'),
       obj('arr-3', 'AAL1201 lands', 'landed:AAL1201'),
       obj('dep-1', 'N214BQ takes off', 'takeoff:N214BQ'),
+      obj('ifr-clr', 'Issue NKS329 its IFR clearance', 'ifr_clearance:NKS329'),
       obj('dep-2', 'NKS329 takes off', 'takeoff:NKS329'),
+      obj('dep-2-handled', 'NKS329 is handed to Departure, instructed and leaves the area', 'handled:NKS329'),
       NO_INCURSIONS,
       obj('no-sep', 'No separation violations', 'no_separation'),
     ],
-    durationSec: 1500, difficulty: 'normal',
+    durationSec: 2400, difficulty: 'normal',
   }),
 );
 
 // ---------------------------------------------------------------------------
-// 8. IFR traffic
+// 8. IFR traffic (Approach, then Tower)
 // ---------------------------------------------------------------------------
 const step8 = def(
-  { id: 'career-08-ifr', name: '8. IFR traffic', description: 'Low IFR: Spirit and American A320s on the ILS to runway 13, GA grounded.', mode: 'career', difficulty: 4, careerStep: 8, estimatedMinutes: 15 },
+  { id: 'career-08-ifr', name: '8. IFR traffic', description: 'Low IFR: three A320s arrive over the ILS 13 fixes. Work Approach, clear each one for the ILS, hand it to Tower and land it.', mode: 'career', difficulty: 4, careerStep: 8, estimatedMinutes: 20 },
   (airport, o) => ({
     id: 'career-08-ifr', name: '8. IFR traffic', mode: 'career', careerStep: 8, seed: o?.seed ?? 108,
     description:
-      'The IMC weather preset is in effect: 600 ft broken, 1,100 ft overcast, visibility 2 miles in mist. VFR general aviation is grounded. Three A320s are flying the ILS to runway 13 (runway 13 has an ILS; runway 4/22 has none) ' +
-      'and one Spirit departure is ready at the gate. Keep generous spacing behind each arrival, and remember an arrival will not accept a late landing clearance inside 0.5 nm: it goes around.',
-    weather: getPresetWeather('imc'), activeRunways: { departing: ['13'], landing: ['13'] }, controllerPositions: TOWER_AND_GROUND,
+      'The IMC weather preset is in effect: 600 ft broken, 1,100 ft overcast, visibility 2 miles in mist. VFR general aviation is grounded. You work Approach (124.6), Tower (120.3) and Ground (121.9). ' +
+      'Three A320s check in over the ILS 13 fixes: Spirit 244 over CARYL and American 1672 over Cedar Lake (VCN, it flies VCN - CARYL - MAYBN), with Spirit 377 over Cedar Lake six minutes later, at 3,000 or 4,000 ft. ' +
+      'Each is already on the published route, so "Spirit two forty four, descend and maintain two thousand, cleared ILS runway one three approach" is enough; keep them apart (3 nm in trail on the final) and use speed or vectors if they bunch up. ' +
+      'When a pilot reports established, hand it to Tower, then clear it to land; after landing send it to Ground and taxi it to parking so the next arrival can use the same exit. A Spirit departure is holding short of 13 on Tower: use the gaps. Runway 4/22 has no ILS: only 13 and 31 do.',
+    weather: getPresetWeather('imc'), activeRunways: { departing: ['13'], landing: ['13'] }, controllerPositions: ['APP', 'DEP', 'TWR', 'GND'],
     spawns: [
-      arrivalOnFinal(airport, 'NKS244', 'A320', '13', 10, 0, { altitudeFt: 3000 }),
-      arrivalOnFinal(airport, 'AAL1672', 'A320', '13', 16, 0, { altitudeFt: 3000, speedKt: 180 }),
-      arrivalOnFinal(airport, 'NKS377', 'A320', '13', 22, 60, { altitudeFt: 3000, speedKt: 180 }),
-      parkedDeparture('NKS890', 'A320', 'GATE-5', 30),
+      ifrArrival(airport, 'NKS244', 'A320', '13', 0, { altitudeFt: 3000 }),
+      ifrArrival(airport, 'AAL1672', 'A320', '13', 0, { altitudeFt: 4000, fromFeeder: true }),
+      ifrArrival(airport, 'NKS377', 'A320', '13', 360, { altitudeFt: 4000, fromFeeder: true }),
+      holdingShort(airport, 'NKS890', 'A320', '13', 30),
     ],
     objectives: [
+      obj('appr-1', 'Clear NKS244 for the ILS 13 approach', 'approach:NKS244'),
+      obj('appr-2', 'Clear AAL1672 for the ILS 13 approach', 'approach:AAL1672'),
+      obj('appr-3', 'Clear NKS377 for the ILS 13 approach', 'approach:NKS377'),
       obj('arr-1', 'NKS244 lands', 'landed:NKS244'),
       obj('arr-2', 'AAL1672 lands', 'landed:AAL1672'),
       obj('arr-3', 'NKS377 lands', 'landed:NKS377'),
       obj('dep-1', 'NKS890 takes off', 'takeoff:NKS890'),
-      NO_INCURSIONS,
-      obj('no-sep', 'No separation violations', 'no_separation'),
+      obj('safe', 'No incursions, unsafe clearances or separation losses', 'no_conflicts'),
     ],
-    durationSec: 1800, difficulty: 'normal',
+    durationSec: 2100, difficulty: 'normal',
   }),
 );
 
@@ -244,29 +252,32 @@ const step8 = def(
 // 9. Mixed aircraft performance
 // ---------------------------------------------------------------------------
 const step9 = def(
-  { id: 'career-09-mixed-performance', name: '9. Mixed aircraft performance', description: 'A fast Airbus is catching a slow Cessna on the same final. Sequence them.', mode: 'career', difficulty: 4, careerStep: 9, estimatedMinutes: 14 },
+  { id: 'career-09-mixed-performance', name: '9. Mixed aircraft performance', description: 'A fast Airbus is catching a slow Cessna on the same final, and an IFR departure needs its clearance. Sequence them.', mode: 'career', difficulty: 4, careerStep: 9, estimatedMinutes: 20 },
   (airport, o) => ({
     id: 'career-09-mixed-performance', name: '9. Mixed aircraft performance', mode: 'career', careerStep: 9, seed: o?.seed ?? 109,
     description:
       'Cessna N48KT is 6 nm out at 90 knots with Spirit 817 (A320) 12 nm out at 180 knots behind it: the Airbus closes about 70-100 knots faster. Slow the Spirit, or land the Cessna first and keep it from reaching the runway until it is clear. ' +
-      'Two departures (N61RT, then Spirit 540 from the gate) need gaps; the Airbus needs far more runway and time than the Cessna.' +
+      'Two departures (N61RT, then Spirit 540 from the gate) need gaps; the Airbus needs far more runway and time than the Cessna. ' +
+      'Spirit 540 is IFR to Newark (cruise 14,000): read its clearance on Clearance Delivery (127.85) when it calls, then it asks Ground for taxi; after takeoff hand it to Departure (124.6), say radar contact and climb it or send it direct.' +
       ' The A320 needs about 6,500 ft of runway: send it to the full-length hold on Bravo (or Charlie), not the Alpha intersection - the simulator will refuse the takeoff.',
-    weather: WX_RWY13(), activeRunways: { departing: ['13'], landing: ['13'] }, controllerPositions: TOWER_AND_GROUND,
+    weather: WX_RWY13(), activeRunways: { departing: ['13'], landing: ['13'] }, controllerPositions: IFR_DEPARTURE_POSITIONS,
     spawns: [
       arrivalOnFinal(airport, 'N48KT', 'C172', '13', 6, 0, { speedKt: 90 }),
       arrivalOnFinal(airport, 'NKS817', 'A320', '13', 12, 0, { speedKt: 180 }),
       holdingShort(airport, 'N61RT', 'C172', '13', 0),
-      parkedDeparture('NKS540', 'A320', 'GATE-7', 45),
+      ifrDeparture(airport, 'NKS540', 'A320', 'GATE-7', 45, 'KEWR', 14000),
     ],
     objectives: [
       obj('arr-1', 'N48KT lands', 'landed:N48KT'),
       obj('arr-2', 'NKS817 lands', 'landed:NKS817'),
       obj('dep-1', 'N61RT takes off', 'takeoff:N61RT'),
+      obj('ifr-clr', 'Issue NKS540 its IFR clearance', 'ifr_clearance:NKS540'),
       obj('dep-2', 'NKS540 takes off', 'takeoff:NKS540'),
+      obj('dep-2-handled', 'NKS540 is handed to Departure, instructed and leaves the area', 'handled:NKS540'),
       obj('no-sep', 'No separation violations', 'no_separation'),
       NO_INCURSIONS,
     ],
-    durationSec: 1500, difficulty: 'hard',
+    durationSec: 2400, difficulty: 'hard',
   }),
 );
 
@@ -320,15 +331,17 @@ const step10 = def(
 const step11 = def(
   { id: 'career-11-complex', name: '11. Complex airport traffic', description: 'A busy afternoon: continuous arrivals and departures, GA and airline, for 25 minutes.', mode: 'career', difficulty: 5, careerStep: 11, estimatedMinutes: 25 },
   (airport, o) => {
+    // IFR departures only: airline departures start on Clearance Delivery (positions TWR, GND, CLNC, DEP); arrivals stay on final for Tower.
     const fp = buildFreePlay(airport, {
       seed: o?.seed ?? 111, weather: 'light-crosswinds', difficulty: 'hard', startingScenario: 'mixed',
       aircraftCount: 6, arrivalsPerHour: 20, departuresPerHour: 20, gaFraction: 0.35, maxAircraft: 14,
-    });
+    }, { ifrArrivals: false, ifrDepartures: true, controllerPositions: IFR_DEPARTURE_POSITIONS });
     return {
       ...fp,
       id: 'career-11-complex', name: '11. Complex airport traffic', mode: 'career', careerStep: 11,
       description:
-        'Free-play density at its highest: up to 14 aircraft, about 40 operations an hour, GA and airline traffic, and a 12 knot crosswind with gusts. Handle at least 10 aircraft in 25 minutes without a runway incursion or a loss of separation.',
+        'Free-play density at its highest: up to 14 aircraft, about 40 operations an hour, GA and airline traffic, and a 12 knot crosswind with gusts. Airline departures are IFR: they call Clearance Delivery (127.85) first, then Ground, and after takeoff Tower hands them to Departure (124.6). ' +
+        'Handle at least 10 aircraft in 25 minutes without a runway incursion or a loss of separation.',
       objectives: [
         obj('handled', 'Handle at least 10 aircraft', 'handled:>=10'),
         NO_INCURSIONS,
