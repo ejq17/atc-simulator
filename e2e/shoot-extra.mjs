@@ -1,0 +1,41 @@
+// Extra review screenshots (busy free play, drawers, debrief) into docs/screenshots/.
+import { chromium } from '@playwright/test';
+
+const browser = await chromium.launch();
+const ctx = await browser.newContext({ baseURL: 'http://localhost:5173', viewport: { width: 1440, height: 900 } });
+await ctx.addInitScript(() => {
+  localStorage.setItem('kacy.voice.settings', JSON.stringify({ providerId: 'none', ttsEnabled: false, radioEffectsEnabled: false }));
+});
+const page = await ctx.newPage();
+page.on('console', (m) => { if (m.type() === 'error') console.log('[console.error]', m.text()); });
+page.on('pageerror', (e) => console.log('[pageerror]', e.message));
+await page.goto('/');
+await page.getByTestId('scenario-free-play-busy-arrivals').click();
+await page.getByTestId('seed-input').fill('11');
+await page.waitForTimeout(800);
+await page.screenshot({ path: 'docs/screenshots/setup-scenario.png' });
+await page.getByTestId('start-session').click();
+await page.waitForSelector('[data-testid="sim-screen"]');
+await page.getByTestId('speed-4').click();
+await page.waitForTimeout(25000);
+await page.screenshot({ path: 'docs/screenshots/sim-busy.png' });
+await page.getByTestId('tab-radar').click();
+await page.waitForTimeout(800);
+await page.screenshot({ path: 'docs/screenshots/radar-busy.png' });
+await page.getByTestId('open-charts').click();
+await page.waitForTimeout(2500);
+await page.screenshot({ path: 'docs/screenshots/charts.png' });
+await page.keyboard.press('Escape');
+await page.getByTestId('open-settings').click();
+await page.waitForTimeout(600);
+await page.screenshot({ path: 'docs/screenshots/settings.png' });
+await page.keyboard.press('Escape');
+await page.getByTestId('atis-button').click();
+await page.waitForTimeout(400);
+await page.screenshot({ path: 'docs/screenshots/atis.png' });
+await page.keyboard.press('Escape');
+await page.getByTestId('end-session').click();
+await page.waitForSelector('[data-testid="debrief-screen"]');
+await page.waitForTimeout(500);
+await page.screenshot({ path: 'docs/screenshots/debrief.png', fullPage: false });
+await browser.close();

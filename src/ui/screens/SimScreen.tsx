@@ -1,0 +1,108 @@
+import { useEffect } from 'react';
+import { useSimStore } from '../store/simStore';
+import { useUiStore, viewBus } from '../store/uiStore';
+import { TopBar } from '../components/TopBar';
+import { AircraftPanel } from '../components/AircraftPanel';
+import { AircraftDetails } from '../components/AircraftDetails';
+import { RadioPanel } from '../components/RadioPanel';
+import { CommsLog } from '../components/CommsLog';
+import { AlertsStrip } from '../components/AlertsStrip';
+import { NoticeBar, TrainingBanner } from '../components/Banners';
+import { Segmented } from '../components/ui';
+import { SurfaceDisplay } from '../display/SurfaceDisplay';
+import { RadarDisplay } from '../display/RadarDisplay';
+import { ChartsDrawer } from '../drawers/ChartsDrawer';
+import { NavaidsDrawer } from '../drawers/NavaidsDrawer';
+import { SettingsDrawer } from '../drawers/SettingsDrawer';
+import { AtisDrawer } from '../drawers/AtisDrawer';
+import { WeatherDrawer } from '../drawers/WeatherDrawer';
+
+function isEditable(t: EventTarget | null): boolean {
+  const el = t as HTMLElement | null;
+  if (!el || !('tagName' in el)) return false;
+  return el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.tagName === 'SELECT' || el.isContentEditable;
+}
+
+function useShortcuts() {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
+      const ui = useUiStore.getState();
+      const sim = useSimStore.getState();
+      if (isEditable(e.target)) return;
+      switch (e.key) {
+        case 'Enter':
+          if (ui.drawer) return;
+          e.preventDefault();
+          window.dispatchEvent(new Event('atc:focus-input'));
+          break;
+        case 'Escape':
+          if (ui.drawer) return; // the drawer closes itself
+          sim.selectAircraft(undefined);
+          break;
+        case '1': ui.setView('surface'); break;
+        case '2': ui.setView('radar'); break;
+        case '+': case '=': viewBus.emit({ type: 'zoom', factor: 1.4 }); break;
+        case '-': case '_': viewBus.emit({ type: 'zoom', factor: 1 / 1.4 }); break;
+        case 'p': case 'P': sim.togglePause(); break;
+        default:
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
+}
+
+export function SimScreen() {
+  const view = useUiStore((s) => s.view);
+  const setView = useUiStore((s) => s.setView);
+  const drawer = useUiStore((s) => s.drawer);
+  const setDrawer = useUiStore((s) => s.setDrawer);
+  useShortcuts();
+  const close = () => setDrawer(null);
+  return (
+    <div className="flex h-full flex-col bg-atc-bg" data-testid="sim-screen">
+      <TopBar />
+      <NoticeBar />
+      <TrainingBanner />
+      <div className="flex min-h-0 flex-1">
+        <div className="flex min-w-0 flex-1 flex-col">
+          <div className="flex h-9 shrink-0 items-center justify-between border-b border-atc-border bg-atc-panel px-3">
+            <Segmented
+              value={view}
+              onChange={setView}
+              options={[
+                { value: 'surface', label: <span data-testid="tab-surface">Surface <span className="opacity-60">1</span></span> },
+                { value: 'radar', label: <span data-testid="tab-radar">Radar <span className="opacity-60">2</span></span> },
+              ]}
+            />
+            <span className="hidden font-sans text-[10.5px] uppercase tracking-wider text-atc-muted md:inline">
+              {view === 'surface' ? 'Wheel zoom · drag pan · click aircraft to select · +/− zoom' : 'Wheel / +/− change range · drag pan · click target to select'}
+            </span>
+          </div>
+          <div className="relative min-h-0 flex-1" data-testid="display-area">
+            {view === 'surface' ? <SurfaceDisplay key="surface" /> : <RadarDisplay key="radar" />}
+          </div>
+        </div>
+        <aside className="flex w-[380px] shrink-0 flex-col border-l border-atc-border bg-atc-panel xl:w-[400px]">
+          <AircraftPanel />
+          <div className="max-h-[62%] shrink-0 overflow-y-auto border-t border-atc-border">
+            <AircraftDetails />
+          </div>
+        </aside>
+      </div>
+      <div className="flex h-[262px] shrink-0 border-t border-atc-border">
+        <div className="flex min-w-0 flex-1 flex-col">
+          <AlertsStrip />
+          <div className="min-h-0 flex-1"><CommsLog /></div>
+        </div>
+        <div className="w-[380px] shrink-0 border-l border-atc-border xl:w-[400px]"><RadioPanel /></div>
+      </div>
+      {drawer === 'charts' && <ChartsDrawer onClose={close} />}
+      {drawer === 'navaids' && <NavaidsDrawer onClose={close} />}
+      {drawer === 'settings' && <SettingsDrawer onClose={close} />}
+      {drawer === 'atis' && <AtisDrawer onClose={close} />}
+      {drawer === 'weather' && <WeatherDrawer onClose={close} />}
+    </div>
+  );
+}

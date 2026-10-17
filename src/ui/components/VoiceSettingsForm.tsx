@@ -1,0 +1,115 @@
+import { useEffect, useState } from 'react';
+import { STT_PROVIDER_NOTES, VOICE_PRIVACY_NOTES, TRANSCRIPT_STORAGE_KEY, createWebSpeechProvider } from '../../voice';
+import type { SttProviderId } from '../../voice';
+import { voiceSettings, useVoiceSettings } from '../store/voiceSettings';
+import { keyLabel } from '../lib/voiceStatus';
+import { Btn, Field, Kbd, SELECT, Toggle } from './ui';
+
+function useProviderAvailability(id: SttProviderId): { checking: boolean; available: boolean | null; detail?: string } {
+  const [state, setState] = useState<{ checking: boolean; available: boolean | null; detail?: string }>({ checking: true, available: null });
+  useEffect(() => {
+    let cancelled = false;
+    setState({ checking: true, available: null });
+    (async () => {
+      try {
+        if (id === 'none') return !cancelled && setState({ checking: false, available: true, detail: 'No microphone needed.' });
+        if (id === 'webspeech') {
+          const ok = await createWebSpeechProvider().isAvailable();
+          return !cancelled && setState({ checking: false, available: ok, detail: ok ? 'Speech recognition is available in this browser.' : 'This browser has no Web Speech recognition (use Chrome or Edge, or Deepgram).' });
+        }
+        const res = await fetch('/api/voice/deepgram-token', { headers: { Accept: 'application/json' } });
+        const body = (await res.json().catch(() => ({}))) as { configured?: boolean };
+        if (cancelled) return;
+        if (res.ok && body.configured) setState({ checking: false, available: true, detail: 'Deepgram key is configured on the local server.' });
+        else setState({ checking: false, available: false, detail: 'No Deepgram key on the local server. Start it with DEEPGRAM_API_KEY set (see src/voice/README.md).' });
+      } catch {
+        if (!cancelled) setState({ checking: false, available: false, detail: 'Local backend not reachable (run `npm run server`).' });
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [id]);
+  return state;
+}
+
+export function VoiceSettingsForm({ compact = false }: { compact?: boolean }) {
+  const s = useVoiceSettings();
+  const [capturing, setCapturing] = useState(false);
+  const avail = useProviderAvailability(s.providerId);
+  const note = STT_PROVIDER_NOTES[s.providerId];
+
+  useEffect(() => {
+    if (!capturing) return;
+    const onKey = (e: KeyboardEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (e.key === 'Escape') return setCapturing(false);
+      voiceSettings.update({ pttKey: e.code && e.code !== 'Unidentified' ? e.code : e.key });
+      setCapturing(false);
+    };
+    window.addEventListener('keydown', onKey, true);
+    return () => window.removeEventListener('keydown', onKey, true);
+  }, [capturing]);
+
+  return (
+    <div className="flex flex-col gap-4 text-xs">
+      <section className="flex flex-col gap-2.5">
+        <h3 className="font-sans text-[11px] font-semibold uppercase tracking-[0.18em] text-atc-cyan">Speech input</h3>
+        <Field label="Recognition provider">
+          <select className={SELECT} value={s.providerId} onChange={(e) => voiceSettings.update({ providerId: e.target.value as SttProviderId })} aria-label="Recognition provider">
+            {(Object.keys(STT_PROVIDER_NOTES) as SttProviderId[]).map((id) => (
+              <option key={id} value={id}>{STT_PROVIDER_NOTES[id].label}</option>
+            ))}
+          </select>
+        </Field>
+        <p className="leading-snug text-atc-muted">{note.summary}</p>
+        <div className={`border px-2 py-1.5 leading-snug ${avail.available === false ? 'border-atc-amber/60 text-atc-amber' : 'border-atc-border text-atc-muted'}`}>
+          {avail.checking ? 'Checking availability…' : avail.detail}
+        </div>
+        <div className="border border-atc-border bg-atc-bg px-2 py-1.5 leading-snug text-atc-muted">
+          <b className="text-atc-text">Where your audio goes: </b>{note.audioGoesTo} <span className="text-atc-muted">Cost: {note.cost}</span>
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="Push-to-talk key">
+            <Btn onClick={() => setCapturing(true)} tone={capturing ? 'amber' : 'default'} aria-label="Change push-to-talk key">
+              {capturing ? 'Press a key… (Esc)' : <>Key: <Kbd>{keyLabel(s.pttKey)}</Kbd></>}
+            </Btn>
+          </Field>
+          <Field label="PTT mode">
+            <select className={SELECT} value={s.pttMode} onChange={(e) => voiceSettings.update({ pttMode: e.target.value as 'hold' | 'toggle' })} aria-label="PTT mode">
+              <option value="hold">Hold to talk</option>
+              <option value="toggle">Press to start / stop</option>
+            </select>
+          </Field>
+        </div>
+      </section>
+
+      <section className="flex flex-col gap-1">
+        <h3 className="mb-1 font-sans text-[11px] font-semibold uppercase tracking-[0.18em] text-atc-cyan">Pilot voices and radio</h3>
+        <Toggle checked={s.ttsEnabled} onChange={(v) => voiceSettings.update({ ttsEnabled: v })} label="Speak pilot transmissions" hint="Browser text-to-speech, one voice profile per aircraft. Off = text only." />
+        <div className="grid grid-cols-2 gap-3 py-1">
+          <Field label={`Volume ${Math.round(s.ttsVolume * 100)}%`}>
+            <input type="range" min={0} max={1} step={0.05} value={s.ttsVolume} onChange={(e) => voiceSettings.update({ ttsVolume: Number(e.target.value) })} className="accent-[#39c5e8]" aria-label="Pilot voice volume" />
+          </Field>
+          <Field label={`Speech rate ${s.ttsRate.toFixed(2)}×`}>
+            <input type="range" min={0.5} max={2} step={0.05} value={s.ttsRate} onChange={(e) => voiceSettings.update({ ttsRate: Number(e.target.value) })} className="accent-[#39c5e8]" aria-label="Pilot voice rate" />
+          </Field>
+        </div>
+        <Toggle checked={s.radioEffectsEnabled} onChange={(v) => voiceSettings.update({ radioEffectsEnabled: v })} label="Radio effects" hint="Key-up and key-down clicks. The browser cannot filter the synthesised voice itself." />
+      </section>
+
+      {!compact && (
+        <section className="flex flex-col gap-1">
+          <h3 className="mb-1 font-sans text-[11px] font-semibold uppercase tracking-[0.18em] text-atc-cyan">Privacy</h3>
+          <Toggle checked={s.storeTranscripts} onChange={(v) => voiceSettings.update({ storeTranscripts: v })} label="Store transcripts in this browser" hint="Off by default. Text only, never audio." />
+          <Btn size="xs" className="self-start" onClick={() => { try { localStorage.removeItem(TRANSCRIPT_STORAGE_KEY); } catch { /* ignore */ } }}>Erase stored transcripts</Btn>
+        </section>
+      )}
+      <section className="flex flex-col gap-1.5 border-t border-atc-border pt-3 leading-snug text-atc-muted">
+        <p className="text-atc-text">{VOICE_PRIVACY_NOTES.headline}</p>
+        <p>{VOICE_PRIVACY_NOTES.recordings}</p>
+        {!compact && <p>{VOICE_PRIVACY_NOTES.transcripts}</p>}
+        <p>{VOICE_PRIVACY_NOTES.analytics}</p>
+      </section>
+    </div>
+  );
+}

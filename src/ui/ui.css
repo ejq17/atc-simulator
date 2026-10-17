@@ -1,0 +1,21 @@
+/* Extra styling for the simulator shell. Tokens (atc-*) come from src/index.css. */
+:root { color-scheme: dark; }
+html, body { overflow: hidden; }
+body { -webkit-font-smoothing: antialiased; }
+*::-webkit-scrollbar { width: 8px; height: 8px; }
+*::-webkit-scrollbar-track { background: #0b0e11; }
+*::-webkit-scrollbar-thumb { background: #2a323c; border-radius: 0; }
+*::-webkit-scrollbar-thumb:hover { background: #3a4552; }
+button { font-family: inherit; }
+input, select { font-family: inherit; }
+.atc-grid-bg {
+  background-image:
+    linear-gradient(rgba(57, 197, 232, 0.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(57, 197, 232, 0.035) 1px, transparent 1px);
+  background-size: 48px 48px;
+}
+@keyframes atc-blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
+.atc-blink { animation: atc-blink 1s steps(2, start) infinite; }
+@keyframes atc-pulse-ring { 0% { box-shadow: 0 0 0 0 rgba(255, 77, 79, 0.55); } 100% { box-shadow: 0 0 0 10px rgba(255, 77, 79, 0); } }
+.atc-tx { animation: atc-pulse-ring 1s ease-out infinite; }
+:focus-visible { outline: 1px solid #39c5e8; outline-offset: 1px; }

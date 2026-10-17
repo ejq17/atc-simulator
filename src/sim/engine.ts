@@ -177,7 +177,12 @@ export function createEngine(opts: EngineOptionsExt): SimulationEngine {
     },
     setWeather(w: Weather) {
       state.weather = { ...w };
-      emitEvent(ctx, { kind: 'INFO', text: `Weather updated: wind ${w.windDirDeg}/${w.windSpeedKt} kt`, severity: 'info', speaker: 'SYSTEM' });
+      const magDir = typeof w.windDirDeg === 'number' ? String(Math.round((((w.windDirDeg - airport.magneticVariationDeg) % 360) + 360) % 360) || 360).padStart(3, '0') : 'VRB';
+      emitEvent(ctx, { kind: 'INFO', text: `Weather updated: wind ${magDir}/${w.windSpeedKt} kt (magnetic)`, severity: 'info', speaker: 'SYSTEM' });
+      notify();
+    },
+    setAtis(atis) {
+      state.atis = { ...atis, activeRunways: { departing: [...atis.activeRunways.departing], landing: [...atis.activeRunways.landing] }, simulated: true };
       notify();
     },
     setActiveRunways(cfg) {

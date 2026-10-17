@@ -3,7 +3,7 @@
  * depend ONLY on this file and on `types.ts`, never on engine internals.
  */
 import type {
-  Aircraft, Airport, CommandOutcome, ControllerPositionId, ParsedCommand,
+  Aircraft, Airport, Atis, CommandOutcome, ControllerPositionId, ParsedCommand,
   Scenario, SimEvent, SimulationState, Weather,
 } from './types';
 
@@ -16,7 +16,7 @@ export interface SimulationEngine {
   subscribe(listener: (state: SimulationState) => void): Unsubscribe;
   /** Advance the simulation by exactly one fixed step (`state.clock.dtSec`). */
   step(): void;
-  /** Advance by wall-clock seconds, honouring `clock.speed`; runs N fixed steps and returns the leftover accumulator. */
+  /** Advance by wall-clock seconds, honouring `clock.speed`; runs N whole fixed steps and keeps the remainder in an internal accumulator. */
   advance(wallSec: number): void;
   setSpeed(speed: number): void;
 
@@ -33,6 +33,8 @@ export interface SimulationEngine {
   removeAircraft(id: string): void;
 
   setWeather(weather: Weather): void;
+  /** Replace the current ATIS (letter/text/runways). The UI generates ATIS from weather + runway config. */
+  setAtis(atis: Atis): void;
   setActiveRunways(cfg: { departing: string[]; landing: string[] }): void;
   setControllerPosition(position: ControllerPositionId): void;
   selectAircraft(id?: string): void;

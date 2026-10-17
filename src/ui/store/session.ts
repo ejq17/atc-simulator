@@ -1,0 +1,317 @@
+/**
+ * A running simulator session: ONE engine, the rAF loop that advances it, the render buffer the canvases
+ * interpolate from, and the voice stack (push-to-talk, pilot TTS). Framework-free so it can be driven and
+ * tested without React; `simStore.ts` wraps it for the UI.
+ */
+import { createEngine } from '../../sim/engine';
+import type { SimulationEngine } from '../../sim/api';
+import type {
+  Atis, ControllerPositionId, Scenario, SimulationState, Weather,
+} from '../../sim/types';
+import type { ScenarioEventRunner, TrainingController, TrainingStepState } from '../../game';
+import { game } from '../../game';
+import { sameFrequency } from '../../radio/frequencies';
+import { altimeterText, windText } from '../lib/format';
+import { atisNeedsUpdate, generateAtis, nextAtisLetter } from '../../weather/atis';
+import type { SimulatedAtis } from '../../weather/atis';
+import {
+  createBrowserTts, createPilotVoice, createRadioEffects, createTranscriptLog, createVoiceController,
+} from '../../voice';
+import type { TranscriptLog, TransmissionQueue, VoiceController, VoiceStatusEvent } from '../../voice';
+import { createRenderBuffer } from '../display/renderBuffer';
+import type { RenderBuffer } from '../display/renderBuffer';
+import { controllerFrequencies, transmit } from '../commands/transmit';
+import type { ControllerSetup, TransmitResult } from '../commands/transmit';
+import { voiceSettings } from './voiceSettings';
+
+export const AIRPORT_CALL_NAME = 'Atlantic City';
+
+export interface SessionHooks {
+  /** State changed in a way the React tree should re-read (throttled ~10 Hz, and immediately after commands). */
+  onRev(): void;
+  onVoiceStatus(e: VoiceStatusEvent): void;
+  onPartial(text: string): void;
+  onTransmitting(on: boolean): void;
+  onTransmitResult(r: TransmitResult): void;
+  onTraining(step: TrainingStepState | null): void;
+  onAtis(atis: SimulatedAtis): void;
+  onScenarioComplete(): void;
+  onNotice(level: 'info' | 'warn' | 'error', text: string): void;
+}
+
+export interface SessionParams {
+  engine: SimulationEngine;
+  scenario: Scenario;
+  controller: ControllerSetup;
+  startUtcMs: number;
+  atisLetter: string;
+  training: TrainingController | null;
+  /** Scripted scenario events (wind shift, emergency call); updated once per animation frame. */
+  runner?: ScenarioEventRunner;
+  hooks: SessionHooks;
+  /** Set false in tests / non-browser contexts. */
+  enableVoice?: boolean;
+  /** Provide the pilot-transmission sink; the engine must have been created with `pilotSink`. */
+  pilotSink: PilotSink;
+}
+
+/** Created before the engine so `onPilotTransmission` can reach the session once it exists. */
+export interface PilotSink {
+  handler: ((t: { aircraftId: string; callsign: string; text: string; frequencyMhz: number; voiceId: string }) => void) | null;
+}
+
+export function createPilotSink(): { sink: PilotSink; onPilotTransmission: NonNullable<Parameters<typeof createEngine>[0]['onPilotTransmission']> } {
+  const sink: PilotSink = { handler: null };
+  return { sink, onPilotTransmission: (t) => sink.handler?.(t) };
+}
+
+export interface Session {
+  readonly engine: SimulationEngine;
+  readonly buffer: RenderBuffer;
+  readonly scenario: Scenario;
+  readonly startUtcMs: number;
+  readonly voice: VoiceController | null;
+  readonly transcript: TranscriptLog;
+  atis: SimulatedAtis;
+  getController(): ControllerSetup;
+  setController(setup: ControllerSetup): void;
+  submit(text: string, source: 'voice' | 'typed'): TransmitResult;
+  setSpeed(speed: number): void;
+  getSpeed(): number;
+  setWeather(w: Weather): void;
+  setActiveRunways(cfg: { departing: string[]; landing: string[] }): void;
+  /** Speak the simulated ATIS through the pilot TTS provider. */
+  speakAtis(): void;
+  stopSpeaking(): void;
+  trainingStep(): TrainingStepState | null;
+  dispose(): void;
+}
+
+export function makeAtis(state: SimulationState, letter: string, startUtcMs: number): SimulatedAtis {
+  return generateAtis({
+    airportName: AIRPORT_CALL_NAME,
+    icao: state.airport.icao,
+    weather: state.weather,
+    variationDeg: state.airport.magneticVariationDeg,
+    activeRunways: state.activeRunways,
+    letter,
+    timeUtc: new Date(startUtcMs + state.clock.timeSec * 1000),
+    elevationFt: state.airport.elevationFt,
+    issuedAtSec: state.clock.timeSec,
+  });
+}
+
+/**
+ * The engine has no `setAtis`; it reads `state.atis.letter` when pilots check in, so keep that object current.
+ * (Documented gap: docs/PROGRESS.md "Known issues".)
+ */
+export function applyAtisToEngine(state: SimulationState, atis: SimulatedAtis): void {
+  const target: Atis = state.atis;
+  target.letter = atis.letter;
+  target.text = atis.text;
+  target.issuedAtSec = atis.issuedAtSec;
+  target.activeRunways = { departing: [...atis.activeRunways.departing], landing: [...atis.activeRunways.landing] };
+  target.simulated = true;
+}
+
+export function startSession(p: SessionParams): Session {
+  const { engine, hooks } = p;
+  const buffer = createRenderBuffer();
+  let controller: ControllerSetup = { positions: [...p.controller.positions] };
+  let atis = makeAtis(engine.getState(), p.atisLetter, p.startUtcMs);
+  engine.setAtis(atis);
+  hooks.onAtis(atis);
+
+  // ----- voice -------------------------------------------------------------------------------------------------
+  const enableVoice = p.enableVoice ?? typeof window !== 'undefined';
+  const tts = createBrowserTts();
+  const radio = enableVoice ? createRadioEffects({ enabled: voiceSettings.get().radioEffectsEnabled }) : undefined;
+  const transcript = createTranscriptLog(voiceSettings);
+  const pilots: TransmissionQueue = createPilotVoice({ tts, settings: voiceSettings, radio });
+  const monitoredMhz = () => controllerFrequencies(engine.getState(), controller);
+  const syncMonitored = () => {
+    const m = monitoredMhz();
+    pilots.setMonitoredFrequency(m[0] ?? engine.getState().controllerFrequencyMhz);
+  };
+  syncMonitored();
+
+  p.pilotSink.handler = (t) => {
+    // Only audible on a frequency the controller is working; the engine already logged the text.
+    if (!monitoredMhz().some((m) => sameFrequency(m, t.frequencyMhz))) return;
+    transcript.add({ text: `${t.callsign}: ${t.text}`, source: 'pilot' });
+    // Combined positions monitor several frequencies; the queue knows one, so retarget it to this call.
+    pilots.setMonitoredFrequency(t.frequencyMhz);
+    pilots.enqueue({ text: t.text, voiceId: t.voiceId, frequencyMhz: t.frequencyMhz });
+  };
+
+  const submit = (text: string, source: 'voice' | 'typed', confidence?: number): TransmitResult => {
+    transcript.add({ text, source: source === 'voice' ? 'speech' : 'typed', confidence });
+    const r = transmit({ engine, text, source, controller });
+    for (const res of r.results) {
+      training?.onCommand({
+        kind: res.command.kind,
+        status: res.outcome.status,
+        reason: res.outcome.status === 'rejected' ? res.outcome.reason : undefined,
+        callsign: res.command.callsign,
+      });
+    }
+    hooks.onTransmitResult(r);
+    hooks.onTraining(training ? training.update(engine.getState()) : null);
+    hooks.onRev();
+    return r;
+  };
+
+  let voice: VoiceController | null = null;
+  let unsubSettings: (() => void) | null = null;
+  if (enableVoice) {
+    const s = voiceSettings.get();
+    voice = createVoiceController({
+      providerId: s.providerId,
+      ptt: { key: s.pttKey, mode: s.pttMode },
+      onTransmission: (text, meta) => submit(text, meta.source === 'typed' ? 'typed' : 'voice', meta.confidence),
+    });
+    voice.onTransmittingChange((on) => {
+      pilots.setControllerTransmitting(on);
+      hooks.onTransmitting(on);
+    });
+    voice.onStatusChange((e) => hooks.onVoiceStatus(e));
+    voice.onPartial((t) => hooks.onPartial(t));
+    void voice.setProvider(s.providerId);
+    let lastProvider = s.providerId;
+    unsubSettings = voiceSettings.subscribe((next) => {
+      voice?.ptt?.setKey(next.pttKey);
+      voice?.ptt?.setMode(next.pttMode);
+      if (next.providerId !== lastProvider) {
+        lastProvider = next.providerId;
+        void voice?.setProvider(next.providerId);
+      }
+    });
+  }
+
+  // ----- training ----------------------------------------------------------------------------------------------
+  const training = p.training;
+  hooks.onTraining(training ? training.update(engine.getState()) : null);
+
+  // ----- loop --------------------------------------------------------------------------------------------------
+  let raf = 0;
+  let disposed = false;
+  let dirty = true;
+  let lastBump = 0;
+  let lastCompleteCheck = 0;
+  let completeNotified = false;
+  const unsubEngine = engine.subscribe(() => {
+    dirty = true;
+  });
+  const nowMs = () => (typeof performance !== 'undefined' ? performance.now() : Date.now());
+  let last = nowMs();
+  buffer.capture(engine.getState(), last);
+
+  const frame = (t: number) => {
+    if (disposed) return;
+    const wallDelta = Math.min(0.25, Math.max(0, (t - last) / 1000));
+    last = t;
+    engine.advance(wallDelta);
+    const st = engine.getState();
+    if (p.runner) {
+      for (const ev of p.runner.update()) {
+        if (ev.kind === 'weather') {
+          // The runner changed the weather: new ATIS if it matters. Runways are NOT changed for the player.
+          if (atisNeedsUpdate(atis, st.weather, st.activeRunways)) reissueAtis('weather change');
+          const rec = ev.recommendedRunways?.landing[0];
+          hooks.onNotice('warn', `${ev.text}${rec ? ` The new wind favours runway ${rec}; change the runway configuration (Runways button) when ready.` : ''}`);
+        } else if (ev.kind === 'emergency') {
+          hooks.onNotice('warn', `${ev.declaration}: ${ev.text}`);
+        } else {
+          hooks.onNotice('info', ev.text);
+        }
+      }
+    }
+    if (st.clock.tick !== buffer.lastTick()) buffer.capture(st, t);
+    if (dirty && t - lastBump >= 100) {
+      dirty = false;
+      lastBump = t;
+      if (training) hooks.onTraining(training.update(st));
+      if (!completeNotified && t - lastCompleteCheck > 1000) {
+        lastCompleteCheck = t;
+        if (game.isScenarioComplete(st)) {
+          completeNotified = true;
+          hooks.onScenarioComplete();
+        }
+      }
+      hooks.onRev();
+    }
+    raf = requestAnimationFrame(frame);
+  };
+  if (typeof requestAnimationFrame !== 'undefined') raf = requestAnimationFrame(frame);
+
+  // ----- weather / ATIS ------------------------------------------------------------------------------------------
+  const reissueAtis = (reason: string) => {
+    const st = engine.getState();
+    atis = makeAtis(st, nextAtisLetter(atis.letter), p.startUtcMs);
+    engine.setAtis(atis);
+    session.atis = atis;
+    engine.logEvent({ kind: 'INFO', text: `ATIS information ${atis.phonetic} is current (${reason}).`, severity: 'info', speaker: 'SYSTEM' });
+    hooks.onAtis(atis);
+  };
+
+  const session: Session = {
+    engine,
+    buffer,
+    scenario: p.scenario,
+    startUtcMs: p.startUtcMs,
+    voice,
+    transcript,
+    atis,
+    getController: () => controller,
+    setController(setup) {
+      controller = { positions: [...setup.positions] };
+      const primary: ControllerPositionId = controller.positions[0] ?? 'TWR';
+      engine.setControllerPosition(primary);
+      syncMonitored();
+      hooks.onRev();
+    },
+    submit: (text, source) => submit(text, source),
+    setSpeed(speed) {
+      engine.setSpeed(speed);
+      hooks.onRev();
+    },
+    getSpeed: () => engine.getState().clock.speed,
+    setWeather(w) {
+      const st = engine.getState();
+      const needs = atisNeedsUpdate(atis, w, st.activeRunways);
+      engine.setWeather(w);
+      engine.logEvent({
+        kind: 'INFO', speaker: 'SYSTEM', severity: 'info',
+        text: `Weather: wind ${windText(w, st.airport.magneticVariationDeg)} (magnetic), ${altimeterText(w.altimeterInHg)}, ${w.visibilitySm} SM, ${w.flightCategory}.`,
+      });
+      if (needs) reissueAtis('weather change');
+      hooks.onRev();
+    },
+    setActiveRunways(cfg) {
+      const st = engine.getState();
+      const needs = atisNeedsUpdate(atis, st.weather, cfg);
+      engine.setActiveRunways(cfg);
+      if (needs) reissueAtis('runway change');
+      hooks.onRev();
+    },
+    speakAtis() {
+      pilots.clear();
+      void tts.speak({ text: atis.spokenText, voiceId: 'atis', rate: voiceSettings.get().ttsRate, volume: voiceSettings.get().ttsVolume });
+    },
+    stopSpeaking: () => tts.cancel(),
+    trainingStep: () => (training ? training.current() : null),
+    dispose() {
+      disposed = true;
+      if (typeof cancelAnimationFrame !== 'undefined') cancelAnimationFrame(raf);
+      unsubEngine();
+      unsubSettings?.();
+      voice?.dispose();
+      pilots.clear();
+      pilots.dispose();
+      tts.cancel();
+      radio?.dispose();
+      p.pilotSink.handler = null;
+    },
+  };
+  return session;
+}
