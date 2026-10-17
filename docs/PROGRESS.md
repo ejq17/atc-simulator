@@ -64,7 +64,8 @@ Totals: 1540 vitest tests in 76 files, 24 Playwright tests (14 chromium flows, 5
 - Lint: 3 non-blocking warnings.
 
 ## Not yet implemented (goal.md phases 5–6 and beyond)
-- IFR simplifications: KACY has no published STARs (verified: none in the d-TPP), so arrivals appear over the published IAF/IF (CARYL, STEVV, KOPCE, JEDOB); no per-fix altitude restrictions; LAHSO not modelled; MVA approximated for the 20° intercept rule; no heavy/super wake categories (none of the simulated types are heavy).
+- Verified facts, not simplifications: KACY has no published STARs or SIDs (d-TPP cycle 2610 lists none), so IFR arrivals correctly begin at the published IAF/IF (CARYL, STEVV, KOPCE, JEDOB) and departures fly the ATLANTIC CITY THREE (radar vectors). No heavy/super wake categories are needed because neither simulated type is heavy.
+- In progress (final round): LAHSO from the NASR hold-short points, minimum vectoring altitudes from the FAA MVA product, published fix altitudes from the plates, and the daylight landing-behind-landing exception.
 - Additional aircraft types (regional jets, helicopters, ANG F-16s), emergencies beyond a scripted pan-pan call, holding patterns, takeoff cancellation, LAHSO operations, wake-turbulence timing.
 - Radio congestion/blocked transmissions beyond the controller stepping on a pilot; pilot clarification requests.
 - Session replay from recorded events; 3D tower view; desktop (Tauri) packaging; additional airports (architecture allows it: everything airport-specific comes from the `Airport` object).

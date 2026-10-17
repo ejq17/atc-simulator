@@ -42,6 +42,8 @@ export interface RunwayEnd {
   displacedThresholdFt?: number;
   tdzeFt?: number;
   ils?: { ident: string; frequencyMhz: number; courseDeg: number; glideslopeDeg?: number } | null;
+  /** NASR LAHSO: available landing distance when holding short of the intersecting runway, and the hold-short point. */
+  lahso?: { availableLandingDistanceFt: number; holdShortOfRunwayId: string; holdShortPoint: { latLon: LatLon; pos: Vec2 } } | null;
 }
 
 export interface Runway {
@@ -139,6 +141,8 @@ export interface InstrumentProcedure {
   missedApproachText?: string;
   holdingText?: string;
   minimaText?: string;
+  /** Published altitudes at fixes on the plate profile view (human transcription). */
+  fixAltitudes?: { fix: string; minAltitudeFt?: number; maxAltitudeFt?: number; mandatoryAltitudeFt?: number; note?: string }[];
   /** Published holding patterns read from the plate depiction (human transcription). */
   holdingPatterns?: {
     fix: string;
@@ -175,6 +179,8 @@ export interface Airport {
   hotSpots: HotSpot[];
   towerHours?: string;
   airspaceClass?: 'B' | 'C' | 'D' | 'E' | 'G';
+  /** Minimum vectoring altitude sectors from the FAA MVA/MIA digital product (polygons in local metres). */
+  mvaSectors?: { id: string; polygon: Vec2[]; altitudeFt: number; provenance: DataProvenance }[];
   provenance: DataProvenance[];
 }
 
