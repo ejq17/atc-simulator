@@ -1,0 +1,62 @@
+/**
+ * Game-layer extensions to the engine's `Scenario` contract.
+ *
+ * `Scenario` (src/sim/types.ts) is fixed. Everything extra a game scenario carries lives in optional fields
+ * that the engine ignores; the UI may read them (`events`, `difficulty`, `careerStep`...). All of them are
+ * plain JSON so a scenario survives structuredClone / persistence.
+ */
+import type { CommandKind, Scenario, Weather } from '../sim/types';
+
+/** A scripted occurrence at a scenario time. The UI applies them with `applyDueScenarioEvents` (scenarios/events.ts). */
+export type ScenarioEvent =
+  | {
+      atSec: number;
+      kind: 'weather';
+      weather: Weather;
+      /** Text for the log / a toast, e.g. "Wind shift: now 290 at 14". */
+      text: string;
+      /** Runway configuration the new wind favours. NOT applied automatically: the player must switch. */
+      recommendedRunways?: { departing: string[]; landing: string[] };
+    }
+  | {
+      atSec: number;
+      kind: 'emergency';
+      callsign: string;
+      declaration: 'MAYDAY' | 'PAN-PAN';
+      /** Full pilot call, shown/spoken as that aircraft's transmission. */
+      text: string;
+    }
+  | { atSec: number; kind: 'message'; text: string };
+
+/** Training step as stored on `Scenario.training.steps`, with the game-layer extras. */
+export interface TrainingStepSpec {
+  id: string;
+  prompt: string;
+  expectCommand?: CommandKind;
+  explanation: string;
+  reference?: string;
+  /** The aircraft the step is about; an accepted command for another callsign does not complete it. */
+  callsign?: string;
+  /** Alternative/additional completion: an objective-check string (see objectives.ts). If set without `expectCommand`, the step is a "wait" step. */
+  check?: string;
+  /** Example of a correct transmission (shown as a hint). */
+  example?: string;
+  /** Typical errors, appended to the explanation and used in feedback. */
+  mistakes?: string[];
+}
+
+export type Difficulty = 'easy' | 'normal' | 'hard';
+
+export interface GameScenarioExtras {
+  events?: ScenarioEvent[];
+  difficulty?: Difficulty;
+  /** Aircraft types the traffic generator may use. */
+  aircraftTypes?: string[];
+  careerStep?: number;
+  /** Longer briefing text (description is the short form). */
+  briefing?: string;
+  /** Which spawns are the *scripted* ones (traffic generator must not reuse their callsigns). */
+  training?: { steps: TrainingStepSpec[] };
+}
+
+export type GameScenario = Scenario & GameScenarioExtras;

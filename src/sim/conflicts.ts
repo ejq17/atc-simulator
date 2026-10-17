@@ -3,9 +3,10 @@
  *
  * Paragraph references cite FAA JO 7110.65 TOPICS only (no quoted text):
  *   3-9-6   same runway separation (departures)
- *   3-10-3  landing clearance
+ *   3-10-3  same runway separation (arrivals); 3-10-5 landing clearance
  *   3-7-2   taxi and ground movement, runway crossings
- *   3-9-8   intersecting runway separation (verify numbering against the current edition)
+ *   3-9-8   intersecting runway / intersecting flight path operations
+ *   (paragraph numbers and titles verified 2026-10-16; see docs/FAA-REFERENCES.md)
  */
 import type { Aircraft, ConflictAlert, ParsedCommand, SimulationState } from './types';
 import { dist, mToNm, nmToM, pointInPolygon } from './geo';
@@ -17,7 +18,7 @@ import { emitEvent } from './context';
 import type { SimContext } from './context';
 
 export const REF_SAME_RUNWAY = 'FAA JO 7110.65 3-9-6 (same runway separation)';
-export const REF_LANDING = 'FAA JO 7110.65 3-10-3 (landing clearance)';
+export const REF_LANDING = 'FAA JO 7110.65 3-10-5 (landing clearance) and 3-10-3 (same runway separation)';
 export const REF_TAXI = 'FAA JO 7110.65 3-7-2 (taxi and ground movement, runway crossings)';
 export const REF_INTERSECTING = 'FAA JO 7110.65 3-9-8 (intersecting runway separation)';
 

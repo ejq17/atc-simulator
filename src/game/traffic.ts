@@ -1,0 +1,177 @@
+/**
+ * Scenario traffic generator (`createTrafficGenerator`).
+ *
+ * Poisson-ish, seeded, deterministic: exponential inter-arrival clocks run separately for arrivals and departures
+ * at the scenario's hourly rates scaled by a difficulty ramp. When a clock fires a spawn becomes "due"; the generator
+ * releases due spawns one at a time, alternating arrival/departure, subject to hard rules:
+ *
+ *  - never more than `traffic.maxAircraft` aircraft in the sim,
+ *  - at least `MIN_SPAWN_SPACING_SEC` (45 s) between generated spawns,
+ *  - arrivals 10-12 nm out on the active landing runway's final or a base-leg offset, 2,500-3,000 ft, never within
+ *    3 nm of another arrival (5 nm when a faster aircraft would sit behind a slower one on the same final),
+ *  - departures on a free parking position (GA ramp / FBO for C172, gates for A320); A320 departures only when the
+ *    active departure runway is long enough for it (not 4/22),
+ *  - unique callsigns (never one already used in the scenario or session, never one that sounds like an active aircraft).
+ *
+ * The generator keeps all its state in the closure; `update(state)` is called every engine tick, so the fast path is
+ * a couple of comparisons.
+ */
+import type { Airport, Scenario, SimulationState } from '../sim/types';
+import type { SpawnSpec, TrafficGenerator } from '../sim/traffic';
+import { createNullTrafficGenerator } from '../sim/traffic';
+import { mulberry32 } from '../sim/rng';
+import type { Rng } from '../sim/rng';
+import { callsignTail, randomAirlineCallsign, randomNNumber, runwayLongEnoughFor } from './world';
+import { pickArrivalStart, pickParking } from './placement';
+import type { AirbornePoint } from './placement';
+import type { Difficulty, GameScenario } from './types';
+
+export const MIN_SPAWN_SPACING_SEC = 45;
+
+/** Intensity ramp: multiplier on the hourly rates, rising linearly from `start` to `end` over `rampSec`, then flat. */
+export const DIFFICULTY_RAMP: Record<Difficulty, { start: number; end: number; rampSec: number }> = {
+  easy: { start: 0.5, end: 1.0, rampSec: 20 * 60 },
+  normal: { start: 0.6, end: 1.25, rampSec: 15 * 60 },
+  hard: { start: 0.8, end: 1.8, rampSec: 10 * 60 },
+};
+
+export function rampFactor(difficulty: Difficulty, timeSec: number): number {
+  const r = DIFFICULTY_RAMP[difficulty];
+  const f = Math.min(1, Math.max(0, timeSec / r.rampSec));
+  return r.start + (r.end - r.start) * f;
+}
+
+const exp = (rng: Rng, meanSec: number): number => -Math.log(1 - rng() * 0.999999) * meanSec;
+
+export function createTrafficGenerator(scenario: Scenario, airport: Airport): TrafficGenerator {
+  const cfg = scenario.traffic;
+  if (!cfg || !cfg.enabled) return createNullTrafficGenerator();
+  const gs = scenario as GameScenario;
+  const difficulty: Difficulty = gs.difficulty ?? 'normal';
+  const types = (gs.aircraftTypes?.length ? gs.aircraftTypes : ['C172', 'A320']).filter((t) => t === 'C172' || t === 'A320');
+  const allowGA = types.includes('C172');
+  const allowJet = types.includes('A320');
+  const gaFraction = allowGA && allowJet ? cfg.gaFraction : allowGA ? 1 : 0;
+  const towerOnly = !scenario.controllerPositions.includes('GND');
+  const arrivalFreq = scenario.controllerPositions.includes('TWR') || !scenario.controllerPositions.includes('APP') ? 'TWR' : 'APP';
+  const departureFreq = towerOnly ? 'TWR' : 'GND';
+
+  let rng: Rng | undefined;
+  let nextArr = Infinity;
+  let nextDep = Infinity;
+  let dueArr = 0;
+  let dueDep = 0;
+  let lastSpawnAt = -Infinity;
+  let lastKind: 'arr' | 'dep' = 'dep';
+  let retryAt = 0;
+  const used = new Set<string>(scenario.spawns.map((s) => s.callsign.toUpperCase()));
+  /** parking id -> time reserved; released once an aircraft stands there or after 20 s. */
+  const reserved = new Map<string, number>();
+  let counter = 0;
+
+  const gap = (kind: 'arr' | 'dep', now: number): number => {
+    const perHour = kind === 'arr' ? cfg.arrivalsPerHour : cfg.departuresPerHour;
+    if (perHour <= 0) return Infinity;
+    return exp(rng!, 3600 / (perHour * rampFactor(difficulty, now)));
+  };
+
+  const callsignFor = (ga: boolean, state: Readonly<SimulationState>): string => {
+    const tails = new Set(Object.values(state.aircraft).map((a) => callsignTail(a.callsign)));
+    for (let i = 0; i < 80; i++) {
+      const cs = ga ? randomNNumber(rng!) : randomAirlineCallsign(rng!);
+      if (used.has(cs) || tails.has(callsignTail(cs))) continue;
+      used.add(cs);
+      return cs;
+    }
+    let cs: string;
+    do cs = ga ? `N${100 + ++counter}ZZ` : `NKS${9000 + ++counter}`;
+    while (used.has(cs));
+    used.add(cs);
+    return cs;
+  };
+
+  const trySpawnArrival = (state: Readonly<SimulationState>): SpawnSpec | undefined => {
+    const ends = state.activeRunways.landing.length ? state.activeRunways.landing : state.activeRunways.departing;
+    if (!ends.length) return undefined;
+    const ga = rng!() < gaFraction;
+    const type = ga ? 'C172' : 'A320';
+    const endId = ends[Math.min(ends.length - 1, Math.floor(rng!() * ends.length))];
+    const others: AirbornePoint[] = Object.values(state.aircraft)
+      .filter((a) => !a.onGround)
+      .map((a) => ({ pos: a.pos, type: a.type, runwayEnd: a.isDeparture ? undefined : a.assignedRunwayEnd }));
+    const start = pickArrivalStart(airport, endId, type, rng!, others);
+    if (!start) return undefined;
+    return {
+      atSec: state.clock.timeSec, callsign: callsignFor(ga, state), type, flightRules: ga ? 'VFR' : 'IFR', start,
+      isDeparture: false, initialFrequencyId: arrivalFreq, initialRequest: 'LANDING',
+    };
+  };
+
+  const trySpawnDeparture = (state: Readonly<SimulationState>): SpawnSpec | undefined => {
+    const depEnds = state.activeRunways.departing.length ? state.activeRunways.departing : state.activeRunways.landing;
+    let ga = rng!() < gaFraction;
+    // A320 needs a long runway; fall back to a Cessna (if allowed) when the departure runway is short.
+    if (!ga) {
+      const longOk = depEnds.length === 0 || depEnds.some((e) => runwayLongEnoughFor(airport, 'A320', e));
+      if (!longOk) {
+        if (!allowGA) return undefined;
+        ga = true;
+      }
+    }
+    const type = ga ? 'C172' : 'A320';
+    const occupied = Object.values(state.aircraft).filter((a) => a.onGround).map((a) => a.pos);
+    const parking = pickParking(airport, type, rng!, occupied, new Set(reserved.keys()));
+    if (!parking) return undefined;
+    reserved.set(parking.id, state.clock.timeSec);
+    return {
+      atSec: state.clock.timeSec, callsign: callsignFor(ga, state), type, flightRules: ga ? 'VFR' : 'IFR',
+      start: { kind: 'parked', parkingId: parking.id }, isDeparture: true, initialFrequencyId: departureFreq, initialRequest: 'TAXI',
+    };
+  };
+
+  return {
+    update(state) {
+      const now = state.clock.timeSec;
+      if (!rng) {
+        rng = mulberry32((state.seed ^ 0x7a3c91d5) >>> 0);
+        // The first generated aircraft appears after a short lull so the player can read the briefing.
+        nextArr = now + 20 + gap('arr', now) * 0.5;
+        nextDep = now + 35 + gap('dep', now) * 0.5;
+      }
+      if (now >= nextArr) {
+        dueArr = Math.min(2, dueArr + 1);
+        nextArr = now + gap('arr', now);
+      }
+      if (now >= nextDep) {
+        dueDep = Math.min(2, dueDep + 1);
+        nextDep = now + gap('dep', now);
+      }
+      if ((dueArr === 0 && dueDep === 0) || now < retryAt || now - lastSpawnAt < MIN_SPAWN_SPACING_SEC) return [];
+      if (Object.keys(state.aircraft).length >= cfg.maxAircraft) {
+        retryAt = now + 5;
+        return [];
+      }
+      // Release parking reservations once the aircraft exists (it blocks via the occupied check) or the spawn was dropped.
+      for (const [id, t] of reserved) if (now - t > 20) reserved.delete(id);
+
+      const order: ('arr' | 'dep')[] = [];
+      const wantArr = dueArr > 0;
+      const wantDep = dueDep > 0;
+      if (wantArr && wantDep) order.push(lastKind === 'arr' ? 'dep' : 'arr', lastKind === 'arr' ? 'arr' : 'dep');
+      else if (wantArr) order.push('arr');
+      else order.push('dep');
+      for (const kind of order) {
+        const spec = kind === 'arr' ? trySpawnArrival(state) : trySpawnDeparture(state);
+        if (spec) {
+          if (kind === 'arr') dueArr--;
+          else dueDep--;
+          lastKind = kind;
+          lastSpawnAt = now;
+          return [spec];
+        }
+      }
+      retryAt = now + 10;
+      return [];
+    },
+  };
+}
