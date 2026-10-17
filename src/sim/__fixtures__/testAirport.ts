@@ -1,0 +1,219 @@
+/**
+ * SYNTHETIC fixture airport for engine tests. It is "roughly like" KACY (two
+ * perpendicular crossing runways 13/31 and 4/22, parallel/connector taxiways A-D)
+ * but is NOT real data. Everything here, including the radio frequencies, is
+ * placeholder test data and must never be shown to a user as KACY information.
+ *
+ * Layout (runway frame: s along 13->31, t along 4->22, both in metres from the
+ * runway intersection X at (0,0)):
+ *
+ *   22 end  A_N ---H22--R22                          t=+1100
+ *            |
+ *   B  AP --A_J-----B_h--B_r422--B_h------BD            t=+400   (apron A_J..AP, GA ramp parking)
+ *            |        |            |        |
+ *   13/31 R13-A_r13---------X---------D_r13---------R31 t=0
+ *            |        |            |        |
+ *   C  C_W---AC-----C_h--C_r422--C_h------CD----C_E     t=-250
+ *            |
+ *   4 end   A_S ---H4---R4                           t=-680
+ */
+import type { Airport, DataProvenance, LatLon, Runway, RunwayEnd, TaxiEdge, TaxiNode, TaxiNodeKind, Vec2 } from '../types';
+import { deg2rad, dist, headingToVec } from '../geo';
+
+const prov: DataProvenance = {
+  source: 'FIXTURE: synthetic test data (not real airport data)',
+  retrievedOn: '2025-01-01',
+  approximate: true,
+  notes: 'Used only by automated tests.',
+};
+
+const ARP: LatLon = { lat: 39.45, lon: -74.57 };
+export const FIXTURE_MAG_VAR = -12; // 12 degrees west
+
+const toLatLon = (p: Vec2): LatLon => ({
+  lat: ARP.lat + p.y / 111320,
+  lon: ARP.lon + p.x / (111320 * Math.cos(deg2rad(ARP.lat))),
+});
+
+const U13 = headingToVec(118); // +s
+const U4 = headingToVec(28); // +t
+/** Position from runway-frame coordinates. */
+export const P = (s: number, t: number): Vec2 => ({ x: s * U13.x + t * U4.x, y: s * U13.y + t * U4.y });
+
+function makeEnd(id: string, s: number, t: number, trueHdg: number): RunwayEnd {
+  const pos = P(s, t);
+  return {
+    id,
+    threshold: pos,
+    thresholdLatLon: toLatLon(pos),
+    trueHeadingDeg: trueHdg,
+    magneticHeadingDeg: (trueHdg - FIXTURE_MAG_VAR + 360) % 360,
+    tdzeFt: 75,
+    ils: null,
+  };
+}
+
+function makeRunway(id: string, a: RunwayEnd, b: RunwayEnd, widthM = 45.72): Runway {
+  const dir = { x: b.threshold.x - a.threshold.x, y: b.threshold.y - a.threshold.y };
+  const len = Math.hypot(dir.x, dir.y);
+  const u = { x: dir.x / len, y: dir.y / len };
+  const n = { x: -u.y * (widthM / 2), y: u.x * (widthM / 2) };
+  const polygon = [
+    { x: a.threshold.x + n.x, y: a.threshold.y + n.y },
+    { x: b.threshold.x + n.x, y: b.threshold.y + n.y },
+    { x: b.threshold.x - n.x, y: b.threshold.y - n.y },
+    { x: a.threshold.x - n.x, y: a.threshold.y - n.y },
+  ];
+  return { id, ends: [a, b], lengthFt: len / 0.3048, widthFt: widthM / 0.3048, surface: 'ASPH', polygon };
+}
+
+export const FIXTURE_PARKING_IDS = ['GA1', 'GA2', 'GA3'] as const;
+
+export function createTestAirport(): Airport {
+  const nodes: Record<string, TaxiNode> = {};
+  const edges: TaxiEdge[] = [];
+  const node = (
+    id: string,
+    kind: TaxiNodeKind,
+    s: number,
+    t: number,
+    taxiways: string[],
+    extra: Partial<TaxiNode> = {},
+  ) => {
+    const pos = P(s, t);
+    nodes[id] = { id, kind, pos, latLon: toLatLon(pos), taxiways, ...extra };
+  };
+  let edgeN = 0;
+  const link = (a: string, b: string, taxiway: string, extra: Partial<TaxiEdge> = {}) => {
+    edges.push({ id: `e${++edgeN}`, from: a, to: b, taxiway, lengthM: dist(nodes[a].pos, nodes[b].pos), ...extra });
+  };
+
+  // Parking + apron
+  node('GA1', 'parking', -540, 470, ['RAMP'], { name: 'GA Ramp 1' });
+  node('GA2', 'parking', -480, 490, ['RAMP'], { name: 'GA Ramp 2' });
+  node('GA3', 'parking', -420, 470, ['RAMP'], { name: 'GA Ramp 3' });
+  node('AP', 'apron', -480, 400, ['RAMP', 'B']);
+
+  // Taxiway A (s = -200)
+  node('A_S', 'taxiway', -200, -680, ['A']);
+  node('AC', 'intersection', -200, -250, ['A', 'C']);
+  node('A_h13S', 'holding_position', -200, -60, ['A'], { runwayId: '13/31' });
+  node('A_r13', 'runway', -200, 0, ['A'], { runwayId: '13/31' });
+  node('A_h13N', 'holding_position', -200, 60, ['A'], { runwayId: '13/31' });
+  node('A_J', 'intersection', -200, 400, ['A', 'B']);
+  node('A_N', 'taxiway', -200, 1100, ['A']);
+  // End stubs (named A) to the 4 and 22 thresholds
+  node('H4', 'holding_position', -70, -680, ['A'], { runwayId: '4/22', protectsRunwayEnd: '4' });
+  node('R4', 'runway', 0, -680, ['A'], { runwayId: '4/22' });
+  node('H22', 'holding_position', -70, 1100, ['A'], { runwayId: '4/22', protectsRunwayEnd: '22' });
+  node('R22', 'runway', 0, 1100, ['A'], { runwayId: '4/22' });
+
+  // Taxiway C (t = -250)
+  node('C_W', 'taxiway', -950, -250, ['C']);
+  node('H13', 'holding_position', -950, -60, ['C'], { runwayId: '13/31', protectsRunwayEnd: '13' });
+  node('R13', 'runway', -950, 0, ['C'], { runwayId: '13/31' });
+  node('C_h422S', 'holding_position', -60, -250, ['C'], { runwayId: '4/22' });
+  node('C_r422', 'runway', 0, -250, ['C'], { runwayId: '4/22' });
+  node('C_h422N', 'holding_position', 60, -250, ['C'], { runwayId: '4/22' });
+  node('CD', 'intersection', 500, -250, ['C', 'D']);
+  node('C_E', 'taxiway', 1990, -250, ['C']);
+  node('H31', 'holding_position', 1990, -60, ['C'], { runwayId: '13/31', protectsRunwayEnd: '31' });
+  node('R31', 'runway', 1990, 0, ['C'], { runwayId: '13/31' });
+
+  // Taxiway D (s = 500)
+  node('D_h13S', 'holding_position', 500, -60, ['D'], { runwayId: '13/31' });
+  node('D_r13', 'runway', 500, 0, ['D'], { runwayId: '13/31' });
+  node('D_h13N', 'holding_position', 500, 60, ['D'], { runwayId: '13/31' });
+  node('BD', 'intersection', 500, 400, ['B', 'D']);
+
+  // Taxiway B (t = +400)
+  node('B_h422W', 'holding_position', -60, 400, ['B'], { runwayId: '4/22' });
+  node('B_r422', 'runway', 0, 400, ['B'], { runwayId: '4/22' });
+  node('B_h422E', 'holding_position', 60, 400, ['B'], { runwayId: '4/22' });
+  node('X', 'runway', 0, 0, [], { runwayId: '13/31' });
+
+  // Ramp
+  link('GA1', 'AP', 'RAMP');
+  link('GA2', 'AP', 'RAMP');
+  link('GA3', 'AP', 'RAMP');
+  link('AP', 'A_J', 'B');
+  // A
+  link('A_S', 'AC', 'A');
+  link('AC', 'A_h13S', 'A');
+  link('A_h13S', 'A_r13', 'A', { onRunwayId: '13/31' });
+  link('A_r13', 'A_h13N', 'A', { onRunwayId: '13/31' });
+  link('A_h13N', 'A_J', 'A');
+  link('A_J', 'A_N', 'A');
+  link('A_S', 'H4', 'A');
+  link('H4', 'R4', 'A', { onRunwayId: '4/22' });
+  link('A_N', 'H22', 'A');
+  link('H22', 'R22', 'A', { onRunwayId: '4/22' });
+  // B
+  link('A_J', 'B_h422W', 'B');
+  link('B_h422W', 'B_r422', 'B', { onRunwayId: '4/22' });
+  link('B_r422', 'B_h422E', 'B', { onRunwayId: '4/22' });
+  link('B_h422E', 'BD', 'B');
+  // C
+  link('C_W', 'AC', 'C');
+  link('C_W', 'H13', 'C');
+  link('H13', 'R13', 'C', { onRunwayId: '13/31' });
+  link('AC', 'C_h422S', 'C');
+  link('C_h422S', 'C_r422', 'C', { onRunwayId: '4/22' });
+  link('C_r422', 'C_h422N', 'C', { onRunwayId: '4/22' });
+  link('C_h422N', 'CD', 'C');
+  link('CD', 'C_E', 'C');
+  link('C_E', 'H31', 'C');
+  link('H31', 'R31', 'C', { onRunwayId: '13/31' });
+  // D
+  link('CD', 'D_h13S', 'D');
+  link('D_h13S', 'D_r13', 'D', { onRunwayId: '13/31' });
+  link('D_r13', 'D_h13N', 'D', { onRunwayId: '13/31' });
+  link('D_h13N', 'BD', 'D');
+  // Runway centrelines (runway travel / back-taxi)
+  link('R13', 'A_r13', 'RWY13/31', { onRunwayId: '13/31' });
+  link('A_r13', 'X', 'RWY13/31', { onRunwayId: '13/31' });
+  link('X', 'D_r13', 'RWY13/31', { onRunwayId: '13/31' });
+  link('D_r13', 'R31', 'RWY13/31', { onRunwayId: '13/31' });
+  link('R4', 'C_r422', 'RWY4/22', { onRunwayId: '4/22' });
+  link('C_r422', 'X', 'RWY4/22', { onRunwayId: '4/22' });
+  link('X', 'B_r422', 'RWY4/22', { onRunwayId: '4/22' });
+  link('B_r422', 'R22', 'RWY4/22', { onRunwayId: '4/22' });
+
+  const r13 = makeEnd('13', -1000, 0, 118);
+  const r31 = makeEnd('31', 2048, 0, 298);
+  const r4 = makeEnd('4', 0, -700, 28);
+  const r22 = makeEnd('22', 0, 1173, 208);
+
+  return {
+    icao: 'KTST',
+    faaId: 'TST',
+    name: 'Atlantic City International (FIXTURE)',
+    arp: ARP,
+    elevationFt: 75,
+    magneticVariationDeg: FIXTURE_MAG_VAR,
+    runways: [makeRunway('13/31', r13, r31), makeRunway('4/22', r4, r22)],
+    taxiwayGraph: {
+      nodes,
+      edges,
+      taxiwayPolylines: {},
+      aprons: [],
+      provenance: prov,
+    },
+    parking: [
+      { id: 'GA1', name: 'GA Ramp 1', nodeId: 'GA1', pos: nodes.GA1.pos, category: 'ga', headingDeg: 200 },
+      { id: 'GA2', name: 'GA Ramp 2', nodeId: 'GA2', pos: nodes.GA2.pos, category: 'ga', headingDeg: 200 },
+      { id: 'GA3', name: 'GA Ramp 3', nodeId: 'GA3', pos: nodes.GA3.pos, category: 'ga', headingDeg: 200 },
+    ],
+    // FIXTURE-ONLY PLACEHOLDER frequencies. Not real KACY values.
+    frequencies: [
+      { id: 'GND', name: 'Atlantic City Ground', mhz: 121.9, position: 'GND', provenance: prov }, // placeholder
+      { id: 'TWR', name: 'Atlantic City Tower', mhz: 120.3, position: 'TWR', provenance: prov }, // placeholder
+      { id: 'APP', name: 'Atlantic City Approach', mhz: 124.6, position: 'APP', provenance: prov }, // placeholder
+    ],
+    navaids: [],
+    procedures: [],
+    hotSpots: [],
+    airspaceClass: 'D',
+    provenance: [prov],
+  };
+}

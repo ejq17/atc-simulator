@@ -1,0 +1,321 @@
+/**
+ * Deepgram streaming speech-to-text over WebSocket.
+ *
+ * Docs verified (see README for dates):
+ *  - Live streaming reference (params, message types, CloseStream):
+ *    https://developers.deepgram.com/reference/speech-to-text/listen-streaming
+ *  - Temporary tokens (POST /v1/auth/grant, 30 s default TTL, max 3600 s):
+ *    https://developers.deepgram.com/reference/auth/tokens/grant
+ *    https://developers.deepgram.com/docs/token-based-authentication
+ *  - Browser auth via Sec-WebSocket-Protocol:
+ *    https://developers.deepgram.com/docs/using-the-sec-websocket-protocol
+ *    The docs show `['token', <api key>]`. They do not state the subprotocol for
+ *    JWT access tokens, so we try `['token', jwt]` first (as specified for this
+ *    project) and fall back to `['bearer', jwt]`, remembering whichever works.
+ *
+ * The API key is NEVER in the browser: a short-lived token is fetched from our
+ * own backend (server/voice/deepgramToken.ts).
+ */
+import { AVIATION_KEYTERMS } from './aviationVocab.ts';
+import { startPcmCapture, TARGET_SAMPLE_RATE } from './pcmCapture.ts';
+import type { PcmCapture } from './pcmCapture.ts';
+import type { SpeechRecognitionProvider, SttStartOptions } from './types.ts';
+import { SttError } from './types.ts';
+
+export const DEEPGRAM_LISTEN_URL = 'wss://api.deepgram.com/v1/listen';
+export const DEEPGRAM_TOKEN_PATH = '/api/voice/deepgram-token';
+
+export type DeepgramAuthScheme = 'token' | 'bearer';
+
+export function buildDeepgramListenUrl(model: string, baseUrl: string = DEEPGRAM_LISTEN_URL): string {
+  const p = new URLSearchParams();
+  p.set('model', model);
+  p.set('language', 'en-US');
+  p.set('smart_format', 'false');
+  p.set('punctuate', 'false');
+  p.set('interim_results', 'true');
+  p.set('endpointing', '300');
+  p.set('encoding', 'linear16');
+  p.set('sample_rate', String(TARGET_SAMPLE_RATE));
+  p.set('channels', '1');
+  if (model.startsWith('nova-3')) {
+    for (const term of AVIATION_KEYTERMS) p.append('keyterm', term);
+  } else {
+    // Nova-2 and earlier use boosted `keywords` instead of `keyterm`.
+    for (const term of AVIATION_KEYTERMS) p.append('keywords', `${term}:2`);
+  }
+  return `${baseUrl}?${p.toString()}`;
+}
+
+interface DgAlternative { transcript?: string; confidence?: number }
+interface DgMessage {
+  type?: string;
+  is_final?: boolean;
+  channel?: { alternatives?: DgAlternative[] };
+}
+
+type WebSocketLike = {
+  binaryType: string;
+  readyState: number;
+  onopen: ((e: unknown) => void) | null;
+  onmessage: ((e: { data: unknown }) => void) | null;
+  onerror: ((e: unknown) => void) | null;
+  onclose: ((e: { code?: number }) => void) | null;
+  send(data: string | ArrayBuffer): void;
+  close(): void;
+};
+type WebSocketCtor = new (url: string, protocols?: string | string[]) => WebSocketLike;
+
+export interface DeepgramProviderOptions {
+  tokenUrl?: string;
+  model?: string;
+  fallbackModel?: string;
+  fetchFn?: typeof fetch;
+  WebSocketCtor?: WebSocketCtor;
+  getUserMedia?: (c: MediaStreamConstraints) => Promise<MediaStream>;
+  startCapture?: (stream: MediaStream, onChunk: (pcm: ArrayBuffer) => void) => Promise<PcmCapture>;
+  closeTimeoutMs?: number;
+  now?: () => number;
+}
+
+let preferredScheme: DeepgramAuthScheme = 'token';
+
+function mapMediaError(err: unknown): SttError {
+  const name = (err as { name?: string } | null)?.name;
+  if (name === 'NotAllowedError' || name === 'SecurityError') {
+    return new SttError('not_allowed', 'Microphone access was blocked. Allow the microphone for this site in your browser settings, then try again.', { cause: err });
+  }
+  if (name === 'NotFoundError' || name === 'OverconstrainedError' || name === 'NotReadableError') {
+    return new SttError('no_microphone', 'No working microphone was found, or it is in use by another app.', { cause: err });
+  }
+  return new SttError('unknown', 'Could not open the microphone.', { cause: err });
+}
+
+export function createDeepgramProvider(options: DeepgramProviderOptions = {}): SpeechRecognitionProvider {
+  const tokenUrl = options.tokenUrl ?? DEEPGRAM_TOKEN_PATH;
+  const models = [options.model ?? 'nova-3', options.fallbackModel ?? 'nova-2'];
+  const closeTimeoutMs = options.closeTimeoutMs ?? 2000;
+  const now = options.now ?? (() => Date.now());
+  const doFetch = (...a: Parameters<typeof fetch>) => (options.fetchFn ?? fetch)(...a);
+  const getWS = () => options.WebSocketCtor ?? (globalThis as unknown as { WebSocket?: WebSocketCtor }).WebSocket;
+  const getMedia = () =>
+    options.getUserMedia ??
+    (typeof navigator !== 'undefined' && navigator.mediaDevices?.getUserMedia
+      ? (c: MediaStreamConstraints) => navigator.mediaDevices.getUserMedia(c)
+      : undefined);
+
+  async function fetchToken(): Promise<string> {
+    let res: Response;
+    try {
+      res = await doFetch(tokenUrl, { method: 'POST', headers: { Accept: 'application/json' } });
+    } catch (err) {
+      throw new SttError('network', 'Could not reach the local voice server to get a Deepgram token. Is `npm run server` running?', { cause: err });
+    }
+    let body: { access_token?: string; error?: string } = {};
+    try {
+      body = (await res.json()) as typeof body;
+    } catch { /* non-JSON error page */ }
+    if (!res.ok) {
+      const code = res.status === 503 ? 'unavailable' : 'network';
+      throw new SttError(code, body.error ?? `Deepgram token request failed (HTTP ${res.status}).`);
+    }
+    if (!body.access_token) throw new SttError('unavailable', 'The voice server did not return a Deepgram token.');
+    return body.access_token;
+  }
+
+  function openSocket(WS: WebSocketCtor, url: string, protocols: string[]): Promise<WebSocketLike> {
+    return new Promise((resolve, reject) => {
+      const ws = new WS(url, protocols);
+      ws.binaryType = 'arraybuffer';
+      let opened = false;
+      ws.onopen = () => {
+        opened = true;
+        resolve(ws);
+      };
+      ws.onerror = () => { /* the close event carries the outcome */ };
+      ws.onclose = (e) => {
+        if (!opened) reject(new Error(`WebSocket closed before opening (code ${e.code ?? 'unknown'})`));
+      };
+    });
+  }
+
+  async function connect(WS: WebSocketCtor, token: string): Promise<WebSocketLike> {
+    const schemes: DeepgramAuthScheme[] = preferredScheme === 'token' ? ['token', 'bearer'] : ['bearer', 'token'];
+    let lastErr: unknown;
+    for (const model of models) {
+      for (const scheme of schemes) {
+        try {
+          const ws = await openSocket(WS, buildDeepgramListenUrl(model), [scheme, token]);
+          preferredScheme = scheme;
+          return ws;
+        } catch (err) {
+          lastErr = err;
+        }
+      }
+    }
+    throw new SttError('network', 'Could not connect to Deepgram. Check your internet connection and that the API key has access to streaming.', { cause: lastErr });
+  }
+
+  let active: {
+    ws: WebSocketLike;
+    capture: PcmCapture;
+    opts: SttStartOptions;
+    finals: string[];
+    confidences: number[];
+    interim: string;
+    startedAt: number;
+    closed: boolean;
+    stopping: boolean;
+    onClosed: (() => void)[];
+    delivered: boolean;
+  } | null = null;
+
+  function text(s: NonNullable<typeof active>): string {
+    return [...s.finals, s.interim].filter(Boolean).join(' ').trim();
+  }
+
+  function handleMessage(s: NonNullable<typeof active>, data: unknown) {
+    if (typeof data !== 'string') return;
+    let msg: DgMessage;
+    try {
+      msg = JSON.parse(data) as DgMessage;
+    } catch {
+      return;
+    }
+    if (msg.type !== 'Results') return;
+    const alt = msg.channel?.alternatives?.[0];
+    const t = (alt?.transcript ?? '').trim();
+    if (msg.is_final) {
+      if (t) {
+        s.finals.push(t);
+        if (typeof alt?.confidence === 'number') s.confidences.push(alt.confidence);
+      }
+      s.interim = '';
+    } else {
+      s.interim = t;
+    }
+    const running = text(s);
+    if (running) s.opts.onPartial(running);
+  }
+
+  function deliver(s: NonNullable<typeof active>, error?: Error) {
+    if (s.delivered) return;
+    s.delivered = true;
+    if (error) {
+      s.opts.onError(error);
+    } else {
+      const t = text(s);
+      if (!t) {
+        s.opts.onError(new SttError('no_speech', 'No speech detected. Hold the key, then speak.'));
+      } else {
+        const conf = s.confidences.length ? s.confidences.reduce((a, b) => a + b, 0) / s.confidences.length : undefined;
+        s.opts.onFinal(t, { confidence: conf, durationMs: now() - s.startedAt });
+      }
+    }
+  }
+
+  const provider: SpeechRecognitionProvider = {
+    id: 'deepgram',
+    label: 'Deepgram',
+    async isAvailable() {
+      if (!getWS() || !getMedia()) return false;
+      try {
+        const res = await doFetch(tokenUrl, { method: 'GET', headers: { Accept: 'application/json' } });
+        if (!res.ok) return false;
+        const body = (await res.json()) as { configured?: boolean };
+        return body.configured === true;
+      } catch {
+        return false;
+      }
+    },
+    async start(opts) {
+      const WS = getWS();
+      const media = getMedia();
+      if (!WS || !media) throw new SttError('unsupported', 'This browser cannot stream microphone audio to Deepgram.');
+      if (active) await provider.stop();
+
+      let stream: MediaStream;
+      try {
+        stream = await media({ audio: { echoCancellation: true, noiseSuppression: true } });
+      } catch (err) {
+        throw mapMediaError(err);
+      }
+
+      // Start capturing right away and buffer, so connection latency never clips the first word.
+      const pending: ArrayBuffer[] = [];
+      let live: WebSocketLike | null = null;
+      const startCapture = options.startCapture ?? startPcmCapture;
+      let capture: PcmCapture;
+      try {
+        capture = await startCapture(stream, (pcm) => {
+          if (live) live.send(pcm);
+          else pending.push(pcm);
+        });
+      } catch (err) {
+        stream.getTracks().forEach((t) => t.stop());
+        throw new SttError('no_microphone', 'Could not process microphone audio in this browser.', { cause: err });
+      }
+      const startedAt = now();
+
+      let ws: WebSocketLike;
+      try {
+        const token = await fetchToken();
+        ws = await connect(WS, token);
+      } catch (err) {
+        await capture.stop().catch(() => undefined);
+        throw err;
+      }
+
+      const s: NonNullable<typeof active> = {
+        ws,
+        capture,
+        opts,
+        finals: [],
+        confidences: [],
+        interim: '',
+        startedAt,
+        closed: false,
+        stopping: false,
+        onClosed: [],
+        delivered: false,
+      };
+      active = s;
+      ws.onmessage = (e) => handleMessage(s, e.data);
+      ws.onclose = () => {
+        s.closed = true;
+        s.onClosed.splice(0).forEach((f) => f());
+        if (!s.stopping) {
+          // Dropped mid-transmission.
+          void capture.stop().catch(() => undefined);
+          deliver(s, new SttError('network', 'The connection to Deepgram was lost.'));
+          if (active === s) active = null;
+        }
+      };
+      ws.onerror = () => { /* followed by close */ };
+      live = ws;
+      for (const chunk of pending.splice(0)) ws.send(chunk);
+    },
+    async stop() {
+      const s = active;
+      if (!s) return;
+      s.stopping = true;
+      active = null;
+      await s.capture.stop().catch(() => undefined);
+      if (!s.closed) {
+        const closed = new Promise<void>((resolve) => s.onClosed.push(resolve));
+        try {
+          s.ws.send(JSON.stringify({ type: 'CloseStream' }));
+        } catch { /* socket already gone */ }
+        let timer: ReturnType<typeof setTimeout> | undefined;
+        const timeout = new Promise<void>((resolve) => {
+          timer = setTimeout(resolve, closeTimeoutMs);
+        });
+        await Promise.race([closed, timeout]);
+        clearTimeout(timer);
+        try { s.ws.close(); } catch { /* ignore */ }
+      }
+      deliver(s);
+    },
+  };
+  return provider;
+}

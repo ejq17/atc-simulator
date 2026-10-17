@@ -1,0 +1,60 @@
+/** Who hears what: aircraft only receive transmissions on their current frequency. */
+import type { Aircraft, Airport, ControllerPositionId, RadioFrequency } from '../sim/types';
+
+const EPS = 0.0005;
+
+export function sameFrequency(a: number, b: number): boolean {
+  return Math.abs(a - b) < EPS;
+}
+
+/** True if the aircraft is tuned to `mhz` (and therefore hears / answers transmissions on it). */
+export function hearsFrequency(aircraft: Pick<Aircraft, 'frequencyMhz'>, mhz: number): boolean {
+  return sameFrequency(aircraft.frequencyMhz, mhz);
+}
+
+export function frequencyForPosition(airport: Airport, position: ControllerPositionId): RadioFrequency | undefined {
+  return airport.frequencies.find((f) => f.position === position);
+}
+
+export function frequencyById(airport: Airport, id: string): RadioFrequency | undefined {
+  const up = id.toUpperCase();
+  return airport.frequencies.find((f) => f.id.toUpperCase() === up);
+}
+
+export function frequencyByMhz(airport: Airport, mhz: number): RadioFrequency | undefined {
+  return airport.frequencies.find((f) => sameFrequency(f.mhz, mhz));
+}
+
+/** All aircraft that would hear a transmission on `mhz`. */
+export function listenersOn(aircraft: Iterable<Aircraft>, mhz: number): Aircraft[] {
+  const out: Aircraft[] = [];
+  for (const a of aircraft) if (hearsFrequency(a, mhz)) out.push(a);
+  return out;
+}
+
+const POSITION_WORD: Record<string, string> = { CLNC: 'Clearance', GND: 'Ground', TWR: 'Tower', APP: 'Approach', DEP: 'Departure', ATIS: 'ATIS' };
+
+/** Short facility word for a position: "Ground", "Tower"... */
+export function positionWord(position: string): string {
+  return POSITION_WORD[position] ?? position;
+}
+
+/** City-style name used on the radio: strips "International/Regional/Airport..." from the airport name. */
+export function airportCallName(airport: Airport): string {
+  return airport.name
+    .replace(/\(.*?\)/g, '')
+    .replace(/\b(International|Intl|Regional|Municipal|Airport|Field|County|Memorial)\b/gi, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+/** Full call name for the facility an aircraft is tuned to: "Atlantic City Ground". */
+export function facilityCallName(airport: Airport, mhz: number): string {
+  const f = frequencyByMhz(airport, mhz);
+  if (f && f.position !== 'OTHER') return `${airportCallName(airport)} ${positionWord(f.position)}`;
+  return airportCallName(airport);
+}
+
+export function formatMhz(mhz: number): string {
+  return mhz.toFixed(3).replace(/0$/, '');
+}

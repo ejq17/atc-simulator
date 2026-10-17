@@ -1,0 +1,858 @@
+{
+  "_provenance": {
+    "source": "FAA d-TPP metadata XML https://aeronav.faa.gov/d-tpp/2610/xml_data/d-TPP_Metafile.xml (saved raw/d-TPP_Metafile_2610.xml; KACY rows in raw/kacy_dtpp_records_2610.json); PDFs https://aeronav.faa.gov/d-tpp/2610/<pdf_name>; cycle page https://www.faa.gov/air_traffic/flight_info/aeronav/digital_products/dtpp/",
+    "retrieved": "2026-10-16",
+    "cycle": "2610",
+    "effective_from": "2026-10-01 0901Z",
+    "effective_to": "2026-10-29 0901Z",
+    "volume": "NE-2 (printed on charts as \"NE-2, 01 OCT 2026 to 29 OCT 2026\")",
+    "airport": {
+      "icao": "KACY",
+      "faa": "ACY",
+      "name": "ATLANTIC CITY INTL",
+      "dtpp_alnum": "669",
+      "city": "ATLANTIC CITY",
+      "state": "NJ"
+    },
+    "next_cycle": "2611 effective 2026-10-29 (DDTPP*_261029.zip listed on the d-TPP page)",
+    "http_checks": "raw/dtpp_http_checks.tsv (GET) and raw/dtpp_http_head_checks.txt (HEAD): all 19 URLs returned 200 application/pdf"
+  },
+  "airport_diagram": {
+    "chart_name": "AIRPORT DIAGRAM",
+    "pdf_name": "00669AD.PDF",
+    "printed_header": "AL-669 (FAA); chart id 26134; NE-2 01 OCT 2026 to 29 OCT 2026",
+    "pdf": {
+      "url": "https://aeronav.faa.gov/d-tpp/2610/00669AD.PDF",
+      "http_status": 200,
+      "content_type": "application/pdf",
+      "verified_by": "curl -I (HEAD, following redirects) and curl GET on 2026-10-16; file begins with %PDF and was downloaded to raw/dtpp_2610_pdfs/00669AD.PDF",
+      "bytes": 157142,
+      "local_file": "raw/dtpp_2610_pdfs/00669AD.PDF"
+    }
+  },
+  "instrument_approaches": [
+    {
+      "chart_name": "HI-ILS Y OR LOC Y RWY 13",
+      "chart_code": "IAP",
+      "pdf_name": "00669HIYLY13.PDF",
+      "amdt_dtpp_metadata": null,
+      "amdt_date_dtpp_metadata": null,
+      "printed_amendment_on_plate": "Amdt 4E 31OCT24",
+      "runway": "13",
+      "approach_type": "ILS (high altitude, DME or radar required)",
+      "final_approach_course_mag_deg": 128,
+      "tdze_ft_plate": 75,
+      "pdf": {
+        "url": "https://aeronav.faa.gov/d-tpp/2610/00669HIYLY13.PDF",
+        "http_status": 200,
+        "content_type": "application/pdf",
+        "verified_by": "curl -I (HEAD, following redirects) and curl GET on 2026-10-16; file begins with %PDF and was downloaded to raw/dtpp_2610_pdfs/00669HIYLY13.PDF",
+        "bytes": 212942,
+        "local_file": "raw/dtpp_2610_pdfs/00669HIYLY13.PDF"
+      },
+      "procuid": "21327",
+      "faa_nfd_id": null,
+      "copter": "",
+      "localizer": "I-PVO 109.1 Chan 28",
+      "fixes_and_roles": [
+        {
+          "fix": "ZAPOM ACY 24 DME (R-215)",
+          "role": "IAF"
+        },
+        {
+          "fix": "JOGIR (I-PVO 12)",
+          "role": "IF"
+        },
+        {
+          "fix": "MAYBN (I-PVO 4.4 RADAR)",
+          "role": "FAF"
+        },
+        {
+          "fix": "WEROL ACY 13 DME (R-337)",
+          "role": "fix on 337 deg route"
+        }
+      ],
+      "minima_summary": "S-ILS 13 DA 275 RVR 1800 HAT 200 (200-1/2); S-LOC 13 520/45 HAT 445 (500-7/8); Cats C-E only",
+      "missed_approach": "Climb to 600 then climbing left turn to 2000 on ACY R-090 to SMITS/ACY 11 DME and hold.",
+      "holding": "ZAPOM hold 17500/14000",
+      "plate_notes": "Printed [USAF], airport ident KACY; emergency safe altitude 100 NM 4100; ATC freq block shows 124.6/327.125 (130-309) and 134.25/292.2 (310-129)",
+      "data_provenance": "Chart name/PDF/amendment from d-TPP metadata XML; fixes, roles, minima, missed approach read visually from the PDF plate (transcription - spot-check before safety use)."
+    },
+    {
+      "chart_name": "ILS OR LOC/DME RWY 31",
+      "chart_code": "IAP",
+      "pdf_name": "00669ILD31.PDF",
+      "amdt_dtpp_metadata": "0E",
+      "amdt_date_dtpp_metadata": null,
+      "printed_amendment_on_plate": "Orig-E 11JUL24",
+      "runway": "31",
+      "approach_type": "ILS",
+      "final_approach_course_mag_deg": 308,
+      "tdze_ft_plate": 64,
+      "pdf": {
+        "url": "https://aeronav.faa.gov/d-tpp/2610/00669ILD31.PDF",
+        "http_status": 200,
+        "content_type": "application/pdf",
+        "verified_by": "curl -I (HEAD, following redirects) and curl GET on 2026-10-16; file begins with %PDF and was downloaded to raw/dtpp_2610_pdfs/00669ILD31.PDF",
+        "bytes": 263970,
+        "local_file": "raw/dtpp_2610_pdfs/00669ILD31.PDF"
+      },
+      "procuid": "20037",
+      "faa_nfd_id": null,
+      "copter": "",
+      "localizer": "I-ACY 109.10 Chan 28",
+      "fixes_and_roles": [
+        {
+          "fix": "STEVV (I-ACY 12.8)",
+          "role": "IF/IAF"
+        },
+        {
+          "fix": "PRSTY (I-ACY 6.7)",
+          "role": "FAF (LOC)"
+        },
+        {
+          "fix": "SMITS INT/ACY 11 DME",
+          "role": "missed approach hold"
+        }
+      ],
+      "minima_summary": "S-ILS 31 DA 264 RVR 4000 HAT 200 (200-3/4); S-LOC 31 A-B 520/55 (500-1), C 520-1 3/8, D-E 520-1 1/2, HAT 456; circling A 540-1, B 600-1, C 620-1 1/2, D 640-2, E 760-2 1/2",
+      "missed_approach": "Climb to 500 then climbing right turn to 2000 via heading 130 deg and via ACY R-090 to SMITS INT/ACY 11 DME and hold.",
+      "holding": "STEVV: one-minute hold 2000 (printed), holding NA at STEVV for Cat E, radar required",
+      "plate_notes": "DME REQUIRED; GS 3.00 TCH 52; VGSI 3.00/TCH 69 not coincident; TDZL/RCLS Rwy 13 only, REIL Rwy 31; printed: 3000 to STEVV 127 deg (11.8)",
+      "data_provenance": "Chart name/PDF/amendment from d-TPP metadata XML; fixes, roles, minima, missed approach read visually from the PDF plate (transcription - spot-check before safety use)."
+    },
+    {
+      "chart_name": "ILS Z OR LOC Z RWY 13",
+      "chart_code": "IAP",
+      "pdf_name": "00669IZLZ13.PDF",
+      "amdt_dtpp_metadata": "8E",
+      "amdt_date_dtpp_metadata": null,
+      "printed_amendment_on_plate": "Amdt 8E 11JUL24",
+      "runway": "13",
+      "approach_type": "ILS",
+      "final_approach_course_mag_deg": 128,
+      "tdze_ft_plate": 75,
+      "pdf": {
+        "url": "https://aeronav.faa.gov/d-tpp/2610/00669IZLZ13.PDF",
+        "http_status": 200,
+        "content_type": "application/pdf",
+        "verified_by": "curl -I (HEAD, following redirects) and curl GET on 2026-10-16; file begins with %PDF and was downloaded to raw/dtpp_2610_pdfs/00669IZLZ13.PDF",
+        "bytes": 278811,
+        "local_file": "raw/dtpp_2610_pdfs/00669IZLZ13.PDF"
+      },
+      "procuid": "3168",
+      "faa_nfd_id": null,
+      "copter": "",
+      "localizer": "I-PVO 109.1 Chan 28",
+      "fixes_and_roles": [
+        {
+          "fix": "CEDAR LAKE VCN 115.2",
+          "role": "IAF"
+        },
+        {
+          "fix": "CARYL INT (I-PVO 10.5)",
+          "role": "IF/IAF"
+        },
+        {
+          "fix": "MAYBN INT (I-PVO 4.4, RADAR)",
+          "role": "FAF (LOC)"
+        }
+      ],
+      "minima_summary": "S-ILS 13 DA 275 RVR 1800 HAT 200; S-LOC 13 MDA 520 (A-B RVR 2400, C-E RVR 4500) HAT 445; circling A 540-1, B 600-1, C 620-1 1/2, D 640-2, E 760-2 1/2",
+      "missed_approach": "Climb to 600 then climbing left turn to 2000 on ACY VORTAC R-090 to SMITS INT/ACY 11 DME and hold.",
+      "holding": "CARYL: one-minute hold 4500/2000 (printed HOLD 4500 2000)",
+      "plate_notes": "MALSR; GS 3.00 TCH 58; VGSI 3.00/TCH 71 not coincident; \"Use I-PVO DME when on the localizer course\"; 2000 NoPT 096 deg (8.1) from CEDAR LAKE; 2000 to CARYL 309 deg (11.5) from LOC; MSA ACY 25 NM: 2100 / 1800; For inop ALS increase S-ILS 13 Cat E visibility to RVR 4000 and S-LOC 13 Cat E visibility to 1 3/8 SM",
+      "data_provenance": "Chart name/PDF/amendment from d-TPP metadata XML; fixes, roles, minima, missed approach read visually from the PDF plate (transcription - spot-check before safety use)."
+    },
+    {
+      "chart_name": "RNAV (RNP) Z RWY 13",
+      "chart_code": "IAP",
+      "pdf_name": "00669RRZ13.PDF",
+      "amdt_dtpp_metadata": "0C",
+      "amdt_date_dtpp_metadata": "10/12/2017",
+      "printed_amendment_on_plate": "Orig-C 12OCT17",
+      "runway": "13",
+      "approach_type": "RNAV (RNP) - authorization required",
+      "final_approach_course_mag_deg": 128,
+      "tdze_ft_plate": 75,
+      "pdf": {
+        "url": "https://aeronav.faa.gov/d-tpp/2610/00669RRZ13.PDF",
+        "http_status": 200,
+        "content_type": "application/pdf",
+        "verified_by": "curl -I (HEAD, following redirects) and curl GET on 2026-10-16; file begins with %PDF and was downloaded to raw/dtpp_2610_pdfs/00669RRZ13.PDF",
+        "bytes": 227365,
+        "local_file": "raw/dtpp_2610_pdfs/00669RRZ13.PDF"
+      },
+      "procuid": "30050",
+      "faa_nfd_id": null,
+      "copter": "",
+      "fixes_and_roles": [
+        {
+          "fix": "CEDAR LAKE VCN",
+          "role": "IAF"
+        },
+        {
+          "fix": "LEBVE",
+          "role": "IAF (210K)"
+        },
+        {
+          "fix": "CARYL",
+          "role": "IF"
+        },
+        {
+          "fix": "MAYBN",
+          "role": "FAF"
+        },
+        {
+          "fix": "RW13",
+          "role": "MAP"
+        },
+        {
+          "fix": "JURAD",
+          "role": "missed approach waypoint"
+        },
+        {
+          "fix": "RODDI",
+          "role": "missed approach hold"
+        }
+      ],
+      "minima_summary": "RNP 0.30 DA 442/40 HAT 367 (400-3/4)",
+      "missed_approach": "Climb to 2000 on track 128 deg to JURAD and on track 076 deg to RODDI and hold.",
+      "holding": "RODDI 5 NM hold",
+      "plate_notes": "AUTHORIZATION REQUIRED; MALSR; GP 3.00 TCH 58",
+      "data_provenance": "Chart name/PDF/amendment from d-TPP metadata XML; fixes, roles, minima, missed approach read visually from the PDF plate (transcription - spot-check before safety use)."
+    },
+    {
+      "chart_name": "RNAV (RNP) Z RWY 31",
+      "chart_code": "IAP",
+      "pdf_name": "00669RRZ31.PDF",
+      "amdt_dtpp_metadata": "0C",
+      "amdt_date_dtpp_metadata": "08/07/2025",
+      "printed_amendment_on_plate": "Orig-C 07AUG25",
+      "runway": "31",
+      "approach_type": "RNAV (RNP) - authorization required",
+      "final_approach_course_mag_deg": 308,
+      "tdze_ft_plate": 63,
+      "pdf": {
+        "url": "https://aeronav.faa.gov/d-tpp/2610/00669RRZ31.PDF",
+        "http_status": 200,
+        "content_type": "application/pdf",
+        "verified_by": "curl -I (HEAD, following redirects) and curl GET on 2026-10-16; file begins with %PDF and was downloaded to raw/dtpp_2610_pdfs/00669RRZ31.PDF",
+        "bytes": 231739,
+        "local_file": "raw/dtpp_2610_pdfs/00669RRZ31.PDF"
+      },
+      "procuid": "30051",
+      "faa_nfd_id": null,
+      "copter": "",
+      "fixes_and_roles": [
+        {
+          "fix": "RODDI",
+          "role": "IAF (210K)"
+        },
+        {
+          "fix": "JENGA",
+          "role": "IAF (210K)"
+        },
+        {
+          "fix": "STEVV",
+          "role": "IF"
+        },
+        {
+          "fix": "PRSTY",
+          "role": "FAF"
+        },
+        {
+          "fix": "RW31",
+          "role": "MAP"
+        },
+        {
+          "fix": "WEREK",
+          "role": "missed approach waypoint"
+        },
+        {
+          "fix": "KOVEC",
+          "role": "missed approach hold"
+        }
+      ],
+      "minima_summary": "RNP 0.30 DA 445/60 HAT 382 (400-1 1/4)",
+      "missed_approach": "Climb to 2000 direct WEREK and on track 259 deg to KOVEC and hold.",
+      "holding": "KOVEC 6 NM hold",
+      "plate_notes": "AUTHORIZATION REQUIRED; GP 3.00 TCH 52; PANZE feeder (RNP 0.50), SEA ISLE SIE feeder (RNP 0.50)",
+      "data_provenance": "Chart name/PDF/amendment from d-TPP metadata XML; fixes, roles, minima, missed approach read visually from the PDF plate (transcription - spot-check before safety use)."
+    },
+    {
+      "chart_name": "RNAV (GPS) RWY 04",
+      "chart_code": "IAP",
+      "pdf_name": "00669R4.PDF",
+      "amdt_dtpp_metadata": "2C",
+      "amdt_date_dtpp_metadata": "09/09/2021",
+      "printed_amendment_on_plate": "Amdt 2C 09SEP21",
+      "runway": "04",
+      "approach_type": "RNAV (GPS)",
+      "final_approach_course_mag_deg": 38,
+      "tdze_ft_plate": 68,
+      "pdf": {
+        "url": "https://aeronav.faa.gov/d-tpp/2610/00669R4.PDF",
+        "http_status": 200,
+        "content_type": "application/pdf",
+        "verified_by": "curl -I (HEAD, following redirects) and curl GET on 2026-10-16; file begins with %PDF and was downloaded to raw/dtpp_2610_pdfs/00669R4.PDF",
+        "bytes": 243949,
+        "local_file": "raw/dtpp_2610_pdfs/00669R4.PDF"
+      },
+      "procuid": "15717",
+      "faa_nfd_id": null,
+      "copter": "",
+      "waas": "CH 78231 W04A",
+      "fixes_and_roles": [
+        {
+          "fix": "WYLEA",
+          "role": "IAF"
+        },
+        {
+          "fix": "DAYAD",
+          "role": "IAF"
+        },
+        {
+          "fix": "JEDOB",
+          "role": "IF/IAF"
+        },
+        {
+          "fix": "FASEN",
+          "role": "FAF"
+        },
+        {
+          "fix": "TEMVE",
+          "role": "step-down 1.3 NM to RW04"
+        },
+        {
+          "fix": "RW04",
+          "role": "MAP"
+        },
+        {
+          "fix": "SMITS",
+          "role": "missed approach hold"
+        }
+      ],
+      "minima_summary": "LPV DA 318/1 HAT 250 (300-1); LNAV/VNAV DA 534-1 5/8 HAT 466 (500-1 5/8); LNAV MDA 480-1 / 480-1 1/8 HAT 412; circling A 540-1 ... E 760-2 1/2",
+      "missed_approach": "Climb to 600 then climbing right turn to 2000 direct SMITS and hold.",
+      "holding": "JEDOB 6 NM hold",
+      "plate_notes": "GP 3.00 TCH 47; Rwy 4 helicopter visibility reduction below 3/4 SM NA; profile shows *520 marked LNAV only after TEMVE",
+      "data_provenance": "Chart name/PDF/amendment from d-TPP metadata XML; fixes, roles, minima, missed approach read visually from the PDF plate (transcription - spot-check before safety use)."
+    },
+    {
+      "chart_name": "RNAV (GPS) RWY 22",
+      "chart_code": "IAP",
+      "pdf_name": "00669R22.PDF",
+      "amdt_dtpp_metadata": "4D",
+      "amdt_date_dtpp_metadata": "07/09/2026",
+      "printed_amendment_on_plate": "Amdt 4D 09JUL26",
+      "runway": "22",
+      "approach_type": "RNAV (GPS)",
+      "final_approach_course_mag_deg": 218,
+      "tdze_ft_plate": 68,
+      "pdf": {
+        "url": "https://aeronav.faa.gov/d-tpp/2610/00669R22.PDF",
+        "http_status": 200,
+        "content_type": "application/pdf",
+        "verified_by": "curl -I (HEAD, following redirects) and curl GET on 2026-10-16; file begins with %PDF and was downloaded to raw/dtpp_2610_pdfs/00669R22.PDF",
+        "bytes": 230633,
+        "local_file": "raw/dtpp_2610_pdfs/00669R22.PDF"
+      },
+      "procuid": "15042",
+      "faa_nfd_id": null,
+      "copter": "",
+      "waas": "CH 53631 W22A",
+      "fixes_and_roles": [
+        {
+          "fix": "PIDVE",
+          "role": "IAF"
+        },
+        {
+          "fix": "KOPCE",
+          "role": "IF"
+        },
+        {
+          "fix": "FLDER",
+          "role": "intermediate fix (1100 203 deg 2.1)"
+        },
+        {
+          "fix": "EFEWY",
+          "role": "FAF"
+        },
+        {
+          "fix": "RW22",
+          "role": "MAP"
+        },
+        {
+          "fix": "TUBER",
+          "role": "missed approach hold"
+        }
+      ],
+      "minima_summary": "LPV DA 364-1 HAT 296 (300-1); LNAV/VNAV DA 356-7/8 HAT 288 (300-7/8); LNAV MDA 520-1 / 520-1 3/8 HAT 452; circling A 540-1 ... E 760-2 1/2",
+      "missed_approach": "Climb to 600 then climbing right turn to 2000 direct TUBER and hold.",
+      "holding": "TUBER 6 NM hold",
+      "plate_notes": "RADAR REQUIRED WHEN R-5002B IS ACTIVE; GP 3.00 TCH 51; NA for arrival on VCN VORTAC airway radials 066 CW 160",
+      "data_provenance": "Chart name/PDF/amendment from d-TPP metadata XML; fixes, roles, minima, missed approach read visually from the PDF plate (transcription - spot-check before safety use)."
+    },
+    {
+      "chart_name": "RNAV (GPS) Y RWY 13",
+      "chart_code": "IAP",
+      "pdf_name": "00669RY13.PDF",
+      "amdt_dtpp_metadata": "4C",
+      "amdt_date_dtpp_metadata": "07/09/2026",
+      "printed_amendment_on_plate": "Amdt 4C 09JUL26",
+      "runway": "13",
+      "approach_type": "RNAV (GPS)",
+      "final_approach_course_mag_deg": 128,
+      "tdze_ft_plate": 75,
+      "pdf": {
+        "url": "https://aeronav.faa.gov/d-tpp/2610/00669RY13.PDF",
+        "http_status": 200,
+        "content_type": "application/pdf",
+        "verified_by": "curl -I (HEAD, following redirects) and curl GET on 2026-10-16; file begins with %PDF and was downloaded to raw/dtpp_2610_pdfs/00669RY13.PDF",
+        "bytes": 281794,
+        "local_file": "raw/dtpp_2610_pdfs/00669RY13.PDF"
+      },
+      "procuid": "14873",
+      "faa_nfd_id": null,
+      "copter": "",
+      "waas": "CH 45513 W13A",
+      "fixes_and_roles": [
+        {
+          "fix": "WAGIR",
+          "role": "IAF"
+        },
+        {
+          "fix": "CARYL",
+          "role": "IF/IAF"
+        },
+        {
+          "fix": "KOVEC",
+          "role": "IAF"
+        },
+        {
+          "fix": "MAYBN",
+          "role": "FAF"
+        },
+        {
+          "fix": "RW13",
+          "role": "MAP"
+        },
+        {
+          "fix": "JURAD",
+          "role": "missed approach waypoint"
+        },
+        {
+          "fix": "RODDI",
+          "role": "missed approach hold"
+        }
+      ],
+      "minima_summary": "LPV DA 275 RVR 1800 HAT 200 (200-1/2); LNAV/VNAV DA 475/40 HAT 400 (A-D), 475/50 (E); LNAV MDA 520 HAT 445 (vis A-B 1/2 (RVR 2400), C-D 7/8 (RVR 4500), E 1 (RVR 5000)); circling A 540-1 ... E 760-2 1/2",
+      "missed_approach": "Climb to 2000 direct JURAD and on track 076 deg to RODDI and hold.",
+      "holding": "CARYL 6 NM hold (printed); RODDI hold max 230 KIAS",
+      "plate_notes": "MALSR; GP 3.00 TCH 58; VGSI 3.00/TCH 71 not coincident",
+      "data_provenance": "Chart name/PDF/amendment from d-TPP metadata XML; fixes, roles, minima, missed approach read visually from the PDF plate (transcription - spot-check before safety use)."
+    },
+    {
+      "chart_name": "RNAV (GPS) Y RWY 31",
+      "chart_code": "IAP",
+      "pdf_name": "00669RY31.PDF",
+      "amdt_dtpp_metadata": "3C",
+      "amdt_date_dtpp_metadata": "08/07/2025",
+      "printed_amendment_on_plate": "Amdt 3C 07AUG25",
+      "runway": "31",
+      "approach_type": "RNAV (GPS)",
+      "final_approach_course_mag_deg": 308,
+      "tdze_ft_plate": 63,
+      "pdf": {
+        "url": "https://aeronav.faa.gov/d-tpp/2610/00669RY31.PDF",
+        "http_status": 200,
+        "content_type": "application/pdf",
+        "verified_by": "curl -I (HEAD, following redirects) and curl GET on 2026-10-16; file begins with %PDF and was downloaded to raw/dtpp_2610_pdfs/00669RY31.PDF",
+        "bytes": 243203,
+        "local_file": "raw/dtpp_2610_pdfs/00669RY31.PDF"
+      },
+      "procuid": "15718",
+      "faa_nfd_id": null,
+      "copter": "",
+      "waas": "CH 50113 W31A",
+      "fixes_and_roles": [
+        {
+          "fix": "RODDI",
+          "role": "IAF"
+        },
+        {
+          "fix": "JENGA",
+          "role": "IAF"
+        },
+        {
+          "fix": "STEVV",
+          "role": "IF"
+        },
+        {
+          "fix": "PRSTY",
+          "role": "FAF"
+        },
+        {
+          "fix": "YIBKU",
+          "role": "step-down, 2.8 NM to RW31"
+        },
+        {
+          "fix": "RW31",
+          "role": "MAP"
+        },
+        {
+          "fix": "WEREK",
+          "role": "missed approach waypoint"
+        },
+        {
+          "fix": "KOVEC",
+          "role": "missed approach hold"
+        }
+      ],
+      "minima_summary": "LPV DA 263/40 HAT 200 (200-3/4); LNAV/VNAV DA 440/55 HAT 377 (400-1); LNAV MDA 440/55 HAT 377 (400-1); circling A 540-1 ... E 760-2 1/2",
+      "missed_approach": "Climb to 2000 direct WEREK and on track 259 deg to KOVEC and hold.",
+      "holding": "KOVEC 6 NM hold",
+      "plate_notes": "GP 3.00 TCH 52; VGSI 3.00/TCH 69 not coincident; transitions from PANZE (2000, 213 deg, 14.5 NM) and SEA ISLE SIE (2000, 069 deg, 21.1 NM); PANZE transition NA for arrivals on V44 NE bound/T315/V184-229 NE bound; NA for arrivals on SIE VORTAC airway radials 333 CW 131",
+      "data_provenance": "Chart name/PDF/amendment from d-TPP metadata XML; fixes, roles, minima, missed approach read visually from the PDF plate (transcription - spot-check before safety use)."
+    },
+    {
+      "chart_name": "VOR RWY 04",
+      "chart_code": "IAP",
+      "pdf_name": "00669V4.PDF",
+      "amdt_dtpp_metadata": "15D",
+      "amdt_date_dtpp_metadata": null,
+      "printed_amendment_on_plate": "Amdt 15D 09SEP21",
+      "runway": "04",
+      "approach_type": "VOR",
+      "final_approach_course_mag_deg": 48,
+      "tdze_ft_plate": 68,
+      "pdf": {
+        "url": "https://aeronav.faa.gov/d-tpp/2610/00669V4.PDF",
+        "http_status": 200,
+        "content_type": "application/pdf",
+        "verified_by": "curl -I (HEAD, following redirects) and curl GET on 2026-10-16; file begins with %PDF and was downloaded to raw/dtpp_2610_pdfs/00669V4.PDF",
+        "bytes": 229226,
+        "local_file": "raw/dtpp_2610_pdfs/00669V4.PDF"
+      },
+      "procuid": "3170",
+      "faa_nfd_id": null,
+      "copter": "",
+      "navaid": "VORTAC ACY 117.15 Chan 118(Y)",
+      "fixes_and_roles": [
+        {
+          "fix": "SEA ISLE SIE 114.8 (R-026 inbound, 2000 NoPT, 14 NM)",
+          "role": "IAF"
+        },
+        {
+          "fix": "MEADY INT (ACY 5.5, RADAR)",
+          "role": "IAF/FAF (hold-in-lieu)"
+        },
+        {
+          "fix": "CARUM INT (ACY 10.5)",
+          "role": "IF"
+        },
+        {
+          "fix": "ACY 1.7 DME",
+          "role": "marker on profile with dashed line (likely VDP; verify on plate)"
+        },
+        {
+          "fix": "XONUJ (ACY 0.5)",
+          "role": "MAP (near rwy 4 threshold; NASR XONUJ is ACY R-228 / 0.54 NM)"
+        }
+      ],
+      "minima_summary": "S-4: A-B 480-1 (412); C-D 480-1 1/4; E 480-1 1/2; circling A 540-1 ... E 760-2 1/2; descent angle 3.05 TCH 47",
+      "missed_approach": "Climbing right turn to 2000 on ACY VORTAC R-090 to SMITS INT/11 DME and hold.",
+      "holding": "MEADY: one-minute hold 2000",
+      "plate_notes": "FAF to MAP 4.9 NM; NA for arrival on SIE VORTAC airway radials 333 CW 059; Rwy 4 helicopter visibility reduction below 3/4 SM NA",
+      "data_provenance": "Chart name/PDF/amendment from d-TPP metadata XML; fixes, roles, minima, missed approach read visually from the PDF plate (transcription - spot-check before safety use)."
+    },
+    {
+      "chart_name": "VOR RWY 31",
+      "chart_code": "IAP",
+      "pdf_name": "00669V31.PDF",
+      "amdt_dtpp_metadata": "1D",
+      "amdt_date_dtpp_metadata": null,
+      "printed_amendment_on_plate": "Amdt 1D 11JUL24",
+      "runway": "31",
+      "approach_type": "VOR",
+      "final_approach_course_mag_deg": 302,
+      "tdze_ft_plate": 64,
+      "pdf": {
+        "url": "https://aeronav.faa.gov/d-tpp/2610/00669V31.PDF",
+        "http_status": 200,
+        "content_type": "application/pdf",
+        "verified_by": "curl -I (HEAD, following redirects) and curl GET on 2026-10-16; file begins with %PDF and was downloaded to raw/dtpp_2610_pdfs/00669V31.PDF",
+        "bytes": 232745,
+        "local_file": "raw/dtpp_2610_pdfs/00669V31.PDF"
+      },
+      "procuid": "15719",
+      "faa_nfd_id": null,
+      "copter": "",
+      "navaid": "VORTAC ACY 117.15 Chan 118(Y)",
+      "fixes_and_roles": [
+        {
+          "fix": "AVALO (on ACY R-174 / 11 DME per NASR FIX_NAV; 059 deg 17.4 NM from SEA ISLE)",
+          "role": "IAF (start of ACY 11 DME arc)"
+        },
+        {
+          "fix": "SEA ISLE SIE 114.8",
+          "role": "IAF (4500 on 059 deg, 17.4 NM to AVALO)"
+        },
+        {
+          "fix": "SMITS (ACY 11 DME, RADAR)",
+          "role": "IAF"
+        },
+        {
+          "fix": "BAZES (ACY 11)",
+          "role": "IF"
+        },
+        {
+          "fix": "BERGR INT (ACY 5, RADAR)",
+          "role": "FAF"
+        },
+        {
+          "fix": "ZUKER (ACY 0.8)",
+          "role": "MAP (near rwy 31 threshold; NASR ZUKER is ACY R-122 / 0.82 NM)"
+        },
+        {
+          "fix": "ACY 1.9 DME",
+          "role": "marker on profile with dashed line (likely VDP; verify on plate)"
+        }
+      ],
+      "minima_summary": "S-31: A-B 480/55 (416) (500-1); C-D 480/60 (500-1 1/4); E 480-1 1/2; circling A 540-1 ... E 760-2 1/2; 3.12 descent, TCH 52",
+      "missed_approach": "Climbing right turn to 2000 via heading 120 deg and ACY R-090 to SMITS INT/ACY 11 DME and hold.",
+      "holding": "-",
+      "plate_notes": "DME REQUIRED; procedure turn NA; FAF to MAP 4.2 NM; ACY 11 DME arcs",
+      "data_provenance": "Chart name/PDF/amendment from d-TPP metadata XML; fixes, roles, minima, missed approach read visually from the PDF plate (transcription - spot-check before safety use)."
+    },
+    {
+      "chart_name": "HI-VOR OR TACAN RWY 31",
+      "chart_code": "IAP",
+      "pdf_name": "00669HVT31.PDF",
+      "amdt_dtpp_metadata": null,
+      "amdt_date_dtpp_metadata": null,
+      "printed_amendment_on_plate": "Amdt 4C 25JAN24",
+      "runway": "31",
+      "approach_type": "VOR/TACAN (high altitude)",
+      "final_approach_course_mag_deg": 302,
+      "tdze_ft_plate": 64,
+      "pdf": {
+        "url": "https://aeronav.faa.gov/d-tpp/2610/00669HVT31.PDF",
+        "http_status": 200,
+        "content_type": "application/pdf",
+        "verified_by": "curl -I (HEAD, following redirects) and curl GET on 2026-10-16; file begins with %PDF and was downloaded to raw/dtpp_2610_pdfs/00669HVT31.PDF",
+        "bytes": 194914,
+        "local_file": "raw/dtpp_2610_pdfs/00669HVT31.PDF"
+      },
+      "procuid": "21328",
+      "faa_nfd_id": null,
+      "copter": "",
+      "navaid": "VORTAC ACY 117.15 Chan 118(Y)",
+      "fixes_and_roles": [
+        {
+          "fix": "ZAPOM ACY 24 DME",
+          "role": "IAF"
+        },
+        {
+          "fix": "EVASE ACY R-097 11 DME",
+          "role": "transition"
+        },
+        {
+          "fix": "BAZES ACY R-122 11 DME",
+          "role": "IF"
+        },
+        {
+          "fix": "BERGR (ACY 5 RADAR)",
+          "role": "FAF"
+        },
+        {
+          "fix": "ZUKER (ACY 0.8)",
+          "role": "MAP"
+        }
+      ],
+      "minima_summary": "S-31 C-E 500-1 1/4 (436); circling C 620-1 1/2, D 640-2, E 760-2 1/2",
+      "missed_approach": "Climbing right turn to 2000 on heading 120 deg and on ACY R-090 to SMITS/ACY 11 DME and hold.",
+      "holding": "ZAPOM hold 17500/14000",
+      "plate_notes": "DME or RADAR required; printed [USAF]; TACAN equivalent of VORTAC (chan 118Y); emergency safe altitude 100 NM 4200; ATC freq block shows CLNC DEL 127.85 353.775",
+      "data_provenance": "Chart name/PDF/amendment from d-TPP metadata XML; fixes, roles, minima, missed approach read visually from the PDF plate (transcription - spot-check before safety use)."
+    },
+    {
+      "chart_name": "COPTER ILS OR LOC/DME RWY 13",
+      "chart_code": "IAP",
+      "pdf_name": "00669COPTERILD13.PDF",
+      "amdt_dtpp_metadata": "1D",
+      "amdt_date_dtpp_metadata": "08/07/2025",
+      "printed_amendment_on_plate": "Amdt 1D 07AUG25",
+      "runway": "13",
+      "approach_type": "ILS (helicopter)",
+      "final_approach_course_mag_deg": 128,
+      "tdze_ft_plate": 75,
+      "pdf": {
+        "url": "https://aeronav.faa.gov/d-tpp/2610/00669COPTERILD13.PDF",
+        "http_status": 200,
+        "content_type": "application/pdf",
+        "verified_by": "curl -I (HEAD, following redirects) and curl GET on 2026-10-16; file begins with %PDF and was downloaded to raw/dtpp_2610_pdfs/00669COPTERILD13.PDF",
+        "bytes": 234553,
+        "local_file": "raw/dtpp_2610_pdfs/00669COPTERILD13.PDF"
+      },
+      "procuid": "15716",
+      "faa_nfd_id": null,
+      "copter": "",
+      "localizer": "I-PVO 109.1 Chan 28",
+      "fixes_and_roles": [
+        {
+          "fix": "MAYBN (I-PVO 4.4 RADAR)",
+          "role": "IF"
+        },
+        {
+          "fix": "TESKE (I-PVO 2.9)",
+          "role": "step-down"
+        },
+        {
+          "fix": "I-PVO 0.8 DME",
+          "role": "MAP/DME antenna area"
+        }
+      ],
+      "minima_summary": "H-ILS 13 DA 275/12 HAT 200 (200-1/4); H-LOC 13 440/24 HAT 365 (400-1/2)",
+      "missed_approach": "Climb to 600 then climbing left turn to 2000 on ACY VORTAC R-090 to SMITS INT/ACY 11 DME and hold.",
+      "holding": "-",
+      "plate_notes": "RADAR required; GS 3.00 HCH 58; FAF to MAP 3 NM; MALSR",
+      "data_provenance": "Chart name/PDF/amendment from d-TPP metadata XML; fixes, roles, minima, missed approach read visually from the PDF plate (transcription - spot-check before safety use)."
+    }
+  ],
+  "departure_procedures": [
+    {
+      "chart_name": "ATLANTIC CITY THREE DEPARTURE",
+      "type": "DP (radar vector departure; NOT a SID with a named route)",
+      "faa_id": "ACY3.ACY",
+      "printed_date": "07AUG25",
+      "pdf": {
+        "url": "https://aeronav.faa.gov/d-tpp/2610/00669ATLANTICCITY.PDF",
+        "http_status": 200,
+        "content_type": "application/pdf",
+        "verified_by": "curl -I (HEAD, following redirects) and curl GET on 2026-10-16; file begins with %PDF and was downloaded to raw/dtpp_2610_pdfs/00669ATLANTICCITY.PDF",
+        "bytes": 210364,
+        "local_file": "raw/dtpp_2610_pdfs/00669ATLANTICCITY.PDF"
+      },
+      "radar_required": true,
+      "top_altitude_ft": 2000,
+      "takeoff_minimums": "Rwy 4, 13, 22, 31: Standard.",
+      "route_description": {
+        "4": "Climb on heading 038 or as assigned by ATC, thence....",
+        "13": "Climb on heading 128 or as assigned by ATC, thence....",
+        "22": "Climb on heading 218 or as assigned by ATC, thence....",
+        "31": "Climb on heading 308 or as assigned by ATC, thence...."
+      },
+      "common_text": "....for vectors to filed route. Maintain 2000, expect filed altitude ten (10) minutes after departure. SPECIAL INSTRUCTIONS: For appropriate departure control frequency, see graphic. Use frequency depicted within sector where your first navaid/fix/route is located or as assigned.",
+      "departure_sectors": {
+        "ACY NORTH DEP CON": "134.25 292.2",
+        "ACY SOUTH DEP CON": "124.6 327.125"
+      },
+      "frequencies_on_chart": {
+        "ATIS": "125.725 316.15",
+        "CLNC DEL": "127.85 353.775",
+        "GND CON": "121.9 284.6",
+        "TOWER": "120.3 239.0"
+      },
+      "navaids_depicted": "ROBBINSVILLE RBV 113.8 (chan 85), COLTS NECK COL 115.4 (101), COYLE CYN 113.4 (81), CEDAR LAKE VCN 115.2 (99), ATLANTIC CITY ACY 117.15 (118Y), WATERLOO ATR 112.6 (73), SMYRNA ENO 111.4 (51), SEA ISLE SIE 114.8 (95); fixes DIXIE, ZIGGI, CAMRN, MANTA, PANZE, LEEAH",
+      "note": "The plate gives the four runway headings; the rest is radar vectors. This is the only DP/SID-like procedure. NASR DP files contain no ACY departure."
+    }
+  ],
+  "obstacle_departure_procedures": {
+    "chart_name": "TAKEOFF MINIMUMS AND (OBSTACLE) DEPARTURE PROCEDURES (Northeast 2 booklet page)",
+    "pdf_name": "NE2TO.PDF",
+    "pdf": {
+      "url": "https://aeronav.faa.gov/d-tpp/2610/NE2TO.PDF",
+      "http_status": 200,
+      "content_type": "application/pdf",
+      "verified_by": "curl -I (HEAD, following redirects) and curl GET on 2026-10-16; file begins with %PDF and was downloaded to raw/dtpp_2610_pdfs/NE2TO.PDF",
+      "bytes": 485163,
+      "local_file": "raw/dtpp_2610_pdfs/NE2TO.PDF"
+    },
+    "kacy_entry_version": "ORIG-A 12OCT17 (17285) (FAA)",
+    "content": "KACY entry lists only TAKEOFF OBSTACLE NOTES (no non-standard takeoff minimums and no named ODP climb gradient text in the entry). Obstacle notes (verbatim summary): Rwy 4 sign 36 ft from DER 303 ft right 4 ft AGL/69 MSL; trees up to 135 MSL (1942-2583 ft from DER). Rwy 13 NAVAID 42 ft from DER 149 ft right 2 AGL/65 MSL; trees up to 118 MSL. Rwy 22 terrain and NAVAID from 5 ft from DER up to 63 MSL; poles/transmission tower up to 90 MSL; trees up to 126 MSL. Rwy 31 light support structures 10-11 ft from DER 2 AGL/76-77 MSL; trees beginning 2405 ft from DER up to 144 MSL. Full list in the PDF.",
+    "note": "Shared regional PDF (all NE-2 airports), not KACY-specific."
+  },
+  "stars": [],
+  "stars_note": "No STAR for KACY in the d-TPP metadata (no STAR records under KACY) and no ACY rows in NASR STAR_APT/DP_APT. NASR FRQ shows the ACY approach facility (124.6/327.125) is listed for \"WAALK STAR\" serving MJX (McGuire), not KACY.",
+  "sids": [],
+  "sids_note": "No SID records for KACY (the Atlantic City Three Departure above is the only departure chart).",
+  "supporting_charts": {
+    "takeoff_minimums_pdf": [
+      {
+        "chart_name": "TAKEOFF MINIMUMS",
+        "pdf_name": "NE2TO.PDF",
+        "pdf": {
+          "url": "https://aeronav.faa.gov/d-tpp/2610/NE2TO.PDF",
+          "http_status": 200,
+          "content_type": "application/pdf",
+          "verified_by": "curl -I (HEAD, following redirects) and curl GET on 2026-10-16; file begins with %PDF and was downloaded to raw/dtpp_2610_pdfs/NE2TO.PDF",
+          "bytes": 485163,
+          "local_file": "raw/dtpp_2610_pdfs/NE2TO.PDF"
+        }
+      },
+      {
+        "chart_name": "ALTERNATE MINIMUMS",
+        "pdf_name": "NE2ALT.PDF",
+        "pdf": {
+          "url": "https://aeronav.faa.gov/d-tpp/2610/NE2ALT.PDF",
+          "http_status": 200,
+          "content_type": "application/pdf",
+          "verified_by": "curl -I (HEAD, following redirects) and curl GET on 2026-10-16; file begins with %PDF and was downloaded to raw/dtpp_2610_pdfs/NE2ALT.PDF",
+          "bytes": 172020,
+          "local_file": "raw/dtpp_2610_pdfs/NE2ALT.PDF"
+        }
+      }
+    ],
+    "lahso": [
+      {
+        "chart_name": "LAHSO",
+        "pdf_name": "NE2LAHSO.PDF",
+        "pdf": {
+          "url": "https://aeronav.faa.gov/d-tpp/2610/NE2LAHSO.PDF",
+          "http_status": 200,
+          "content_type": "application/pdf",
+          "verified_by": "curl -I (HEAD, following redirects) and curl GET on 2026-10-16; file begins with %PDF and was downloaded to raw/dtpp_2610_pdfs/NE2LAHSO.PDF",
+          "bytes": 55728,
+          "local_file": "raw/dtpp_2610_pdfs/NE2LAHSO.PDF"
+        }
+      }
+    ],
+    "hot_spot": [
+      {
+        "chart_name": "HOT SPOT",
+        "pdf_name": "NE2HOTSPOT.PDF",
+        "pdf": {
+          "url": "https://aeronav.faa.gov/d-tpp/2610/NE2HOTSPOT.PDF",
+          "http_status": 200,
+          "content_type": "application/pdf",
+          "verified_by": "curl -I (HEAD, following redirects) and curl GET on 2026-10-16; file begins with %PDF and was downloaded to raw/dtpp_2610_pdfs/NE2HOTSPOT.PDF",
+          "bytes": 45373,
+          "local_file": "raw/dtpp_2610_pdfs/NE2HOTSPOT.PDF"
+        }
+      }
+    ],
+    "lahso_atc_entries": {
+      "04": {
+        "lahso_with": "13-31",
+        "ald_ft": 3550
+      },
+      "13": {
+        "lahso_with": "04-22",
+        "ald_ft": 3600
+      },
+      "31": {
+        "lahso_with": "04-22",
+        "ald_ft": 5750
+      },
+      "note": "From NE2LAHSO.PDF (matches NASR LAHSO_ALD)"
+    },
+    "hot_spot_text": "HS 1: \"Rwy 13-31 at Twy A and Rwy 04-22 at Twy B.\" (verbatim from NE2HOTSPOT.PDF; the airport diagram circles the runway 13-31 / 04-22 intersection area, where Twy A and Twy B approach it)",
+    "alternate_minimums_pdf_note": "NE2ALT.PDF: ILS or LOC/DME Rwy 31: ILS Cat E 700-2 1/2, LOC Cat E 800-2 1/2. ILS Z or LOC Z Rwy 13: LOC Cat E 800-2 1/2. RNAV (GPS) Rwy 4, Rwy 22, Y Rwy 13, Y Rwy 31; VOR Rwy 4, VOR Rwy 31: Cat E 800-2 1/2."
+  },
+  "not_included": [
+    "RNAV (RNP) charts need special authorization (AR); listed but not usable by a generic sim aircraft",
+    "No \"converging ILS/ILS PRM\" or circling-only procedures; no GPS/GLS approaches exist in KACY d-TPP records"
+  ]
+}

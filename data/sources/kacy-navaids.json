@@ -1,0 +1,1006 @@
+{
+  "_provenance": {
+    "sources": [
+      "FAA NASR 28-day subscription, cycle effective 2026-10-01; https://nfdc.faa.gov/webContent/28DaySub/extra/01_Oct_2026_FRQ_CSV.zip  NAV_CSV, ILS_CSV, FIX_CSV zips",
+      "FAA d-TPP cycle 2610 (effective 2026-10-01 to 2026-10-29) approach plate PDFs for roles/minima"
+    ],
+    "retrieved": "2026-10-16",
+    "faa_cycle_effective": "2026-10-01",
+    "raw": "raw/nasr_2026-10-01/, raw/dtpp_2610_pdfs/"
+  },
+  "vortac_acy": {
+    "id": "ACY",
+    "type": "VORTAC",
+    "name": "ATLANTIC CITY",
+    "status": "OPERATIONAL RESTRICTED",
+    "status_note": "NASR NAV_STATUS = OPERATIONAL RESTRICTED (see restrictions in remarks)",
+    "freq_mhz": 117.15,
+    "tacan_dme_channel": "118Y",
+    "lat": 39.4558748,
+    "lon": -74.57631472,
+    "lat_dms": "39-27-21.1493N",
+    "lon_dms": "74-34-34.733W",
+    "elev_ft": 66.5,
+    "mag_var": "10W",
+    "mag_var_epoch": "1970",
+    "class": "VL",
+    "dme_service_volume": "H",
+    "hours": "24",
+    "owner": "F-FEDERAL AVIATION ADMIN",
+    "identifier_voice": "NONE",
+    "remarks": [
+      "DME UNUSBL 270-290 BYD 10 NM; 305-340 BYD 20 NM BLW 1900 FT.",
+      "VOR UNUSBL 135-140 BYD 40 NM; 160-240 BYD 40 NM; 241-251 BYD 41 NM; 252-260 BYD 40 NM; 270-290 BYD 10 NM; 291-304 BYD 40 NM; 305-340; 341-070 BYD 40 NM.",
+      "TACAN AZM UNUSBL 270-290 BYD 10NM; 305-340 BYD 20 NM BLW 1900 FT."
+    ],
+    "location_note": "Computed from NASR coordinates: VORTAC is about 664 ft from the ARP on bearing about 159 true (south-southeast of the ARP, on the airfield); computed, not an FAA-published figure."
+  },
+  "ils_localizers_at_kacy": {
+    "runways_with_ils": [
+      "13",
+      "31"
+    ],
+    "runways_without_ils_or_loc": [
+      "04",
+      "22"
+    ],
+    "note": "Rwy 13 ILS ident I-PVO (NASR LOC id PVO), rwy 31 ILS ident I-ACY (LOC id ACY); both 109.1 MHz (interlocked reciprocal pair) with GS 331.4 and DME channel 28X. Rwy 04/22 have RNAV(GPS)/VOR only; no ILS/LOC. NASR also lists ILS_TYPE=ILS/DME on both ends 13 and 31.",
+    "systems": [
+      {
+        "runway_end": "13",
+        "system_type_code": "LD",
+        "system_type_meaning": "LD = localizer with DME (NASR code; plates say LOC/DME and ILS/DME)",
+        "loc_ident": "PVO",
+        "plate_ident": "I-PVO",
+        "category": "CAT I",
+        "loc_freq_mhz": 109.1,
+        "dme_channel": "28X",
+        "front_course_mag_deg": 127.99,
+        "mag_var": "10W",
+        "status": "OPERATIONAL IFR",
+        "status_date": "1975/01/05",
+        "localizer_antenna": {
+          "lat": 39.45001944,
+          "lon": -74.55646308,
+          "elev_ft": 63.9
+        },
+        "glideslope": {
+          "angle_deg": 3.0,
+          "freq_mhz": 331.4,
+          "type": "GS",
+          "antenna": {
+            "lat": 39.46383611,
+            "lon": -74.58684552,
+            "elev_ft": 68.4
+          },
+          "status": "OPERATIONAL IFR"
+        },
+        "dme_antenna": {
+          "lat": 39.466123,
+          "lon": -74.59357258,
+          "elev_ft": 86.9
+        },
+        "marker_beacons": "none listed in ILS_MKR.csv for ACY",
+        "classification_remark": [
+          "ILS CLASSIFICATION CODE IT."
+        ],
+        "approach_lighting": "MALSR",
+        "plate_data": {
+          "plate_minima": "ILS Z or LOC Z RWY 13 (Amdt 8E 11JUL24): S-ILS 13 DA 275 ft, RVR 1800, HAT 200 (200-1/2), all categories. GS 3.00 deg, TCH 58 (plate). S-LOC 13: Cat A-B MDA 520 RVR 2400 HAT 445 (500-1/2); Cat C-E MDA 520 RVR 4500 HAT 445 (500-7/8). VGSI and ILS glidepath not coincident (VGSI 3.00/TCH 71).",
+          "tdze_plate_ft": 75
+        },
+        "plate_data_source": "d-TPP cycle 2610 PDFs 00669IZLZ13.PDF / 00669ILD31.PDF read visually (DA/DH values are NOT in NASR)"
+      },
+      {
+        "runway_end": "31",
+        "system_type_code": "LD",
+        "system_type_meaning": "LD = localizer with DME (NASR code; plates say LOC/DME and ILS/DME)",
+        "loc_ident": "ACY",
+        "plate_ident": "I-ACY",
+        "category": "CAT I",
+        "loc_freq_mhz": 109.1,
+        "dme_channel": "28X",
+        "front_course_mag_deg": 308.01,
+        "mag_var": "10W",
+        "status": "OPERATIONAL IFR",
+        "status_date": "2004/08/25",
+        "localizer_antenna": {
+          "lat": 39.46560041,
+          "lon": -74.5942685,
+          "elev_ft": 76.4
+        },
+        "glideslope": {
+          "angle_deg": 3.0,
+          "freq_mhz": 331.4,
+          "type": "GS",
+          "antenna": {
+            "lat": 39.45365733,
+            "lon": -74.56227158,
+            "elev_ft": 58.8
+          },
+          "status": "OPERATIONAL IFR"
+        },
+        "dme_antenna": {
+          "lat": 39.466123,
+          "lon": -74.59357258,
+          "elev_ft": 86.9
+        },
+        "marker_beacons": "none listed in ILS_MKR.csv for ACY",
+        "classification_remark": [
+          "ILS CLASSIFICATION CODE IE."
+        ],
+        "approach_lighting": "none recorded (REIL only per plate/NASR)",
+        "plate_data": {
+          "plate_minima": "ILS or LOC/DME RWY 31 (Orig-E 11JUL24): S-ILS 31 DA 264 ft, RVR 4000, HAT 200 (200-3/4), all categories. GS 3.00 deg, TCH 52 (plate). S-LOC 31: Cat A-B MDA 520 RVR 5500 HAT 456 (500-1); Cat C MDA 520-1 3/8 HAT 456 (500-1 3/8); Cat D-E MDA 520-1 1/2 HAT 456 (500-1 1/2). DME required. VGSI/ILS not coincident (VGSI 3.00/TCH 69).",
+          "tdze_plate_ft": 64
+        },
+        "plate_data_source": "d-TPP cycle 2610 PDFs 00669IZLZ13.PDF / 00669ILD31.PDF read visually (DA/DH values are NOT in NASR)"
+      }
+    ]
+  },
+  "other_navaids_referenced_by_kacy_procedures": [
+    {
+      "id": "VCN",
+      "type": "VOR/DME",
+      "name": "CEDAR LAKE",
+      "status": "OPERATIONAL IFR",
+      "freq_mhz": "115.2",
+      "channel": "99X",
+      "lat": 39.53767111,
+      "lon": -74.96714388,
+      "mag_var": "10W (1980)",
+      "elev_ft": 120.0
+    },
+    {
+      "id": "SIE",
+      "type": "VORTAC",
+      "name": "SEA ISLE",
+      "status": "OPERATIONAL RESTRICTED",
+      "freq_mhz": "114.8",
+      "channel": "95X",
+      "lat": 39.095509,
+      "lon": -74.80034394,
+      "mag_var": "9W (1965)",
+      "elev_ft": 8.3
+    },
+    {
+      "id": "CYN",
+      "type": "VORTAC",
+      "name": "COYLE",
+      "status": "OPERATIONAL RESTRICTED",
+      "freq_mhz": "113.4",
+      "channel": "81X",
+      "lat": 39.81733791,
+      "lon": -74.43162572,
+      "mag_var": "10W (1965)",
+      "elev_ft": 203.4
+    },
+    {
+      "id": "ENO",
+      "type": "VORTAC",
+      "name": "SMYRNA",
+      "status": "OPERATIONAL RESTRICTED",
+      "freq_mhz": "111.4",
+      "channel": "51X",
+      "lat": 39.23164669,
+      "lon": -75.51596994,
+      "mag_var": "9W (1965)",
+      "elev_ft": 14.9
+    },
+    {
+      "id": "COL",
+      "type": "VOR/DME",
+      "name": "COLTS NECK",
+      "status": "OPERATIONAL RESTRICTED",
+      "freq_mhz": "115.4",
+      "channel": "101X",
+      "lat": 40.31162952,
+      "lon": -74.15972847,
+      "mag_var": "11W (1975)",
+      "elev_ft": 128.7
+    },
+    {
+      "id": "RBV",
+      "type": "VORTAC",
+      "name": "ROBBINSVILLE",
+      "status": "OPERATIONAL IFR",
+      "freq_mhz": "113.8",
+      "channel": "85X",
+      "lat": 40.20240208,
+      "lon": -74.49502611,
+      "mag_var": "10W (1965)",
+      "elev_ft": 248.3
+    },
+    {
+      "id": "ATR",
+      "type": "VOR/DME",
+      "name": "WATERLOO",
+      "status": "OPERATIONAL RESTRICTED",
+      "freq_mhz": "112.6",
+      "channel": "73X",
+      "lat": 38.80981022,
+      "lon": -75.21132236,
+      "mag_var": "9W (1965)",
+      "elev_ft": 4.7
+    }
+  ],
+  "fixes_named_on_kacy_approach_charts": [
+    {
+      "id": "CARYL",
+      "lat": 39.54746388,
+      "lon": -74.79363888,
+      "fix_use_code": "RP   ",
+      "fix_use_meaning": null,
+      "artcc_low": "ZDC",
+      "charted_on": "IAP",
+      "reference_navaid_radial_distance": [
+        {
+          "nav": "CYN",
+          "nav_type": "VORTAC",
+          "bearing_deg": 236.14,
+          "dist_nm": null
+        },
+        {
+          "nav": "PVO",
+          "nav_type": "LOC",
+          "bearing_deg": 307.99,
+          "dist_nm": 10.5
+        }
+      ],
+      "roles_on_kacy_plates": {
+        "ILS Z/LOC Z RWY 13": "IF/IAF (I-PVO 10.5)",
+        "RNAV (GPS) Y RWY 13": "IF/IAF",
+        "RNAV (RNP) Z RWY 13": "IF",
+        "COPTER": null
+      },
+      "source": "NASR FIX_BASE.csv / FIX_NAV.csv; roles read from the d-TPP plate images (human transcription of PDF)"
+    },
+    {
+      "id": "MAYBN",
+      "lat": 39.49984166,
+      "lon": -74.67750555,
+      "fix_use_code": "RP   ",
+      "fix_use_meaning": null,
+      "artcc_low": "ZDC",
+      "charted_on": "IAP,MILITARY IAP",
+      "reference_navaid_radial_distance": [
+        {
+          "nav": "CYN",
+          "nav_type": "VORTAC",
+          "bearing_deg": 220.99,
+          "dist_nm": null
+        },
+        {
+          "nav": "PVO",
+          "nav_type": "LOC",
+          "bearing_deg": 307.99,
+          "dist_nm": 4.39
+        }
+      ],
+      "roles_on_kacy_plates": {
+        "ILS Z/LOC Z RWY 13": "FAF for LOC (I-PVO 4.4, RADAR); GS intercept 1600",
+        "HI-ILS Y/LOC Y RWY 13": "FAF-equivalent (I-PVO 4.4 RADAR)",
+        "RNAV (GPS) Y RWY 13": "FAF",
+        "RNAV (RNP) Z RWY 13": "FAF",
+        "COPTER ILS/LOC/DME RWY 13": "IF (I-PVO 4.4 RADAR)"
+      },
+      "source": "NASR FIX_BASE.csv / FIX_NAV.csv; roles read from the d-TPP plate images (human transcription of PDF)"
+    },
+    {
+      "id": "SMITS",
+      "lat": 39.4875,
+      "lon": -74.34309444,
+      "fix_use_code": "RP   ",
+      "fix_use_meaning": null,
+      "artcc_low": "ZDC",
+      "charted_on": "CONTROLLER LOW,ENROUTE LOW,IAP,MILITARY IAP",
+      "reference_navaid_radial_distance": [
+        {
+          "nav": "ACY",
+          "nav_type": "VORTAC",
+          "bearing_deg": 90.0,
+          "dist_nm": 11.0
+        },
+        {
+          "nav": "CYN",
+          "nav_type": "VORTAC",
+          "bearing_deg": 178.25,
+          "dist_nm": null
+        },
+        {
+          "nav": "VCN",
+          "nav_type": "VOR/DME",
+          "bearing_deg": 105.73,
+          "dist_nm": 29.13
+        }
+      ],
+      "roles_on_kacy_plates": {
+        "missed approach holding fix for ILS/LOC/VOR 13/31 (ACY R-090 / 11 DME)": "MAHF",
+        "RNAV (GPS) RWY 4": "MAHF (missed approach hold)",
+        "VOR RWY 31": "IAF (ACY 11 DME arc, RADAR)"
+      },
+      "source": "NASR FIX_BASE.csv / FIX_NAV.csv; roles read from the d-TPP plate images (human transcription of PDF)"
+    },
+    {
+      "id": "STEVV",
+      "lat": 39.36494444,
+      "lon": -74.35088333,
+      "fix_use_code": "RP   ",
+      "fix_use_meaning": null,
+      "artcc_low": "ZDC",
+      "charted_on": "IAP",
+      "reference_navaid_radial_distance": [
+        {
+          "nav": "ACY",
+          "nav_type": "LOC",
+          "bearing_deg": 128.01,
+          "dist_nm": 12.81
+        }
+      ],
+      "roles_on_kacy_plates": {
+        "ILS or LOC/DME RWY 31": "IF/IAF (I-ACY 12.8); holding NA for Cat E, radar required",
+        "RNAV (GPS) Y RWY 31": "IF",
+        "RNAV (RNP) Z RWY 31": "IF"
+      },
+      "source": "NASR FIX_BASE.csv / FIX_NAV.csv; roles read from the d-TPP plate images (human transcription of PDF)"
+    },
+    {
+      "id": "PRSTY",
+      "lat": 39.41288055,
+      "lon": -74.46655277,
+      "fix_use_code": "RP   ",
+      "fix_use_meaning": null,
+      "artcc_low": "ZDC",
+      "charted_on": "IAP",
+      "reference_navaid_radial_distance": [
+        {
+          "nav": "ACY",
+          "nav_type": "LOC",
+          "bearing_deg": 128.01,
+          "dist_nm": 6.71
+        }
+      ],
+      "roles_on_kacy_plates": {
+        "ILS or LOC/DME RWY 31": "FAF for LOC (I-ACY 6.7); GS intercept 1700",
+        "RNAV (GPS) Y RWY 31": "FAF",
+        "RNAV (RNP) Z RWY 31": "FAF"
+      },
+      "source": "NASR FIX_BASE.csv / FIX_NAV.csv; roles read from the d-TPP plate images (human transcription of PDF)"
+    },
+    {
+      "id": "JURAD",
+      "lat": 39.40113055,
+      "lon": -74.43823333,
+      "fix_use_code": "WP   ",
+      "fix_use_meaning": null,
+      "artcc_low": "ZDC",
+      "charted_on": "IAP",
+      "reference_navaid_radial_distance": null,
+      "roles_on_kacy_plates": {
+        "RNAV (GPS) Y RWY 13": "missed approach waypoint",
+        "RNAV (RNP) Z RWY 13": "missed approach waypoint"
+      },
+      "source": "NASR FIX_BASE.csv / FIX_NAV.csv; roles read from the d-TPP plate images (human transcription of PDF)"
+    },
+    {
+      "id": "RODDI",
+      "lat": 39.45318611,
+      "lon": -74.28999444,
+      "fix_use_code": "WP   ",
+      "fix_use_meaning": null,
+      "artcc_low": "ZDC",
+      "charted_on": "IAP",
+      "reference_navaid_radial_distance": null,
+      "roles_on_kacy_plates": {
+        "RNAV (GPS) Y RWY 13": "missed approach holding fix",
+        "RNAV (RNP) Z RWY 13": "missed approach holding fix",
+        "RNAV (GPS) Y RWY 31": "IAF",
+        "RNAV (RNP) Z RWY 31": "IAF"
+      },
+      "source": "NASR FIX_BASE.csv / FIX_NAV.csv; roles read from the d-TPP plate images (human transcription of PDF)"
+    },
+    {
+      "id": "KOVEC",
+      "lat": 39.45896388,
+      "lon": -74.853975,
+      "fix_use_code": "WP   ",
+      "fix_use_meaning": null,
+      "artcc_low": "ZDC",
+      "charted_on": "IAP",
+      "reference_navaid_radial_distance": null,
+      "roles_on_kacy_plates": {
+        "RNAV (GPS) Y RWY 13": "IAF",
+        "RNAV (GPS) Y RWY 31": "missed approach holding fix",
+        "RNAV (RNP) Z RWY 31": "missed approach holding fix"
+      },
+      "source": "NASR FIX_BASE.csv / FIX_NAV.csv; roles read from the d-TPP plate images (human transcription of PDF)"
+    },
+    {
+      "id": "WAGIR",
+      "lat": 39.63593055,
+      "lon": -74.73315,
+      "fix_use_code": "WP   ",
+      "fix_use_meaning": null,
+      "artcc_low": "ZDC",
+      "charted_on": "IAP",
+      "reference_navaid_radial_distance": null,
+      "roles_on_kacy_plates": {
+        "RNAV (GPS) Y RWY 13": "IAF"
+      },
+      "source": "NASR FIX_BASE.csv / FIX_NAV.csv; roles read from the d-TPP plate images (human transcription of PDF)"
+    },
+    {
+      "id": "LEBVE",
+      "lat": 39.65694722,
+      "lon": -74.73983888,
+      "fix_use_code": "RP   ",
+      "fix_use_meaning": null,
+      "artcc_low": "ZNY",
+      "charted_on": "CONTROLLER LOW,ENROUTE LOW,IAP,SECTIONAL",
+      "reference_navaid_radial_distance": [
+        {
+          "nav": "CYN",
+          "nav_type": "VORTAC",
+          "bearing_deg": 246.12,
+          "dist_nm": 17.2
+        }
+      ],
+      "roles_on_kacy_plates": {
+        "RNAV (RNP) Z RWY 13": "IAF (210K max)"
+      },
+      "source": "NASR FIX_BASE.csv / FIX_NAV.csv; roles read from the d-TPP plate images (human transcription of PDF)"
+    },
+    {
+      "id": "JENGA",
+      "lat": 39.27666944,
+      "lon": -74.41161944,
+      "fix_use_code": "WP   ",
+      "fix_use_meaning": null,
+      "artcc_low": "ZDC",
+      "charted_on": "CONTROLLER HIGH,CONTROLLER LOW,ENROUTE HIGH,ENROUTE LOW,IAP,STAR",
+      "reference_navaid_radial_distance": null,
+      "roles_on_kacy_plates": {
+        "RNAV (GPS) Y RWY 31": "IAF",
+        "RNAV (RNP) Z RWY 31": "IAF (210K max)"
+      },
+      "source": "NASR FIX_BASE.csv / FIX_NAV.csv; roles read from the d-TPP plate images (human transcription of PDF)"
+    },
+    {
+      "id": "YIBKU",
+      "lat": 39.429425,
+      "lon": -74.506575,
+      "fix_use_code": "WP   ",
+      "fix_use_meaning": null,
+      "artcc_low": "ZDC",
+      "charted_on": "IAP",
+      "reference_navaid_radial_distance": null,
+      "roles_on_kacy_plates": {
+        "RNAV (GPS) Y RWY 31": "step-down fix, 2.8 NM to RW31"
+      },
+      "source": "NASR FIX_BASE.csv / FIX_NAV.csv; roles read from the d-TPP plate images (human transcription of PDF)"
+    },
+    {
+      "id": "WEREK",
+      "lat": 39.50693611,
+      "lon": -74.69485277,
+      "fix_use_code": "WP   ",
+      "fix_use_meaning": null,
+      "artcc_low": "ZDC",
+      "charted_on": "IAP",
+      "reference_navaid_radial_distance": null,
+      "roles_on_kacy_plates": {
+        "RNAV (GPS) Y RWY 31": "missed approach waypoint",
+        "RNAV (RNP) Z RWY 31": "missed approach waypoint"
+      },
+      "source": "NASR FIX_BASE.csv / FIX_NAV.csv; roles read from the d-TPP plate images (human transcription of PDF)"
+    },
+    {
+      "id": "PANZE",
+      "lat": 39.67599444,
+      "lon": -74.16818055,
+      "fix_use_code": "RP   ",
+      "fix_use_meaning": null,
+      "artcc_low": "ZNY",
+      "charted_on": "CONTROLLER HIGH,CONTROLLER LOW,ENROUTE HIGH,ENROUTE LOW,IAP,MILITARY IAP,MILITARY SID,MILITARY STAR,SECTIONAL,SID,STAR",
+      "reference_navaid_radial_distance": [
+        {
+          "nav": "ACY",
+          "nav_type": "VORTAC",
+          "bearing_deg": 65.0,
+          "dist_nm": 23.08
+        },
+        {
+          "nav": "COL",
+          "nav_type": "VOR/DME",
+          "bearing_deg": 191.59,
+          "dist_nm": null
+        },
+        {
+          "nav": "CYN",
+          "nav_type": "VORTAC",
+          "bearing_deg": 134.72,
+          "dist_nm": null
+        },
+        {
+          "nav": "JFK",
+          "nav_type": "VOR/DME",
+          "bearing_deg": 209.78,
+          "dist_nm": null
+        },
+        {
+          "nav": "SIE",
+          "nav_type": "VORTAC",
+          "bearing_deg": 49.0,
+          "dist_nm": 45.56
+        }
+      ],
+      "roles_on_kacy_plates": {
+        "RNAV (GPS) Y RWY 31": "feeder (2000, 213 deg, 14.5 NM) to STEVV area; procedure NA for arrivals at PANZE on V44 NE bound and T315, V184-229 NE bound",
+        "RNAV (RNP) Z RWY 31": "feeder (RNP 0.50)"
+      },
+      "source": "NASR FIX_BASE.csv / FIX_NAV.csv; roles read from the d-TPP plate images (human transcription of PDF)"
+    },
+    {
+      "id": "DAYAD",
+      "lat": 39.17995555,
+      "lon": -74.52666111,
+      "fix_use_code": "WP   ",
+      "fix_use_meaning": null,
+      "artcc_low": "ZDC",
+      "charted_on": "IAP,MILITARY IAP",
+      "reference_navaid_radial_distance": null,
+      "roles_on_kacy_plates": {
+        "RNAV (GPS) RWY 4": "IAF"
+      },
+      "source": "NASR FIX_BASE.csv / FIX_NAV.csv; roles read from the d-TPP plate images (human transcription of PDF)"
+    },
+    {
+      "id": "FASEN",
+      "lat": 39.37609722,
+      "lon": -74.63558333,
+      "fix_use_code": "WP   ",
+      "fix_use_meaning": null,
+      "artcc_low": "ZDC",
+      "charted_on": "IAP,MILITARY IAP",
+      "reference_navaid_radial_distance": null,
+      "roles_on_kacy_plates": {
+        "RNAV (GPS) RWY 4": "FAF"
+      },
+      "source": "NASR FIX_BASE.csv / FIX_NAV.csv; roles read from the d-TPP plate images (human transcription of PDF)"
+    },
+    {
+      "id": "TEMVE",
+      "lat": 39.43058611,
+      "lon": -74.59828611,
+      "fix_use_code": "WP   ",
+      "fix_use_meaning": null,
+      "artcc_low": "ZDC",
+      "charted_on": "IAP",
+      "reference_navaid_radial_distance": null,
+      "roles_on_kacy_plates": {
+        "RNAV (GPS) RWY 4": "step-down fix 1.3 NM to RW04 (MAP is RW04)"
+      },
+      "source": "NASR FIX_BASE.csv / FIX_NAV.csv; roles read from the d-TPP plate images (human transcription of PDF)"
+    },
+    {
+      "id": "WYLEA",
+      "lat": 39.33612222,
+      "lon": -74.90589444,
+      "fix_use_code": "WP   ",
+      "fix_use_meaning": null,
+      "artcc_low": "ZDC",
+      "charted_on": "IAP",
+      "reference_navaid_radial_distance": null,
+      "roles_on_kacy_plates": {
+        "RNAV (GPS) RWY 4": "IAF"
+      },
+      "source": "NASR FIX_BASE.csv / FIX_NAV.csv; roles read from the d-TPP plate images (human transcription of PDF)"
+    },
+    {
+      "id": "JEDOB",
+      "lat": 39.25819444,
+      "lon": -74.71606666,
+      "fix_use_code": "WP   ",
+      "fix_use_meaning": null,
+      "artcc_low": "ZDC",
+      "charted_on": "IAP,MILITARY IAP",
+      "reference_navaid_radial_distance": null,
+      "roles_on_kacy_plates": {
+        "RNAV (GPS) RWY 4": "IF/IAF"
+      },
+      "source": "NASR FIX_BASE.csv / FIX_NAV.csv; roles read from the d-TPP plate images (human transcription of PDF)"
+    },
+    {
+      "id": "PIDVE",
+      "lat": 39.64672777,
+      "lon": -74.63374166,
+      "fix_use_code": "WP   ",
+      "fix_use_meaning": null,
+      "artcc_low": "ZDC",
+      "charted_on": "IAP",
+      "reference_navaid_radial_distance": null,
+      "roles_on_kacy_plates": {
+        "RNAV (GPS) RWY 22": "IAF"
+      },
+      "source": "NASR FIX_BASE.csv / FIX_NAV.csv; roles read from the d-TPP plate images (human transcription of PDF)"
+    },
+    {
+      "id": "KOPCE",
+      "lat": 39.60761944,
+      "lon": -74.51460555,
+      "fix_use_code": "WP   ",
+      "fix_use_meaning": null,
+      "artcc_low": "ZDC",
+      "charted_on": "IAP",
+      "reference_navaid_radial_distance": null,
+      "roles_on_kacy_plates": {
+        "RNAV (GPS) RWY 22": "IF"
+      },
+      "source": "NASR FIX_BASE.csv / FIX_NAV.csv; roles read from the d-TPP plate images (human transcription of PDF)"
+    },
+    {
+      "id": "FLDER",
+      "lat": 39.54416388,
+      "lon": -74.53358333,
+      "fix_use_code": "WP   ",
+      "fix_use_meaning": null,
+      "artcc_low": "ZDC",
+      "charted_on": "IAP,MILITARY IAP",
+      "reference_navaid_radial_distance": null,
+      "roles_on_kacy_plates": {
+        "RNAV (GPS) RWY 22": "intermediate segment fix (1100 203 deg 2.1 NM)"
+      },
+      "source": "NASR FIX_BASE.csv / FIX_NAV.csv; roles read from the d-TPP plate images (human transcription of PDF)"
+    },
+    {
+      "id": "EFEWY",
+      "lat": 39.51003611,
+      "lon": -74.54377777,
+      "fix_use_code": "WP   ",
+      "fix_use_meaning": null,
+      "artcc_low": "ZDC",
+      "charted_on": "IAP,MILITARY IAP",
+      "reference_navaid_radial_distance": null,
+      "roles_on_kacy_plates": {
+        "RNAV (GPS) RWY 22": "FAF"
+      },
+      "source": "NASR FIX_BASE.csv / FIX_NAV.csv; roles read from the d-TPP plate images (human transcription of PDF)"
+    },
+    {
+      "id": "TUBER",
+      "lat": 39.36553333,
+      "lon": -74.75144166,
+      "fix_use_code": "RP   ",
+      "fix_use_meaning": null,
+      "artcc_low": "ZDC",
+      "charted_on": "CONTROLLER LOW,ENROUTE LOW,IAP,MILITARY IAP,SECTIONAL",
+      "reference_navaid_radial_distance": [
+        {
+          "nav": "ACY",
+          "nav_type": "VORTAC",
+          "bearing_deg": 246.43,
+          "dist_nm": null
+        },
+        {
+          "nav": "SIE",
+          "nav_type": "VORTAC",
+          "bearing_deg": 17.0,
+          "dist_nm": 16.35
+        }
+      ],
+      "roles_on_kacy_plates": {
+        "RNAV (GPS) RWY 22": "missed approach holding fix"
+      },
+      "source": "NASR FIX_BASE.csv / FIX_NAV.csv; roles read from the d-TPP plate images (human transcription of PDF)"
+    },
+    {
+      "id": "XONUJ",
+      "lat": 39.44875,
+      "lon": -74.58349444,
+      "fix_use_code": "RP   ",
+      "fix_use_meaning": null,
+      "artcc_low": "ZDC",
+      "charted_on": "IAP",
+      "reference_navaid_radial_distance": [
+        {
+          "nav": "ACY",
+          "nav_type": "VORTAC",
+          "bearing_deg": 228.0,
+          "dist_nm": 0.54
+        }
+      ],
+      "roles_on_kacy_plates": {
+        "VOR RWY 4": "MAP (ACY 0.5 DME)"
+      },
+      "source": "NASR FIX_BASE.csv / FIX_NAV.csv; roles read from the d-TPP plate images (human transcription of PDF)"
+    },
+    {
+      "id": "MEADY",
+      "lat": 39.38420833,
+      "lon": -74.64844444,
+      "fix_use_code": "RP   ",
+      "fix_use_meaning": null,
+      "artcc_low": "ZDC",
+      "charted_on": "IAP,MILITARY IAP",
+      "reference_navaid_radial_distance": [
+        {
+          "nav": "ACY",
+          "nav_type": "VORTAC",
+          "bearing_deg": 228.0,
+          "dist_nm": 5.45
+        },
+        {
+          "nav": "VCN",
+          "nav_type": "VOR/DME",
+          "bearing_deg": 131.75,
+          "dist_nm": null
+        }
+      ],
+      "roles_on_kacy_plates": {
+        "VOR RWY 4": "IAF/FAF (ACY 5.5, RADAR; hold-in-lieu)"
+      },
+      "source": "NASR FIX_BASE.csv / FIX_NAV.csv; roles read from the d-TPP plate images (human transcription of PDF)"
+    },
+    {
+      "id": "CARUM",
+      "lat": 39.318425,
+      "lon": -74.71448611,
+      "fix_use_code": "RP   ",
+      "fix_use_meaning": null,
+      "artcc_low": "ZDC",
+      "charted_on": "IAP",
+      "reference_navaid_radial_distance": [
+        {
+          "nav": "ACY",
+          "nav_type": "VORTAC",
+          "bearing_deg": 228.0,
+          "dist_nm": 10.45
+        },
+        {
+          "nav": "SIE",
+          "nav_type": "VORTAC",
+          "bearing_deg": 25.65,
+          "dist_nm": null
+        },
+        {
+          "nav": "VCN",
+          "nav_type": "VOR/DME",
+          "bearing_deg": 148.13,
+          "dist_nm": null
+        }
+      ],
+      "roles_on_kacy_plates": {
+        "VOR RWY 4": "IF (ACY 10.5)"
+      },
+      "source": "NASR FIX_BASE.csv / FIX_NAV.csv; roles read from the d-TPP plate images (human transcription of PDF)"
+    },
+    {
+      "id": "ZUKER",
+      "lat": 39.45077777,
+      "lon": -74.56005833,
+      "fix_use_code": "RP   ",
+      "fix_use_meaning": null,
+      "artcc_low": "ZDC",
+      "charted_on": "IAP,MILITARY IAP",
+      "reference_navaid_radial_distance": [
+        {
+          "nav": "ACY",
+          "nav_type": "VORTAC",
+          "bearing_deg": 122.0,
+          "dist_nm": 0.82
+        }
+      ],
+      "roles_on_kacy_plates": {
+        "VOR RWY 31": "MAP area (ACY 0.8 DME)",
+        "HI-VOR or TACAN RWY 31": "MAP area (ACY 0.8 DME)"
+      },
+      "source": "NASR FIX_BASE.csv / FIX_NAV.csv; roles read from the d-TPP plate images (human transcription of PDF)"
+    },
+    {
+      "id": "BERGR",
+      "lat": 39.42458611,
+      "lon": -74.47660833,
+      "fix_use_code": "RP   ",
+      "fix_use_meaning": null,
+      "artcc_low": "ZDC",
+      "charted_on": "IAP,MILITARY IAP",
+      "reference_navaid_radial_distance": [
+        {
+          "nav": "ACY",
+          "nav_type": "VORTAC",
+          "bearing_deg": 122.0,
+          "dist_nm": 5.0
+        },
+        {
+          "nav": "CYN",
+          "nav_type": "VORTAC",
+          "bearing_deg": 195.08,
+          "dist_nm": null
+        }
+      ],
+      "roles_on_kacy_plates": {
+        "VOR RWY 31": "FAF (ACY 5, RADAR)",
+        "HI-VOR or TACAN RWY 31": "FAF (ACY 5, RADAR)"
+      },
+      "source": "NASR FIX_BASE.csv / FIX_NAV.csv; roles read from the d-TPP plate images (human transcription of PDF)"
+    },
+    {
+      "id": "BAZES",
+      "lat": 39.38692222,
+      "lon": -74.357075,
+      "fix_use_code": "RP   ",
+      "fix_use_meaning": null,
+      "artcc_low": "ZDC",
+      "charted_on": "IAP,MILITARY IAP",
+      "reference_navaid_radial_distance": [
+        {
+          "nav": "ACY",
+          "nav_type": "VORTAC",
+          "bearing_deg": 122.0,
+          "dist_nm": 11.0
+        }
+      ],
+      "roles_on_kacy_plates": {
+        "VOR RWY 31": "IF (ACY 11 DME arc)",
+        "HI-VOR or TACAN RWY 31": "IF (R-122 ACY 11)"
+      },
+      "source": "NASR FIX_BASE.csv / FIX_NAV.csv; roles read from the d-TPP plate images (human transcription of PDF)"
+    },
+    {
+      "id": "AVALO",
+      "lat": 39.28181111,
+      "lon": -74.51409722,
+      "fix_use_code": "RP   ",
+      "fix_use_meaning": null,
+      "artcc_low": "ZDC",
+      "charted_on": "CONTROLLER LOW,ENROUTE LOW,IAP,SECTIONAL",
+      "reference_navaid_radial_distance": [
+        {
+          "nav": "ACY",
+          "nav_type": "VORTAC",
+          "bearing_deg": 174.47,
+          "dist_nm": null
+        },
+        {
+          "nav": "ENO",
+          "nav_type": "VORTAC",
+          "bearing_deg": 95.0,
+          "dist_nm": 46.79
+        },
+        {
+          "nav": "SIE",
+          "nav_type": "VORTAC",
+          "bearing_deg": 59.0,
+          "dist_nm": 17.41
+        }
+      ],
+      "roles_on_kacy_plates": {
+        "VOR RWY 31": "IAF (ACY 11 DME arc start, R-174)"
+      },
+      "source": "NASR FIX_BASE.csv / FIX_NAV.csv; roles read from the d-TPP plate images (human transcription of PDF)"
+    },
+    {
+      "id": "EVASE",
+      "lat": 39.46523611,
+      "lon": -74.33991388,
+      "fix_use_code": "MR   ",
+      "fix_use_meaning": null,
+      "artcc_low": "ZNY",
+      "charted_on": "MILITARY IAP",
+      "reference_navaid_radial_distance": [
+        {
+          "nav": "ACY",
+          "nav_type": "VORTAC",
+          "bearing_deg": 97.0,
+          "dist_nm": 11.0
+        }
+      ],
+      "roles_on_kacy_plates": {
+        "HI-VOR or TACAN RWY 31": "transition fix (ACY R-097 11 DME)"
+      },
+      "source": "NASR FIX_BASE.csv / FIX_NAV.csv; roles read from the d-TPP plate images (human transcription of PDF)"
+    },
+    {
+      "id": "ZAPOM",
+      "lat": 39.09282222,
+      "lon": -74.79344722,
+      "fix_use_code": "MR   ",
+      "fix_use_meaning": null,
+      "artcc_low": "ZDC",
+      "charted_on": "MILITARY IAP",
+      "reference_navaid_radial_distance": [
+        {
+          "nav": "ACY",
+          "nav_type": "VORTAC",
+          "bearing_deg": 215.0,
+          "dist_nm": 24.0
+        },
+        {
+          "nav": "ENO",
+          "nav_type": "VORTAC",
+          "bearing_deg": 112.64,
+          "dist_nm": null
+        }
+      ],
+      "roles_on_kacy_plates": {
+        "HI-VOR or TACAN RWY 31": "IAF (ACY 24 DME, R-215)",
+        "HI-ILS Y/LOC Y RWY 13": "IAF (ACY 24 DME)"
+      },
+      "source": "NASR FIX_BASE.csv / FIX_NAV.csv; roles read from the d-TPP plate images (human transcription of PDF)"
+    },
+    {
+      "id": "WEROL",
+      "lat": 39.63763888,
+      "lon": -74.72906944,
+      "fix_use_code": "MR   ",
+      "fix_use_meaning": null,
+      "artcc_low": "ZDC",
+      "charted_on": "MILITARY IAP",
+      "reference_navaid_radial_distance": [
+        {
+          "nav": "ACY",
+          "nav_type": "VORTAC",
+          "bearing_deg": 337.0,
+          "dist_nm": 13.0
+        }
+      ],
+      "roles_on_kacy_plates": {
+        "HI-ILS Y/LOC Y RWY 13": "fix on ACY R-337 13 DME (missed/transition)"
+      },
+      "source": "NASR FIX_BASE.csv / FIX_NAV.csv; roles read from the d-TPP plate images (human transcription of PDF)"
+    },
+    {
+      "id": "JOGIR",
+      "lat": 39.55921944,
+      "lon": -74.822425,
+      "fix_use_code": "MR   ",
+      "fix_use_meaning": null,
+      "artcc_low": "ZDC",
+      "charted_on": "MILITARY IAP",
+      "reference_navaid_radial_distance": [
+        {
+          "nav": "ACY",
+          "nav_type": "VORTAC",
+          "bearing_deg": 308.54,
+          "dist_nm": null
+        },
+        {
+          "nav": "PVO",
+          "nav_type": "LOC",
+          "bearing_deg": 317.99,
+          "dist_nm": 12.0
+        }
+      ],
+      "roles_on_kacy_plates": {
+        "HI-ILS Y/LOC Y RWY 13": "IF (I-PVO 12)"
+      },
+      "source": "NASR FIX_BASE.csv / FIX_NAV.csv; roles read from the d-TPP plate images (human transcription of PDF)"
+    },
+    {
+      "id": "TESKE",
+      "lat": 39.48779722,
+      "lon": -74.6482,
+      "fix_use_code": "RP   ",
+      "fix_use_meaning": null,
+      "artcc_low": "ZDC",
+      "charted_on": "IAP",
+      "reference_navaid_radial_distance": [
+        {
+          "nav": "PVO",
+          "nav_type": "LOC",
+          "bearing_deg": 307.99,
+          "dist_nm": 2.85
+        }
+      ],
+      "roles_on_kacy_plates": {
+        "COPTER ILS or LOC/DME RWY 13": "step-down fix (I-PVO 2.9)"
+      },
+      "source": "NASR FIX_BASE.csv / FIX_NAV.csv; roles read from the d-TPP plate images (human transcription of PDF)"
+    }
+  ],
+  "unverified": [
+    "COYLE on the ILS Z 13 plate is the CYN VORTAC (113.4), not the Indiana waypoint COYLE in FIX_BASE; ignore that fix.",
+    "Fix roles are human-read from plate images; verify against the PDFs before safety-critical use. Altitudes in the procedures file likewise.",
+    "Exact missed-approach MAP location along track for ILS/LOC (DA point on glideslope) was not computed."
+  ]
+}

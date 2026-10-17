@@ -1,0 +1,123 @@
+/**
+ * Wind component maths and runway recommendation.
+ * All headings passed to the component functions must be in the SAME
+ * reference (both magnetic, or both true). `recommendRunways` handles the
+ * true->magnetic conversion of the stored METAR wind.
+ */
+import type { Weather } from '../sim/types';
+import { KACY_MAGNETIC_VARIATION_DEG, windMagnetic } from './metar';
+
+const DEG = Math.PI / 180;
+
+/** Headwind component in knots. Negative = tailwind. */
+export function headwindComponent(windDirMag: number, windKt: number, runwayHeadingMag: number): number {
+  return windKt * Math.cos((windDirMag - runwayHeadingMag) * DEG);
+}
+
+/** Crosswind component magnitude in knots (always >= 0). */
+export function crosswindComponent(windDirMag: number, windKt: number, runwayHeadingMag: number): number {
+  return Math.abs(windKt * Math.sin((windDirMag - runwayHeadingMag) * DEG));
+}
+
+/**
+ * Signed crosswind: positive when the wind comes from the RIGHT of the runway
+ * heading (pilot's view), negative from the left.
+ */
+export function crosswindSigned(windDirMag: number, windKt: number, runwayHeadingMag: number): number {
+  return windKt * Math.sin((windDirMag - runwayHeadingMag) * DEG);
+}
+
+export interface RunwayEndInput {
+  id: string;
+  magneticHeadingDeg: number;
+}
+
+export interface RunwayRanking {
+  id: string;
+  headwindKt: number;
+  crosswindKt: number;
+}
+
+export interface RunwayRecommendation {
+  /** Ends whose headwind is within `toleranceKt` of the best, in preference order. */
+  best: string[];
+  /** First of `best`. */
+  primary: string;
+  /** Every end, sorted best first. */
+  ranking: RunwayRanking[];
+  /** True when wind was calm/variable/light and the preferred order decided. */
+  calmWindRule: boolean;
+}
+
+export interface RecommendOptions {
+  /** Runway ids in order of preference; used for ties and calm wind. */
+  preferredOrder?: string[];
+  /** East-positive magnetic variation used to convert the stored TRUE wind. Default KACY (-10). */
+  variationDeg?: number;
+  /** Headwind differences up to this are treated as ties. Default 1 kt. */
+  toleranceKt?: number;
+  /** Wind at/below this speed (or variable) uses the preferred order only. Default 3 kt. */
+  calmBelowKt?: number;
+  /** Use gust speed instead of steady speed. Default false. */
+  useGusts?: boolean;
+}
+
+/**
+ * Recommend the runway end(s) with the best headwind component for the wind in
+ * `weather` (TRUE wind, converted internally to magnetic).
+ */
+export function recommendRunways(
+  weather: Pick<Weather, 'windDirDeg' | 'windSpeedKt' | 'windGustKt'>,
+  runwayEnds: readonly RunwayEndInput[],
+  options: RecommendOptions = {},
+): RunwayRecommendation {
+  if (runwayEnds.length === 0) throw new Error('recommendRunways: no runway ends supplied');
+  const {
+    preferredOrder = [],
+    variationDeg = KACY_MAGNETIC_VARIATION_DEG,
+    toleranceKt = 1,
+    calmBelowKt = 3,
+    useGusts = false,
+  } = options;
+
+  const speed = useGusts && weather.windGustKt ? weather.windGustKt : weather.windSpeedKt;
+  const magDir = windMagnetic(weather, variationDeg);
+  const calm = magDir === 'VRB' || magDir === 0 || speed <= calmBelowKt;
+
+  const prefRank = (id: string) => {
+    const i = preferredOrder.indexOf(id);
+    return i < 0 ? Number.MAX_SAFE_INTEGER : i;
+  };
+
+  const ranking: RunwayRanking[] = runwayEnds.map((r) => {
+    if (typeof magDir !== 'number' || magDir === 0) {
+      return { id: r.id, headwindKt: 0, crosswindKt: 0 };
+    }
+    return {
+      id: r.id,
+      headwindKt: headwindComponent(magDir, speed, r.magneticHeadingDeg),
+      crosswindKt: crosswindComponent(magDir, speed, r.magneticHeadingDeg),
+    };
+  });
+
+  const orderIndex = new Map(runwayEnds.map((r, i) => [r.id, i]));
+  const tieBreak = (a: RunwayRanking, b: RunwayRanking) =>
+    prefRank(a.id) - prefRank(b.id) || (orderIndex.get(a.id)! - orderIndex.get(b.id)!);
+
+  if (calm) {
+    ranking.sort(tieBreak);
+    const best = ranking.map((r) => r.id);
+    return { best: [ranking[0].id], primary: best[0], ranking, calmWindRule: true };
+  }
+
+  const maxHw = Math.max(...ranking.map((r) => r.headwindKt));
+  ranking.sort((a, b) => {
+    const aTop = maxHw - a.headwindKt <= toleranceKt;
+    const bTop = maxHw - b.headwindKt <= toleranceKt;
+    if (aTop && bTop) return tieBreak(a, b);
+    if (aTop !== bTop) return aTop ? -1 : 1;
+    return b.headwindKt - a.headwindKt;
+  });
+  const best = ranking.filter((r) => maxHw - r.headwindKt <= toleranceKt).map((r) => r.id);
+  return { best, primary: best[0], ranking, calmWindRule: false };
+}

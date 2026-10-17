@@ -1,0 +1,620 @@
+{
+  "_provenance": {
+    "source": "FAA NASR 28-day subscription, cycle effective 2026-10-01 (next 2026-10-29), CSV per-file zips from https://nfdc.faa.gov/webContent/28DaySub/extra/01_Oct_2026_<NAME>_CSV.zip; page https://www.faa.gov/air_traffic/flight_info/aeronav/aero_data/NASR_Subscription/2026-10-01/",
+    "files": [
+      "APT_BASE.csv",
+      "APT_RWY.csv",
+      "APT_RWY_END.csv",
+      "APT_RMK.csv",
+      "APT_CON.csv",
+      "APT_ARS.csv",
+      "APT_ATT.csv",
+      "ATC_BASE.csv",
+      "ATC_ATIS.csv",
+      "ATC_SVC.csv",
+      "CLS_ARSP.csv",
+      "ILS_BASE.csv",
+      "ILS_GS.csv"
+    ],
+    "retrieved": "2026-10-16",
+    "faa_cycle_effective": "2026-10-01",
+    "faa_cycle_next": "2026-10-29",
+    "arpt_id": "ACY",
+    "icao": "KACY",
+    "site_no": "13487.",
+    "method": "Downloaded NASR CSV zips and extracted rows with ARPT_ID/FACILITY_ID == ACY by script; values copied verbatim, only numeric conversion applied. Blank NASR fields are reported as null/none-recorded, never filled in.",
+    "raw_dir": "raw/nasr_2026-10-01/"
+  },
+  "airport": {
+    "name": "ATLANTIC CITY INTL",
+    "icao": "KACY",
+    "faa_id": "ACY",
+    "city": "ATLANTIC CITY",
+    "state": "NJ",
+    "county": "ATLANTIC",
+    "faa_region": "AEA",
+    "ownership": {
+      "type_code": "PU",
+      "type_meaning": "PU = publicly owned (NASR code)",
+      "owner": "SOUTH JERSEY TRANSPORTATION AUTH",
+      "contacts": [
+        {
+          "title": "MANAGER",
+          "name": "TIM KROLL",
+          "address": "SUITE 100, EGG HARBOR TOWNSHIP, NJ, 08234",
+          "phone": "609-645-7895"
+        },
+        {
+          "title": "OPNS MGR",
+          "name": "LEON CORI",
+          "address": "SOUTH JERSEY TRANS AUTHORITY, ACY INTL ARPT, SUITE 100, EGG HARBOR TOWNSHIP, NJ, 08234",
+          "phone": "609-645-7895"
+        },
+        {
+          "title": "OWNER",
+          "name": "SOUTH JERSEY TRANSPORTATION AUTH",
+          "address": "SUITE 106, EGG HARBOR TOWNSHIP, NJ, 08234",
+          "phone": "609-645-7895"
+        }
+      ]
+    },
+    "facility_use": "PU",
+    "status": "O",
+    "activation_date": "1943/06",
+    "far139_type": "I C",
+    "far139_carrier_service": "S",
+    "arp": {
+      "lat": 39.45757583,
+      "lon": -74.57715527,
+      "lat_dms": "39-27-27.273N",
+      "lon_dms": "74-34-37.759W",
+      "source": "3RD PARTY SURVEY",
+      "source_date": "2024/01/11"
+    },
+    "field_elevation_ft": 74.8,
+    "elevation_source": "3RD PARTY SURVEY",
+    "elevation_source_date": "2024/01/11",
+    "magnetic_variation": {
+      "deg": 10.0,
+      "hemisphere": "W",
+      "epoch_year": "1965",
+      "note": "NASR airport variation is 10W, epoch 1965 (stale). Airport diagram prints VAR 10 deg W, January 1965, annual change 0.1 deg W. Charted magnetic runway headings = true + 10 (038/218/128/308). Current WMM declination for 2026 is NOT verified here."
+    },
+    "artcc": {
+      "id": "ZDC",
+      "name": "WASHINGTON"
+    },
+    "fss": {
+      "id": "MIV",
+      "name": "MILLVILLE"
+    },
+    "tower_type": "ATCT-TRACON",
+    "beacon": {
+      "schedule": "SS-SR",
+      "lens": "WG"
+    },
+    "wind_indicator": "Y-L",
+    "fuel": "100LL,A,A++",
+    "customs": "US CUSTOMS USER FEE ARPT (see remarks)",
+    "landing_fee": "Y",
+    "military_landing_rights": "Y",
+    "acreage": 5000.0,
+    "chart_name": "WASHINGTON",
+    "distance_city_to_airport_nm": 9.0,
+    "direction_city_to_airport": "NW",
+    "last_inspection": "2026/03/11",
+    "traffic_pattern_altitude_ft": null,
+    "traffic_pattern_altitude_note": "TPA blank in NASR for ACY - UNVERIFIED"
+  },
+  "tower": {
+    "facility_type": "ATCT-TRACON",
+    "operator_code": "F",
+    "operator_meaning": "F = FAA (NASR code)",
+    "tower_call": "ATLANTIC CITY",
+    "tower_hours": "24",
+    "tower_hours_note": "NASR TWR_HRS = 24 (24 hours/day). Approach/departure control hours (CTL_PRVDING_HRS) = 24",
+    "approach_radio_call": "ATLANTIC CITY",
+    "departure_radio_call": "ATLANTIC CITY",
+    "approach_provider": "ACY",
+    "services": [
+      "ARTS-II",
+      "CLASS C"
+    ],
+    "atis": [
+      {
+        "atis_no": "1",
+        "hours": "24",
+        "phone": "609-485-4444"
+      }
+    ],
+    "note": "Tower and TRACON (ATCT-TRACON) both listed 24 hours. Remark: \"DURG ATC ZERO EVENTS, CTAF 120.3.\""
+  },
+  "airspace": {
+    "class_c": true,
+    "class_b": false,
+    "class_d": false,
+    "class_e_surface": false,
+    "hours": null,
+    "note": "NASR CLS_ARSP: ACY is a CLASS C surface area airport (CLASS C service also in ATC_SVC and FRQ rows \"CLASS C\" on 124.6/327.125/134.25/292.2). Vertical/lateral limits of the Class C are NOT in the CSV rows; see class_airspace_shape_files.zip (not downloaded) - shelf dimensions UNVERIFIED."
+  },
+  "runways": [
+    {
+      "id": "04/22",
+      "length_ft": 6145.0,
+      "width_ft": 150.0,
+      "surface": "ASPH-CONC",
+      "condition": "GOOD",
+      "treatment": "GRVD",
+      "pavement_classification": "PCR",
+      "pcr_number": "480",
+      "pavement_code": "R/B/W/T",
+      "edge_lights": "HIGH",
+      "weight_bearing_klbs": {
+        "single": 120.0,
+        "dual": 161.0,
+        "dual_tandem": 278.0,
+        "double_dual_tandem": 682.0
+      },
+      "length_source": "3RD PARTY SURVEY",
+      "length_source_date": "2024/01/11",
+      "ends": [
+        {
+          "id": "04",
+          "true_alignment_deg": 28.0,
+          "threshold": {
+            "lat": 39.44973666,
+            "lon": -74.58516197,
+            "lat_dms": "39-26-59.052N",
+            "lon_dms": "74-35-6.5831W",
+            "elev_ft": 61.3,
+            "position_source": "3RD PARTY SURVEY",
+            "position_date": "2024/01/11"
+          },
+          "displaced_threshold": {
+            "present": false,
+            "length_ft": null,
+            "note": "NASR DISPLACED_THR_* fields are blank for this runway end (none recorded)."
+          },
+          "tdz_elev_ft": 68.4,
+          "threshold_crossing_height_ft": 50.0,
+          "visual_glide_path_angle_deg": 3.0,
+          "vgsi": "P4L",
+          "approach_lighting": "NONE recorded in NASR",
+          "tdz_lights": null,
+          "centerline_lights": null,
+          "reil": null,
+          "ils_type_nasr": "NONE recorded in NASR",
+          "marking": {
+            "type": "NPI",
+            "condition": "GOOD"
+          },
+          "declared_distances_ft": {
+            "tora": 6145.0,
+            "toda": 6145.0,
+            "asda": 6145.0,
+            "lda": 6145.0
+          },
+          "lahso": {
+            "available_landing_distance_ft": 3550.0,
+            "hold_short_of": "13/31",
+            "hold_short_point": {
+              "lat": 39.45834222,
+              "lon": -74.57926077
+            }
+          },
+          "right_hand_traffic": "N",
+          "controlling_obstruction": {
+            "type": "TREE",
+            "height_ft": 64.0,
+            "slope": "32",
+            "dist_from_thr_ft": 2259.0,
+            "offset_ft": 471.0,
+            "offset_side": "R"
+          }
+        },
+        {
+          "id": "22",
+          "true_alignment_deg": 208.0,
+          "threshold": {
+            "lat": 39.46463163,
+            "lon": -74.574946,
+            "lat_dms": "39-27-52.6739N",
+            "lon_dms": "74-34-29.8056W",
+            "elev_ft": 67.1,
+            "position_source": "3RD PARTY SURVEY",
+            "position_date": "2024/01/11"
+          },
+          "displaced_threshold": {
+            "present": false,
+            "length_ft": null,
+            "note": "NASR DISPLACED_THR_* fields are blank for this runway end (none recorded)."
+          },
+          "tdz_elev_ft": 67.6,
+          "threshold_crossing_height_ft": 51.0,
+          "visual_glide_path_angle_deg": 3.0,
+          "vgsi": "V4L",
+          "approach_lighting": "NONE recorded in NASR",
+          "tdz_lights": null,
+          "centerline_lights": null,
+          "reil": null,
+          "ils_type_nasr": "NONE recorded in NASR",
+          "marking": {
+            "type": "NPI",
+            "condition": "GOOD"
+          },
+          "declared_distances_ft": {
+            "tora": 6145.0,
+            "toda": 6145.0,
+            "asda": 6145.0,
+            "lda": 6145.0
+          },
+          "lahso": null,
+          "right_hand_traffic": "N",
+          "controlling_obstruction": {
+            "type": "TREE",
+            "height_ft": 70.0,
+            "slope": "27",
+            "dist_from_thr_ft": 2073.0,
+            "offset_ft": 505.0,
+            "offset_side": "R"
+          }
+        }
+      ],
+      "type": "RUNWAY"
+    },
+    {
+      "id": "13/31",
+      "length_ft": 10001.0,
+      "width_ft": 150.0,
+      "surface": "ASPH",
+      "condition": "GOOD",
+      "treatment": "GRVD",
+      "pavement_classification": "PCR",
+      "pcr_number": "601",
+      "pavement_code": "F/A/X/T",
+      "edge_lights": "HIGH",
+      "weight_bearing_klbs": {
+        "single": 120.0,
+        "dual": 250.0,
+        "dual_tandem": 550.0,
+        "double_dual_tandem": 1120.0
+      },
+      "length_source": "3RD PARTY SURVEY",
+      "length_source_date": "2024/01/11",
+      "ends": [
+        {
+          "id": "13",
+          "true_alignment_deg": 118.0,
+          "threshold": {
+            "lat": 39.46426008,
+            "lon": -74.5910113,
+            "lat_dms": "39-27-51.3363N",
+            "lon_dms": "74-35-27.6407W",
+            "elev_ft": 74.8,
+            "position_source": "3RD PARTY SURVEY",
+            "position_date": "2024/01/11"
+          },
+          "displaced_threshold": {
+            "present": false,
+            "length_ft": null,
+            "note": "NASR DISPLACED_THR_* fields are blank for this runway end (none recorded)."
+          },
+          "tdz_elev_ft": 74.8,
+          "threshold_crossing_height_ft": 71.0,
+          "visual_glide_path_angle_deg": 3.0,
+          "vgsi": "P4L",
+          "approach_lighting": "MALSR",
+          "tdz_lights": "Y",
+          "centerline_lights": "Y",
+          "reil": "N",
+          "ils_type_nasr": "ILS/DME",
+          "marking": {
+            "type": "PIR",
+            "condition": "GOOD"
+          },
+          "declared_distances_ft": {
+            "tora": 10001.0,
+            "toda": 10001.0,
+            "asda": 10001.0,
+            "lda": 10001.0
+          },
+          "lahso": {
+            "available_landing_distance_ft": 3600.0,
+            "hold_short_of": "04/22",
+            "hold_short_point": {
+              "lat": 39.45962111,
+              "lon": -74.57975544
+            }
+          },
+          "right_hand_traffic": "N",
+          "controlling_obstruction": {
+            "type": "TREE",
+            "height_ft": 64.0,
+            "slope": "36",
+            "dist_from_thr_ft": 2472.0,
+            "offset_ft": 708.0,
+            "offset_side": "L"
+          }
+        },
+        {
+          "id": "31",
+          "true_alignment_deg": 298.0,
+          "threshold": {
+            "lat": 39.45137069,
+            "lon": -74.55973902,
+            "lat_dms": "39-27-4.9345N",
+            "lon_dms": "74-33-35.0605W",
+            "elev_ft": 63.1,
+            "position_source": "3RD PARTY SURVEY",
+            "position_date": "2024/01/11"
+          },
+          "displaced_threshold": {
+            "present": false,
+            "length_ft": null,
+            "note": "NASR DISPLACED_THR_* fields are blank for this runway end (none recorded)."
+          },
+          "tdz_elev_ft": 63.4,
+          "threshold_crossing_height_ft": 69.0,
+          "visual_glide_path_angle_deg": 3.0,
+          "vgsi": "P4L",
+          "approach_lighting": "NONE recorded in NASR",
+          "tdz_lights": null,
+          "centerline_lights": "Y",
+          "reil": "Y",
+          "ils_type_nasr": "ILS/DME",
+          "marking": {
+            "type": "PIR",
+            "condition": "GOOD"
+          },
+          "declared_distances_ft": {
+            "tora": 10001.0,
+            "toda": 10001.0,
+            "asda": 10001.0,
+            "lda": 10001.0
+          },
+          "lahso": {
+            "available_landing_distance_ft": 5750.0,
+            "hold_short_of": "04/22",
+            "hold_short_point": {
+              "lat": 39.45878483,
+              "lon": -74.57772633
+            }
+          },
+          "right_hand_traffic": "N",
+          "controlling_obstruction": {
+            "type": "TREE",
+            "height_ft": 50.0,
+            "slope": "22",
+            "dist_from_thr_ft": 1296.0,
+            "offset_ft": 622.0,
+            "offset_side": "L"
+          }
+        }
+      ],
+      "type": "RUNWAY"
+    },
+    {
+      "id": "H1",
+      "length_ft": 102.0,
+      "width_ft": 102.0,
+      "surface": "ASPH",
+      "condition": null,
+      "treatment": "NONE",
+      "pavement_classification": null,
+      "pcr_number": null,
+      "pavement_code": null,
+      "edge_lights": null,
+      "weight_bearing_klbs": null,
+      "length_source": null,
+      "length_source_date": null,
+      "ends": [
+        {
+          "id": "H1",
+          "true_alignment_deg": null,
+          "threshold": {
+            "lat": 39.46483611,
+            "lon": -74.565925,
+            "lat_dms": "39-27-53.41N",
+            "lon_dms": "74-33-57.33W",
+            "elev_ft": 56.0,
+            "position_source": "FAA",
+            "position_date": "2000/11/01"
+          },
+          "displaced_threshold": {
+            "present": false,
+            "length_ft": null,
+            "note": "NASR DISPLACED_THR_* fields are blank for this runway end (none recorded)."
+          },
+          "tdz_elev_ft": null,
+          "threshold_crossing_height_ft": null,
+          "visual_glide_path_angle_deg": null,
+          "vgsi": null,
+          "approach_lighting": "NONE recorded in NASR",
+          "tdz_lights": null,
+          "centerline_lights": null,
+          "reil": null,
+          "ils_type_nasr": "NONE recorded in NASR",
+          "marking": {
+            "type": null,
+            "condition": null
+          },
+          "declared_distances_ft": {
+            "tora": null,
+            "toda": null,
+            "asda": null,
+            "lda": null
+          },
+          "lahso": null,
+          "right_hand_traffic": null,
+          "controlling_obstruction": null
+        }
+      ],
+      "type": "HELIPAD (private, experimental use only per NASR remark)"
+    }
+  ],
+  "lights_and_aids": {
+    "arresting_gear": [
+      {
+        "rwy_end": "13/31 end 13",
+        "device": "BAK-14"
+      },
+      {
+        "rwy_end": "13/31 end 31",
+        "device": "BAK-14"
+      }
+    ]
+  },
+  "ils_by_runway_end": {
+    "13": {
+      "loc_ident": "PVO",
+      "category": "I",
+      "loc_freq_mhz": 109.1,
+      "approach_bearing_mag": 127.99,
+      "glideslope_angle": 3.0,
+      "gs_freq_mhz": 331.4
+    },
+    "31": {
+      "loc_ident": "ACY",
+      "category": "I",
+      "loc_freq_mhz": 109.1,
+      "approach_bearing_mag": 308.01,
+      "glideslope_angle": 3.0,
+      "gs_freq_mhz": 331.4
+    }
+  },
+  "remarks": [
+    {
+      "legacy_element": "E111",
+      "applies_to": "ASP_ANLYS_DTRM_CODE",
+      "seq": "1",
+      "text": "EXISTED PRIOR TO 1959."
+    },
+    {
+      "legacy_element": "A110-4",
+      "applies_to": "GENERAL_REMARK",
+      "seq": "4",
+      "text": "FAA APRON PPR CALL 609-485-6482."
+    },
+    {
+      "legacy_element": "A110-6",
+      "applies_to": "GENERAL_REMARK",
+      "seq": "6",
+      "text": "TWY C CLSD TO DUAL TANDEM & DOUBLE TANDEM EQUIPPED ACFT."
+    },
+    {
+      "legacy_element": "A110-7",
+      "applies_to": "GENERAL_REMARK",
+      "seq": "7",
+      "text": "NO TRNG FLTS 2300-0700 LCL."
+    },
+    {
+      "legacy_element": "A110-9",
+      "applies_to": "GENERAL_REMARK",
+      "seq": "9",
+      "text": "FOX & BIRDS ON & INVOF ARPT."
+    },
+    {
+      "legacy_element": "A110-11",
+      "applies_to": "GENERAL_REMARK",
+      "seq": "11",
+      "text": "HIGH PER MIL ACFT OPERATING AT ARPT."
+    },
+    {
+      "legacy_element": "A110-12",
+      "applies_to": "GENERAL_REMARK",
+      "seq": "12",
+      "text": "NOISE ABATEMENT PROCS IN EFCT CTC ARPT OPNS AT (609) 645-7895 EXT 4702."
+    },
+    {
+      "legacy_element": "A110-17",
+      "applies_to": "GENERAL_REMARK",
+      "seq": "17",
+      "text": "MILITARY: ANG APRON PPR, CTC ANG BASE OPS C609-761-6009, FAX C609-761-6484, COMD POST C609-761-6001. LTD TRAN SVC AVBL 1100-2030Z++ TUE-FRI, CLSD SAT-MON AND HOL."
+    },
+    {
+      "legacy_element": "A110-18",
+      "applies_to": "GENERAL_REMARK",
+      "seq": "18",
+      "text": "MILITARY: ANG: BASH PHASE II IN EFCT APR-OCT CTC BASE OPS ON 261.0 OR 140.7 FOR CURRENT BASH COND."
+    },
+    {
+      "legacy_element": "A110-19",
+      "applies_to": "GENERAL_REMARK",
+      "seq": "19",
+      "text": "MILITARY: ANG: NSTD MRK ON ANG RAMPS: BLUE LINES DELINEATE F-16 WING TIP CLNC, YELLOW LINES AT HGR DOORS FOR PERS CLEAR ZONE."
+    },
+    {
+      "legacy_element": "A110-21",
+      "applies_to": "GENERAL_REMARK",
+      "seq": "21",
+      "text": "AVOID CNTRLN LGT DUR CABLE ENGAGEMENT TO PREVENT TAILHOOK BOUNCE."
+    },
+    {
+      "legacy_element": "A110-22",
+      "applies_to": "GENERAL_REMARK",
+      "seq": "22",
+      "text": "DURG ATC ZERO EVENTS, CTAF 120.3."
+    },
+    {
+      "legacy_element": "A110-23",
+      "applies_to": "GENERAL_REMARK",
+      "seq": "23",
+      "text": "ANG ARM/DEARM PADS FOR MIL USE ONLY."
+    },
+    {
+      "legacy_element": "A110-24",
+      "applies_to": "GENERAL_REMARK",
+      "seq": "24",
+      "text": "FOR ITINERANT MIL ACFT OPS PPR CTC ARPT OPS 609-645-7895 EXT 4702."
+    },
+    {
+      "legacy_element": "A110-25",
+      "applies_to": "GENERAL_REMARK",
+      "seq": "25",
+      "text": "PILOTS CONDUCTING EFVS OPS; BE AWARE LED ALS IN USE RWY 13."
+    },
+    {
+      "legacy_element": "A110-26",
+      "applies_to": "GENERAL_REMARK",
+      "seq": "26",
+      "text": "DE-ICING PAD FOR DE-ICING OPS ONLY.  EXE CTC ARPT OPS 609-645-7895 EXT 4702."
+    },
+    {
+      "legacy_element": "E80",
+      "applies_to": "LNDG_RIGHTS_FLAG",
+      "seq": "1",
+      "text": "US CUSTOMS USER FEE ARPT.CUSTOMS AVBL MON-FRI 0800-1700. PROVIDE MINIMUM 24 HR ADVANCE NOTICE TO ARRANGE FOR CUSTOMS. ALL CALLS TO CUSTOMS MON-FRI 0800-1700; PHONE 609-484-1610. US CUSTOMS FAX 609-484-1614."
+    },
+    {
+      "legacy_element": "A76-CHTR",
+      "applies_to": "CHTR",
+      "seq": "1",
+      "text": "FOR CHARTER OPNS CTC 609-645-7895 EXT 4702."
+    },
+    {
+      "legacy_element": "E60-13_BAK-14",
+      "applies_to": "13_BAK-14",
+      "seq": "1",
+      "text": "BAK-14 BAK-12B (B) (1600')"
+    },
+    {
+      "legacy_element": "E60-31_BAK-14",
+      "applies_to": "31_BAK-14",
+      "seq": "1",
+      "text": "BAK-14 BAK-12B (B) (1600')"
+    },
+    {
+      "legacy_element": "A30-H1",
+      "applies_to": "H1",
+      "seq": "1",
+      "text": "PVT - EXPERIMENTAL USE ONLY. CTC FAA TECH CENTER AT 609-485-6675."
+    }
+  ],
+  "unverified": [
+    "Traffic pattern altitude (TPA blank in NASR)",
+    "Current (2026) magnetic declination; NASR/diagram epoch is 1965",
+    "Class C airspace vertical/lateral dimensions (shape files not downloaded)",
+    "UNICOM frequency (not in NASR CSV; tower is 24 hours)",
+    "Operating hours of airport-owned customer services other than as given in remarks"
+  ]
+}

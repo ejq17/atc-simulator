@@ -1,0 +1,852 @@
+/**
+ * Command executor: the only place where controller instructions change aircraft state.
+ *
+ * Pipeline: log ATC transmission -> resolve aircraft -> confidence/entity gate -> frequency check
+ * -> duplicate (idempotency) check -> readback-error correction -> per-kind validation producing a Plan
+ * -> safety assessment (training: refuse, otherwise: accept + flag + score) -> commit -> pilot readback.
+ *
+ * To add a command: add the kind to `requiredEntities`, write a `plan<Kind>` function returning
+ * `{ plan }` or `{ reject }`, add it to the `PLANNERS` table, and add readback phrasing in
+ * src/radio/readback.ts.
+ */
+import type {
+  Aircraft, Airport, Clearance, ClearanceKind, CommandOutcome, ControllerPositionId, ParsedCommand, TaxiNode,
+} from './types';
+import { dist, ftToM, magneticToTrue } from './geo';
+import {
+  advancePhase, completeClearances, emitEvent, getRuntime, perfOf, pilotSay, setPhase, speechDurationSec,
+} from './context';
+import type { AircraftRuntime, ReadbackErrorRecord, SimContext } from './context';
+import { findRunway, findRunwayEnd, alongCross, normalizeRunwayEndId } from './runways';
+import type { RunwayEndGeom } from './runways';
+import { findTaxiRoute, nearestNode, neighborIds, runwayCrossingsAlong } from './pathfinding';
+import { computeStopNodes } from './groundMovement';
+import { initiateGoAround } from './flightDynamics';
+import { assessClearanceSafety, recordUnsafeClearance } from './conflicts';
+import { frequencyById, frequencyByMhz, frequencyForPosition, hearsFrequency, formatMhz } from '../radio/frequencies';
+import { buildReadback, buildSayAgain, buildUnable } from '../radio/readback';
+import { SPEED_LIMIT_BELOW_10K_KT } from './performance';
+
+const DUPLICATE_WINDOW_SEC = 5;
+const TAKEOFF_NEAR_HOLD_M = 100;
+const CROSS_APPROACH_M = 600;
+
+interface Reject {
+  reason: string;
+  pilot?: string;
+  commError?: boolean;
+}
+interface Plan {
+  patch: Partial<Clearance>;
+  commit: (clr: Clearance) => void;
+}
+type PlanResult = { plan: Plan } | { reject: Reject };
+
+interface Env {
+  ctx: SimContext;
+  ac: Aircraft;
+  rt: AircraftRuntime;
+  cmd: ParsedCommand;
+  g?: RunwayEndGeom;
+  airport: Airport;
+  now: number;
+  position: ControllerPositionId;
+}
+
+const unable = (env: Env, reason: string, phrase: string, commError = true): { reject: Reject } => ({
+  reject: { reason, pilot: buildUnable(env.ac, phrase), commError },
+});
+
+// ---------------------------------------------------------------------------
+// Entry point
+// ---------------------------------------------------------------------------
+
+export function executeCommand(
+  ctx: SimContext,
+  cmdIn: ParsedCommand,
+  opts?: { position?: ControllerPositionId; source?: 'voice' | 'typed'; transmissionId?: string },
+): CommandOutcome {
+  const { state } = ctx;
+  const airport = state.airport;
+  const now = state.clock.timeSec;
+  const position = opts?.position ?? state.controllerPosition;
+  const ctrlFreq = frequencyForPosition(airport, position)?.mhz ?? state.controllerFrequencyMhz;
+
+  const tid = opts?.transmissionId;
+  if (!tid || !ctx.loggedTransmissions.has(tid)) {
+    if (tid) ctx.loggedTransmissions.add(tid);
+    emitEvent(ctx, {
+      kind: 'TRANSMISSION', callsign: cmdIn.callsign ?? undefined, text: cmdIn.rawText, severity: 'info', speaker: 'ATC',
+      frequencyMhz: ctrlFreq, data: { source: opts?.source, transmissionId: tid, normalized: cmdIn.normalizedText },
+    });
+  }
+
+  const clarify = (ac: Aircraft | undefined, question: string, commError: boolean): CommandOutcome => {
+    emitEvent(ctx, {
+      kind: 'CLARIFICATION', aircraftId: ac?.id, callsign: ac?.callsign ?? cmdIn.callsign ?? undefined, text: question, severity: 'info',
+      speaker: 'SYSTEM', data: { commError, kind: cmdIn.kind },
+    });
+    if (ac && hearsFrequency(ac, ctrlFreq)) pilotSay(ctx, ac, buildSayAgain(ac), { clarify: true });
+    return { status: 'clarify', question };
+  };
+  const reject = (ac: Aircraft | undefined, r: Reject, extra?: { unsafe?: boolean }): CommandOutcome => {
+    emitEvent(ctx, {
+      kind: 'COMMAND_REJECTED', aircraftId: ac?.id, callsign: ac?.callsign ?? cmdIn.callsign ?? undefined, text: r.reason, severity: 'warning',
+      speaker: 'SYSTEM', data: { commError: !!r.commError, unsafe: !!extra?.unsafe, kind: cmdIn.kind },
+    });
+    if (ac && r.pilot) pilotSay(ctx, ac, r.pilot, { rejection: true });
+    return { status: 'rejected', reason: r.reason, pilotResponse: r.pilot, unsafe: extra?.unsafe };
+  };
+
+  // --- resolve the aircraft -------------------------------------------------
+  if (!cmdIn.callsign) {
+    if (cmdIn.callsignCandidates && cmdIn.callsignCandidates.length > 1) {
+      return clarify(undefined, `Which aircraft? ${cmdIn.callsignCandidates.join(' or ')}`, false);
+    }
+    return clarify(undefined, 'No callsign recognised. Say the aircraft callsign.', true);
+  }
+  const ac = Object.values(state.aircraft).find((a) => a.callsign.toUpperCase() === cmdIn.callsign!.toUpperCase());
+  if (!ac) return clarify(undefined, `No aircraft "${cmdIn.callsign}" is on the airport or in the area.`, true);
+  const rt = getRuntime(ctx, ac);
+
+  if (cmdIn.kind === 'UNKNOWN') return clarify(ac, cmdIn.issues[0] ?? `Instruction not understood for ${ac.callsign}.`, false);
+
+  // --- frequency ------------------------------------------------------------
+  if (!hearsFrequency(ac, ctrlFreq)) {
+    const here = frequencyByMhz(airport, ac.frequencyMhz);
+    const mine = frequencyByMhz(airport, ctrlFreq);
+    return reject(ac, {
+      reason: `Not on frequency: ${ac.callsign} is on ${formatMhz(ac.frequencyMhz)}${here ? ` (${here.id})` : ''}; you are transmitting on ${formatMhz(ctrlFreq)}${mine ? ` (${mine.id})` : ` (${position})`}.`,
+      commError: true,
+    });
+  }
+
+  if (cmdIn.kind === 'SAY_AGAIN') {
+    const text = rt.lastPilotText ?? buildSayAgain(ac);
+    emitEvent(ctx, { kind: 'INFO', aircraftId: ac.id, callsign: ac.callsign, text: `${ac.callsign} repeats last transmission`, severity: 'info', speaker: 'SYSTEM' });
+    pilotSay(ctx, ac, text, { repeated: true });
+    return { status: 'rejected', reason: 'Say-again request: pilot repeated the last transmission.', pilotResponse: text };
+  }
+
+  // --- confidence + required entities --------------------------------------
+  if (cmdIn.confidence < 0.6) {
+    return clarify(ac, cmdIn.issues[0] ?? `Low confidence (${cmdIn.confidence.toFixed(2)}); say again, ${ac.callsign}.`, false);
+  }
+  const { cmd, g } = normalizeCommand(airport, ac, cmdIn, cmdIn.confidence >= 0.8);
+  const missing = missingEntities(cmd, g);
+  if (missing.length) {
+    return clarify(ac, `${ac.callsign}: missing ${missing.join(', ')}${cmdIn.confidence < 0.8 ? ' (confidence too low to assume)' : ''}.`, false);
+  }
+
+  const env: Env = { ctx, ac, rt, cmd, g, airport, now, position };
+
+  // --- readback-error correction -------------------------------------------
+  if (rt.readbackError && rt.readbackError.kind === (cmd.kind as string)) {
+    const original = ac.clearances.find((c) => c.id === rt.readbackError!.clearanceId);
+    if (original && sameParams(original, cmd, g)) {
+      const rb = buildReadback(ac, original, { airport });
+      emitEvent(ctx, {
+        kind: 'READBACK_ERROR', aircraftId: ac.id, callsign: ac.callsign, severity: 'info', speaker: 'SYSTEM',
+        text: `Readback error from ${ac.callsign} corrected (said "${rt.readbackError.spoken}", correct "${rt.readbackError.correct}")`,
+        data: { corrected: true },
+      });
+      rt.readbackError = undefined;
+      ac.flags.readbackErrorPending = false;
+      pilotSay(ctx, ac, rb.text, { correction: true });
+      ac.radioState = 'IDLE';
+      emitEvent(ctx, { kind: 'COMMAND_ACCEPTED', aircraftId: ac.id, callsign: ac.callsign, text: `${ac.callsign}: ${cmd.kind} re-issued (correction)`, severity: 'info', speaker: 'SYSTEM', data: { kind: cmd.kind, scored: false, correction: true } });
+      return { status: 'accepted', clearance: original, readback: rb.text };
+    }
+  }
+
+  // --- idempotency ----------------------------------------------------------
+  const key = commandKey(ac, cmd);
+  const last = ctx.recentCommands.get(key);
+  if (last !== undefined && now - last < DUPLICATE_WINDOW_SEC) {
+    emitEvent(ctx, { kind: 'INFO', aircraftId: ac.id, callsign: ac.callsign, text: `Duplicate ${cmd.kind} for ${ac.callsign} ignored (${(now - last).toFixed(1)} s after the identical command).`, severity: 'info', speaker: 'SYSTEM', data: { duplicate: true } });
+    return { status: 'rejected', reason: `Duplicate command ignored: identical ${cmd.kind} was issued ${(now - last).toFixed(1)} s ago.` };
+  }
+
+  // --- validation -----------------------------------------------------------
+  const planner = PLANNERS[cmd.kind as ClearanceKind];
+  if (!planner) return reject(ac, { reason: `Command ${cmd.kind} is not supported by the simulator.`, commError: false });
+  const result = planner(env);
+  if ('reject' in result) return reject(ac, result.reject);
+
+  // --- safety ---------------------------------------------------------------
+  const assessment = assessClearanceSafety(state, { ...cmd, callsign: ac.callsign });
+  const training = state.scenario.mode === 'training';
+  if (!assessment.safe) {
+    if (training) {
+      recordUnsafeClearance(ctx, ac, assessment, true);
+      const detail = assessment.issues.map((i) => `${i.text}. See ${i.reference}.`).join(' ');
+      return reject(ac, { reason: `Unsafe clearance not issued (training mode). ${detail}`, commError: false }, { unsafe: true });
+    }
+    recordUnsafeClearance(ctx, ac, assessment, false);
+  }
+
+  // --- commit ---------------------------------------------------------------
+  const clr: Clearance = {
+    id: `clr-${++ctx.clearanceSeq}`,
+    kind: cmd.kind as ClearanceKind,
+    issuedAtSec: now,
+    byPosition: position,
+    ...result.plan.patch,
+  };
+  result.plan.commit(clr);
+  ac.clearances.push(clr);
+  ac.activeClearanceId = clr.id;
+  const waitSec = ac.pendingRequest ? now - ac.pendingRequest.sinceSec : undefined;
+  ac.pendingRequest = undefined;
+  if (rt.readbackError) {
+    // A different instruction supersedes the earlier mistaken readback.
+    rt.readbackError = undefined;
+    ac.flags.readbackErrorPending = false;
+  }
+
+  const rb = buildReadback(ac, clr, { airport, rng: ctx.rng, errorRate: ctx.readbackErrorRate });
+  pilotSay(ctx, ac, rb.text, { readback: true, clearanceId: clr.id });
+  if (rb.error) {
+    rt.readbackError = { sinceSec: now, kind: cmd.kind as ReadbackErrorRecord['kind'], clearanceId: clr.id, correct: rb.error.correct, spoken: rb.error.spoken };
+    ac.flags.readbackErrorPending = true;
+    ac.radioState = 'WAITING_FOR_READBACK';
+    emitEvent(ctx, { kind: 'INFO', aircraftId: ac.id, callsign: ac.callsign, text: `(hidden from pilot) ${ac.callsign} misread back: ${rb.error.spoken} instead of ${rb.error.correct}`, severity: 'info', speaker: 'SYSTEM', data: { readbackError: true } });
+  }
+  if (cmd.kind === 'CONTACT_FREQUENCY' && rt.pendingFreq) rt.pendingFreq.atSec = now + speechDurationSec(rb.text) + 0.5;
+
+  ctx.recentCommands.set(key, now);
+  emitEvent(ctx, {
+    kind: 'COMMAND_ACCEPTED', aircraftId: ac.id, callsign: ac.callsign, severity: assessment.safe ? 'info' : 'critical', speaker: 'SYSTEM',
+    text: `${ac.callsign}: ${describeClearance(clr)}${assessment.safe ? '' : ' (UNSAFE)'}`,
+    data: { kind: clr.kind, clearanceId: clr.id, scored: assessment.safe, unsafe: !assessment.safe, waitSec },
+  });
+  return { status: 'accepted', clearance: clr, readback: rb.text };
+}
+
+// ---------------------------------------------------------------------------
+// Normalisation / gating helpers
+// ---------------------------------------------------------------------------
+
+function normalizeCommand(airport: Airport, ac: Aircraft, cmd: ParsedCommand, mayInfer: boolean): { cmd: ParsedCommand; g?: RunwayEndGeom } {
+  const needsEnd = cmd.kind === 'TAKEOFF' || cmd.kind === 'LAND' || cmd.kind === 'LINE_UP_AND_WAIT' || cmd.kind === 'ENTER_PATTERN';
+  const n: ParsedCommand = { ...cmd };
+  let g: RunwayEndGeom | undefined;
+  if (needsEnd) {
+    const explicit = cmd.runwayEnd ?? (cmd.runwayId && !cmd.runwayId.includes('/') ? cmd.runwayId : undefined);
+    g = findRunwayEnd(airport, explicit);
+    if (!g && mayInfer) {
+      const assigned = findRunwayEnd(airport, ac.assignedRunwayEnd);
+      const pair = cmd.runwayId ? findRunway(airport, cmd.runwayId) : undefined;
+      if (assigned && (!pair || pair.id === assigned.runway.id)) g = assigned;
+    }
+    if (g) n.runwayEnd = g.end.id;
+  } else if (cmd.kind === 'TAXI' && !cmd.destination && cmd.runwayEnd) {
+    g = findRunwayEnd(airport, cmd.runwayEnd);
+  }
+  return { cmd: n, g };
+}
+
+function missingEntities(cmd: ParsedCommand, g?: RunwayEndGeom): string[] {
+  const m: string[] = [];
+  switch (cmd.kind) {
+    case 'TAXI':
+      if (!cmd.destination && !cmd.runwayEnd) m.push('taxi destination');
+      break;
+    case 'TAKEOFF':
+    case 'LAND':
+    case 'LINE_UP_AND_WAIT':
+    case 'ENTER_PATTERN':
+      if (!g) m.push('runway');
+      break;
+    case 'CROSS_RUNWAY':
+      if (!cmd.crossRunwayId && !cmd.runwayId && !cmd.runwayEnd) m.push('runway to cross');
+      break;
+    case 'HOLD_SHORT':
+      if (!cmd.holdShort?.length && !cmd.runwayId && !cmd.runwayEnd && !cmd.crossRunwayId) m.push('runway to hold short of');
+      break;
+    case 'HEADING':
+      if (cmd.headingDeg === undefined) m.push('heading');
+      break;
+    case 'ALTITUDE':
+      if (cmd.altitudeFt === undefined) m.push('altitude');
+      break;
+    case 'SPEED':
+      if (cmd.speedKt === undefined) m.push('speed');
+      break;
+    case 'CONTACT_FREQUENCY':
+      if (cmd.frequencyMhz === undefined && !cmd.frequencyId) m.push('frequency');
+      break;
+    default:
+      break;
+  }
+  return m;
+}
+
+function commandKey(ac: Aircraft, c: ParsedCommand): string {
+  return [
+    ac.id, c.kind, c.runwayEnd ?? '', c.runwayId ?? '', (c.route ?? []).join('>'), (c.holdShort ?? []).join(','), c.crossRunwayId ?? '',
+    c.destination ?? '', c.headingDeg ?? '', c.turnDirection ?? '', c.altitudeFt ?? '', c.speedKt ?? '', c.frequencyMhz ?? '', c.frequencyId ?? '', c.patternLeg ?? '',
+  ].join('|');
+}
+
+function sameParams(clr: Clearance, cmd: ParsedCommand, g?: RunwayEndGeom): boolean {
+  switch (cmd.kind) {
+    case 'TAKEOFF':
+    case 'LAND':
+    case 'LINE_UP_AND_WAIT':
+      return !!g && clr.runwayEnd === g.end.id;
+    case 'HEADING':
+      return clr.headingDeg !== undefined && cmd.headingDeg !== undefined && Math.abs(clr.headingDeg - cmd.headingDeg) < 0.5 && (cmd.turnDirection ?? undefined) === (clr.turnDirection ?? undefined);
+    case 'CROSS_RUNWAY': {
+      const a = normalizeRunwayEndId(clr.runwayId ?? '');
+      const b = normalizeRunwayEndId(cmd.crossRunwayId ?? cmd.runwayId ?? cmd.runwayEnd ?? '');
+      return a === b || a.split('/').includes(b) || b.split('/').includes(a);
+    }
+    case 'TAXI':
+    case 'TAXI_TO_PARKING':
+      return (clr.destination ?? '') === (cmd.destination ?? '') && (clr.runwayEnd ?? '') === (g?.end.id ?? cmd.runwayEnd ?? '');
+    default:
+      return false;
+  }
+}
+
+function describeClearance(c: Clearance): string {
+  const bits: string[] = [c.kind];
+  if (c.runwayEnd) bits.push(`rwy ${c.runwayEnd}`);
+  else if (c.runwayId) bits.push(`rwy ${c.runwayId}`);
+  if (c.destination) bits.push(`to ${c.destination}`);
+  if (c.route?.length) bits.push(`via ${c.route.join(' ')}`);
+  if (c.holdShort?.length) bits.push(`hold short ${c.holdShort.join(' ')}`);
+  if (c.headingDeg !== undefined) bits.push(`hdg ${c.headingDeg}`);
+  if (c.altitudeFt !== undefined) bits.push(`${c.altitudeFt} ft`);
+  if (c.speedKt !== undefined) bits.push(`${c.speedKt} kt`);
+  if (c.frequencyMhz !== undefined) bits.push(`${c.frequencyMhz}`);
+  return bits.join(' ');
+}
+
+// ---------------------------------------------------------------------------
+// Ground helpers
+// ---------------------------------------------------------------------------
+
+function isDepartureHold(n: TaxiNode, g: RunwayEndGeom): boolean {
+  return (
+    n.kind === 'holding_position' && n.runwayId === g.runway.id &&
+    (!n.protectsRunwayEnd || normalizeRunwayEndId(n.protectsRunwayEnd) === normalizeRunwayEndId(g.end.id))
+  );
+}
+
+/** The node the aircraft's next route should start from. */
+function currentStartNode(env: Env): TaxiNode | undefined {
+  const { ac, rt, airport } = env;
+  const graph = airport.taxiwayGraph;
+  if (rt.stoppedAtNodeId && graph.nodes[rt.stoppedAtNodeId] && dist(graph.nodes[rt.stoppedAtNodeId].pos, ac.pos) < 3) return graph.nodes[rt.stoppedAtNodeId];
+  const near = nearestNode(graph, ac.pos, { maxDistM: 2 });
+  if (near) return near;
+  if (ac.route && ac.route.progressIndex < ac.route.nodeIds.length) return graph.nodes[ac.route.nodeIds[ac.route.progressIndex]];
+  return nearestNode(graph, ac.pos, { maxDistM: 150 });
+}
+
+function runwayEntryNode(env: Env, hold: TaxiNode, g: RunwayEndGeom): TaxiNode | undefined {
+  const graph = env.airport.taxiwayGraph;
+  const nbrs = neighborIds(graph, hold.id).map((i) => graph.nodes[i]).filter((n) => n.kind === 'runway' && n.runwayId === g.runway.id);
+  if (nbrs.length) return nbrs.sort((a, b) => dist(a.pos, hold.pos) - dist(b.pos, hold.pos))[0];
+  return nearestNode(graph, hold.pos, { kinds: ['runway'], maxDistM: 200, filter: (n) => n.runwayId === g.runway.id });
+}
+
+/** Distance along the route from the aircraft to route node index i. */
+function routeDistanceTo(env: Env, index: number): number {
+  const route = env.ac.route!;
+  const graph = env.airport.taxiwayGraph;
+  let d = 0;
+  let prev = env.ac.pos;
+  for (let i = route.progressIndex; i <= index && i < route.nodeIds.length; i++) {
+    const p = graph.nodes[route.nodeIds[i]].pos;
+    d += dist(prev, p);
+    prev = p;
+  }
+  return d;
+}
+
+function allRunwayIds(airport: Airport): string[] {
+  return airport.runways.map((r) => r.id);
+}
+
+function parseRunwayDestination(raw: string): string | undefined {
+  const m = /^(?:RWY|RUNWAY)\s*0?(\d{1,2}[LRC]?)$/i.exec(raw.trim()) ?? /^0?(\d{1,2}[LRC]?)$/i.exec(raw.trim());
+  return m ? m[1].toUpperCase() : undefined;
+}
+
+// ---------------------------------------------------------------------------
+// Planners
+// ---------------------------------------------------------------------------
+
+function planTaxi(env: Env): PlanResult {
+  const { ac, rt, cmd, airport, ctx } = env;
+  const graph = airport.taxiwayGraph;
+  if (!ac.onGround) return unable(env, `${ac.callsign} is airborne; cannot taxi.`, "we're airborne");
+  const departurePhases = ['PARKED', 'READY', 'TAXIING', 'HOLDING_SHORT'];
+  const arrivalPhases = ['RUNWAY_EXIT', 'TAXI_TO_PARKING'];
+  if (!departurePhases.includes(ac.phase) && !arrivalPhases.includes(ac.phase)) {
+    return unable(env, `${ac.callsign} is in phase ${ac.phase}; a taxi instruction cannot be executed now.`, ac.phase === 'ARRIVED' ? "we're parked" : 'not able to taxi now');
+  }
+  const start = currentStartNode(env);
+  if (!start) return unable(env, `${ac.callsign} is not on the taxiway system.`, "we're not on a taxiway");
+
+  // Destination.
+  let targets: string[] = [];
+  let runwayEnd: string | undefined;
+  const destRaw = cmd.destination ?? (cmd.runwayEnd ? `RWY${cmd.runwayEnd}` : undefined);
+  if (!destRaw) {
+    if (cmd.kind !== 'TAXI_TO_PARKING') return unable(env, 'No taxi destination given.', 'say destination', false);
+    targets = airport.parking.map((p) => p.nodeId);
+  } else {
+    const up = destRaw.trim().toUpperCase();
+    const parking = airport.parking.find((p) => p.id.toUpperCase() === up || p.name.toUpperCase() === up);
+    if (parking) targets = [parking.nodeId];
+    else {
+      const endRaw = parseRunwayDestination(destRaw);
+      const g = findRunwayEnd(airport, endRaw);
+      if (!g) return unable(env, `Unknown taxi destination "${destRaw}".`, "we can't find that destination");
+      runwayEnd = g.end.id;
+      const holds = Object.values(graph.nodes).filter((n) => n.kind === 'holding_position' && n.runwayId === g.runway.id);
+      const explicit = holds.filter((h) => h.protectsRunwayEnd && normalizeRunwayEndId(h.protectsRunwayEnd) === normalizeRunwayEndId(g.end.id));
+      const implicit = holds.filter((h) => !h.protectsRunwayEnd);
+      let cands = explicit.length ? explicit : implicit;
+      const lastVia = cmd.route?.[cmd.route.length - 1]?.toUpperCase();
+      if (lastVia) {
+        const m = [...explicit, ...implicit].filter((h) => h.taxiways.some((t) => t.toUpperCase() === lastVia));
+        if (m.length) cands = m;
+      }
+      if (!cands.length) return unable(env, `No holding position serves runway ${g.end.id}.`, `we can't find a holding position for runway ${g.end.id}`);
+      targets = cands.map((h) => h.id);
+    }
+  }
+  if (runwayEnd && ac.isDeparture === false) return unable(env, 'Arriving aircraft cannot be taxied to a departure runway.', 'we are an arrival');
+
+  let best: { route: NonNullable<ReturnType<typeof findTaxiRoute>['route']>; target: string } | undefined;
+  let why = '';
+  for (const t of targets) {
+    const res = findTaxiRoute(graph, start.id, t, { via: cmd.route, avoidRunways: true, allowedRunwayIds: allRunwayIds(airport) });
+    if (res.route && (!best || res.route.lengthM < best.route.lengthM)) best = { route: res.route, target: t };
+    else if (!res.route && !why) why = res.reason ?? '';
+  }
+  if (!best) {
+    return unable(env, `Invalid taxi route for ${ac.callsign}${cmd.route?.length ? ` via ${cmd.route.join(', ')}` : ''}: ${why}.`, `that route isn't available`);
+  }
+  const route = best.route;
+  const dest = airport.parking.find((p) => p.nodeId === best!.target);
+
+  return {
+    plan: {
+      patch: { route: cmd.route, holdShort: cmd.holdShort, destination: cmd.destination ?? (runwayEnd ? `RWY${runwayEnd}` : dest?.id), runwayEnd },
+      commit: () => {
+        const stops = new Set(computeStopNodes(graph, route.nodeIds, ac.runwayAuthorizations));
+        for (const rid of cmd.holdShort ?? []) {
+          const rw = findRunway(airport, rid);
+          if (!rw) continue;
+          const holds = route.nodeIds.filter((id) => graph.nodes[id].kind === 'holding_position' && graph.nodes[id].runwayId === rw.id);
+          if (holds.length && !holds.some((id) => stops.has(id))) stops.add(holds[0]);
+        }
+        ac.route = { nodeIds: route.nodeIds, taxiways: route.taxiways, stopAtNodeIds: [...stops], progressIndex: 0 };
+        ac.flags.holdingPosition = false;
+        rt.lineUp = undefined;
+        rt.takeoffCleared = false;
+        completeClearances(ctx, ac, ['TAXI', 'TAXI_TO_PARKING', 'HOLD_POSITION']);
+        if (runwayEnd) ac.assignedRunwayEnd = runwayEnd;
+        if (arrivalPhases.includes(ac.phase)) setPhase(ctx, ac, 'TAXI_TO_PARKING');
+        else advancePhase(ctx, ac, 'TAXIING');
+      },
+    },
+  };
+}
+
+function planHoldPosition(env: Env): PlanResult {
+  const { ac } = env;
+  if (!ac.onGround) return unable(env, `${ac.callsign} is airborne; "hold position" applies to ground traffic.`, "we're airborne");
+  return { plan: { patch: {}, commit: () => { ac.flags.holdingPosition = true; } } };
+}
+
+function planHoldShort(env: Env): PlanResult {
+  const { ac, cmd, airport } = env;
+  if (!ac.onGround) return unable(env, `${ac.callsign} is airborne; "hold short" applies to ground traffic.`, "we're airborne");
+  const refs = cmd.holdShort?.length ? cmd.holdShort : [cmd.crossRunwayId ?? cmd.runwayId ?? cmd.runwayEnd!];
+  const rws = refs.map((r) => findRunway(airport, r));
+  if (rws.some((r) => !r)) return unable(env, `Unknown runway in hold-short instruction (${refs.join(', ')}).`, "we can't find that runway");
+  return {
+    plan: {
+      patch: { holdShort: refs },
+      commit: () => {
+        const graph = airport.taxiwayGraph;
+        for (const rw of rws) {
+          const i = ac.runwayAuthorizations.indexOf(rw!.id);
+          if (i >= 0) ac.runwayAuthorizations.splice(i, 1);
+          if (ac.route) {
+            for (let k = ac.route.progressIndex; k < ac.route.nodeIds.length; k++) {
+              const n = graph.nodes[ac.route.nodeIds[k]];
+              if (n.kind === 'holding_position' && n.runwayId === rw!.id && !ac.route.stopAtNodeIds.includes(n.id)) ac.route.stopAtNodeIds.push(n.id);
+            }
+          }
+        }
+      },
+    },
+  };
+}
+
+function planCross(env: Env): PlanResult {
+  const { ac, rt, cmd, airport } = env;
+  const graph = airport.taxiwayGraph;
+  if (!ac.onGround) return unable(env, `${ac.callsign} is airborne; cannot cross a runway.`, "we're airborne");
+  const raw = cmd.crossRunwayId ?? cmd.runwayId ?? cmd.runwayEnd!;
+  const rw = findRunway(airport, raw);
+  if (!rw) return unable(env, `Unknown runway "${raw}".`, "we can't find that runway");
+  const route = ac.route;
+  if (!route) return unable(env, `${ac.callsign} has no taxi route; issue a taxi instruction first.`, "we don't have a taxi route");
+  const from = rt.stoppedAtNodeId && route.nodeIds.includes(rt.stoppedAtNodeId) ? route.nodeIds.indexOf(rt.stoppedAtNodeId) : route.progressIndex;
+  let holdIdx = -1;
+  for (let i = from; i < route.nodeIds.length; i++) {
+    const n = graph.nodes[route.nodeIds[i]];
+    if (n.kind === 'holding_position' && n.runwayId === rw.id) {
+      holdIdx = i;
+      break;
+    }
+  }
+  if (holdIdx < 0) return unable(env, `${ac.callsign} is not holding short of or approaching runway ${rw.id} on its route.`, `we're not approaching runway ${rw.id}`);
+  const standing = rt.stoppedAtNodeId === route.nodeIds[holdIdx];
+  if (!standing && routeDistanceTo(env, holdIdx) > CROSS_APPROACH_M) {
+    return unable(env, `${ac.callsign} is still ${Math.round(routeDistanceTo(env, holdIdx))} m from runway ${rw.id}.`, `we're not at runway ${rw.id} yet`);
+  }
+  if (!runwayCrossingsAlong(graph, route.nodeIds.slice(holdIdx)).includes(rw.id)) {
+    return unable(env, `The current route of ${ac.callsign} does not continue across runway ${rw.id}; issue a new taxi instruction.`, `our route doesn't cross runway ${rw.id}`);
+  }
+  return {
+    plan: {
+      patch: { runwayId: raw },
+      commit: () => {
+        if (!ac.runwayAuthorizations.includes(rw.id)) ac.runwayAuthorizations.push(rw.id);
+        route.stopAtNodeIds = route.stopAtNodeIds.filter((id) => graph.nodes[id].runwayId !== rw.id);
+        ac.flags.holdingPosition = false;
+        if (ac.phase === 'HOLDING_SHORT') setPhase(env.ctx, ac, 'TAXIING', `crossing runway ${rw.id}`);
+      },
+    },
+  };
+}
+
+/** Shared by LINE_UP_AND_WAIT and TAKEOFF: find the departure hold and build the route onto the runway. */
+function planRunwayEntry(env: Env, g: RunwayEndGeom): { reject: Reject } | { hold: TaxiNode; entry: TaxiNode; nodeIds: string[] } {
+  const { ac, rt, airport } = env;
+  const graph = airport.taxiwayGraph;
+  let hold: TaxiNode | undefined;
+  let nodeIds: string[] = [];
+  const stopped = rt.stoppedAtNodeId ? graph.nodes[rt.stoppedAtNodeId] : undefined;
+  if (stopped && dist(stopped.pos, ac.pos) < 3 && isDepartureHold(stopped, g)) {
+    hold = stopped;
+    nodeIds = [stopped.id];
+  } else if (ac.route && ac.phase === 'TAXIING') {
+    for (let i = ac.route.progressIndex; i < ac.route.nodeIds.length; i++) {
+      const n = graph.nodes[ac.route.nodeIds[i]];
+      if (isDepartureHold(n, g)) {
+        if (dist(ac.pos, n.pos) <= TAKEOFF_NEAR_HOLD_M) {
+          hold = n;
+          nodeIds = ac.route.nodeIds.slice(ac.route.progressIndex, i + 1);
+        }
+        break;
+      }
+    }
+  }
+  if (!hold) {
+    return unable(env, `${ac.callsign} is not at (or within ${TAKEOFF_NEAR_HOLD_M} m of) a holding position for runway ${g.end.id}.`, `we're not at runway ${g.end.id}`);
+  }
+  const entry = runwayEntryNode(env, hold, g);
+  if (!entry) return unable(env, `No runway entry from ${hold.id} onto runway ${g.runway.id}.`, "we can't see a way onto the runway");
+  return { hold, entry, nodeIds: [...nodeIds, entry.id] };
+}
+
+function applyRunwayEntry(env: Env, g: RunwayEndGeom, hold: TaxiNode, entry: TaxiNode, nodeIds: string[]): void {
+  const { ac, rt } = env;
+  ac.route = { nodeIds, taxiways: hold.taxiways.slice(0, 1), stopAtNodeIds: [], progressIndex: 0 };
+  if (!ac.runwayAuthorizations.includes(g.runway.id)) ac.runwayAuthorizations.push(g.runway.id);
+  ac.assignedRunwayEnd = g.end.id;
+  rt.lineUp = { holdNodeId: hold.id, runwayNodeId: entry.id, runwayEnd: g.end.id, aligned: false };
+  rt.stoppedAtNodeId = undefined;
+  ac.flags.holdingPosition = false;
+}
+
+function planLineUp(env: Env): PlanResult {
+  const { ac, rt, ctx } = env;
+  const g = env.g!;
+  if (!ac.onGround) return unable(env, `${ac.callsign} is airborne.`, "we're airborne");
+  if (ac.phase !== 'HOLDING_SHORT' && ac.phase !== 'TAXIING') {
+    return unable(env, `${ac.callsign} is ${ac.phase}; line up and wait needs an aircraft holding short or taxiing to the runway.`, `we're not holding short of runway ${g.end.id}`);
+  }
+  const entry = planRunwayEntry(env, g);
+  if ('reject' in entry) return entry;
+  return {
+    plan: {
+      patch: { runwayEnd: g.end.id, runwayId: g.runway.id },
+      commit: () => {
+        applyRunwayEntry(env, g, entry.hold, entry.entry, entry.nodeIds);
+        rt.takeoffCleared = false;
+        setPhase(ctx, ac, 'LINE_UP_AND_WAIT', `runway ${g.end.id}`);
+      },
+    },
+  };
+}
+
+function planTakeoff(env: Env): PlanResult {
+  const { ac, rt, ctx, now } = env;
+  const g = env.g!;
+  if (!ac.onGround) return unable(env, `${ac.callsign} is airborne.`, "we're airborne");
+  if (ac.phase === 'LINE_UP_AND_WAIT') {
+    if (ac.assignedRunwayEnd !== g.end.id) {
+      return unable(env, `${ac.callsign} is lined up on runway ${ac.assignedRunwayEnd}, not ${g.end.id}.`, `we're lined up on runway ${ac.assignedRunwayEnd}`);
+    }
+    const entryNode = rt.lineUp ? env.airport.taxiwayGraph.nodes[rt.lineUp.runwayNodeId] : undefined;
+    const lenErr = entryNode ? runwayLengthCheck(env, g, entryNode) : undefined;
+    if (lenErr) return lenErr;
+    return {
+      plan: {
+        patch: { runwayEnd: g.end.id, runwayId: g.runway.id },
+        commit: () => {
+          rt.takeoffCleared = true;
+          rt.rollAtSec = now + 2.5;
+          setPhase(ctx, ac, 'CLEARED_FOR_TAKEOFF');
+        },
+      },
+    };
+  }
+  if (ac.phase !== 'HOLDING_SHORT' && ac.phase !== 'TAXIING') {
+    return unable(env, `${ac.callsign} is ${ac.phase}; takeoff requires holding short, lined up, or taxiing to the runway.`, `we're not at runway ${g.end.id}`);
+  }
+  const entry = planRunwayEntry(env, g);
+  if ('reject' in entry) return entry;
+  const lenErr = runwayLengthCheck(env, g, entry.entry);
+  if (lenErr) return lenErr;
+  return {
+    plan: {
+      patch: { runwayEnd: g.end.id, runwayId: g.runway.id },
+      commit: () => {
+        applyRunwayEntry(env, g, entry.hold, entry.entry, entry.nodeIds);
+        rt.takeoffCleared = true;
+        rt.rollAtSec = now + 2.5;
+        setPhase(ctx, ac, 'CLEARED_FOR_TAKEOFF');
+      },
+    },
+  };
+}
+
+function runwayLengthCheck(env: Env, g: RunwayEndGeom, entry: TaxiNode): { reject: Reject } | undefined {
+  const perf = perfOf(env.ac);
+  const avail = g.lengthM - Math.max(0, alongCross(g, entry.pos).along);
+  if (avail < ftToM(perf.takeoffDistanceFt)) {
+    return unable(
+      env,
+      `Only ${Math.round(avail / 0.3048)} ft of runway ${g.end.id} remain from that position; ${env.ac.type} needs about ${perf.takeoffDistanceFt} ft.`,
+      `runway ${g.end.id} is too short from this position`,
+    );
+  }
+  return undefined;
+}
+
+function planLand(env: Env): PlanResult {
+  const { ac, rt, ctx } = env;
+  const g = env.g!;
+  if (ac.onGround) return unable(env, `${ac.callsign} is on the ground.`, "we're on the ground");
+  const ok = ['INBOUND', 'APPROACH', 'FINAL', 'PATTERN', 'GO_AROUND', 'LANDING'];
+  if (!ok.includes(ac.phase) || ac.isDeparture && ac.phase !== 'GO_AROUND' && ac.phase !== 'PATTERN') {
+    return unable(env, `${ac.callsign} (${ac.phase}) is not inbound for a landing.`, "we're not inbound for landing");
+  }
+  if (ac.phase === 'LANDING') return unable(env, `${ac.callsign} is already landing.`, "we're already landing", false);
+  if (ac.assignedRunwayEnd && ac.assignedRunwayEnd !== g.end.id && ac.phase === 'FINAL') {
+    return unable(env, `${ac.callsign} is established on final for runway ${ac.assignedRunwayEnd}.`, `we're established on final for runway ${ac.assignedRunwayEnd}`, false);
+  }
+  return {
+    plan: {
+      patch: { runwayEnd: g.end.id, runwayId: g.runway.id },
+      commit: () => {
+        if (ac.assignedRunwayEnd !== g.end.id) {
+          ac.assignedRunwayEnd = g.end.id;
+          rt.decisionDone = false;
+          rt.pattern = undefined;
+        }
+        rt.landingEnd = g.end.id;
+        rt.navMode = 'AUTO';
+        ac.target.headingDeg = undefined;
+        if (!ac.runwayAuthorizations.includes(g.runway.id)) ac.runwayAuthorizations.push(g.runway.id);
+        if (ac.phase === 'GO_AROUND') setPhase(ctx, ac, 'APPROACH', 'cleared to land');
+        else if (ac.phase === 'PATTERN' && !rt.pattern) rt.pattern = undefined;
+      },
+    },
+  };
+}
+
+function planGoAround(env: Env): PlanResult {
+  const { ac, ctx } = env;
+  if (ac.onGround) return unable(env, `${ac.callsign} is on the ground.`, "we're on the ground");
+  if (!['APPROACH', 'FINAL', 'LANDING', 'PATTERN'].includes(ac.phase)) {
+    return unable(env, `${ac.callsign} (${ac.phase}) is not on an approach.`, "we're not on an approach");
+  }
+  return { plan: { patch: {}, commit: () => initiateGoAround(ctx, ac, { reason: 'ATC instruction', announce: false }) } };
+}
+
+function planContinueApproach(env: Env): PlanResult {
+  const { ac, rt, ctx } = env;
+  if (ac.onGround || !ac.assignedRunwayEnd || !['INBOUND', 'APPROACH', 'FINAL', 'PATTERN', 'GO_AROUND'].includes(ac.phase)) {
+    return unable(env, `${ac.callsign} has no approach to continue.`, 'we have no approach to continue');
+  }
+  return {
+    plan: {
+      patch: {},
+      commit: () => {
+        rt.navMode = 'AUTO';
+        ac.target.headingDeg = undefined;
+        if (ac.phase === 'GO_AROUND') setPhase(ctx, ac, 'APPROACH', 'continue approach');
+      },
+    },
+  };
+}
+
+function leaveFinalIfNeeded(env: Env): void {
+  const { ac, ctx, rt } = env;
+  if (ac.phase === 'FINAL') setPhase(ctx, ac, 'APPROACH', 'vectored off final');
+  else if (ac.phase === 'PATTERN') {
+    rt.pattern = undefined;
+    setPhase(ctx, ac, 'APPROACH', 'vectored out of the pattern');
+  }
+  if (rt.landingEnd) {
+    rt.landingEnd = undefined;
+    completeClearances(ctx, ac, ['LAND']);
+  }
+}
+
+function planHeading(env: Env): PlanResult {
+  const { ac, rt, cmd, airport } = env;
+  if (ac.onGround) return unable(env, `${ac.callsign} is on the ground; headings apply to airborne aircraft.`, "we're on the ground");
+  if (ac.phase === 'LANDING') return unable(env, `${ac.callsign} is on short final / landing.`, "we're landing");
+  const h = cmd.headingDeg!;
+  if (!(h >= 0 && h <= 360)) return unable(env, `Invalid heading ${h}.`, 'say again the heading');
+  return {
+    plan: {
+      patch: { headingDeg: h, turnDirection: cmd.turnDirection },
+      commit: () => {
+        leaveFinalIfNeeded(env);
+        ac.target.headingDeg = magneticToTrue(h, airport.magneticVariationDeg);
+        rt.navMode = 'HEADING';
+        rt.turnDirection = cmd.turnDirection;
+      },
+    },
+  };
+}
+
+function planAltitude(env: Env): PlanResult {
+  const { ac, cmd, airport } = env;
+  if (ac.onGround) return unable(env, `${ac.callsign} is on the ground.`, "we're on the ground");
+  if (ac.phase === 'FINAL' || ac.phase === 'LANDING') {
+    return unable(env, `${ac.callsign} is established on the approach; an altitude change requires a go-around.`, "we're established on the approach");
+  }
+  const alt = cmd.altitudeFt!;
+  const perf = perfOf(ac);
+  if (alt > perf.serviceCeilingFt) return unable(env, `${alt} ft is above the ${ac.type} service ceiling (${perf.serviceCeilingFt} ft).`, 'we cannot reach that altitude');
+  if (alt < airport.elevationFt + 300) return unable(env, `${alt} ft is too close to the field elevation (${airport.elevationFt} ft).`, 'that altitude is too low');
+  return { plan: { patch: { altitudeFt: alt }, commit: () => { ac.target.altitudeFt = alt; } } };
+}
+
+function planSpeed(env: Env): PlanResult {
+  const { ac, cmd } = env;
+  if (ac.onGround) return unable(env, `${ac.callsign} is on the ground.`, "we're on the ground");
+  const perf = perfOf(ac);
+  const v = cmd.speedKt!;
+  if (v < perf.minSpeedKt || v > perf.maxSpeedKt) {
+    return unable(env, `${v} kt is outside the ${ac.type} range (${perf.minSpeedKt}-${perf.maxSpeedKt} kt).`, 'we cannot fly that speed');
+  }
+  if (ac.altitudeFt < 10000 && perf.category !== 'light' && v > SPEED_LIMIT_BELOW_10K_KT) {
+    return unable(env, `${v} kt exceeds the ${SPEED_LIMIT_BELOW_10K_KT} kt limit below 10,000 ft.`, 'that speed exceeds the limit below ten thousand');
+  }
+  return { plan: { patch: { speedKt: v }, commit: () => { ac.target.speedKt = v; } } };
+}
+
+function planContact(env: Env): PlanResult {
+  const { ac, rt, cmd, airport, now } = env;
+  if (['CLEARED_FOR_TAKEOFF', 'TAKEOFF_ROLL', 'LANDING', 'ROLLOUT'].includes(ac.phase)) {
+    return unable(env, `${ac.callsign} (${ac.phase}) cannot change frequency now.`, "we're busy at the moment");
+  }
+  let mhz = cmd.frequencyMhz;
+  let id = cmd.frequencyId;
+  const byId = id ? frequencyById(airport, id) : undefined;
+  if (byId) {
+    mhz = mhz ?? byId.mhz;
+    id = byId.id;
+  }
+  if (mhz === undefined) return unable(env, `Unknown frequency "${id}".`, 'say again the frequency', false);
+  const known = frequencyByMhz(airport, mhz);
+  if (!known && !(mhz >= 118 && mhz <= 137)) return unable(env, `${mhz} is not a valid VHF voice frequency.`, 'say again the frequency', false);
+  id = known?.id ?? id;
+  if (hearsFrequency(ac, mhz)) return unable(env, `${ac.callsign} is already on ${formatMhz(mhz)}.`, "we're already on that frequency", false);
+  const finalMhz = mhz;
+  const finalId = id;
+  return {
+    plan: {
+      patch: { frequencyMhz: finalMhz, frequencyId: finalId },
+      commit: () => {
+        rt.pendingFreq = { atSec: now + 3, mhz: finalMhz, id: finalId };
+      },
+    },
+  };
+}
+
+function planPattern(env: Env): PlanResult {
+  const { ac, rt, cmd, ctx } = env;
+  const g = env.g!;
+  if (ac.onGround) return unable(env, `${ac.callsign} is on the ground.`, "we're on the ground");
+  if (!['INBOUND', 'APPROACH', 'GO_AROUND', 'DEPARTURE', 'INITIAL_CLIMB', 'PATTERN'].includes(ac.phase)) {
+    return unable(env, `${ac.callsign} (${ac.phase}) cannot enter the pattern now.`, 'we cannot enter the pattern now');
+  }
+  const leg = cmd.patternLeg ?? 'straight_in';
+  return {
+    plan: {
+      patch: { runwayEnd: g.end.id, patternLeg: leg },
+      commit: () => {
+        ac.assignedRunwayEnd = g.end.id;
+        rt.decisionDone = false;
+        rt.navMode = 'AUTO';
+        ac.target.headingDeg = undefined;
+        ac.target.altitudeFt = undefined;
+        if (leg === 'straight_in') {
+          rt.pattern = undefined;
+          if (ac.phase === 'GO_AROUND') setPhase(ctx, ac, 'APPROACH');
+          else if (ac.phase === 'DEPARTURE' || ac.phase === 'INITIAL_CLIMB') {
+            /* departures joining straight-in are not modelled; they stay on their heading */
+            rt.navMode = 'HEADING';
+          }
+        } else {
+          rt.pattern = { leg: leg === 'base' ? 'BASE' : 'DOWNWIND', side: leg === 'right_downwind' ? 'right' : 'left', runwayEnd: g.end.id };
+          if (ac.phase !== 'PATTERN') setPhase(ctx, ac, 'PATTERN', leg);
+        }
+      },
+    },
+  };
+}
+
+function planPushback(env: Env): PlanResult {
+  const { ac, ctx } = env;
+  if (ac.phase !== 'PARKED' && ac.phase !== 'READY') return unable(env, `${ac.callsign} (${ac.phase}) cannot push back.`, "we can't push back now");
+  return { plan: { patch: {}, commit: () => { if (ac.phase === 'PARKED') setPhase(ctx, ac, 'READY', 'pushback'); } } };
+}
+
+const PLANNERS: Partial<Record<ClearanceKind, (env: Env) => PlanResult>> = {
+  TAXI: planTaxi,
+  TAXI_TO_PARKING: planTaxi,
+  HOLD_POSITION: planHoldPosition,
+  HOLD_SHORT: planHoldShort,
+  CROSS_RUNWAY: planCross,
+  LINE_UP_AND_WAIT: planLineUp,
+  TAKEOFF: planTakeoff,
+  LAND: planLand,
+  GO_AROUND: planGoAround,
+  CONTINUE_APPROACH: planContinueApproach,
+  CONTACT_FREQUENCY: planContact,
+  HEADING: planHeading,
+  ALTITUDE: planAltitude,
+  SPEED: planSpeed,
+  ENTER_PATTERN: planPattern,
+  PUSHBACK: planPushback,
+};
