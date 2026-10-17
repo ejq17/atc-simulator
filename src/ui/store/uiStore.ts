@@ -5,7 +5,7 @@ import type { SurfaceLayers } from '../display/surfaceRenderer';
 import { DEFAULT_RADAR_LAYERS } from '../display/radarRenderer';
 import type { RadarLayers, RadarRangeNm } from '../display/radarRenderer';
 
-export type DisplayView = 'surface' | 'radar';
+export type DisplayView = 'surface' | 'radar' | 'tower';
 export type SideTab = 'list' | 'strips';
 export type DrawerId = 'charts' | 'navaids' | 'settings' | 'atis' | 'weather' | null;
 

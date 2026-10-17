@@ -36,6 +36,11 @@ src/weather/    METAR parsing, simulated weather presets, ATIS generation
 src/charts/     FAA d-TPP chart index and viewer, navaid reference
 src/game/       scenarios, traffic generation, free play/career/training, scoring, debrief
 src/ui/         React app shell, panels, canvas displays
+src/ui/tower/   3D Tower tab (lazy chunk). Pure, unit-tested: geometry.ts (polygon/ribbon/extrusion meshes, runway markings,
+                lights, hold bars, taxiway signs), aircraftModel.ts (class, low-poly parts, placement/pitch, billboard scale),
+                cameraMath.ts (look-at, drag/zoom/snap/follow, compass), skyMath.ts (sun, sky, fog, cloud deck),
+                towerPosition.ts (cab site). Only towerScene.ts imports three.js (the GPU boundary; owns and disposes every
+                resource); TowerDisplay.tsx is the React shell and reads the store per animation frame like the Surface view
 server/         AWC proxy + cache, optional Deepgram token endpoint
 data/sources/   verified FAA/NASR/d-TPP/OSM extracts with provenance (raw/ is git-ignored)
 ```
