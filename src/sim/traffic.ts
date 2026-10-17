@@ -88,7 +88,8 @@ export function createBasicTrafficGenerator(): TrafficGenerator {
               flightRules: ga ? 'VFR' : 'IFR',
               start: { kind: 'airborne', pos, altitudeFt: ga ? 3000 : 5000, headingDeg: g.headingDeg, speedKt: ga ? 100 : 210, runwayEnd: g.end.id, distanceNm: dNm },
               isDeparture: false,
-              initialFrequencyId: state.airport.frequencies.some((f) => f.id === 'APP') ? 'APP' : 'TWR',
+              // Approach only when somebody works it (player or AI); otherwise the arrival would never be handed to Tower.
+              initialFrequencyId: state.airport.frequencies.some((f) => f.id === 'APP') && state.scenario.controllerPositions.includes('APP') ? 'APP' : 'TWR',
               initialRequest: 'LANDING',
             });
             count++;

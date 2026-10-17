@@ -60,11 +60,15 @@ export function createAiControllers(opts: AiControllerOptions): AiControllers {
   const sameMhz = (a: number, b: number) => Math.abs(a - b) < 0.0005;
 
   const clearanceStore = { rand, reserved: new Set<string>(), memo: new Map<string, string>() };
+  const approachAgent = createApproachAgent((v) => !v.staffed.has('DEP'));
+  const towerAgent = createTowerAgent();
   const agents: Record<ControllerPositionId, Agent> = {
     CLNC: createClearanceAgent(clearanceStore),
     GND: createGroundAgent(clearanceStore),
-    TWR: createTowerAgent(),
-    APP: createApproachAgent((v) => !v.staffed.has('DEP')),
+    // Approach closed (nobody works APP): Tower sequences missed approaches and inbound IFR traffic itself, as Ground issues
+    // IFR clearances when Delivery is closed. Otherwise an IFR go-around would wait forever for a frequency that nobody answers.
+    TWR: (v) => [...towerAgent(v), ...(v.staffed.has('APP') ? [] : approachAgent(v))],
+    APP: approachAgent,
     DEP: createDepartureAgent(),
   };
 

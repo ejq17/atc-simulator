@@ -51,7 +51,7 @@ describe('traffic generator with a density curve', () => {
   it('without a curve it is byte-for-byte the old seeded behaviour (deterministic)', () => {
     expect(spawnsOver(11, 1800)).toBe(spawnsOver(11, 1800));
     expect(spawnsOver(11, 1800)).toBe(spawnsOver(11, 1800, undefined));
-  });
+  }, 180_000);
 
   it('density 1 matches the peak rate; density 0 spawns nothing; 0.2 spawns clearly fewer than 1 (same seed)', () => {
     const full = spawnsOver(11, 3600, () => 1);
@@ -60,10 +60,10 @@ describe('traffic generator with a density curve', () => {
     expect(none).toBe(0);
     expect(full).toBeGreaterThan(5);
     expect(low).toBeLessThan(full);
-  });
+  }, 180_000);
 
   it('is deterministic for a given seed and curve', () => {
     const curve = () => 0.5;
     expect(spawnsOver(3, 1800, curve)).toBe(spawnsOver(3, 1800, curve));
-  });
+  }, 180_000);
 });

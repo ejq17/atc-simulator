@@ -246,6 +246,7 @@ export function createTowerAgent(): Agent {
             });
           }
         } else if (!ifr && pending === 'LANDING' && ac.assignedRunwayEnd) {
+          // (IFR with nobody on Approach is re-sequenced by the Approach agent that Tower runs then; see controllers.ts.)
           // After a runway change the pattern re-entry is for the runway now in use, not the one the go-around was flown from.
           const active = state.activeRunways.landing;
           const end = active.includes(ac.assignedRunwayEnd) || !active.length ? ac.assignedRunwayEnd : active[0];

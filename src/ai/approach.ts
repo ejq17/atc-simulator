@@ -124,7 +124,7 @@ export function createApproachAgent(handleDepartures: (v: AgentView) => boolean)
       const facility = v.facility(ac);
 
       // Established: Tower.
-      if (phase === 'FINAL' && v.staffed.has('TWR')) {
+      if (phase === 'FINAL' && v.staffed.has('TWR') && v.position !== 'TWR') {
         const twr = frequencyForPosition(airport, 'TWR');
         if (twr) {
           plans.push({
