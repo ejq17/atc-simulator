@@ -41,8 +41,8 @@ export function formatElapsed(sec: number): string {
 }
 
 /** Zulu wall clock "HH:MM:SSZ" at `startUtcMs + simSec`. */
-export function formatZulu(startUtcMs: number, simSec: number): string {
-  const d = new Date(startUtcMs + simSec * 1000);
+export function formatZulu(startUtcMs: number | ((simSec: number) => number), simSec: number): string {
+  const d = new Date(typeof startUtcMs === 'function' ? startUtcMs(simSec) : startUtcMs + simSec * 1000);
   return `${pad(d.getUTCHours(), 2)}:${pad(d.getUTCMinutes(), 2)}:${pad(d.getUTCSeconds(), 2)}Z`;
 }
 

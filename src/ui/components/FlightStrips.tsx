@@ -6,7 +6,7 @@ import { useSimState, useSimStore } from '../store/simStore';
 import { TONE_COLOR, formatMhz, phaseLabel, statusTone } from '../lib/format';
 import { requestBadge } from '../lib/ifr';
 import { BAY_LABEL, BAY_ORDER, STRIP_KEYS, STRIP_LEGEND, bayListFor, bayWorkedByPlayer, zuluHm } from '../strips/stripModel';
-import type { BayId, Strip, StripBoard } from '../strips/stripModel';
+import type { BayId, Strip, StripBoard, UtcSource } from '../strips/stripModel';
 import { Panel } from './ui';
 
 const AI_TEXT = 'text-[#b79cff]';
@@ -31,7 +31,7 @@ interface StripViewProps {
   strip: Strip;
   ac: Aircraft | undefined;
   board: StripBoard;
-  startUtcMs: number;
+  startUtcMs: UtcSource;
   selected: boolean;
   owner: 'player' | 'ai';
   fresh: boolean;
@@ -302,7 +302,7 @@ export function FlightStrips() {
                     strip={strip}
                     ac={state.aircraft[strip.id]}
                     board={board}
-                    startUtcMs={session.startUtcMs}
+                    startUtcMs={session.utcAt}
                     selected={state.selectedAircraftId === strip.id}
                     owner={owner}
                     fresh={strip.bayEnteredWall > 0 && now - strip.bayEnteredWall < FRESH_MS}

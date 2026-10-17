@@ -14,6 +14,11 @@ import { loadKacy } from '../../airport';
 import { createEngine } from '../../sim/engine';
 import type { Airport, GameMode, Scenario, SimEvent, SimulationState, Weather } from '../../sim/types';
 import { fetchLiveMetar } from '../../weather/liveWeather';
+import type { LiveMetar } from '../../weather/liveWeather';
+import { createLiveFeed, METAR_RETRY_MS } from '../../weather/liveFeed';
+import type { LiveFeed, LiveFeedStatus } from '../../weather/liveFeed';
+import { initialAtisLetter } from '../../weather/atisCycle';
+import { realTimeDensity } from '../../game/trafficDensity';
 import { getPresetWeather } from '../../weather/presets';
 import type { WeatherPresetId } from '../../weather/presets';
 import { recommendRunways } from '../../weather/runwaySelection';
@@ -50,6 +55,11 @@ export interface StartOptions {
   ai?: boolean;
   /** 'auto' = recommended from the wind; otherwise explicit ends. */
   runways: 'auto' | { landing: string; departing: string };
+  /**
+   * Real-time mode (default true): sim time follows the wall clock, the UTC epoch is the real time at start, free-play traffic follows the
+   * time-of-day curve and the ATIS letter follows the hourly cycle. False = the old "sim clock at the speed buttons' multiple" behaviour.
+   */
+  realTime?: boolean;
 }
 
 export interface Notice {
@@ -69,6 +79,23 @@ export function recommendedRunways(weather: Weather, airport: Pick<Airport, 'run
   return { departing: [rec.primary], landing: [rec.primary], summary };
 }
 
+/**
+ * Live wind -> runway configuration, with the existing selection rules (best headwind, KACY preference order, calm-wind rule). To avoid flapping
+ * on every METAR it only proposes a change when the runway now in use is no longer among the best ends AND (the wind is not calm OR the
+ * current runway has a tailwind).
+ */
+export function runwayChangeForWind(weather: Weather, current: { landing: string[]; departing: string[] }, airport: Pick<Airport, 'runways' | 'magneticVariationDeg'> = loadKacy()): { departing: string[]; landing: string[]; summary: string } | undefined {
+  const ends = airport.runways.flatMap((r) => r.ends.map((e) => ({ id: e.id, magneticHeadingDeg: e.magneticHeadingDeg })));
+  const rec = recommendRunways(weather, ends, { preferredOrder: ['31', '13', '22', '4'], variationDeg: airport.magneticVariationDeg });
+  const inUse = current.landing[0] ?? current.departing[0];
+  if (!inUse || rec.best.includes(inUse)) return undefined;
+  const cur = rec.ranking.find((r) => r.id === inUse);
+  if (rec.calmWindRule && (cur?.headwindKt ?? 0) >= 0) return undefined;
+  const top = rec.ranking.find((r) => r.id === rec.primary);
+  const summary = `wind ${Math.round(top?.headwindKt ?? 0)} kt headwind on ${rec.primary}`;
+  return { departing: [rec.primary], landing: [rec.primary], summary };
+}
+
 interface SimStore {
   screen: Screen;
   starting: boolean;
@@ -79,6 +106,10 @@ interface SimStore {
   notices: Notice[];
   atis?: SimulatedAtis;
   weatherNote: string;
+  /** Live METAR feed state for the running session (undefined when the session uses simulated weather). */
+  liveWeather?: LiveFeedStatus;
+  /** The running session follows the wall clock (it may still be in 2x/4x: see `session.clockStatus()`). */
+  realTime: boolean;
   controller: ControllerSetup;
   voice: { status: VoiceStatus; message?: string; partial: string; transmitting: boolean };
   /** Pilot audio: the browser is speaking right now (and who). */
@@ -118,6 +149,11 @@ interface SimStore {
 
 let noticeSeq = 0;
 let previousSpeed = 1;
+let liveFeed: LiveFeed | null = null;
+function stopLiveFeed() {
+  liveFeed?.stop();
+  liveFeed = null;
+}
 
 export const useSimStore = create<SimStore>((set, get) => ({
   screen: 'setup',
@@ -127,6 +163,7 @@ export const useSimStore = create<SimStore>((set, get) => ({
   session: null,
   notices: [],
   weatherNote: '',
+  realTime: false,
   controller: { positions: ['TWR'], aiPositions: [] },
   voice: { status: 'idle', partial: '', transmitting: false },
   audio: { speaking: false },
@@ -155,6 +192,8 @@ export const useSimStore = create<SimStore>((set, get) => ({
       // ---- weather ---------------------------------------------------------------------------------------------
       let weather: Weather | undefined;
       let weatherNote = '';
+      let initialMetar: LiveMetar | undefined;
+      let liveFailed = false;
       let wantLive = opts.weather.kind === 'live';
       if (opts.weather.kind === 'scenario' && opts.scenarioId) {
         // The scenario decides: a fixed Weather object, or 'live' (placeholder / free-play style scenarios).
@@ -170,8 +209,10 @@ export const useSimStore = create<SimStore>((set, get) => ({
         try {
           const live = await fetchLiveMetar('KACY');
           weather = live.weather;
+          initialMetar = live;
           weatherNote = `Live METAR ${live.raw}`;
         } catch (err) {
+          liveFailed = true;
           weather = getPresetWeather('clear');
           weatherNote = 'Simulated weather: Clear (live weather unavailable)';
           note('warn', `Live weather unavailable (${err instanceof Error ? err.message : String(err)}). Using the simulated "Clear" preset instead.`);
@@ -202,12 +243,13 @@ export const useSimStore = create<SimStore>((set, get) => ({
       }
 
       // ---- engine ------------------------------------------------------------------------------------------------
+      const realTime = opts.realTime !== false;
       const { sink, onPilotTransmission } = createPilotSink();
       const engine = createEngine({
         airport,
         scenario,
         onPilotTransmission,
-        trafficGenerator: game.createTrafficGenerator(scenario, airport),
+        trafficGenerator: game.createTrafficGenerator(scenario, airport, realTime && !opts.scenarioId ? { densityAt: realTimeDensity } : {}),
       });
       engine.setWeather(weather);
       engine.setControllerPosition(positions[0]);
@@ -216,6 +258,7 @@ export const useSimStore = create<SimStore>((set, get) => ({
 
       const prev = get().session;
       prev?.dispose();
+      stopLiveFeed();
       const startUtcMs = Date.now();
       const session = startEngineSession({
         engine,
@@ -224,7 +267,8 @@ export const useSimStore = create<SimStore>((set, get) => ({
         enableAi: opts.ai !== false,
         seed,
         startUtcMs,
-        atisLetter: String.fromCharCode(65 + new Date(startUtcMs).getUTCHours()),
+        realTime,
+        atisLetter: realTime ? initialAtisLetter(startUtcMs) : String.fromCharCode(65 + new Date(startUtcMs).getUTCHours()),
         training,
         runner,
         pilotSink: sink,
@@ -246,8 +290,34 @@ export const useSimStore = create<SimStore>((set, get) => ({
       });
 
       previousSpeed = 1;
+      if (wantLive) {
+        const autoRunways = opts.runways === 'auto' && !opts.scenarioId;
+        liveFeed = createLiveFeed({
+          fetchMetar: () => fetchLiveMetar('KACY'),
+          initial: initialMetar,
+          onStatus: (liveWeather) => {
+            set({ liveWeather });
+            if (liveWeather.kind === 'stale') get().addNotice('warn', `Live weather refresh failed (${liveWeather.error}). Still using the KACY METAR observed ${liveWeather.observedAt.slice(11, 16)}Z; retrying every minute.`);
+            else if (liveWeather.kind === 'fallback') set({ weatherNote: 'Simulated weather: Clear (live weather unavailable)' });
+          },
+          onWeather: (w, m) => {
+            if (get().session !== session) return;
+            session.setWeather(w);
+            set({ weatherNote: `Live METAR ${m.raw}` });
+            get().addNotice('info', `New KACY METAR (${m.observedAt.slice(11, 16)}Z): ${m.raw}`);
+            const change = autoRunways ? runwayChangeForWind(w, session.engine.getState().activeRunways, airport) : undefined;
+            if (change) {
+              session.setActiveRunways({ departing: change.departing, landing: change.landing });
+              get().addNotice('warn', `The wind favours runway ${change.landing[0]} now (${change.summary}); active runways changed. Aircraft already in the pattern may need to be re-sequenced.`);
+            }
+          },
+        });
+        liveFeed.start(liveFailed ? METAR_RETRY_MS : undefined);
+      }
       set({
         session,
+        realTime,
+        liveWeather: wantLive ? (initialMetar ? { kind: 'live', observedAt: initialMetar.observedAt, raw: initialMetar.raw, checkedAtMs: Date.now() } : { kind: 'fallback', error: 'backend unreachable', failedAtMs: Date.now() }) : undefined,
         screen: 'sim',
         starting: false,
         startStatus: '',
@@ -279,6 +349,7 @@ export const useSimStore = create<SimStore>((set, get) => ({
     const events = st.events.slice();
     const duration = st.clock.timeSec;
     s.dispose();
+    stopLiveFeed();
     set({
       session: null,
       screen: 'debrief',
@@ -304,6 +375,7 @@ export const useSimStore = create<SimStore>((set, get) => ({
 
   backToSetup() {
     get().session?.dispose();
+    stopLiveFeed();
     set({ session: null, screen: 'setup', debrief: undefined, training: null, scenarioComplete: false, notices: [] });
   },
 

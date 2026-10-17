@@ -60,7 +60,16 @@ export function rampFactor(difficulty: Difficulty, timeSec: number): number {
 
 const exp = (rng: Rng, meanSec: number): number => -Math.log(1 - rng() * 0.999999) * meanSec;
 
-export function createTrafficGenerator(scenario: Scenario, airport: Airport): TrafficGenerator {
+export interface TrafficGeneratorOptions {
+  /**
+   * Time-of-day density in 0..1 (see `trafficDensity.ts`), read from the state each time a spawn clock fires. The scenario's hourly rates are the
+   * peak-bank rates; a firing is kept with probability `densityAt(state)` (thinning of a Poisson process, so the arrival rate follows the curve
+   * exactly and no long night-time gap lingers after the morning bank starts). Unset = constant rate (tests, scripted scenarios).
+   */
+  densityAt?: (state: Readonly<SimulationState>) => number;
+}
+
+export function createTrafficGenerator(scenario: Scenario, airport: Airport, options: TrafficGeneratorOptions = {}): TrafficGenerator {
   const cfg = scenario.traffic;
   if (!cfg || !cfg.enabled) return createNullTrafficGenerator();
   const gs = scenario as GameScenario;
@@ -183,6 +192,12 @@ export function createTrafficGenerator(scenario: Scenario, airport: Airport): Tr
     };
   };
 
+  /** Thinning by time of day; consumes no random number without a density curve (seeded runs stay identical). */
+  const keep = (state: Readonly<SimulationState>): boolean => {
+    if (!options.densityAt) return true;
+    return rng!() < options.densityAt(state);
+  };
+
   return {
     update(state) {
       const now = state.clock.timeSec;
@@ -193,11 +208,11 @@ export function createTrafficGenerator(scenario: Scenario, airport: Airport): Tr
         nextDep = now + 35 + gap('dep', now) * 0.5;
       }
       if (now >= nextArr) {
-        dueArr = Math.min(2, dueArr + 1);
+        if (keep(state)) dueArr = Math.min(2, dueArr + 1);
         nextArr = now + gap('arr', now);
       }
       if (now >= nextDep) {
-        dueDep = Math.min(2, dueDep + 1);
+        if (keep(state)) dueDep = Math.min(2, dueDep + 1);
         nextDep = now + gap('dep', now);
       }
       if ((dueArr === 0 && dueDep === 0) || now < retryAt || now - lastSpawnAt < MIN_SPAWN_SPACING_SEC) return [];

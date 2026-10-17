@@ -105,6 +105,7 @@ export function SetupScreen() {
   const [departing, setDeparting] = useState<string>('auto');
   const [position, setPosition] = useState<PositionChoice>(prev?.controller ?? 'TWR');
   const [aiOn, setAiOn] = useState<boolean>(prev?.ai ?? true);
+  const [realTime, setRealTime] = useState<boolean>(prev?.realTime ?? true);
   const [live, setLive] = useState<LiveState>({ status: 'loading' });
 
   const refreshLive = () => {
@@ -190,6 +191,7 @@ export function SetupScreen() {
       seed: seed !== undefined && Number.isFinite(seed) ? seed : undefined,
       controller: position,
       ai: aiOn,
+      realTime,
       runways: landing === 'auto' && departing === 'auto' ? 'auto' : { landing: landing === 'auto' ? rec.landing[0] : landing, departing: departing === 'auto' ? rec.departing[0] : departing },
     };
     void startSession(opts);
@@ -346,7 +348,7 @@ export function SetupScreen() {
                 <div className="col-span-2">
                   <Field label="Weather">
                     <select className={SELECT} value={weatherKey} onChange={(e) => setWeatherKey(e.target.value)} aria-label="Weather" data-testid="weather-select">
-                      <option value="live">Live KACY METAR</option>
+                      <option value="live">Live weather (real METAR)</option>
                       {WEATHER_PRESET_IDS.map((id) => (<option key={id} value={`preset:${id}`}>Simulated: {WEATHER_PRESETS[id].label}</option>))}
                       {!isCustom && <option value="scenario">Scenario default</option>}
                     </select>
@@ -374,6 +376,12 @@ export function SetupScreen() {
                 <p className="col-span-2 text-[11px] leading-snug text-atc-muted">
                   {rec.summary}. {!isCustom && 'Ready-made scenarios keep their own runway unless you pick one here.'}
                 </p>
+                <Field label="Clock" hint="Real time: sim time, day/night and traffic volume follow the real clock. Sim speed: the old 1x/2x/4x sim clock.">
+                  <select className={SELECT} value={realTime ? 'real' : 'sim'} onChange={(e) => setRealTime(e.target.value === 'real')} aria-label="Clock" data-testid="clock-select">
+                    <option value="real">Real time (live)</option>
+                    <option value="sim">Sim speed</option>
+                  </select>
+                </Field>
                 <Field label="Random seed" hint="Same seed + same commands = the same session. Blank = random.">
                   <input className={INPUT} inputMode="numeric" value={seedText} onChange={(e) => setSeedText(e.target.value.replace(/[^0-9]/g, ''))} placeholder="random" aria-label="Random seed" data-testid="seed-input" />
                 </Field>

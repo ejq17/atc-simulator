@@ -42,11 +42,14 @@ export function bayListFor(sessionPositions: readonly ControllerPositionId[]): B
 // Time and marking
 // ---------------------------------------------------------------------------------------------------------------------
 
+/** Epoch ms of sim time 0, or a function from sim seconds to UTC ms (real-time mode moves the epoch when the clock re-locks). */
+export type UtcSource = number | ((simSec: number) => number);
+
 const two = (n: number) => String(n).padStart(2, '0');
 
 /** "1203Z": the time FAA strips carry. */
-export function zuluHm(startUtcMs: number, simSec: number): string {
-  const d = new Date(startUtcMs + simSec * 1000);
+export function zuluHm(startUtcMs: UtcSource, simSec: number): string {
+  const d = new Date(typeof startUtcMs === 'function' ? startUtcMs(simSec) : startUtcMs + simSec * 1000);
   return `${two(d.getUTCHours())}${two(d.getUTCMinutes())}Z`;
 }
 
@@ -216,7 +219,7 @@ export function displayOrder(strips: readonly Strip[]): Strip[] {
 // ---------------------------------------------------------------------------------------------------------------------
 
 export interface StripBoardOptions {
-  startUtcMs: number;
+  startUtcMs: UtcSource;
   /** Wall clock for animation stamps; injectable for tests. */
   wallNow?: () => number;
   /** Finished (struck or gone) strips kept per bay before the oldest is dropped. Default 8. */

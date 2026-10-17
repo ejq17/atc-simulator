@@ -64,6 +64,16 @@ Honest status as of 2026-10-16. "Done" means it runs and is covered by tests.
 
 **UI** — `src/ui`, `e2e/` (see `src/ui/README.md`): setup (mode / scenario / weather / runways / **controller positions** with per-position explanations, the positions each scenario needs and an **IFR flows** option), simulator (surface + radar canvases with interpolation, aircraft list and **Strips** tab, aircraft details, radio panel with PTT, typed input and one live RX/TX chip per active frequency, comms log, alerts, charts/navaids/ATIS/weather/settings drawers, training banner), debrief. IFR support: eight position sets (CLNC, GND, TWR, TWR+GND, APP+DEP, DEP, APP+TWR, All) with each call applied on the addressed aircraft's frequency and a clear "Not on frequency" rejection; `fixes` passed to the parser; flight rules, squawk, route, navigation mode, IFR clearance, approach clearance / established state and request badges (REQ IFR CLNC, REQ APPROACH, CHECK-IN, REQ TAXI, ...) in the panels; radar with 60 NM range, procedure fixes and final course of the active landing runways, dashed selected-aircraft route, All fixes, squawk and V/R/A letters in data blocks; empty readbacks (radar contact) are never spoken. Screenshots in `docs/screenshots/` (`sim`, `radar`, `approach`, `strips`, `setup-ifr`, ...).
 
+**Real time** (`realTime` option on `StartOptions` / `SessionParams`, default on in the app, off for the engine and every pre-existing test):
+wall-clock-locked session clock with LIVE / SIM 2x / PAUSED badge (`realtimeClock.ts`), live METAR polling every 5 min with stale/fallback status
+(`liveFeed.ts`), hourly + material-change ATIS letters (`atisCycle.ts`), live-wind runway follow (`runwayChangeForWind`, same selection rules),
+DAY/NIGHT + sunrise/sunset from the real epoch in the top bar, local-time traffic density curve (`trafficDensity.ts`). Unit tests: fake-timer clock sync
+including a one-hour jitter run, mock-fetch feed refresh/fallback, ATIS cycle, density curve and thinning, session-level hourly ATIS and LIVE/SIM transitions.
+Manual verification (needs a browser, `npm run server` + `npm run dev`): start a free-play session with defaults and check (1) top bar shows LIVE and
+LIVE WX hhmmZ, and the Zulu clock matches `date -u` after 10+ minutes (no drift; the Sim time stat equals the elapsed minutes); (2) click 2x: badge SIM 2x; click 1x: LIVE and
+Zulu again equals real UTC; (3) stop the backend: within 5 min (1 min after the first failure) the badge turns WX STALE and a warning appears, restart: LIVE WX; (4) at HH:55Z the
+ATIS letter advances once; (5) DAY/NIGHT flips at the sunrise/sunset shown in the Zulu tooltip. Not run in a browser by the automated task.
+
 Totals: 1740 vitest tests in 91 files, 34 Playwright tests passing across 6 projects (simulator, pilot-TTS in real Chrome, Whisper fake-mic, Web Speech real Chrome, Deepgram protocol) plus the opt-in real-microphone project, type-check clean. Verified by the orchestrator on 2026-10-17 after the AI-controller round.
 
 

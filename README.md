@@ -46,8 +46,19 @@ npm run server   # local backend on :8787 (AWC weather proxy, FAA chart proxy, o
 npm run dev      # Vite on http://localhost:5173
 ```
 
-Open the app, pick a mode (Free Play, Career, Training), a scenario, weather (live
-KACY METAR or a preset), runway configuration and controller position, then Start.
+Open the app, pick a mode (Free Play, Career, Training), a scenario, weather (**Live weather
+(real METAR)** is the default; or a simulated preset), runway configuration and controller position, then Start.
+
+**Real time by default.** The session clock is the real clock: sim time advances one second per wall-clock second
+(corrected against `performance.now`, so it does not drift), the Zulu time, sunrise/sunset (DAY/NIGHT in the top bar) and
+free-play traffic volume follow the real date and time at the airport (quiet overnight, busy morning and evening banks),
+and the top bar shows **LIVE**. With live weather the KACY METAR is refreshed every 5 minutes (new observation times only),
+the ATIS letter advances at HH:55Z and when the weather changes materially, and the runway in use follows the wind. If the backend is
+unreachable the last good METAR stays in use (**WX STALE**) or the session falls back to simulated weather (**WX SIMULATED**), and
+the top bar says so. Pause is always available.
+
+**Sim speed (override).** The **2x / 4x** buttons ("Sim speed") release the real-time lock; the badge turns to **SIM 2x**. Press **1x**
+to lock back to the wall clock. To start a session on the old sim clock instead, choose **Clock: Sim speed** on the setup screen.
 
 * **Push-to-talk:** hold **Space** (configurable in Settings) and speak, e.g.
   "Cessna seven two three echo juliet, runway one three, cleared for takeoff".
