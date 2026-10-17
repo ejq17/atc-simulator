@@ -26,7 +26,7 @@ export interface SimulationEngine {
    * commands with a reason, and ask for clarification when the command is
    * ambiguous (unresolved callsign, missing runway...).
    */
-  applyCommand(cmd: ParsedCommand, opts?: { position?: ControllerPositionId; source?: 'voice' | 'typed'; transmissionId?: string }): CommandOutcome;
+  applyCommand(cmd: ParsedCommand, opts?: { position?: ControllerPositionId; source?: 'voice' | 'typed' | 'ai'; transmissionId?: string; aiPosition?: ControllerPositionId }): CommandOutcome;
 
   /** Spawn/despawn helpers used by scenarios and traffic generation. */
   spawnAircraft(spec: Scenario['spawns'][number]): Aircraft;

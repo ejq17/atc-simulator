@@ -81,7 +81,7 @@ const unable = (env: Env, reason: string, phrase: string, commError = true): { r
 export function executeCommand(
   ctx: SimContext,
   cmdIn: ParsedCommand,
-  opts?: { position?: ControllerPositionId; source?: 'voice' | 'typed'; transmissionId?: string },
+  opts?: { position?: ControllerPositionId; source?: 'voice' | 'typed' | 'ai'; transmissionId?: string; aiPosition?: ControllerPositionId },
 ): CommandOutcome {
   const { state } = ctx;
   const airport = state.airport;
@@ -94,7 +94,7 @@ export function executeCommand(
     if (tid) ctx.loggedTransmissions.add(tid);
     emitEvent(ctx, {
       kind: 'TRANSMISSION', callsign: cmdIn.callsign ?? undefined, text: cmdIn.rawText, severity: 'info', speaker: 'ATC',
-      frequencyMhz: ctrlFreq, data: { source: opts?.source, transmissionId: tid, normalized: cmdIn.normalizedText },
+      frequencyMhz: ctrlFreq, aiPosition: opts?.aiPosition, data: { source: opts?.source, transmissionId: tid, normalized: cmdIn.normalizedText },
     });
   }
 

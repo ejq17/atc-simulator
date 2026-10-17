@@ -464,6 +464,8 @@ export interface SimEvent {
   /** Transmission metadata. */
   frequencyMhz?: number;
   speaker?: 'ATC' | 'PILOT' | 'SYSTEM';
+  /** Set when an AI controller (not the player) made this transmission or decision. */
+  aiPosition?: ControllerPositionId;
   data?: Record<string, unknown>;
 }
 
@@ -516,6 +518,8 @@ export interface Scenario {
   weather: Weather | 'live';
   activeRunways: { departing: string[]; landing: string[] };
   controllerPositions: ControllerPositionId[];
+  /** Positions the human player works; every other position in `controllerPositions` is worked by an AI controller. Defaults to all. */
+  playerPositions?: ControllerPositionId[];
   spawns: ScenarioAircraftSpawn[];
   /** Continuous traffic generation settings (free play). */
   traffic?: { enabled: boolean; arrivalsPerHour: number; departuresPerHour: number; gaFraction: number; maxAircraft: number };
