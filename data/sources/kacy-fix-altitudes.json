@@ -1,0 +1,455 @@
+{
+ "_provenance": {
+  "source": "FAA d-TPP cycle 2610 approach plates (rendered pages data/sources/raw/dtpp_2610_txt/P_*-1.png)",
+  "retrieved": "2026-10-17",
+  "method": "Profile-view altitudes were read from magnified crops; underline = minimum altitude, overline = maximum, both = mandatory (per FAA chart symbology). Plan-view route labels (\"2000 NoPT 096 deg (8.1)\") are italic numbers without under/overline lines in the plan view and are recorded as the leg minimum altitude with view=\"plan view route label...\". HUMAN TRANSCRIPTION - verify against the PDFs before any real use.",
+  "missed_approach_climbs": "Missed-approach climb altitudes are not repeated here; see missedApproachText in kacy-procedures.json.",
+  "correction": "ILS Z / LOC Z 13: the glideslope intercept altitude at the FAF MAYBN is 1600 (underlined, lightning bolt), not 1700. ILS/LOC-DME 31: PRSTY 1700."
+ },
+ "procedures": [
+  {
+   "chart_name": "RNAV (GPS) RWY 22",
+   "pdf_name": "00669R22.PDF",
+   "plate_image": "P_R22-1.png",
+   "fix_altitudes": [
+    {
+     "fix": "PIDVE",
+     "min_altitude_ft": 1800,
+     "view": "plan view route label (altitude printed without under/overline; read as the leg minimum altitude)",
+     "note": "leg PIDVE-KOPCE 123 deg (6)",
+     "provenance": "transcribed from plate P_R22-1.png (00669R22.PDF, d-TPP 2610) plan view route label (altitude printed without under/overline; read as the leg minimum altitude) by visual read"
+    },
+    {
+     "fix": "KOPCE",
+     "min_altitude_ft": 1800,
+     "view": "profile view",
+     "note": "IF; underlined",
+     "provenance": "transcribed from plate P_R22-1.png (00669R22.PDF, d-TPP 2610) profile view by visual read"
+    },
+    {
+     "fix": "FLDER",
+     "min_altitude_ft": 1600,
+     "view": "profile view",
+     "note": "underlined",
+     "provenance": "transcribed from plate P_R22-1.png (00669R22.PDF, d-TPP 2610) profile view by visual read"
+    },
+    {
+     "fix": "EFEWY",
+     "min_altitude_ft": 1100,
+     "view": "profile view",
+     "note": "FAF; underlined 1100 with lightning bolt (also 1100 printed above the fix) = glidepath altitude at the FAF",
+     "provenance": "transcribed from plate P_R22-1.png (00669R22.PDF, d-TPP 2610) profile view by visual read"
+    }
+   ]
+  },
+  {
+   "chart_name": "ILS OR LOC/DME RWY 31",
+   "pdf_name": "00669ILD31.PDF",
+   "plate_image": "P_ILD31-1.png",
+   "fix_altitudes": [
+    {
+     "fix": "STEVV",
+     "min_altitude_ft": 2000,
+     "view": "profile view",
+     "note": "IF/IAF; 2000 underlined in the One Minute Holding Pattern and on the profile; also plan note \"3000 to STEVV 127 deg (11.8)\" from the localizer side",
+     "provenance": "transcribed from plate P_ILD31-1.png (00669ILD31.PDF, d-TPP 2610) profile view by visual read"
+    },
+    {
+     "fix": "PRSTY",
+     "min_altitude_ft": 1700,
+     "view": "profile view",
+     "note": "FAF (LOC); lightning-bolt altitude at the FAF: glidepath intercept / minimum altitude (underlined)",
+     "provenance": "transcribed from plate P_ILD31-1.png (00669ILD31.PDF, d-TPP 2610) profile view by visual read"
+    }
+   ]
+  },
+  {
+   "chart_name": "ILS Z OR LOC Z RWY 13",
+   "pdf_name": "00669IZLZ13.PDF",
+   "plate_image": "P_IZLZ13-1.png",
+   "fix_altitudes": [
+    {
+     "fix": "VCN",
+     "min_altitude_ft": 2000,
+     "view": "plan view route label (altitude printed without under/overline; read as the leg minimum altitude)",
+     "note": "IAF; \"2000 NoPT 096 deg (8.1)\" to CARYL",
+     "provenance": "transcribed from plate P_IZLZ13-1.png (00669IZLZ13.PDF, d-TPP 2610) plan view route label (altitude printed without under/overline; read as the leg minimum altitude) by visual read"
+    },
+    {
+     "fix": "CARYL",
+     "min_altitude_ft": 2000,
+     "max_altitude_ft": 4500,
+     "view": "profile view",
+     "note": "IF/IAF hold-in-lieu: HOLD 4500 (overlined = maximum) / 2000 (underlined = minimum)",
+     "provenance": "transcribed from plate P_IZLZ13-1.png (00669IZLZ13.PDF, d-TPP 2610) profile view by visual read"
+    },
+    {
+     "fix": "MAYBN",
+     "min_altitude_ft": 1600,
+     "view": "profile view",
+     "note": "FAF (LOC); lightning-bolt altitude at the FAF: glidepath intercept / minimum altitude (underlined) [1600, not 1700]",
+     "provenance": "transcribed from plate P_IZLZ13-1.png (00669IZLZ13.PDF, d-TPP 2610) profile view by visual read"
+    }
+   ]
+  },
+  {
+   "chart_name": "HI-ILS Y OR LOC Y RWY 13",
+   "pdf_name": "00669HIYLY13.PDF",
+   "plate_image": "P_HIYLY13-1.png",
+   "fix_altitudes": [
+    {
+     "fix": "ZAPOM",
+     "min_altitude_ft": 14000,
+     "max_altitude_ft": 17500,
+     "view": "profile view",
+     "note": "IAF hold: HOLD 17,500 (overlined = maximum) / 14,000 (underlined = minimum)",
+     "provenance": "transcribed from plate P_HIYLY13-1.png (00669HIYLY13.PDF, d-TPP 2610) profile view by visual read"
+    },
+    {
+     "fix": "ACY",
+     "mandatory_altitude_ft": 4000,
+     "view": "profile view",
+     "note": "ACY VORTAC on the 337 deg route: 4000 overlined AND underlined = mandatory",
+     "provenance": "transcribed from plate P_HIYLY13-1.png (00669HIYLY13.PDF, d-TPP 2610) profile view by visual read"
+    },
+    {
+     "fix": "JOGIR",
+     "min_altitude_ft": 2000,
+     "view": "profile view",
+     "note": "IF; underlined",
+     "provenance": "transcribed from plate P_HIYLY13-1.png (00669HIYLY13.PDF, d-TPP 2610) profile view by visual read"
+    },
+    {
+     "fix": "MAYBN",
+     "min_altitude_ft": 1600,
+     "view": "profile view",
+     "note": "FAF-equivalent (RADAR); lightning-bolt altitude at the FAF: glidepath intercept / minimum altitude (underlined)",
+     "provenance": "transcribed from plate P_HIYLY13-1.png (00669HIYLY13.PDF, d-TPP 2610) profile view by visual read"
+    }
+   ]
+  },
+  {
+   "chart_name": "RNAV (RNP) Z RWY 13",
+   "pdf_name": "00669RRZ13.PDF",
+   "plate_image": "P_RRZ13-1.png",
+   "fix_altitudes": [
+    {
+     "fix": "VCN",
+     "min_altitude_ft": 2000,
+     "view": "plan view route label (altitude printed without under/overline; read as the leg minimum altitude)",
+     "note": "IAF; \"2000 096 deg (8.1)\" to CARYL",
+     "provenance": "transcribed from plate P_RRZ13-1.png (00669RRZ13.PDF, d-TPP 2610) plan view route label (altitude printed without under/overline; read as the leg minimum altitude) by visual read"
+    },
+    {
+     "fix": "LEBVE",
+     "min_altitude_ft": 2000,
+     "view": "plan view route label (altitude printed without under/overline; read as the leg minimum altitude)",
+     "note": "IAF (210K); \"2000 211 deg (7)\" to CARYL",
+     "provenance": "transcribed from plate P_RRZ13-1.png (00669RRZ13.PDF, d-TPP 2610) plan view route label (altitude printed without under/overline; read as the leg minimum altitude) by visual read"
+    },
+    {
+     "fix": "CARYL",
+     "min_altitude_ft": 2000,
+     "view": "profile view",
+     "note": "IF; underlined",
+     "provenance": "transcribed from plate P_RRZ13-1.png (00669RRZ13.PDF, d-TPP 2610) profile view by visual read"
+    },
+    {
+     "fix": "MAYBN",
+     "min_altitude_ft": 1600,
+     "view": "profile view",
+     "note": "FAF; underlined 1600 with lightning bolt (also 1600 printed above the fix)",
+     "provenance": "transcribed from plate P_RRZ13-1.png (00669RRZ13.PDF, d-TPP 2610) profile view by visual read"
+    }
+   ]
+  },
+  {
+   "chart_name": "RNAV (RNP) Z RWY 31",
+   "pdf_name": "00669RRZ31.PDF",
+   "plate_image": "P_RRZ31-1.png",
+   "fix_altitudes": [
+    {
+     "fix": "RODDI",
+     "min_altitude_ft": 2000,
+     "view": "plan view route label (altitude printed without under/overline; read as the leg minimum altitude)",
+     "note": "IAF (210K); \"2000 218 deg (6)\" to STEVV",
+     "provenance": "transcribed from plate P_RRZ31-1.png (00669RRZ31.PDF, d-TPP 2610) plan view route label (altitude printed without under/overline; read as the leg minimum altitude) by visual read"
+    },
+    {
+     "fix": "JENGA",
+     "min_altitude_ft": 2000,
+     "view": "plan view route label (altitude printed without under/overline; read as the leg minimum altitude)",
+     "note": "IAF (210K); \"2000 038 deg (6)\" to STEVV",
+     "provenance": "transcribed from plate P_RRZ31-1.png (00669RRZ31.PDF, d-TPP 2610) plan view route label (altitude printed without under/overline; read as the leg minimum altitude) by visual read"
+    },
+    {
+     "fix": "STEVV",
+     "min_altitude_ft": 2000,
+     "view": "profile view",
+     "note": "IF; underlined",
+     "provenance": "transcribed from plate P_RRZ31-1.png (00669RRZ31.PDF, d-TPP 2610) profile view by visual read"
+    },
+    {
+     "fix": "PRSTY",
+     "min_altitude_ft": 1700,
+     "view": "profile view",
+     "note": "FAF; underlined 1700 with lightning bolt (also 1700 printed above the fix)",
+     "provenance": "transcribed from plate P_RRZ31-1.png (00669RRZ31.PDF, d-TPP 2610) profile view by visual read"
+    }
+   ]
+  },
+  {
+   "chart_name": "RNAV (GPS) RWY 04",
+   "pdf_name": "00669R4.PDF",
+   "plate_image": "P_R4-1.png",
+   "fix_altitudes": [
+    {
+     "fix": "WYLEA",
+     "min_altitude_ft": 2000,
+     "view": "plan view route label (altitude printed without under/overline; read as the leg minimum altitude)",
+     "note": "IAF; \"2000 NoPT 128 deg (10)\" to JEDOB",
+     "provenance": "transcribed from plate P_R4-1.png (00669R4.PDF, d-TPP 2610) plan view route label (altitude printed without under/overline; read as the leg minimum altitude) by visual read"
+    },
+    {
+     "fix": "DAYAD",
+     "min_altitude_ft": 2000,
+     "view": "plan view route label (altitude printed without under/overline; read as the leg minimum altitude)",
+     "note": "IAF; \"2000 NoPT 308 deg (10)\" to JEDOB",
+     "provenance": "transcribed from plate P_R4-1.png (00669R4.PDF, d-TPP 2610) plan view route label (altitude printed without under/overline; read as the leg minimum altitude) by visual read"
+    },
+    {
+     "fix": "JEDOB",
+     "min_altitude_ft": 2000,
+     "view": "profile view",
+     "note": "IF/IAF; underlined 2000 in the 6 NM holding pattern",
+     "provenance": "transcribed from plate P_R4-1.png (00669R4.PDF, d-TPP 2610) profile view by visual read"
+    },
+    {
+     "fix": "FASEN",
+     "min_altitude_ft": 1700,
+     "view": "profile view",
+     "note": "FAF; underlined 1700 with lightning bolt (also 1700 printed above the fix)",
+     "provenance": "transcribed from plate P_R4-1.png (00669R4.PDF, d-TPP 2610) profile view by visual read"
+    },
+    {
+     "fix": "TEMVE",
+     "min_altitude_ft": 520,
+     "view": "profile view",
+     "note": "step-down 1.3 NM to RW04; \"*520\" underlined, * = LNAV only",
+     "provenance": "transcribed from plate P_R4-1.png (00669R4.PDF, d-TPP 2610) profile view by visual read"
+    }
+   ]
+  },
+  {
+   "chart_name": "RNAV (GPS) Y RWY 13",
+   "pdf_name": "00669RY13.PDF",
+   "plate_image": "P_RY13-1.png",
+   "fix_altitudes": [
+    {
+     "fix": "WAGIR",
+     "min_altitude_ft": 2000,
+     "view": "plan view route label (altitude printed without under/overline; read as the leg minimum altitude)",
+     "note": "IAF; \"2000 NoPT 218 deg (6)\" to CARYL",
+     "provenance": "transcribed from plate P_RY13-1.png (00669RY13.PDF, d-TPP 2610) plan view route label (altitude printed without under/overline; read as the leg minimum altitude) by visual read"
+    },
+    {
+     "fix": "KOVEC",
+     "min_altitude_ft": 2000,
+     "view": "plan view route label (altitude printed without under/overline; read as the leg minimum altitude)",
+     "note": "IAF; \"2000 NoPT 038 deg (6)\" to CARYL",
+     "provenance": "transcribed from plate P_RY13-1.png (00669RY13.PDF, d-TPP 2610) plan view route label (altitude printed without under/overline; read as the leg minimum altitude) by visual read"
+    },
+    {
+     "fix": "CARYL",
+     "min_altitude_ft": 2000,
+     "view": "profile view",
+     "note": "IF/IAF; underlined 2000 in the 6 NM holding pattern",
+     "provenance": "transcribed from plate P_RY13-1.png (00669RY13.PDF, d-TPP 2610) profile view by visual read"
+    },
+    {
+     "fix": "MAYBN",
+     "min_altitude_ft": 1600,
+     "view": "profile view",
+     "note": "FAF; underlined 1600 with lightning bolt (also 1600 printed above the fix)",
+     "provenance": "transcribed from plate P_RY13-1.png (00669RY13.PDF, d-TPP 2610) profile view by visual read"
+    }
+   ]
+  },
+  {
+   "chart_name": "RNAV (GPS) Y RWY 31",
+   "pdf_name": "00669RY31.PDF",
+   "plate_image": "P_RY31-1.png",
+   "fix_altitudes": [
+    {
+     "fix": "RODDI",
+     "min_altitude_ft": 2000,
+     "view": "plan view route label (altitude printed without under/overline; read as the leg minimum altitude)",
+     "note": "IAF; \"2000 218 deg (6)\" to STEVV",
+     "provenance": "transcribed from plate P_RY31-1.png (00669RY31.PDF, d-TPP 2610) plan view route label (altitude printed without under/overline; read as the leg minimum altitude) by visual read"
+    },
+    {
+     "fix": "JENGA",
+     "min_altitude_ft": 2000,
+     "view": "plan view route label (altitude printed without under/overline; read as the leg minimum altitude)",
+     "note": "IAF; \"2000 038 deg (6)\" to STEVV",
+     "provenance": "transcribed from plate P_RY31-1.png (00669RY31.PDF, d-TPP 2610) plan view route label (altitude printed without under/overline; read as the leg minimum altitude) by visual read"
+    },
+    {
+     "fix": "STEVV",
+     "min_altitude_ft": 2000,
+     "view": "profile view",
+     "note": "IF; underlined",
+     "provenance": "transcribed from plate P_RY31-1.png (00669RY31.PDF, d-TPP 2610) profile view by visual read"
+    },
+    {
+     "fix": "PRSTY",
+     "min_altitude_ft": 1700,
+     "view": "profile view",
+     "note": "FAF; underlined 1700 with lightning bolt (also 1700 printed above the fix)",
+     "provenance": "transcribed from plate P_RY31-1.png (00669RY31.PDF, d-TPP 2610) profile view by visual read"
+    },
+    {
+     "fix": "YIBKU",
+     "min_altitude_ft": 1000,
+     "view": "profile view",
+     "note": "step-down 2.8 NM to RW31; underlined",
+     "provenance": "transcribed from plate P_RY31-1.png (00669RY31.PDF, d-TPP 2610) profile view by visual read"
+    }
+   ]
+  },
+  {
+   "chart_name": "VOR RWY 04",
+   "pdf_name": "00669V4.PDF",
+   "plate_image": "P_V4-1.png",
+   "fix_altitudes": [
+    {
+     "fix": "SIE",
+     "min_altitude_ft": 2000,
+     "view": "plan view route label (altitude printed without under/overline; read as the leg minimum altitude)",
+     "note": "IAF; \"2000 NoPT 026 deg (14)\" to CARUM",
+     "provenance": "transcribed from plate P_V4-1.png (00669V4.PDF, d-TPP 2610) plan view route label (altitude printed without under/overline; read as the leg minimum altitude) by visual read"
+    },
+    {
+     "fix": "CARUM",
+     "min_altitude_ft": 1700,
+     "view": "plan view route label (altitude printed without under/overline; read as the leg minimum altitude)",
+     "note": "IF; \"1700 048 deg (5)\" CARUM to MEADY",
+     "provenance": "transcribed from plate P_V4-1.png (00669V4.PDF, d-TPP 2610) plan view route label (altitude printed without under/overline; read as the leg minimum altitude) by visual read"
+    },
+    {
+     "fix": "MEADY",
+     "min_altitude_ft": 2000,
+     "view": "profile view",
+     "note": "IAF/FAF hold-in-lieu: 2000 underlined while in the One Minute Holding Pattern (before the fix)",
+     "provenance": "transcribed from plate P_V4-1.png (00669V4.PDF, d-TPP 2610) profile view by visual read"
+    },
+    {
+     "fix": "MEADY",
+     "min_altitude_ft": 1700,
+     "view": "profile view",
+     "note": "after the fix on the final segment: underlined 1700 at the MEADY INT symbol",
+     "provenance": "transcribed from plate P_V4-1.png (00669V4.PDF, d-TPP 2610) profile view by visual read"
+    }
+   ]
+  },
+  {
+   "chart_name": "VOR RWY 31",
+   "pdf_name": "00669V31.PDF",
+   "plate_image": "P_V31-1.png",
+   "fix_altitudes": [
+    {
+     "fix": "SIE",
+     "min_altitude_ft": 4500,
+     "view": "plan view route label (altitude printed without under/overline; read as the leg minimum altitude)",
+     "note": "IAF; \"4500 059 deg (17.4)\" to AVALO",
+     "provenance": "transcribed from plate P_V31-1.png (00669V31.PDF, d-TPP 2610) plan view route label (altitude printed without under/overline; read as the leg minimum altitude) by visual read"
+    },
+    {
+     "fix": "AVALO",
+     "min_altitude_ft": 2000,
+     "view": "plan view route label (altitude printed without under/overline; read as the leg minimum altitude)",
+     "note": "IAF; \"2000 ACY 11 Arc\" (arc to BAZES)",
+     "provenance": "transcribed from plate P_V31-1.png (00669V31.PDF, d-TPP 2610) plan view route label (altitude printed without under/overline; read as the leg minimum altitude) by visual read"
+    },
+    {
+     "fix": "SMITS",
+     "min_altitude_ft": 2000,
+     "view": "plan view route label (altitude printed without under/overline; read as the leg minimum altitude)",
+     "note": "IAF; \"2000 ... ACY 11 Arc\" (arc to BAZES)",
+     "provenance": "transcribed from plate P_V31-1.png (00669V31.PDF, d-TPP 2610) plan view route label (altitude printed without under/overline; read as the leg minimum altitude) by visual read"
+    },
+    {
+     "fix": "BAZES",
+     "min_altitude_ft": 2000,
+     "view": "profile view",
+     "note": "IF; underlined; Procedure Turn NA",
+     "provenance": "transcribed from plate P_V31-1.png (00669V31.PDF, d-TPP 2610) profile view by visual read"
+    },
+    {
+     "fix": "BERGR",
+     "min_altitude_ft": 1500,
+     "view": "profile view",
+     "note": "FAF; underlined 1500",
+     "provenance": "transcribed from plate P_V31-1.png (00669V31.PDF, d-TPP 2610) profile view by visual read"
+    }
+   ]
+  },
+  {
+   "chart_name": "HI-VOR OR TACAN RWY 31",
+   "pdf_name": "00669HVT31.PDF",
+   "plate_image": "P_HVT31-1.png",
+   "fix_altitudes": [
+    {
+     "fix": "ZAPOM",
+     "min_altitude_ft": 14000,
+     "max_altitude_ft": 17500,
+     "view": "profile view",
+     "note": "IAF hold: HOLD 17,500 (overlined = maximum) / 14,000 (underlined = minimum)",
+     "provenance": "transcribed from plate P_HVT31-1.png (00669HVT31.PDF, d-TPP 2610) profile view by visual read"
+    },
+    {
+     "fix": "ACY",
+     "mandatory_altitude_ft": 4000,
+     "view": "profile view",
+     "note": "ACY VORTAC on the 097 deg route: 4000 overlined AND underlined = mandatory",
+     "provenance": "transcribed from plate P_HVT31-1.png (00669HVT31.PDF, d-TPP 2610) profile view by visual read"
+    },
+    {
+     "fix": "BAZES",
+     "min_altitude_ft": 2000,
+     "view": "profile view",
+     "note": "IF; underlined 2000 near the BAZES R-122 11 DME fix",
+     "provenance": "transcribed from plate P_HVT31-1.png (00669HVT31.PDF, d-TPP 2610) profile view by visual read"
+    },
+    {
+     "fix": "BERGR",
+     "min_altitude_ft": 1500,
+     "view": "profile view",
+     "note": "FAF (RADAR); underlined 1500",
+     "provenance": "transcribed from plate P_HVT31-1.png (00669HVT31.PDF, d-TPP 2610) profile view by visual read"
+    }
+   ]
+  },
+  {
+   "chart_name": "COPTER ILS OR LOC/DME RWY 13",
+   "pdf_name": "00669COPTERILD13.PDF",
+   "plate_image": "P_COPTERILD13-1.png",
+   "fix_altitudes": [
+    {
+     "fix": "MAYBN",
+     "min_altitude_ft": 1600,
+     "view": "profile view",
+     "note": "IF (RADAR); underlined",
+     "provenance": "transcribed from plate P_COPTERILD13-1.png (00669COPTERILD13.PDF, d-TPP 2610) profile view by visual read"
+    },
+    {
+     "fix": "TESKE",
+     "min_altitude_ft": 1100,
+     "view": "profile view",
+     "note": "step-down (I-PVO 2.9); underlined 1100 with lightning bolt (also 1100 printed above the fix) = glidepath altitude",
+     "provenance": "transcribed from plate P_COPTERILD13-1.png (00669COPTERILD13.PDF, d-TPP 2610) profile view by visual read"
+    }
+   ]
+  }
+ ]
+}

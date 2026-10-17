@@ -19,6 +19,8 @@ ADS-B, or live traffic.
 | Airport diagram, 13 instrument approach charts, ATLANTIC CITY THREE departure, hot spot, LAHSO pages (viewed in-app from the official PDFs) | FAA d-TPP | cycle 2610, 2026-10-01 to 2026-10-29 |
 | Taxiway and apron geometry, gates | OpenStreetMap, reconciled with the FAA airport diagram (all 12 charted taxiway identifiers A B C D G H J K L M N P present) | snapshot 2026-10-17 |
 | Live weather (METAR/TAF) | Aviation Weather Center API via the local backend | live |
+| Minimum vectoring altitudes (9 sectors) | FAA MVA/MIA digital product, Atlantic City ATCT/TRACON chart ACY_MVA_FUS3 | server date 2025-10-20 |
+| LAHSO hold-short points and available landing distances; published fix altitudes and holding patterns | FAA NASR; d-TPP plates (transcribed, with provenance) | 2026-10-01 / cycle 2610 |
 | Procedural references in training/debrief | FAA JO 7110.65 paragraph numbers and titles verified against the FAA web edition (`docs/FAA-REFERENCES.md`) | 2026-10-16 |
 
 Behavioural realism is verified too: aircraft performance values carry a source each
@@ -93,7 +95,8 @@ and wait, cleared for takeoff, cleared to land (incl. option / touch-and-go / lo
 approach), go around, continue approach, contact/monitor frequency, headings, altitudes,
 speeds, pattern entries, IFR clearances (Clearance Delivery), approach clearances
 (ILS/LOC/RNAV/VOR/visual), direct-to-fix, resume own navigation, radar contact, holding
-instructions (as published or with radial/turns/legs/EFC), execute missed approach.
+instructions (as published or with radial/turns/legs/EFC), execute missed approach,
+land-and-hold-short (LAHSO) clearances.
 430+ parser test transmissions in `src/commands`. Positions: Clearance Delivery,
 Ground, Tower, Approach/Departure, or any combination.
 

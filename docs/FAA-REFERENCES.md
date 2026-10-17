@@ -51,3 +51,13 @@ Page URLs (the FAA site returns 403 to non-browser user agents; fetch with a nor
 - https://www.faa.gov/air_traffic/publications/atpubs/atc_html/chap4_section_8.html
 - https://www.faa.gov/air_traffic/publications/atpubs/atc_html/chap5_section_7.html
 - https://www.faa.gov/air_traffic/publications/atpubs/atc_html/chap5_section_9.html
+
+## Other official data products used
+
+| Product | Source | Used for |
+|---|---|---|
+| FAA MVA/MIA digital product, Atlantic City ATCT/TRACON chart `ACY_MVA_FUS3` (KML/AIXM/PDF) | https://www.faa.gov/air_traffic/flight_info/aeronav/digital_products/mva_mia/mva/ (geometry https://aeronav.faa.gov/MVA_Charts/kmz/ACY_MVA_FUS3.kml) | Minimum vectoring altitude sectors (visual reference only per the FAA memo; not for navigation) |
+| FAA AC 150/5300-13B Chg 1, Appendix G | https://www.faa.gov/documentLibrary/media/Advisory_Circular/AC-150-5300-13B-Airport-Design-Chg1-w-errata.pdf | Runway holding position distance (250 ft) |
+| AIM 5-3-8 Holding | https://www.faa.gov/air_traffic/publications/atpubs/aim_html/chap5_section_3.html | Holding entries, speeds, leg timing |
+| AIM 4-3-11 LAHSO | https://www.faa.gov/air_traffic/publications/atpubs/aim_html/chap4_section_3.html | Land-and-hold-short operations |
+| 14 CFR 91.117 | https://www.ecfr.gov/current/title-14/part-91/section-91.117 | Speed limits below 10,000 ft and in Class C |

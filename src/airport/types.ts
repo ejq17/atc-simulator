@@ -89,6 +89,19 @@ export interface KacyBuilding {
   provenance: DataProvenance;
 }
 
+/** MVA sector: `polygon` is the OUTER ring; `holes` are inner rings (other sectors inside it) that must be excluded from containment. */
+export interface KacyMvaSector {
+  id: string;
+  /** Sector letter in the FAA chart ("A".."I"). */
+  name?: string;
+  polygon: Vec2[];
+  holes?: Vec2[][];
+  altitudeFt: number;
+  remarks?: string;
+  controllingObstruction?: string;
+  provenance: DataProvenance;
+}
+
 export interface KacyTaxiwayGraph extends TaxiwayGraph {
   nodes: Record<string, KacyTaxiNode>;
   edges: KacyTaxiEdge[];
@@ -105,6 +118,7 @@ export interface KacyHotSpot {
 
 export interface KacyAirport extends Airport {
   runways: KacyRunway[];
+  mvaSectors?: KacyMvaSector[];
   taxiwayGraph: KacyTaxiwayGraph;
   parking: KacyParking[];
   procedures: InstrumentProcedure[];

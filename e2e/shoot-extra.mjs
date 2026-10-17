@@ -2,7 +2,7 @@
 import { chromium } from '@playwright/test';
 
 const browser = await chromium.launch();
-const ctx = await browser.newContext({ baseURL: 'http://localhost:5173', viewport: { width: 1440, height: 900 } });
+const ctx = await browser.newContext({ baseURL: process.env.BASE_URL ?? 'http://localhost:5173', viewport: { width: 1440, height: 900 } });
 await ctx.addInitScript(() => {
   localStorage.setItem('kacy.voice.settings', JSON.stringify({ providerId: 'none', ttsEnabled: false, radioEffectsEnabled: false }));
 });

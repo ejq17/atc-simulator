@@ -187,6 +187,23 @@ Override points added for this: server env `DEEPGRAM_API_BASE` (absolute http(s)
 only honoured for `ws://localhost` / `ws://127.0.0.1`, so a stray value can never send microphone audio to a remote host. The Deepgram
 provider also uses the idle `WarmAudio` graph now, so the first word is not clipped there either.
 
+### Real microphone and speakers (`chrome-real-mic`, opt-in)
+
+`REAL_MIC=1 npx playwright test --project=chrome-real-mic` launches Google Chrome with the real microphone (`--use-fake-ui-for-media-stream`
+only, no fake device), plays the lead-in clips through the laptop speakers while Space is held, and expects Local Whisper (then Web Speech,
+default mode first, then `audioSource: 'track'`) to hear them and the aircraft to obey. It makes sound. Notes from building it:
+
+* `afplay` plays to the system default output, which may be Bluetooth headphones, so the spec uses `scripts/play-on-device.swift`
+  (AVAudioPlayer pinned to the built-in speakers) and `scripts/output-volume.swift` (CoreAudio volume of that one device, restored afterwards).
+  Chrome's own `<audio>`/WebAudio output stalled (currentTime frozen) in this environment, so Chrome is not used to play.
+* The default input may be the Bluetooth headset (opening it puts the headphones in call mode), so the spec pins the built-in microphone with
+  localStorage `kacy.voice.inputDeviceId` (`stt/inputDevice.ts`, honoured by Whisper, Web Speech track mode and Deepgram).
+* The Whisper provider records `getLastCapture()` (`{ambientRms, ambientDbfs, rms, peak}`; ambient = first 500 ms) and exposes the shared
+  instance as `window.__kacyLocalWhisper` for the spec to print the room noise level.
+* **Pre-flight:** the spec fails with a diagnosis, not a timeout, when the chosen microphone returns digital silence or the speakers cannot
+  play. With the laptop lid closed (`ioreg` `AppleClamshellState = Yes`) macOS disables the built-in microphone and speakers. A denied
+  microphone fails with the System Settings > Privacy & Security > Microphone step.
+
 ## Privacy
 
 * No audio is ever recorded, saved or uploaded by this app. Mic audio is streamed live to the selected provider only while PTT is active.

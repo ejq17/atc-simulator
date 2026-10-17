@@ -21,8 +21,9 @@
  *  - The ONNX runtime's .wasm/.mjs are fetched from cdn.jsdelivr.net by default (see node_modules/.../backends/onnx.js).
  */
 import { postProcessTranscript } from './aviationPostProcess.ts';
+import { withPreferredInput } from './inputDevice.ts';
 import { mapMediaError } from './mediaErrors.ts';
-import { startPcmCapture, TARGET_SAMPLE_RATE, warmUpAudio } from './pcmCapture.ts';
+import { hasTrackProcessor, startPcmCapture, TARGET_SAMPLE_RATE, warmUpAudio } from './pcmCapture.ts';
 import type { PcmCapture, WarmAudio } from './pcmCapture.ts';
 import type { SpeechRecognitionProvider, SttStartOptions } from './types.ts';
 import { SttError } from './types.ts';
@@ -222,6 +223,30 @@ export interface LocalWhisperOptions {
   finalTimeoutMs?: number;
 }
 
+/** Level statistics of one capture. `ambient*` covers the first 500 ms (speak after that, so it is the room's noise floor). */
+export interface CaptureStats {
+  seconds: number;
+  ambientRms: number;
+  ambientDbfs: number;
+  rms: number;
+  peak: number;
+}
+
+const toDb = (x: number) => (x > 0 ? Math.round(20 * Math.log10(x) * 10) / 10 : -Infinity);
+
+export function captureStats(audio: Float32Array): CaptureStats {
+  const rmsOf = (a: Float32Array) => {
+    if (!a.length) return 0;
+    let s = 0;
+    for (let i = 0; i < a.length; i++) s += a[i] * a[i];
+    return Math.sqrt(s / a.length);
+  };
+  let peak = 0;
+  for (let i = 0; i < audio.length; i++) peak = Math.max(peak, Math.abs(audio[i]));
+  const ambient = rmsOf(audio.subarray(0, Math.round(TARGET_SAMPLE_RATE * 0.5)));
+  return { seconds: audio.length / TARGET_SAMPLE_RATE, ambientRms: ambient, ambientDbfs: toDb(ambient), rms: rmsOf(audio), peak };
+}
+
 export interface LocalWhisperProvider extends SpeechRecognitionProvider {
   readonly id: typeof LOCAL_WHISPER_ID;
   readonly model: string;
@@ -230,6 +255,8 @@ export interface LocalWhisperProvider extends SpeechRecognitionProvider {
   /** Subscribe to model download/initialisation progress. Replays the current state immediately. */
   onProgress(listener: (p: WhisperProgress) => void): () => void;
   getProgress(): WhisperProgress;
+  /** Level statistics of the most recent capture (debug/e2e hook; no audio is kept). */
+  getLastCapture(): CaptureStats | null;
   /** Where decoding runs: 'worker' (default), 'main' (fallback), or 'none' until the model has been prepared. */
   getEngine(): 'worker' | 'main' | 'none';
   prepare(): Promise<void>;
@@ -366,6 +393,7 @@ export function createLocalWhisperProvider(options: LocalWhisperOptions = {}): L
     startedAt: number;
   }
   let current: Capture | null = null;
+  let lastCapture: CaptureStats | null = null;
 
   /**
    * Idle audio graph kept between key presses so the microphone is heard from the first instant (building it on demand
@@ -373,7 +401,8 @@ export function createLocalWhisperProvider(options: LocalWhisperOptions = {}): L
    */
   let warm: Promise<WarmAudio | null> | null = null;
   const getWarm = (): Promise<WarmAudio | null> => {
-    warm ??= (options.warmUpAudio ?? warmUpAudio)().catch(() => null);
+    // The track-processor capture path needs no AudioContext, so there is nothing to warm up.
+    warm ??= (options.warmUpAudio === undefined && hasTrackProcessor() ? Promise.resolve(null) : (options.warmUpAudio ?? warmUpAudio)().catch(() => null));
     return warm;
   };
 
@@ -390,6 +419,7 @@ export function createLocalWhisperProvider(options: LocalWhisperOptions = {}): L
 
     getProgress: () => progress,
     getEngine: () => engineKind,
+    getLastCapture: () => lastCapture,
     onProgress(listener) {
       listeners.add(listener);
       listener(progress);
@@ -422,7 +452,7 @@ export function createLocalWhisperProvider(options: LocalWhisperOptions = {}): L
       try {
         // Open the microphone and (first press only) build the audio graph at the same time.
         [stream, graph] = await Promise.all([
-          media({ audio: { channelCount: 1, echoCancellation: false, noiseSuppression: false, autoGainControl: false } }),
+          media({ audio: withPreferredInput({ channelCount: 1, echoCancellation: false, noiseSuppression: false, autoGainControl: false }) }),
           getWarm(),
         ]);
       } catch (err) {
@@ -466,6 +496,7 @@ export function createLocalWhisperProvider(options: LocalWhisperOptions = {}): L
         /* the graph is already being torn down */
       }
       const audio = int16ToFloat32(c.chunks, c.samples);
+      lastCapture = captureStats(audio);
       if (audio.length < MIN_SAMPLES || meanAbs(audio) < SILENCE_LEVEL) {
         c.opts.onError(new SttError('no_speech', 'No speech detected. Hold the key, then speak.'));
         return;
@@ -504,5 +535,10 @@ export function createLocalWhisperProvider(options: LocalWhisperOptions = {}): L
 let shared: LocalWhisperProvider | null = null;
 /** The app-wide instance: the voice controller and the Settings “prepare model” button share its loaded model. */
 export function getLocalWhisperProvider(): LocalWhisperProvider {
-  return (shared ??= createLocalWhisperProvider());
+  if (!shared) {
+    shared = createLocalWhisperProvider();
+    // Debug hook for e2e/realmic.spec.ts (reads getLastCapture() for the measured room noise).
+    if (typeof window !== 'undefined') (globalThis as unknown as { __kacyLocalWhisper?: LocalWhisperProvider }).__kacyLocalWhisper = shared;
+  }
+  return shared;
 }

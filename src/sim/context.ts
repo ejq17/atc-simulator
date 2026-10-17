@@ -31,6 +31,12 @@ export interface ApproachRuntime {
   onCourse: string[];
   /** TRUE final approach course of the procedure (undefined for visual approaches). */
   courseTrue?: number;
+  /** Published fix altitudes of the procedure (`InstrumentProcedure.fixAltitudes`), fix ids upper-cased; undefined when the plate has none. */
+  profile?: { fix: string; minAltitudeFt?: number; maxAltitudeFt?: number; mandatoryAltitudeFt?: number }[];
+  /** Distance before the threshold (m) of the FAF: non-precision approaches intercept the 3 degree path there (precision ones from the IF). */
+  fafDM?: number;
+  /** Precision (ILS / LOC) approach: the glidepath is intercepted from the IF on; otherwise at the FAF when a published profile exists. */
+  precision?: boolean;
   /** Distance before the threshold (m) of the outermost on-course fix: the glidepath is flown from here inward. */
   ifDM?: number;
   /** Vector-intercept clearance: keep the assigned heading until the course is captured. */
@@ -86,6 +92,8 @@ export interface AircraftRuntime {
   missed?: MissedState;
   /** Holding pattern in progress (nav mode 'holding'). */
   hold?: HoldState;
+  /** Accepted land-and-hold-short clearance: the aircraft must stop (or exit) before `holdShortAlongM` along its landing runway. */
+  lahso?: { holdShortRunwayId: string; holdShortAlongM: number; stopAlongM: number };
   /** A missed approach / go-around was flown and the aircraft has not yet been cleared for another approach. */
   missedFlown?: boolean;
   /** Nav mode to return to on RESUME_OWN_NAVIGATION after vectors. */

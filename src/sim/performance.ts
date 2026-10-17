@@ -61,6 +61,7 @@ export const A320: AircraftPerformance = {
   lengthM: 37.6,
 };
 
+import type { WakeCategory } from './wake';
 const registry: Record<string, AircraftPerformance> = { C172, A320 };
 
 /**
@@ -71,6 +72,18 @@ const registry: Record<string, AircraftPerformance> = { C172, A320 };
 const SRS: Record<string, 1 | 2 | 3> = { C172: 1, C182: 1, C152: 1, C210: 1, PA28: 1, SR22: 1, BE36: 1, PA34: 2, BE58: 2, C310: 2, A320: 3 };
 export function srsCategory(type: string): 1 | 2 | 3 {
   return SRS[type] ?? (getPerformance(type).category === 'light' ? 1 : 3);
+}
+
+/**
+ * Wake RECAT category, FAA JO 7110.126A Appendix A (verified by the accuracy review): A320 = F ("other aircraft over 41,000 lb"),
+ * C172 = I ("41,000 lb and under"); B757 = E; heavies B / D. Types not listed: `wakeCategory` light -> I, medium -> F, heavy -> D.
+ */
+const RECAT: Record<string, WakeCategory> = { C172: 'I', C182: 'I', C152: 'I', C210: 'I', PA28: 'I', SR22: 'I', BE36: 'I', PA34: 'I', BE58: 'I', C310: 'I', A320: 'F' };
+export function wakeRecatCategory(type: string): WakeCategory {
+  const known = RECAT[type];
+  if (known) return known;
+  const w = getPerformance(type).wakeCategory;
+  return w === 'light' ? 'I' : w === 'medium' ? 'F' : 'D';
 }
 
 /** Register extra aircraft types (regional jets, helicopters...) without touching the engine. */

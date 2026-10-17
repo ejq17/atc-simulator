@@ -102,6 +102,8 @@ async function speak(page: Page, clip: ClipName, expectInPartial: RegExp) {
   await expect(page.getByTestId('partial')).toHaveText(/\S/);
   await expect(page.getByTestId('partial')).toHaveText(expectInPartial, { timeout: 120_000 });
   const transcribeMs = Date.now() - releasedAt;
+  const capture = await page.evaluate(() => (window as unknown as { __kacyLocalWhisper?: { getLastCapture(): unknown } }).__kacyLocalWhisper?.getLastCapture());
+  console.log(`[voice] capture stats ${JSON.stringify(capture)}`);
   const holdStats = await probe(page, downAt);
   const decode = await probe(page, upAt);
   decodeStats = { hold: holdStats, decode };

@@ -17,9 +17,10 @@
  * own backend (server/voice/deepgramToken.ts).
  */
 import { AVIATION_KEYTERMS } from './aviationVocab.ts';
-import { startPcmCapture, TARGET_SAMPLE_RATE, warmUpAudio } from './pcmCapture.ts';
+import { hasTrackProcessor, startPcmCapture, TARGET_SAMPLE_RATE, warmUpAudio } from './pcmCapture.ts';
 import type { PcmCapture, WarmAudio } from './pcmCapture.ts';
 import type { SpeechRecognitionProvider, SttStartOptions } from './types.ts';
+import { withPreferredInput } from './inputDevice.ts';
 import { mapMediaError } from './mediaErrors.ts';
 import { SttError } from './types.ts';
 
@@ -246,7 +247,7 @@ export function createDeepgramProvider(options: DeepgramProviderOptions = {}): S
 
   let warm: Promise<WarmAudio | null> | null = null;
   const getWarm = (): Promise<WarmAudio | null> => {
-    warm ??= (options.warmUpAudio ?? warmUpAudio)().catch(() => null);
+    warm ??= (options.warmUpAudio === undefined && hasTrackProcessor() ? Promise.resolve(null) : (options.warmUpAudio ?? warmUpAudio)().catch(() => null));
     return warm;
   };
 
@@ -283,7 +284,7 @@ export function createDeepgramProvider(options: DeepgramProviderOptions = {}): S
       try {
         // Open the microphone and (first press only) build the audio graph at the same time: building it on demand
         // costs about half a second of speech (see pcmCapture.warmUpAudio).
-        [stream, graph] = await Promise.all([media({ audio: { echoCancellation: true, noiseSuppression: true } }), getWarm()]);
+        [stream, graph] = await Promise.all([media({ audio: withPreferredInput({ echoCancellation: true, noiseSuppression: true }) }), getWarm()]);
       } catch (err) {
         throw mapMediaError(err);
       }

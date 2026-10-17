@@ -12,7 +12,7 @@
  */
 
 /** Spelling variants of "Cessna" seen from Whisper tiny/base. Compared lower-case, whole word. */
-const CESSNA_VARIANTS = ['sessna', 'sesna', 'cesna', 'sesena', 'cessena', 'cessnah', 'sessnah', 'cessnia', 'cessner'];
+const CESSNA_VARIANTS = ['sessna', 'sesna', 'sesma', 'cesna', 'sesena', 'cessena', 'cessnah', 'sessnah', 'cessnia', 'cessner'];
 const CESSNA_RE = new RegExp(`\\b(?:${CESSNA_VARIANTS.join('|')})\\b`, 'gi');
 
 /** Whole-utterance outputs Whisper produces for silence or room noise. They must never become a transmission. */

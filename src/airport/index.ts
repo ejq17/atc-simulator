@@ -21,10 +21,12 @@ export {
   normalizeRunwayEnd,
   normalizeRunwayId,
 } from './graphUtils';
+export { mvaSectorAt, mvaAltitudeAt } from './mva';
 export type { GraphSource, RunwayExit } from './graphUtils';
 export type {
   KacyAirport,
   KacyBuilding,
+  KacyMvaSector,
   KacyParking,
   KacyRunway,
   KacyRunwayEnd,

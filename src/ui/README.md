@@ -104,7 +104,9 @@ Status (`unsupported`, `permission_denied`, `listening`, `processing`, `error`, 
   aircraft's active route** is a dashed violet line through the fixes still ahead (faint on vectors). Data blocks add the squawk once assigned and a
   mode letter: **V** vectors (incl. an IFR aircraft on a heading), **R** route / direct, **A** approach (cleared or flying it). A radar-identified target
   carries a centre dot. The top-left **All fixes** button (also in Layers) shows every fix in the data; layers "Procedure fixes" and "Selected aircraft
-  route" can be switched off.
+  route" can be switched off. **MVA layer** (`airport.mvaSectors`, polygons in local metres): sector outlines with the altitude in hundreds at the centroid, drawn at 20 NM and wider when the layer is on and the airport data has sectors (nothing is drawn when the field is absent; the KACY dataset has none yet).
+
+* **Surface**: NASR LAHSO hold-short points (`RunwayEnd.lahso.holdShortPoint.pos`, KACY runways 4, 13, 31) are short magenta ticks across the landing runway labelled "LAHSO" (`lahsoMarks`).
 
 ## Aircraft panels
 
@@ -115,6 +117,7 @@ Status (`unsupported`, `permission_denied`, `listening`, `processing`, `error`, 
   "Vectors, heading 105 · intercepting ILS 13"), the approach clearance with its **established** state (derived from the open APPROACH clearance and the
   final-course geometry; the engine keeps `approach` private), the issued **IFR clearance** (destination, DP, maintain, expect, departure frequency,
   squawk), the flight plan route with the current fix highlighted, active clearances and the pending request.
+* **Cleared approach**: published fix altitudes from `procedure.fixAltitudes` (matching the cleared approach type/runway) are listed in the approach box ("CARYL at or above 2,000 · MAYBN at 1,500"); nothing shows when the data has none. A landing clearance that carries `holdShort` shows a magenta badge "LAHSO: hold short 13/31, 3,550 ft available" (`RunwayEnd.lahso`).
 * **Strips tab** (right column, next to "Aircraft"): flight-progress-strip view grouped in one bay per frequency (CLNC, GND, TWR, APP/DEP; bays you do not
   work are dimmed and tagged "not worked"): callsign, type, rules, squawk, origin to destination, runway, mode letter, phase or request badge and the
   clearance summary / route. Test ids `fps-<callsign>` and `bay-<mhz>` (the list keeps `strip-<callsign>`).

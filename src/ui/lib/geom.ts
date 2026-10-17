@@ -52,3 +52,21 @@ export function niceLength(maxMetres: number): number {
   for (const m of [5, 2, 1]) if (m * p <= maxMetres) return m * p;
   return p;
 }
+
+/** Area centroid of a simple polygon (falls back to the vertex mean for degenerate shapes). */
+export function polygonCentroid(pts: readonly Vec2[]): Vec2 {
+  if (pts.length === 0) return { x: 0, y: 0 };
+  let a = 0;
+  let cx = 0;
+  let cy = 0;
+  for (let i = 0; i < pts.length; i++) {
+    const p = pts[i];
+    const q = pts[(i + 1) % pts.length];
+    const f = p.x * q.y - q.x * p.y;
+    a += f;
+    cx += (p.x + q.x) * f;
+    cy += (p.y + q.y) * f;
+  }
+  if (Math.abs(a) < 1e-6) return { x: pts.reduce((m, p) => m + p.x, 0) / pts.length, y: pts.reduce((m, p) => m + p.y, 0) / pts.length };
+  return { x: cx / (3 * a), y: cy / (3 * a) };
+}

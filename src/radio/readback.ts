@@ -122,7 +122,8 @@ export function buildReadback(aircraft: Aircraft, c: Clearance, env: ReadbackEnv
       case 'TAKEOFF':
         return `Runway ${runwaySpoken(c.runwayEnd ?? c.runwayId ?? '')}, cleared for takeoff`;
       case 'LAND':
-        return `Runway ${runwaySpoken(c.runwayEnd ?? c.runwayId ?? '')}, cleared to land`;
+        // land and hold short (JO 7110.65 3-10-5; AIM 4-3-11: the readback includes "hold short of ...")
+        return `Runway ${runwaySpoken(c.runwayEnd ?? c.runwayId ?? '')}, cleared to land${c.holdShort?.length ? `, hold short of runway ${runwayRef(c.holdShort[0])}` : ''}`;
       case 'LINE_UP_AND_WAIT':
         return `Runway ${runwaySpoken(c.runwayEnd ?? c.runwayId ?? '')}, line up and wait`;
       case 'TAXI':

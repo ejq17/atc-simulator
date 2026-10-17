@@ -4,7 +4,7 @@ import { chromium } from '@playwright/test';
 
 const which = process.argv[2] ?? 'all';
 const browser = await chromium.launch();
-const ctx = await browser.newContext({ baseURL: 'http://localhost:5173', viewport: { width: 1440, height: 900 }, deviceScaleFactor: 1 });
+const ctx = await browser.newContext({ baseURL: process.env.BASE_URL ?? 'http://localhost:5173', viewport: { width: 1440, height: 900 }, deviceScaleFactor: 1 });
 await ctx.addInitScript(() => {
   localStorage.setItem('kacy.voice.settings', JSON.stringify({ providerId: 'none', ttsEnabled: false, radioEffectsEnabled: false }));
 });
@@ -30,6 +30,7 @@ await page.getByTestId('strip-N723EJ').click();
 await page.waitForTimeout(600);
 await page.screenshot({ path: 'docs/screenshots/sim.png' });
 await page.getByTestId('tab-radar').click();
+await page.getByRole('button', { name: '40 NM' }).click(); // MVA sectors draw from 20 NM up
 await page.waitForTimeout(1500);
 await page.screenshot({ path: 'docs/screenshots/radar.png' });
 await browser.close();

@@ -30,6 +30,7 @@
  * microphone in automation (see e2e/webspeech.spec.ts); it is off by default so older browsers are unaffected.
  */
 import { pickBestAlternative } from './aviationVocab.ts';
+import { withPreferredInput } from './inputDevice.ts';
 import { mapMediaError } from './mediaErrors.ts';
 import type { SpeechRecognitionProvider, SttStartOptions } from './types.ts';
 import { SttError } from './types.ts';
@@ -186,7 +187,7 @@ export function createWebSpeechProvider(options: WebSpeechProviderOptions = {}):
       const media = getMedia();
       if (media) {
         releaseStream();
-        stream = await media({ audio: true });
+        stream = await media({ audio: withPreferredInput(true) });
         const track = stream.getAudioTracks()[0];
         try {
           r.start(track);

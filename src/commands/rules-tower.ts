@@ -1,6 +1,6 @@
 import { applyRunway, cmdHit, makeDraft, type Draft, type Rule } from './draft';
-import { runwayAfter } from './entities';
-import { seq, type Toks } from './match';
+import { parseOneTaxiway, parseRunway, runwayAfter } from './entities';
+import { seq, skipWords, type Toks } from './match';
 
 function withRunway(d: Draft, t: Toks, at: number): number {
   const r = runwayAfter(t, at);
@@ -17,6 +17,36 @@ export const ruleTakeoff: Rule = (t, i) => {
   return cmdHit(withRunway(d, t, j), d);
 };
 
+const TRAFFIC_WORDS = ['landing', 'departing', 'crossing', 'holding', 'is', 'will', 'be', 'a', 'an', 'the', 'on', 'at', 'in', 'position', 'and'];
+
+/**
+ * LAHSO: "..., hold short of runway 13 | taxiway A", optionally followed by a traffic advisory
+ * ("traffic landing runway 13"), which is consumed and ignored. The hold-short point goes on the
+ * LAND draft as `holdShort` (never `runwayEnd`). Returns the new end index (== at when absent).
+ */
+function landHoldShort(d: Draft, t: Toks, at: number): number {
+  const h = seq(t, at, 'hold short of?');
+  if (h < 0) return at;
+  const j = skipWords(t, h, ['the']);
+  let end = -1;
+  const rw = parseRunway(t, j);
+  if (rw) {
+    if (rw.ok) d.fields.holdShort = [`RWY${rw.ref.end}`]; else { d.issues.push(rw.reason); d.unknownIds++; }
+    end = rw.next;
+  } else {
+    const tw = parseOneTaxiway(t, skipWords(t, j, ['taxiway']));
+    if (tw) { d.fields.holdShort = [tw.id]; end = tw.next; }
+  }
+  if (end < 0) return at;
+  if (seq(t, end, 'traffic') >= 0) {
+    let k = skipWords(t, end + 1, TRAFFIC_WORDS);
+    const tr = parseRunway(t, k);
+    if (tr) k = tr.next;
+    end = k;
+  }
+  return end;
+}
+
 const LAND_FORMS: readonly { pattern: string; destination?: string }[] = [
   { pattern: 'land' },
   { pattern: 'option', destination: 'option' },
@@ -32,7 +62,7 @@ export const ruleLand: Rule = (t, i) => {
     const j = seq(t, i, `cleared|clear for|to? the? ${form.pattern}`);
     if (j < 0) continue;
     const d = makeDraft('LAND', form.destination ? { destination: form.destination } : {});
-    return cmdHit(withRunway(d, t, j), d);
+    return cmdHit(landHoldShort(d, t, withRunway(d, t, j)), d);
   }
   return null;
 };

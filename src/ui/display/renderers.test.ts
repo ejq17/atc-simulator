@@ -4,8 +4,9 @@ import type { SimulationEngine } from '../../sim/api';
 import type { Scenario } from '../../sim/types';
 import { loadKacy, runwayEntryNodes } from '../../airport';
 import { getPresetWeather } from '../../weather/presets';
-import { drawSurface, DEFAULT_SURFACE_LAYERS, labelLines, runwayTint } from './surfaceRenderer';
-import { DEFAULT_RADAR_LAYERS, RADAR_RANGES_NM, approachPath, dataBlock, drawRadar, radarScale, ringSpacingNm } from './radarRenderer';
+import { drawSurface, DEFAULT_SURFACE_LAYERS, labelLines, lahsoMarks, runwayTint } from './surfaceRenderer';
+import { DEFAULT_RADAR_LAYERS, RADAR_RANGES_NM, approachPath, dataBlock, drawRadar, mvaLabel, mvaVisible, radarScale, ringSpacingNm } from './radarRenderer';
+import { polygonCentroid } from '../lib/geom';
 import { hitTestAircraft } from './hitTest';
 import { fitBounds, worldToScreen } from './viewTransform';
 import { buildSurfaceStatic } from './surfaceStatic';
@@ -189,5 +190,52 @@ describe('radar renderer', () => {
     const textsOff = off.calls.filter((c) => c.startsWith('fillText:'));
     expect(textsOn).toEqual(textsOff);
     expect(on.calls.filter((c) => c.startsWith('arc')).length).toBeGreaterThan(off.calls.filter((c) => c.startsWith('arc')).length);
+  });
+});
+
+describe('LAHSO marks on the surface display', () => {
+  it('lists the NASR hold-short points of runway ends 4, 13 and 31 and draws a LAHSO label for each', () => {
+    const marks = lahsoMarks(airport);
+    expect(marks.map((m) => m.endId).sort()).toEqual(['13', '31', '4']);
+    expect(marks.find((m) => m.endId === '4')).toMatchObject({ availableFt: 3550, holdShortOfRunwayId: '13/31' });
+    const engine = makeEngine();
+    const { ctx, calls } = stubContext();
+    const v = fitBounds(buildSurfaceStatic(airport).bounds, 1000, 600);
+    drawSurface(ctx, frameOf(engine), v, DEFAULT_SURFACE_LAYERS);
+    expect(calls.filter((c) => c === 'fillText:LAHSO')).toHaveLength(3);
+  });
+});
+
+describe('MVA layer on the radar', () => {
+  const sectors = [
+    { id: 'a', polygon: [{ x: 1000, y: 1000 }, { x: 9000, y: 1000 }, { x: 9000, y: 9000 }, { x: 1000, y: 9000 }], altitudeFt: 2500, provenance: airport.provenance[0] },
+  ];
+  const withMva = { ...airport, mvaSectors: sectors };
+  const textsAt = (ap: typeof airport, range: number, layers = DEFAULT_RADAR_LAYERS) => {
+    const engine = makeEngine();
+    engine.getState().airport = ap;
+    const { ctx, calls } = stubContext();
+    const v = { cx: 0, cy: 0, scale: radarScale(range, 1000, 700), width: 1000, height: 700 };
+    drawRadar(ctx, frameOf(engine), v, range, layers);
+    return calls.filter((c) => c.startsWith('fillText:')).map((c) => c.slice('fillText:'.length));
+  };
+
+  it('computes the centroid and the label in hundreds of feet', () => {
+    expect(polygonCentroid(sectors[0].polygon)).toEqual({ x: 5000, y: 5000 });
+    expect(mvaLabel(sectors[0])).toEqual({ text: '025', at: { x: 5000, y: 5000 } });
+  });
+  it('draws the altitude at 20 NM and wider, not at 10 NM, and not when the layer is off', () => {
+    expect(textsAt(withMva, 20)).toContain('025');
+    expect(textsAt(withMva, 40)).toContain('025');
+    expect(textsAt(withMva, 10)).not.toContain('025');
+    expect(textsAt(withMva, 20, { ...DEFAULT_RADAR_LAYERS, mva: false })).not.toContain('025');
+    expect(mvaVisible(withMva, DEFAULT_RADAR_LAYERS, 20)).toBe(true);
+  });
+  it('simply does not draw when the airport data has no sectors', () => {
+    const none = { ...airport, mvaSectors: undefined };
+    expect(mvaVisible(none, DEFAULT_RADAR_LAYERS, 40)).toBe(false);
+    expect(mvaVisible({ ...airport, mvaSectors: [] }, DEFAULT_RADAR_LAYERS, 40)).toBe(false);
+    expect(() => textsAt(none, 40)).not.toThrow();
+    expect(textsAt(none, 40)).not.toContain('025');
   });
 });

@@ -6,7 +6,7 @@ import { altText } from '../lib/ifr';
 import { TONE_COLOR, altHundreds, formatElapsed, formatMhz, magHeading, phaseLabel, statusTone, trendArrow } from '../lib/format';
 import { LABEL, Panel, Btn } from './ui';
 import { freqLabel } from './AircraftPanel';
-import { approachInfo, ifrClearanceParts, navDescription, nextFix, remainingFixes, requestBadge } from '../lib/ifr';
+import { approachFixAltitudes, approachInfo, ifrClearanceParts, lahsoBadge, navDescription, nextFix, remainingFixes, requestBadge } from '../lib/ifr';
 
 export function describeClearance(c: Clearance): string {
   const parts: string[] = [c.kind.replace(/_/g, ' ')];
@@ -70,6 +70,8 @@ export function AircraftDetails() {
   const tone = statusTone(ac);
   const mag = magHeading(ac.headingDeg, var_);
   const approach = approachInfo(state, ac);
+  const fixAlts = approachFixAltitudes(state, ac);
+  const lahso = lahsoBadge(state, ac);
   return (
     <Panel
       title="Aircraft details"
@@ -109,7 +111,16 @@ export function AircraftDetails() {
         {approach.state !== 'none' && (
           <div className={`border px-2 py-1 text-[11.5px] ${approach.state === 'established' ? 'border-atc-green-dim bg-atc-green/10 text-atc-green' : 'border-atc-cyan/50 bg-atc-cyan/10 text-atc-cyan'}`} data-testid="detail-approach" data-state={approach.state}>
             Cleared {approach.label} approach · {approach.state === 'established' ? 'established' : 'not yet established'}
+            {fixAlts.length > 0 && (
+              <div className="mt-0.5 break-words text-[11px] text-atc-text/90" data-testid="detail-fix-altitudes">
+                {fixAlts.map((a, i) => <span key={a.fix} title={a.note}>{i > 0 ? ' · ' : ''}<b>{a.fix}</b> {a.text}</span>)}
+              </div>
+            )}
           </div>
+        )}
+
+        {lahso && (
+          <div className="border border-fuchsia-400/60 bg-fuchsia-400/10 px-2 py-1 text-[11.5px] text-fuchsia-300" data-testid="detail-lahso">{lahso}</div>
         )}
 
         {ac.flightPlan?.ifrClearance && (

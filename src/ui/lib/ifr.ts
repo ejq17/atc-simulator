@@ -5,6 +5,7 @@
 import type { Aircraft, Clearance, IfrClearanceDetails, PendingRequest, SimulationState } from '../../sim/types';
 import { M_PER_NM, headingVec } from './geom';
 import { formatMhz, magHeading } from './format';
+import { pickProcedure } from './procedures';
 
 /** Badge text for what a pilot is waiting for. `OTHER` is the generic check-in after a frequency change. */
 export const REQUEST_BADGE: Record<PendingRequest['kind'], string> = {
@@ -156,4 +157,39 @@ export function stripClearance(state: Pick<SimulationState, 'airport'>, ac: Airc
   if (open.kind === 'DIRECT_FIX') return `DIRECT ${open.fix ?? ''}`.trim();
   if (open.kind === 'TAKEOFF' || open.kind === 'LAND') return `${open.kind === 'LAND' ? 'LAND' : 'TKOF'} ${open.runwayEnd ?? ''}`.trim();
   return open.kind.replace(/_/g, ' ');
+}
+
+type FixAlt = NonNullable<import('../../sim/types').InstrumentProcedure['fixAltitudes']>[number];
+
+/** "2,000" / "at 1,500" / "at or above 2,000" / "at or below 3,000" / "2,000-3,000" for a published fix altitude. */
+export function fixAltitudeText(a: Pick<FixAlt, 'minAltitudeFt' | 'maxAltitudeFt' | 'mandatoryAltitudeFt'>): string {
+  const f = (n: number) => n.toLocaleString('en-US');
+  if (a.mandatoryAltitudeFt !== undefined) return `at ${f(a.mandatoryAltitudeFt)}`;
+  if (a.minAltitudeFt !== undefined && a.maxAltitudeFt !== undefined) return `${f(a.minAltitudeFt)}-${f(a.maxAltitudeFt)}`;
+  if (a.minAltitudeFt !== undefined) return `at or above ${f(a.minAltitudeFt)}`;
+  if (a.maxAltitudeFt !== undefined) return `at or below ${f(a.maxAltitudeFt)}`;
+  return '';
+}
+
+/** Published altitudes (`procedure.fixAltitudes`) of the procedure the aircraft is cleared for; empty without data. */
+export function approachFixAltitudes(state: Pick<SimulationState, 'airport'>, ac: Aircraft): { fix: string; text: string; note?: string }[] {
+  const c = openClearance(ac, 'APPROACH');
+  if (!c) return [];
+  const end = c.runwayEnd ?? ac.assignedRunwayEnd;
+  if (!end) return [];
+  const pick = pickProcedure(state.airport, end, c.approachType);
+  return (pick?.procedure.fixAltitudes ?? [])
+    .map((a) => ({ fix: a.fix, text: fixAltitudeText(a), note: a.note }))
+    .filter((a) => a.text);
+}
+
+/** LAHSO state of an open landing clearance that carries hold-short runways, from `RunwayEnd.lahso`; undefined otherwise. */
+export function lahsoBadge(state: Pick<SimulationState, 'airport'>, ac: Aircraft): string | undefined {
+  const c = openClearance(ac, 'LAND');
+  if (!c?.holdShort?.length) return undefined;
+  const end = c.runwayEnd ?? ac.assignedRunwayEnd;
+  const re = state.airport.runways.flatMap((r) => r.ends).find((e) => e.id === end);
+  const l = re?.lahso;
+  const rwy = c.holdShort.join(', ');
+  return l ? `LAHSO: hold short ${rwy}, ${l.availableLandingDistanceFt.toLocaleString('en-US')} ft available` : `LAHSO: hold short ${rwy}`;
 }

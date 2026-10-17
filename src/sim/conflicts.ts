@@ -9,32 +9,30 @@
  *   (paragraph numbers and titles verified 2026-10-16; see docs/FAA-REFERENCES.md)
  */
 import type { Aircraft, ConflictAlert, ParsedCommand, SimulationState } from './types';
-import { dist, headingDiff, ktToMps, mToFt, mToNm, nmToM, pointInPolygon } from './geo';
+import { dist, headingDiff, ktToMps, magneticToTrue, mToFt, mToNm, nmToM, pointInPolygon } from './geo';
+import { highestMvaAhead, MVA_LOOKAHEAD_NM, mvaExempt } from './mva';
 import { alongCross, crossingRunways, findRunway, findRunwayEnd, isOnFinal, runwayIntersection } from './runways';
 import type { Runway } from './types';
 import { assessApproach, courseGeom } from './approach';
 import { computeRunwayActivity } from './runwayOccupancy';
 import { TAXI_PHASES } from './stateMachines';
 import { activeClearance, emitEvent, perfOf } from './context';
-import { getPerformance, srsCategory } from './performance';
+import { isDaylight, simUtcMs } from './solar';
+import { getPerformance, srsCategory, wakeRecatCategory } from './performance';
+import { wakeMinimumNm } from './wake';
 import type { RunwayEndGeom } from './runways';
 import type { SimContext } from './context';
 
 export const REF_SAME_RUNWAY = 'FAA JO 7110.65 3-9-6 (same runway separation)';
+export const REF_MVA = 'FAA JO 7110.65 5-6-1 (vector aircraft at or above the MVA or the minimum IFR altitude)';
 export const REF_LANDING = 'FAA JO 7110.65 3-10-5 (landing clearance) and 3-10-3 (same runway separation)';
 export const REF_TAXI = 'FAA JO 7110.65 3-7-2 (taxi and ground movement, runway crossings)';
 export const REF_INTERSECTING = 'FAA JO 7110.65 3-9-8 / 3-10-4 (intersecting runway separation)';
 export const REF_WAKE_INTERSECTION = 'FAA JO 7110.65 3-9-7 (wake turbulence separation for intersection departures)';
 /** 7110.65 5-5-4 MINIMA (paragraph number and title verified, docs/REALISM-VERIFICATION.md): 3 nm is the terminal radar minimum. */
 export const REF_RADAR_SEPARATION = 'FAA JO 7110.65 5-5-4 (radar separation minima, simplified here to 3 nm in-trail on the same final)';
-export const REF_WAKE_SEPARATION = 'FAA JO 7110.65 5-5-4 wake turbulence separation (simplified from the 7110.65 5-5-4 wake tables)';
+export const REF_WAKE_SEPARATION = 'FAA JO 7110.65 5-5-4, TBL 5-5-4 (wake turbulence separation, on approach; categories per JO 7110.126A Appendix A)';
 export const APPROACH_IN_TRAIL_NM = 3;
-/**
- * A light aircraft (wakeCategory 'light', e.g. C172) following a medium / heavy aircraft (e.g. A320) on the same final gets 5 nm.
- * Simplified from the 7110.65 5-5-4 wake tables (5 mi directly behind, 6 mi on approach for a small aircraft behind a large jet):
- * the category mapping is by `AircraftPerformance.wakeCategory` only (light behind anything heavier); every other pair uses 3 nm.
- */
-export const APPROACH_IN_TRAIL_LIGHT_BEHIND_HEAVIER_NM = 5;
 
 export interface SafetyIssue {
   kind: ConflictAlert['kind'];
@@ -86,6 +84,30 @@ export function srsMinimumFt(succeedingType: string, precedingType: string): num
   return 3000;
 }
 
+/**
+ * JO 7110.65 3-10-3, the landed-aircraft exception (verbatim, fetched from faa.gov): "Between sunrise and sunset, if you can
+ * determine distances by reference to suitable landmarks and the other aircraft has landed, it need not be clear of the runway
+ * if the following minimum distance from the landing threshold exists: When a Category I aircraft is landing behind a Category I
+ * or II - 3,000 feet. When a Category II aircraft is landing behind a Category I or II - 4,500 feet." There is NO figure for a
+ * Category III aircraft on either side, so the exception does not apply to them. Applied only between sunrise and sunset (NOAA
+ * solar position at the airport reference point and the engine epoch, `solar.ts`); the "suitable landmarks" are assumed to
+ * exist (the simulator knows every distance). The airborne case (departed, or airborne ahead of the threshold) has no daylight
+ * condition in the text and is `airborneBlockers`.
+ */
+export function landedDistanceExceptionApplies(state: SimulationState, subject: Aircraft, other: Aircraft, g: RunwayEndGeom): boolean {
+  if (!other.onGround || other.isDeparture && other.phase !== 'ROLLOUT' && other.phase !== 'RUNWAY_EXIT') return false; // "has landed"
+  if (other.phase !== 'ROLLOUT' && other.phase !== 'RUNWAY_EXIT' && other.phase !== 'LANDING') return false;
+  if (!isDaylight(state.airport.arp, simUtcMs(state))) return false;
+  const og = findRunwayEnd(state.airport, other.assignedRunwayEnd);
+  if (!og || og.end.id !== g.end.id) return false;
+  const s = srsCategory(subject.type);
+  const p = srsCategory(other.type);
+  if (s === 3 || p === 3) return false;
+  const needFt = s === 1 ? 3000 : 4500;
+  const rearM = alongCross(g, other.pos).along - perfOf(other).lengthM / 2; // the tail of the preceding aircraft
+  return mToFt(rearM) >= needFt && Math.abs(alongCross(g, other.pos).cross) < TURNED_AWAY_M;
+}
+
 /** Aircraft whose lateral offset from the centreline exceeds this have "turned to avert any conflict" (3-9-6 a). */
 const TURNED_AWAY_M = 450;
 
@@ -135,7 +157,7 @@ function airborneBlockers(state: SimulationState, ac: Aircraft, g: RunwayEndGeom
  *  - An ARRIVAL must not cross its threshold until the other aircraft has "departed and passed the intersection" / is clear / has
  *    passed it. Estimated the same way: unsafe only if it would cross its threshold before the departure passes the intersection;
  *    against another arrival, only if that one lands first and would not have passed the intersection by then.
- * Not modelled: the "acknowledged the instruction to hold short / exit prior to the intersection" release (LAHSO is not simulated).
+ * Land and hold short (3-10-5): an arrival cleared to hold short of the other runway (either way round) is not judged against it; the executor validates the LAHSO, and the rollout planning stops it short (crossing the point is an incursion).
  */
 const INTERSECTION_PASS_MARGIN_M = 60;
 const ROLL_START_DELAY_SEC = 2.5;
@@ -178,6 +200,9 @@ function intersectingIssues(state: SimulationState, ac: Aircraft, kind: 'TAKEOFF
       (!o.onGround && (o.phase === 'INITIAL_CLIMB' || o.phase === 'DEPARTURE') && o.altitudeFt - airport.elevationFt < 1500 && sO < og.lengthM + 500);
     const arrivingGround = o.onGround && (o.phase === 'ROLLOUT' || o.phase === 'LANDING');
     const arrivingAir = !o.onGround && (o.phase === 'FINAL' || o.phase === 'LANDING' || !!activeClearance(o, 'LAND'));
+    // an arrival cleared to land and hold short of the subject's runway never reaches the intersection
+    const oHoldsShort = (activeClearance(o, 'LAND')?.holdShort ?? []).some((r) => findRunway(airport, r)?.id === g.runway.id);
+    if (oHoldsShort && (arrivingAir || arrivingGround)) continue;
     if (departing && !o.isDeparture && o.phase !== 'LINE_UP_AND_WAIT') continue;
     if (departing) {
       if (passed) continue; // "has departed and passed the intersection"
@@ -271,12 +296,16 @@ function assessApproachSeparation(state: SimulationState, ac: Aircraft, cmd: Par
     const followerIsMine = mine >= theirsAtJoin;
     const follower = followerIsMine ? ac : o;
     const leader = followerIsMine ? o : ac;
-    const wake = perfOf(follower).wakeCategory === 'light' && perfOf(leader).wakeCategory !== 'light';
-    const minNm = wake ? APPROACH_IN_TRAIL_LIGHT_BEHIND_HEAVIER_NM : APPROACH_IN_TRAIL_NM;
+    // Aircraft in trail on the same final are "on approach" (TBL 5-5-4); the 3 NM radar minimum is the floor.
+    const lc = wakeRecatCategory(leader.type);
+    const fc = wakeRecatCategory(follower.type);
+    const wakeNm = wakeMinimumNm(lc, fc, 'on_approach');
+    const wake = wakeNm > APPROACH_IN_TRAIL_NM;
+    const minNm = Math.max(APPROACH_IN_TRAIL_NM, wakeNm);
     if (gapNm < minNm) {
       issues.push({
         kind: 'AIRBORNE_PROXIMITY',
-        text: `Approach clearance for ${ac.callsign} to runway ${g.end.id} puts it ${gapNm.toFixed(1)} nm ${followerIsMine ? 'in trail of' : 'ahead of'} ${o.callsign}, established on the same final (${mToNm(theirsNow).toFixed(1)} nm out now); ${wake ? `wake turbulence separation (simplified from the 7110.65 5-5-4 wake tables) needs ${minNm} nm for ${follower.callsign} (${follower.type}) behind ${leader.callsign} (${leader.type})` : `radar separation minimum ${minNm} nm`}`,
+        text: `Approach clearance for ${ac.callsign} to runway ${g.end.id} puts it ${gapNm.toFixed(1)} nm ${followerIsMine ? 'in trail of' : 'ahead of'} ${o.callsign}, established on the same final (${mToNm(theirsNow).toFixed(1)} nm out now); ${wake ? `wake turbulence separation (7110.65 5-5-4, TBL 5-5-4 on approach: Category ${lc} leader, Category ${fc} follower) needs ${minNm} NM for ${follower.callsign} (${follower.type}) behind ${leader.callsign} (${leader.type})` : `radar separation minimum ${minNm} nm`}`,
         reference: wake ? REF_WAKE_SEPARATION : REF_RADAR_SEPARATION,
         aircraftIds: [ac.id, o.id],
         runwayId: g.runway.id,
@@ -296,6 +325,7 @@ export function assessClearanceSafety(state: SimulationState, cmd: ParsedCommand
   if (!ac) return { safe: true, issues };
   const { airport } = state;
   if (cmd.kind === 'APPROACH') return assessApproachSeparation(state, ac, cmd);
+  if (cmd.kind === 'HEADING' || cmd.kind === 'ALTITUDE') return assessMva(state, ac, cmd);
   const activity = computeRunwayActivity(state);
 
   let runwayId: string | undefined;
@@ -337,10 +367,11 @@ export function assessClearanceSafety(state: SimulationState, cmd: ParsedCommand
       }
     }
   } else if (cmd.kind === 'LAND') {
-    // 3-10-3: not across the threshold until the other aircraft has landed and is clear of the runway (the daylight
-    // distance exception needs the time of day: not applied), or has departed and crossed the runway end / is airborne
+    // 3-10-3: not across the threshold until the other aircraft has landed and is clear of the runway (unless the daylight
+    // distance exception for a landed aircraft applies, `landedDistanceExceptionApplies`), or has departed and crossed the runway end / is airborne
     // the categorical distance ahead of the landing threshold (checked below).
-    const occ = others(act.occupants).filter((i) => state.aircraft[i]?.onGround);
+    const gLand = findRunwayEnd(airport, cmd.runwayEnd ?? cmd.runwayId ?? ac.assignedRunwayEnd);
+    const occ = others(act.occupants).filter((i) => state.aircraft[i]?.onGround && !(gLand && landedDistanceExceptionApplies(state, ac, state.aircraft[i], gLand)));
     if (occ.length) push(`Landing clearance for ${ac.callsign} on runway ${runwayId} while it is occupied by ${cs(state, occ)}`, REF_LANDING, occ);
     const dep = others(act.departing).filter((i) => !occ.includes(i) && state.aircraft[i]?.onGround);
     if (dep.length) push(`Landing clearance for ${ac.callsign} while ${cs(state, dep)} is cleared for takeoff / rolling on runway ${runwayId}`, REF_LANDING, dep);
@@ -366,7 +397,10 @@ export function assessClearanceSafety(state: SimulationState, cmd: ParsedCommand
   // Intersecting runways (e.g. 13/31 and 4/22): JO 7110.65 3-9-8 (departures) and 3-10-4 (arrivals).
   if (cmd.kind === 'TAKEOFF' || cmd.kind === 'LAND') {
     const gEnd = findRunwayEnd(airport, cmd.runwayEnd ?? cmd.runwayId ?? ac.assignedRunwayEnd);
-    if (gEnd) for (const other of crossingRunways(airport, runwayId)) issues.push(...intersectingIssues(state, ac, cmd.kind, gEnd, other));
+    // Land and hold short (3-10-4 / 3-10-5): the clearance names the intersecting runway to hold short of, so the arrival is not
+    // required to have the other runway's traffic clear of the intersection; the hold-short itself is validated by the executor.
+    const holdShortIds = cmd.kind === 'LAND' ? (cmd.holdShort ?? []).map((r) => findRunway(airport, r)?.id) : [];
+    if (gEnd) for (const other of crossingRunways(airport, runwayId)) if (!holdShortIds.includes(other.id)) issues.push(...intersectingIssues(state, ac, cmd.kind, gEnd, other));
   }
   // Wake turbulence time interval for an intersection departure (3-9-7).
   if (cmd.kind === 'TAKEOFF') {
@@ -383,6 +417,18 @@ export function assessClearanceSafety(state: SimulationState, cmd: ParsedCommand
 export function recordUnsafeClearance(ctx: SimContext, ac: Aircraft, assessment: SafetyAssessment, prevented: boolean): void {
   const now = ctx.state.clock.timeSec;
   for (const issue of assessment.issues) {
+    if (issue.kind === 'UNSAFE_CLEARANCE') {
+      // not tied to a runway / proximity alert: only the unsafe-clearance alert and event
+      const unsafe: ConflictAlert = { id: `cf-${++ctx.alertSeq}`, kind: 'UNSAFE_CLEARANCE', aircraftIds: issue.aircraftIds, text: `Unsafe clearance: ${issue.text} [${issue.reference}]`, severity: 'critical', sinceSec: now };
+      ctx.clearanceAlerts.push({ alert: unsafe, expiresAtSec: now + 90 });
+      refreshConflicts(ctx);
+      emitEvent(ctx, {
+        kind: 'CONFLICT', aircraftId: ac.id, callsign: ac.callsign, severity: 'critical', speaker: 'SYSTEM',
+        text: `${prevented ? 'Unsafe clearance prevented' : 'Unsafe clearance issued'}: ${issue.text}`,
+        data: { alertKind: 'UNSAFE_CLEARANCE', reference: issue.reference, prevented },
+      });
+      continue;
+    }
     const alert: ConflictAlert = {
       id: `cf-${++ctx.alertSeq}`,
       kind: issue.kind,
@@ -423,6 +469,39 @@ function parkedLike(state: SimulationState, ac: Aircraft): boolean {
   if (ac.phase === 'PARKED' || ac.phase === 'ARRIVED') return true;
   return ac.groundSpeedKt < 0.1 && state.airport.parking.some((p) => dist(p.pos, ac.pos) < 8);
 }
+/**
+ * Minimum vectoring altitude, JO 7110.65 5-6-1: "Vector aircraft ... At or above the MVA or the minimum IFR altitude except as
+ * authorized for radar approaches, radar departures, special VFR, VFR operations, or by paragraph 5-6-3". An ALTITUDE assignment
+ * below the MVA of the sector the aircraft is in, or of one it enters within 2 nm along its track, or a HEADING that points it into
+ * airspace whose MVA is above its altitude at its present (or lower assigned) altitude, is unsafe. Exempt: see `mvaExempt`. Does nothing when
+ * the airport has no `mvaSectors`.
+ */
+function assessMva(state: SimulationState, ac: Aircraft, cmd: ParsedCommand): SafetyAssessment {
+  const issues: SafetyIssue[] = [];
+  const airport = state.airport;
+  if (!airport.mvaSectors?.length || mvaExempt(ac)) return { safe: true, issues };
+  const lookahead = (trackTrue: number) => highestMvaAhead(airport, ac.pos, trackTrue);
+  if (cmd.kind === 'ALTITUDE' && cmd.altitudeFt !== undefined) {
+    const mva = lookahead(ac.trackDeg);
+    if (mva && cmd.altitudeFt < mva.altitudeFt) {
+      issues.push({
+        kind: 'UNSAFE_CLEARANCE', aircraftIds: [ac.id], reference: REF_MVA,
+        text: `Altitude ${cmd.altitudeFt} ft for ${ac.callsign} is below the minimum vectoring altitude of ${mva.altitudeFt} ft (MVA sector ${mva.sectorId}, its sector now or one it enters within ${MVA_LOOKAHEAD_NM} nm)`,
+      });
+    }
+  } else if (cmd.kind === 'HEADING' && cmd.headingDeg !== undefined) {
+    const altitude = Math.min(ac.altitudeFt, ac.target.altitudeFt ?? ac.altitudeFt);
+    const mva = lookahead(magneticToTrue(cmd.headingDeg, airport.magneticVariationDeg));
+    if (mva && altitude < mva.altitudeFt) {
+      issues.push({
+        kind: 'UNSAFE_CLEARANCE', aircraftIds: [ac.id], reference: REF_MVA,
+        text: `Heading ${Math.round(cmd.headingDeg)} for ${ac.callsign} at ${Math.round(altitude)} ft would put it below the minimum vectoring altitude of ${mva.altitudeFt} ft (MVA sector ${mva.sectorId}, within ${MVA_LOOKAHEAD_NM} nm)`,
+      });
+    }
+  }
+  return { safe: issues.length === 0, issues };
+}
+
 /** Near-miss ALERT thresholds (not the separation minimum: the radar minimum is 3 nm, see REF_RADAR_SEPARATION). */
 export const AIRBORNE_PROXIMITY_NM = 1.5;
 export const AIRBORNE_PROXIMITY_FT = 500;
@@ -446,6 +525,20 @@ export function detectConflicts(ctx: SimContext): void {
         alert: { kind: 'RUNWAY_INCURSION', aircraftIds: [ac.id], runwayId: rw.id, text: `${ac.callsign} is on runway ${rw.id} without a clearance`, severity: 'critical' },
       });
     }
+  }
+
+  // Land and hold short: the nose passing the published hold-short point is an incursion of the other runway (JO 7110.65 3-10-5).
+  for (const ac of list) {
+    const lahso = ctx.runtime.get(ac.id)?.lahso;
+    if (!lahso || !ac.onGround || ac.phase !== 'ROLLOUT') continue;
+    const g = findRunwayEnd(airport, ac.assignedRunwayEnd);
+    if (!g) continue;
+    const noseAlong = alongCross(g, ac.pos).along + perfOf(ac).lengthM / 2;
+    if (noseAlong <= lahso.holdShortAlongM) continue;
+    candidates.push({
+      key: `INC:${ac.id}:${lahso.holdShortRunwayId}`,
+      alert: { kind: 'RUNWAY_INCURSION', aircraftIds: [ac.id], runwayId: lahso.holdShortRunwayId, text: `${ac.callsign} did not hold short of runway ${lahso.holdShortRunwayId} after a land and hold short clearance`, severity: 'critical' },
+    });
   }
 
   // Two or more aircraft on a runway surface while one of them is operating at speed.

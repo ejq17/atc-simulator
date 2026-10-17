@@ -65,3 +65,25 @@ export async function launchVoiceBrowser(clip: ClipName, opts: LaunchOptions = {
   const page = context.pages()[0] ?? (await context.newPage());
   return { context, page, close: () => context.close() };
 }
+
+/**
+ * Google Chrome with the REAL microphone: only the permission prompt is auto-granted (`--use-fake-ui-for-media-stream`); there is
+ * deliberately no `--use-fake-device-for-media-stream`, so getUserMedia opens actual hardware. Opt-in project `chrome-real-mic`
+ * (REAL_MIC=1). macOS must have granted the microphone to Google Chrome (System Settings > Privacy & Security > Microphone).
+ */
+export const REAL_MIC_PROFILE_DIR = path.resolve(import.meta.dirname, '../../.cache/playwright-profile-chrome-real');
+
+export async function launchRealMicBrowser(baseURL = 'http://localhost:5173', headless = true): Promise<VoiceBrowser> {
+  const context = await chromium.launchPersistentContext(REAL_MIC_PROFILE_DIR, {
+    headless,
+    channel: 'chrome',
+    baseURL,
+    viewport: { width: 1440, height: 900 },
+    permissions: ['microphone'],
+    // Playwright adds --mute-audio to headless browsers; the real-speaker test needs actual output.
+    ignoreDefaultArgs: ['--mute-audio'],
+    args: ['--use-fake-ui-for-media-stream', '--autoplay-policy=no-user-gesture-required'],
+  });
+  const page = context.pages()[0] ?? (await context.newPage());
+  return { context, page, close: () => context.close() };
+}

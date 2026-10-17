@@ -49,6 +49,7 @@ const r = parseTransmission('Spirit four fifty one, runway one three, cleared fo
 | line up and wait / position and hold / taxi into position | `LINE_UP_AND_WAIT` ("line up" alone is accepted but flagged) |
 | cleared for takeoff (STT: take off, clear for) | `TAKEOFF`; "fly heading/runway heading" and "turn left heading" are separate `HEADING` commands |
 | cleared to land / option / touch and go / stop and go / low approach | `LAND` (`destination: option, touch_and_go, stop_and_go, low_approach`) |
+| LAHSO: cleared to land runway N, hold short of runway M \| taxiway X [, traffic landing runway M] | ONE `LAND` with `holdShort: ['RWY13']` (same format as taxi hold-short; `runwayEnd` stays the landing runway). The trailing traffic advisory is consumed and ignored. A "hold short" with no resolvable point is left to the separate `HOLD_SHORT` rule (flagged as missing) |
 | go around | `GO_AROUND` |
 | continue [approach] [expect late landing clearance] | `CONTINUE_APPROACH` |
 | contact/monitor/switch to/change to ground, tower, approach, departure, clearance delivery [freq] | `CONTACT_FREQUENCY` (`frequencyId` GND/TWR/APP/DEP/CLNC, `frequencyMhz`); bare "point niner" leaves `frequencyMhz` undefined; "change to my frequency" -> `destination: 'MY_FREQUENCY'` |

@@ -116,6 +116,26 @@ describe('local whisper provider', () => {
     expect(finals).toEqual(['runway one three']);
   });
 
+  it('records level statistics of the last capture (ambient noise = first 500 ms)', async () => {
+    // 0.5 s of quiet noise (amplitude 0.01) followed by 0.5 s of a loud tone.
+    const chunk = () => {
+      const a = new Int16Array(16000);
+      for (let i = 0; i < 8000; i++) a[i] = i % 2 ? 328 : -328;
+      for (let i = 8000; i < 16000; i++) a[i] = Math.round(Math.sin((2 * Math.PI * 440 * i) / 16000) * 16000);
+      return a.buffer;
+    };
+    const h = harness({ chunk });
+    expect(h.provider.getLastCapture()).toBeNull();
+    await h.provider.start(h.handlers);
+    await h.provider.stop();
+    const st = h.provider.getLastCapture()!;
+    expect(st.seconds).toBeCloseTo(1, 5);
+    expect(st.ambientRms).toBeCloseTo(0.01, 3);
+    expect(st.ambientDbfs).toBeCloseTo(-40, 0);
+    expect(st.peak).toBeGreaterThan(0.45);
+    expect(st.rms).toBeGreaterThan(st.ambientRms);
+  });
+
   it('builds the idle audio graph once, reuses it for every press, and releases it on dispose', async () => {
     const closeGraph = vi.fn(async () => undefined);
     const graph = { ctx: { state: 'running' } as unknown as AudioContext, workletReady: true, close: closeGraph };

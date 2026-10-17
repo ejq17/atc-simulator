@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { loadKacy } from '../../airport';
 import type { Aircraft, SimEvent } from '../../sim/types';
 import { choiceFromPositions, frequencyRows, POSITION_CHOICES, POSITION_ORDER, rowLabel, suggestPosition } from './positions';
-import { approachInfo, ifrClearanceSummary, navDescription, navLetter, requestBadge, stripClearance } from './ifr';
+import { approachFixAltitudes, approachInfo, fixAltitudeText, ifrClearanceSummary, lahsoBadge, navDescription, navLetter, requestBadge, stripClearance } from './ifr';
 import { pickProcedure, procedureGeometry } from './procedures';
 import { groupByFrequency } from '../components/FlightStrips';
 import { lastActivity } from '../components/RadioPanel';
@@ -109,5 +109,30 @@ describe('strips and frequency activity', () => {
     expect(act.get(124.6)).toMatchObject({ dir: 'TX', timeSec: 5 });
     expect(act.get(127.85)).toMatchObject({ dir: 'RX', callsign: 'NKS608' });
     expect(act.has(120.3)).toBe(false);
+  });
+});
+
+describe('published fix altitudes and LAHSO', () => {
+  it('formats fix altitude restrictions', () => {
+    expect(fixAltitudeText({ mandatoryAltitudeFt: 1500 })).toBe('at 1,500');
+    expect(fixAltitudeText({ minAltitudeFt: 2000 })).toBe('at or above 2,000');
+    expect(fixAltitudeText({ maxAltitudeFt: 3000 })).toBe('at or below 3,000');
+    expect(fixAltitudeText({ minAltitudeFt: 2000, maxAltitudeFt: 3000 })).toBe('2,000-3,000');
+    expect(fixAltitudeText({})).toBe('');
+  });
+  it('reads fix altitudes of the cleared procedure, and nothing when the data has none', () => {
+    const clr = { id: 'c', kind: 'APPROACH' as const, issuedAtSec: 0, byPosition: 'APP' as const, approachType: 'ILS' as const, runwayEnd: '13' };
+    const ac = base({ clearances: [clr] });
+    const bare = { ...airport, procedures: airport.procedures.map((p) => ({ ...p, fixAltitudes: undefined })) };
+    expect(approachFixAltitudes({ airport: bare }, ac)).toEqual([]);
+    const procedures = airport.procedures.map((p) => (p.id === 'ILS-Z-OR-LOC-Z-RWY-13' ? { ...p, fixAltitudes: [{ fix: 'CARYL', minAltitudeFt: 2000 }, { fix: 'MAYBN', mandatoryAltitudeFt: 1500 }] } : p));
+    expect(approachFixAltitudes({ airport: { ...bare, procedures: bare.procedures.map((p) => (p.id === 'ILS-Z-OR-LOC-Z-RWY-13' ? procedures.find((q) => q.id === p.id)! : p)) } }, ac).map((a) => `${a.fix} ${a.text}`)).toEqual(['CARYL at or above 2,000', 'MAYBN at 1,500']);
+    expect(approachFixAltitudes({ airport }, base())).toEqual([]);
+  });
+  it('shows the LAHSO badge from RunwayEnd.lahso when a landing clearance carries hold-short runways', () => {
+    const land = { id: 'l', kind: 'LAND' as const, issuedAtSec: 0, byPosition: 'TWR' as const, runwayEnd: '4', holdShort: ['13/31'] };
+    expect(lahsoBadge({ airport }, base({ clearances: [land] }))).toBe('LAHSO: hold short 13/31, 3,550 ft available');
+    expect(lahsoBadge({ airport }, base({ clearances: [{ ...land, holdShort: undefined }] }))).toBeUndefined();
+    expect(lahsoBadge({ airport }, base())).toBeUndefined();
   });
 });

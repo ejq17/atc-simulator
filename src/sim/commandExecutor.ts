@@ -26,11 +26,13 @@ import { freeParkingCandidates, parkingOccupant, resolveParkingQuery } from './p
 import { assessClearanceSafety, recordUnsafeClearance } from './conflicts';
 import { frequencyById, frequencyByMhz, frequencyForPosition, hearsFrequency, formatMhz } from '../radio/frequencies';
 import { buildReadback, buildSayAgain, buildUnable } from '../radio/readback';
+import { spokenRunway } from '../radio/spoken';
 import { SPEED_LIMIT_BELOW_10K_KT } from './performance';
 import { findNavFix, indexOfFix } from './navigation';
 import { startHold } from './holding';
 import { publishedHoldFor } from './missedApproach';
-import { assessApproach } from './approach';
+import { assessApproach, ceilingFt } from './approach';
+import { isDaylight, simUtcMs } from './solar';
 import { buildIfrClearance } from './ifr';
 
 const DUPLICATE_WINDOW_SEC = 5;
@@ -705,6 +707,74 @@ function runwayLengthCheck(env: Env, g: RunwayEndGeom, entry: TaxiNode): { rejec
   return undefined;
 }
 
+/** AIM 4-3-11 / JO 7110.118 (11a) precipitation: "dry runway - no visible moisture". */
+const PRECIPITATION = /(RA|SN|DZ|SG|PL|GR|GS|IC|UP|TS|SH)/;
+
+/** Wind component (kt) of a tailwind on the given runway end (positive = tailwind). */
+function tailwindKt(env: Env, endId: string): number {
+  const w = env.ctx.state.weather;
+  if (w.windDirDeg === 'VRB' || w.windSpeedKt <= 0) return 0;
+  const g = findRunwayEnd(env.airport, endId);
+  if (!g) return 0;
+  // the wind blows FROM windDirDeg, i.e. toward windDirDeg + 180; a tailwind blows along the runway heading
+  return w.windSpeedKt * Math.cos(((w.windDirDeg + 180 - g.headingDeg) * Math.PI) / 180);
+}
+
+/**
+ * Land and hold short (JO 7110.65 3-10-4 / 3-10-5, AIM 4-3-11, JO 7110.118 - the 7/14/00 edition was fetched).
+ * Validation, in order:
+ *  - the runway end has a NASR LAHSO entry for the intersecting runway named in the clearance;
+ *  - the pilot accepts only if the aircraft's landing distance (`landingDistanceFt`) fits the published available landing
+ *    distance (AIM: "the pilot-in-command determines that the aircraft can safely land and stop within the ALD"): otherwise
+ *    "we can't hold short" and the clearance is not issued as LAHSO;
+ *  - conditions (7110.118 11a: ceiling 1,000 ft and visibility 3 sm for non-air-carrier operations, the AIM 4-3-11 minima;
+ *    dry runway = no precipitation; tailwind on the hold-short runway < 3 kt) and daylight (see below): training refuses, other
+ *    modes accept and flag it as an improper instruction.
+ * Daylight: 7110.118 does not forbid night LAHSO, but it needs land-and-hold-short lights (11c) and, for air carriers, a visual glide
+ * slope indicator (11d); the airport data states neither, so the simulator allows LAHSO only between sunrise and sunset (NOAA solar
+ * position, `utcStartMs`). Not modelled: wind shear reports, air-carrier minima (1,500 ft / 5 sm without PAPI/VASI), student pilots,
+ * the traffic-information exchange and the aircraft-list of 7110.118 appendix 1 (the ALD test stands in for it).
+ */
+function planLahso(env: Env, g: RunwayEndGeom): { reject: Reject } | { holdShort?: string; flag?: string; rollout?: { holdShortRunwayId: string; holdShortAlongM: number; stopAlongM: number } } {
+  const { ac, cmd, airport, ctx } = env;
+  const refs = cmd.holdShort?.filter(Boolean) ?? [];
+  if (!refs.length) return {};
+  const info = g.end.lahso;
+  const target = findRunway(airport, refs[0]);
+  const spoken = target ? spokenRunwayForPhrase(target.id) : refs[0];
+  if (!info || !target || target.id !== info.holdShortOfRunwayId) {
+    return unable(env, `No land and hold short operation is published for runway ${g.end.id} short of ${refs[0]}${info ? ` (the published one is short of ${info.holdShortOfRunwayId})` : ''}.`, `we can't hold short of runway ${spoken}`);
+  }
+  const perf = perfOf(ac);
+  if (perf.landingDistanceFt > info.availableLandingDistanceFt) {
+    return unable(
+      env,
+      `${ac.callsign} (${ac.type}) needs about ${perf.landingDistanceFt} ft to land and stop; the available landing distance on runway ${g.end.id} short of runway ${target.id} is ${info.availableLandingDistanceFt} ft (AIM 4-3-11: the pilot declines).`,
+      `we're unable to hold short of runway ${spoken}`,
+    );
+  }
+  const problems: string[] = [];
+  const w = ctx.state.weather;
+  const ceil = ceilingFt(w);
+  if (ceil < 1000 || w.visibilitySm < 3) problems.push(`LAHSO needs a ceiling of at least 1,000 ft and 3 sm visibility (AIM 4-3-11; JO 7110.118 11a): ceiling ${Number.isFinite(ceil) ? Math.round(ceil) : 'none'} ft, visibility ${w.visibilitySm} sm`);
+  if (w.phenomena.some((p) => PRECIPITATION.test(p.replace(/^[-+]|VC/g, '')))) problems.push('the runway must be dry (no visible moisture; JO 7110.118 11a2): precipitation is reported');
+  if (!isDaylight(airport.arp, simUtcMs(ctx.state))) problems.push('LAHSO is limited to the period between sunrise and sunset: night LAHSO needs land and hold short lights and a visual glide slope indicator, which the airport data does not confirm (JO 7110.118 11c, 11d)');
+  const ends = target.ends.map((e) => e.id).filter((id) => ctx.state.activeRunways.departing.includes(id) || ctx.state.activeRunways.landing.includes(id));
+  const worstTail = Math.max(...(ends.length ? ends : target.ends.map((e) => e.id)).map((id) => tailwindKt(env, id)));
+  if (worstTail >= 3) problems.push(`the tailwind on the hold-short runway must be calm, less than 3 kt (JO 7110.118 11a3): ${worstTail.toFixed(0)} kt`);
+  let flag: string | undefined;
+  if (problems.length) {
+    const msg = `Land and hold short not authorised for ${ac.callsign} on runway ${g.end.id}: ${problems.join('; ')}.`;
+    if (ctx.state.scenario.mode === 'training') return unable(env, msg, `we can't accept hold short operations now`);
+    flag = msg;
+  }
+  const hsAlong = alongCross(g, info.holdShortPoint.pos).along;
+  const stop = Math.min(hsAlong, ftToM(info.availableLandingDistanceFt)) - perf.lengthM / 2 - 10;
+  return { holdShort: target.id, flag, rollout: { holdShortRunwayId: target.id, holdShortAlongM: hsAlong, stopAlongM: stop } };
+}
+
+const spokenRunwayForPhrase = (id: string): string => spokenRunway(id);
+
 function planLand(env: Env): PlanResult {
   const { ac, rt, ctx } = env;
   const g = env.g!;
@@ -717,10 +787,14 @@ function planLand(env: Env): PlanResult {
   if (ac.assignedRunwayEnd && ac.assignedRunwayEnd !== g.end.id && ac.phase === 'FINAL') {
     return unable(env, `${ac.callsign} is established on final for runway ${ac.assignedRunwayEnd}.`, `we're established on final for runway ${ac.assignedRunwayEnd}`, false);
   }
+  const lahso = planLahso(env, g);
+  if ('reject' in lahso) return lahso;
   return {
     plan: {
-      patch: { runwayEnd: g.end.id, runwayId: g.runway.id },
+      patch: { runwayEnd: g.end.id, runwayId: g.runway.id, ...(lahso.holdShort ? { holdShort: [lahso.holdShort] } : {}) },
+      flag: lahso.flag,
       commit: () => {
+        rt.lahso = lahso.rollout;
         if (ac.assignedRunwayEnd !== g.end.id) {
           ac.assignedRunwayEnd = g.end.id;
           rt.decisionDone = false;
@@ -1063,7 +1137,7 @@ function planResumeNav(env: Env): PlanResult {
 }
 
 function planApproach(env: Env): PlanResult {
-  const { ac, rt, cmd, ctx } = env;
+  const { ac, rt, cmd, ctx, airport } = env;
   const g = env.g!;
   const type = cmd.approachType!;
   if (ac.onGround) return unable(env, `${ac.callsign} is on the ground.`, "we're on the ground");
@@ -1096,6 +1170,8 @@ function planApproach(env: Env): PlanResult {
         if (ac.phase === 'HOLDING' && !ac.isDeparture) setPhase(ctx, ac, 'APPROACH', `cleared ${type} approach`);
         rt.approach = {
           type, runwayEnd: g.end.id, procedureId: plan.procedureId, onCourse: plan.onCourse, courseTrue: plan.courseTrue, ifDM: plan.ifDM,
+          profile: airport.procedures.find((p) => p.id === plan.procedureId)?.fixAltitudes?.map((f) => ({ ...f, fix: f.fix.toUpperCase() })),
+          fafDM: plan.fafDM, precision: type === 'ILS' || type === 'LOC',
           pendingCapture: !established && plan.mode === 'intercept', clearedAtSec: env.now,
         };
         if (ac.flightPlan) ac.flightPlan = { ...ac.flightPlan, arrivalApproach: { type, runwayEnd: g.end.id, procedureId: plan.procedureId } };

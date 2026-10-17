@@ -16,7 +16,7 @@ import { alongCross, crossingRunways, findRunwayEnd } from './runways';
 import type { RunwayEndGeom } from './runways';
 import { neighborIds, shortestDistances } from './pathfinding';
 import { goingAroundCall } from '../radio/readback';
-import { advanceNav, fixPosition } from './navigation';
+import { advanceNav, fixPosition, turnLeadM } from './navigation';
 import { holdGuidance } from './holding';
 import { missedGuidance, startPublishedMissed } from './missedApproach';
 import { resolveMinima, runwayInSight } from './minima';
@@ -168,7 +168,7 @@ interface RolloutPlan {
  * normal landing rate; failing that, the first exit it can make braking up to the maximum rate; failing that, no exit: stop
  * short of the runway end and of any intersecting runway (never stopping in or beyond its hold line) and ask for taxi instructions.
  */
-function chooseExit(ctx: SimContext, ac: Aircraft, g: RunwayEndGeom, tdAlong: number, vTd: number): RolloutPlan {
+function chooseExit(ctx: SimContext, ac: Aircraft, g: RunwayEndGeom, tdAlong: number, vTd: number, lahsoStopAlong?: number): RolloutPlan {
   const graph = ctx.state.airport.taxiwayGraph;
   const perf = perfOf(ac);
   const normal = ktToMps(perf.decelKtPerSec);
@@ -182,6 +182,10 @@ function chooseExit(ctx: SimContext, ac: Aircraft, g: RunwayEndGeom, tdAlong: nu
     cands.push({ id, along: alongCross(g, graph.nodes[id].pos).along, holds });
   }
   cands.sort((a, b) => a.along - b.along || (a.id < b.id ? -1 : 1));
+  // Land and hold short: only exits before the hold-short point can be used, otherwise stop at it.
+  if (lahsoStopAlong !== undefined) {
+    for (let i = cands.length - 1; i >= 0; i--) if (cands[i].along > lahsoStopAlong) cands.splice(i, 1);
+  }
   const pickHold = (c: { id: string; holds: string[] }): string => {
     // the side from which parking is closest by taxi
     let bestHold = c.holds[0];
@@ -216,7 +220,10 @@ function chooseExit(ctx: SimContext, ac: Aircraft, g: RunwayEndGeom, tdAlong: nu
   // No exit within reach: stop on the remaining runway, short of an intersection and of the end.
   const natural = tdAlong + (vTd * vTd) / (2 * normal);
   const inter = intersectionStartAlong(ctx, g, tdAlong);
-  const stopTarget = Math.min(natural, g.lengthM - RUNWAY_END_STOP_MARGIN_M, inter !== undefined ? inter - INTERSECTION_HOLD_MARGIN_M - perf.lengthM / 2 : Infinity);
+  const stopTarget = Math.min(
+    natural, g.lengthM - RUNWAY_END_STOP_MARGIN_M, lahsoStopAlong ?? Infinity,
+    inter !== undefined ? inter - INTERSECTION_HOLD_MARGIN_M - perf.lengthM / 2 : Infinity,
+  );
   const room = Math.max(1, stopTarget - tdAlong);
   return { exitSpeedMps: 0, brakeMps2: clamp((vTd * vTd) / (2 * room), normal, maxBrake), stopAlongM: stopTarget };
 }
@@ -238,7 +245,7 @@ function touchdown(ctx: SimContext, ac: Aircraft, rt: AircraftRuntime, g: Runway
   rt.turnRateDegPerSec = 0;
   setPhase(ctx, ac, 'ROLLOUT', 'touchdown');
   const { along } = alongCross(g, ac.pos);
-  rt.rollout = chooseExit(ctx, ac, g, along, ktToMps(ac.groundSpeedKt));
+  rt.rollout = chooseExit(ctx, ac, g, along, ktToMps(ac.groundSpeedKt), rt.lahso?.stopAlongM);
   emitEvent(ctx, {
     kind: 'INFO', aircraftId: ac.id, callsign: ac.callsign, severity: 'info', speaker: 'SYSTEM',
     text: `${ac.callsign} touched down runway ${g.end.id} ${Math.round(along)} m from threshold`,
@@ -285,6 +292,7 @@ function stepRollout(ctx: SimContext, ac: Aircraft, dt: number): void {
       ac.groundSpeedKt = mpsToKt(v);
       ac.airspeedKt = ac.groundSpeedKt;
       rt.rollout = undefined;
+      rt.lahso = undefined;
       setPhase(ctx, ac, 'RUNWAY_EXIT', `exit via ${graph.nodes[hold].taxiways[0] ?? exitNode.id}`);
       return;
     }
@@ -296,6 +304,7 @@ function stepRollout(ctx: SimContext, ac: Aircraft, dt: number): void {
     ac.airspeedKt = 0;
     rt.rollout = undefined;
     setPhase(ctx, ac, 'RUNWAY_EXIT', 'stopped on runway');
+    rt.lahso = undefined;
     rt.calls.add('stoppedOnRunway');
   }
 }
@@ -315,6 +324,7 @@ export function initiateGoAround(ctx: SimContext, ac: Aircraft, o: { reason: str
     if (idx >= 0) ac.runwayAuthorizations.splice(idx, 1);
   }
   rt.landingEnd = undefined;
+  rt.lahso = undefined;
   rt.decisionDone = false;
   rt.calls.delete('gaEst');
   rt.navMode = 'HEADING';
@@ -441,7 +451,7 @@ function maybeEstablishFinal(ctx: SimContext, ac: Aircraft, rt: AircraftRuntime,
   ac.target.altitudeFt = undefined;
   if (rt.approach) {
     // Established on a cleared approach: leave the route, slow to approach speed, fly the course.
-    ac.nav = undefined;
+    // the remaining fixes are still reported when crossed (see `trackCrossingsOnFinal`), the route is no longer flown
     ac.target.headingDeg = undefined;
     rt.navMode = 'AUTO';
     rt.turnDirection = undefined;
@@ -570,6 +580,19 @@ function fixesAhead(ctx: SimContext, g: RunwayEndGeom, onCourse: string[], pos: 
   });
 }
 
+/** On FINAL the route is not flown any more, but the fixes still ahead are sequenced so their crossings are reported. */
+function trackCrossingsOnFinal(ctx: SimContext, ac: Aircraft, rt: AircraftRuntime, perf: AircraftPerformance): void {
+  if (!ac.nav || ac.nav.mode !== 'approach' || (ac.phase !== 'FINAL' && ac.phase !== 'LANDING')) return;
+  for (const id of advanceNav(ctx.state.airport, ac, perf)) {
+    rt.passedFixes.add(id.toUpperCase());
+    emitEvent(ctx, {
+      kind: 'INFO', aircraftId: ac.id, callsign: ac.callsign, severity: 'info', speaker: 'SYSTEM',
+      text: `${ac.callsign} crossed ${id} at ${Math.round(ac.altitudeFt)} ft`, data: { crossing: { fix: id.toUpperCase(), altitudeFt: Math.round(ac.altitudeFt) } },
+    });
+  }
+  if (ac.nav.index >= ac.nav.fixes.length) ac.nav = undefined;
+}
+
 /** Vector-intercept approach clearance: when the course is reached, stop flying the heading and capture it. */
 function capturePendingApproach(ctx: SimContext, ac: Aircraft, rt: AircraftRuntime, g: RunwayEndGeom, perf: AircraftPerformance): void {
   const ap = rt.approach;
@@ -604,6 +627,53 @@ function endOfRoute(ctx: SimContext, ac: Aircraft, rt: AircraftRuntime, g: Runwa
   }
 }
 
+/**
+ * Published fix altitudes (`InstrumentProcedure.fixAltitudes`): the altitude to fly toward on the way along the remaining approach
+ * fixes. Each restriction is met at the fix (mandatory = exactly, max = at or below, min = at or above - the pilot descends to the
+ * minimum): the aircraft descends just in time, at 80% of the type's descent rate, to be at the fix altitude about 20 s before
+ * the fix; it never climbs and never goes below the next minimum.
+ */
+const PROFILE_LEAD_SEC = 20;
+
+function profileAltitude(ctx: SimContext, ac: Aircraft, rt: AircraftRuntime, perf: AircraftPerformance): number | undefined {
+  const ap = rt.approach;
+  const nav = ac.nav;
+  if (!ap?.profile?.length || !nav) return undefined;
+  const base = ac.target.altitudeFt ?? ac.altitudeFt;
+  const gs = Math.max(ktToMps(ac.groundSpeedKt), ktToMps(60));
+  let distM = 0;
+  let prev = ac.pos;
+  let ceiling = Infinity;
+  let floor: number | undefined;
+  for (let i = nav.index; i < nav.fixes.length; i++) {
+    const p = fixPosition(ctx.state.airport, nav.fixes[i]);
+    if (!p) continue;
+    distM += dist(prev, p);
+    // the fix is sequenced (and its crossing altitude reported) at the fly-by turn anticipation point, short of the fix itself
+    const nextP = i + 1 < nav.fixes.length ? fixPosition(ctx.state.airport, nav.fixes[i + 1]) : undefined;
+    const lead = turnLeadM(ac, perf, nextP ? Math.abs(headingDiff(bearingDeg(prev, p), bearingDeg(p, nextP))) : 0);
+    const seqDistM = Math.max(0, distM - lead);
+    prev = p;
+    const entries = ap.profile.filter((f) => f.fix === nav.fixes[i].toUpperCase());
+    if (!entries.length) continue;
+    const lowest = entries.reduce((a, b) => (restrictionReach(b) < restrictionReach(a) ? b : a));
+    const reach = restrictionReach(lowest);
+    if (!Number.isFinite(reach)) continue;
+    // aim to be at the fix altitude about 20 s before the fix: the vertical-speed controller (10 s time constant) lags a ramp by that much
+    const tSec = Math.max(0, seqDistM / gs - PROFILE_LEAD_SEC);
+    ceiling = Math.min(ceiling, reach + (perf.descentRateFpm * 0.8 * tSec) / 60);
+    if (floor === undefined) floor = lowest.mandatoryAltitudeFt ?? lowest.minAltitudeFt;
+  }
+  if (!Number.isFinite(ceiling)) return undefined;
+  // never climb back up to a later, higher restriction once a fix has been crossed
+  return Math.min(ac.altitudeFt, base, Math.max(ceiling, floor ?? -Infinity));
+}
+
+/** The altitude a published restriction asks to be at over the fix: mandatory, else the maximum, else the minimum. */
+function restrictionReach(f: { minAltitudeFt?: number; maxAltitudeFt?: number; mandatoryAltitudeFt?: number }): number {
+  return f.mandatoryAltitudeFt ?? f.maxAltitudeFt ?? f.minAltitudeFt ?? Infinity;
+}
+
 /** Lateral guidance toward `nav.fixes[nav.index]`; undefined once the route is exhausted. */
 function routeGuidance(ctx: SimContext, ac: Aircraft, rt: AircraftRuntime, g: RunwayEndGeom | undefined, perf: AircraftPerformance, wind: Vec2, aglFt: number): Guidance | undefined {
   const airport = ctx.state.airport;
@@ -619,7 +689,16 @@ function routeGuidance(ctx: SimContext, ac: Aircraft, rt: AircraftRuntime, g: Ru
     }
     return { desiredHeading: headingForTrack(gd.track, ac.airspeedKt, wind), altTargetFt: ac.target.altitudeFt, speedKt: gd.speedKt, forceDir: gd.forceDir };
   }
-  for (const id of advanceNav(airport, ac, perf)) rt.passedFixes.add(id.toUpperCase());
+  const sequenced = advanceNav(airport, ac, perf);
+  for (const id of sequenced) {
+    rt.passedFixes.add(id.toUpperCase());
+    if (rt.approach && ac.nav!.mode === 'approach') {
+      emitEvent(ctx, {
+        kind: 'INFO', aircraftId: ac.id, callsign: ac.callsign, severity: 'info', speaker: 'SYSTEM',
+        text: `${ac.callsign} crossed ${id} at ${Math.round(ac.altitudeFt)} ft`, data: { crossing: { fix: id.toUpperCase(), altitudeFt: Math.round(ac.altitudeFt) } },
+      });
+    }
+  }
   const nav = ac.nav!;
   if (g && !ac.isDeparture && ac.phase === 'INBOUND' && dist(ac.pos, g.end.threshold) < nmToM(APPROACH_RANGE_NM)) setPhase(ctx, ac, 'APPROACH');
   if (nav.index >= nav.fixes.length) {
@@ -637,13 +716,18 @@ function routeGuidance(ctx: SimContext, ac: Aircraft, rt: AircraftRuntime, g: Ru
     if (inCaptureZone(g, ac, perf)) desired = centrelineHeading(g, ac, perf, wind);
     // Established inbound on the straight-in segment (on the course within the classification tolerance and no farther
     // out than the IF + 1 nm): hold the assigned altitude until the 3 degree path is reached, then follow it.
+    // With a published profile, non-precision approaches follow the fix altitudes and intercept the 3 degree path at the FAF.
+    const published = !!rt.approach.profile?.length;
     const ifM = rt.approach.ifDM ?? nmToM(12);
-    if (d <= ifM + nmToM(1) && isOnCourse(mToNm(d), mToNm(cross))) {
+    const glideFrom = published && !rt.approach.precision ? (rt.approach.fafDM ?? nmToM(4.5)) + nmToM(0.3) : ifM + nmToM(1);
+    if (d <= glideFrom && isOnCourse(mToNm(d), mToNm(cross))) {
       const gs = glideState(ac, perf, g, d);
       vsFpm = gs.err > 50 ? 0 : gs.vs;
     }
   }
-  return { desiredHeading: desired, altTargetFt: ac.target.altitudeFt, vsFpm, speedKt: ac.target.speedKt ?? defaultSpeedKt(ac, perf, aglFt) };
+  let altTarget = ac.target.altitudeFt;
+  if (nav.mode === 'approach' && rt.approach?.profile?.length) altTarget = profileAltitude(ctx, ac, rt, perf) ?? altTarget;
+  return { desiredHeading: desired, altTargetFt: altTarget, vsFpm, speedKt: ac.target.speedKt ?? defaultSpeedKt(ac, perf, aglFt) };
 }
 
 function stepAirborne(ctx: SimContext, ac: Aircraft, dt: number): void {
@@ -662,6 +746,7 @@ function stepAirborne(ctx: SimContext, ac: Aircraft, dt: number): void {
     capturePendingApproach(ctx, ac, rt, gc!, perf);
     if (!rt.approach.pendingCapture) maybeEstablishFinal(ctx, ac, rt, gc!, perf);
   }
+  trackCrossingsOnFinal(ctx, ac, rt, perf);
   let guid: Guidance | undefined;
   if (ac.nav && ac.nav.mode !== 'vectors' && NAV_PHASES.includes(ac.phase)) guid = routeGuidance(ctx, ac, rt, gc, perf, wind, agl);
   if (guid) {

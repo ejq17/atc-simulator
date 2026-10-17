@@ -116,11 +116,13 @@ function fixtureNav(r13: RunwayEnd, r31: RunwayEnd, r4: RunwayEnd, r22: RunwayEn
     iap('FIX-ILS-OR-LOC-RWY-13', 'ILS OR LOC RWY 13', '13', ['TVO', 'FX13A', 'FX13B', 'FX13M'], {
       missedApproachText: 'Climb to 600 then climbing left turn to 2000 on FVR R-090 to FXS/FVR 11 DME and hold.',
       holdingText: 'FX13A: one-minute hold 4500/2000',
+      fixAltitudes: [{ fix: 'TVO', minAltitudeFt: 2000 }, { fix: 'FX13A', minAltitudeFt: 2000, maxAltitudeFt: 4500 }, { fix: 'FX13B', minAltitudeFt: 1600 }],
       minimaText: 'S-ILS 13 DA 275 RVR 1800 HAT 200 (200-1/2); S-LOC 13 520/45 HAT 445 (500-7/8)',
     }),
     iap('FIX-RNAV-GPS-RWY-22', 'RNAV (GPS) RWY 22', '22', ['FX22F', 'FX22A', 'FX22B', 'FX22C', 'FX22M'], {
       missedApproachText: 'Climb to 600 then climbing right turn to 2000 direct FX22M and hold.',
       holdingText: 'FX22M 6 NM hold',
+      fixAltitudes: [{ fix: 'FX22F', minAltitudeFt: 1800 }, { fix: 'FX22A', minAltitudeFt: 1800 }, { fix: 'FX22B', minAltitudeFt: 1600 }, { fix: 'FX22C', minAltitudeFt: 1100 }],
       minimaText: 'LPV DA 364-1 HAT 296 (300-1); LNAV MDA 520-1 / 520-1 3/8 HAT 452',
     }),
     iap('FIX-RNAV-GPS-RWY-04', 'RNAV (GPS) RWY 04', '4', ['FX04F', 'FX04A', 'FX04B', 'FX04C']),

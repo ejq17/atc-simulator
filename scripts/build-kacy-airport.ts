@@ -25,6 +25,7 @@ import type { PWay } from './kacy/planar.ts';
 import { inferIdentifiers } from './kacy/inference.ts';
 import type { Decision, DiagramLabel } from './kacy/inference.ts';
 import { loadDiagramLabels } from './kacy/diagramLabels.ts';
+import { loadMva } from './kacy/mva.ts';
 import { renderDebugSvg } from './kacy/svg.ts';
 import type {
   KacyAirport,
@@ -34,6 +35,7 @@ import type {
   KacyRunwayEnd,
   KacyTaxiEdge,
   KacyTaxiNode,
+  KacyMvaSector,
   LahsoInfo,
 } from '../src/airport/types.ts';
 
@@ -1001,6 +1003,16 @@ const holdingPatternsOf = (pdfName: string): NonNullable<InstrumentProcedure['ho
     notes: h.notes,
     source: h.provenance,
   }));
+const fixAltSrc: J = readJson('kacy-fix-altitudes.json');
+const fixAltsByPdf = new Map<string, J[]>((fixAltSrc.procedures as J[]).map((p: J) => [p.pdf_name as string, p.fix_altitudes as J[]]));
+const fixAltitudesOf = (pdfName: string): NonNullable<InstrumentProcedure['fixAltitudes']> =>
+  (fixAltsByPdf.get(pdfName) ?? []).map((f: J) => ({
+    fix: f.fix,
+    ...(f.min_altitude_ft !== undefined ? { minAltitudeFt: f.min_altitude_ft } : {}),
+    ...(f.max_altitude_ft !== undefined ? { maxAltitudeFt: f.max_altitude_ft } : {}),
+    ...(f.mandatory_altitude_ft !== undefined ? { mandatoryAltitudeFt: f.mandatory_altitude_ft } : {}),
+    note: `${f.note ?? ''}${f.note ? ' ' : ''}[${f.provenance as string}]`.trim(),
+  }));
 const procedures: InstrumentProcedure[] = [];
 for (const a of procSrc.instrument_approaches as J[]) {
   procedures.push({
@@ -1015,6 +1027,7 @@ for (const a of procSrc.instrument_approaches as J[]) {
     ...textField('holdingText', a.holding),
     ...textField('minimaText', a.minima_summary),
     holdingPatterns: holdingPatternsOf(a.pdf_name),
+    fixAltitudes: fixAltitudesOf(a.pdf_name),
     provenance: dtppProv(a.pdf.url, `${a.printed_amendment_on_plate as string}; HTTP ${a.pdf.http_status as number} ${a.pdf.content_type as string}; ${a.data_provenance as string}`),
   });
 }
@@ -1035,6 +1048,45 @@ for (const k of ['takeoff_minimums_pdf', 'lahso', 'hot_spot'] as const) {
     supportingCharts.push({ id: slug(c.chart_name), name: c.chart_name, chartPdfUrl: c.pdf.url, provenance: dtppProv(c.pdf.url, `Regional NE-2 booklet page (shared by several airports); HTTP ${c.pdf.http_status as number}`) });
   }
 }
+
+// ---------------------------------------------------------------------------------------------
+// Minimum vectoring altitude sectors (FAA MVA digital product, ACY)
+// ---------------------------------------------------------------------------------------------
+const MVA_CHART = 'ACY_MVA_FUS3_2025';
+const MVA_URL = 'https://aeronav.faa.gov/MVA_Charts/kmz/ACY_MVA_FUS3.kml';
+const mvaFile = loadMva(path.join(SRC, 'raw/mva/ACY_MVA_FUS3.kml'), path.join(SRC, 'kacy-mva.json'), {
+  product: 'FAA Minimum Vectoring Altitude (MVA) charts, Atlantic City ATCT/TRACON (ACY)',
+  page: 'https://www.faa.gov/air_traffic/flight_info/aeronav/digital_products/mva_mia/mva/',
+  files: {
+    kml: MVA_URL,
+    xml: 'https://aeronav.faa.gov/MVA_Charts/aixm/ACY_MVA_FUS3.xml',
+    pdf: 'https://aeronav.faa.gov/MVA_Charts/pdf/ACY_MVA_FUS3.pdf',
+    fus5_alternate: 'https://aeronav.faa.gov/MVA_Charts/kmz/ACY_MVA_FUS5.kml (same sector letters and altitudes, slightly different geometry for B, D, E, H, I)',
+  },
+  chart_id: MVA_CHART,
+  retrieved: '2026-10-17',
+  server_last_modified: '2025-10-20T20:50:15Z (HTTP Last-Modified of ACY_MVA_FUS3.kml); chart PDF creation date 2025-07-09',
+  effective_date: 'not stated in the product; "MVA/MIA charts are not updated on a regularly scheduled cycle" (FAA memorandum of 2014-12-08 inside the PDF); facilities review biennially. Chart id carries year 2025.',
+  disclaimer: 'Visual reference only; not to be used as a navigational tool (FAA memorandum in the PDF).',
+  variant_choice: 'FUS3 chosen as the primary variant; the page gives no explanation of FUS3 vs FUS5. Both publish identical sector letters and altitudes (A 1600, B 2000, C 2500, D 2100, E 2000, F 5500, G 2000, H 1700, I 2200 ft MSL).',
+  datum: 'altitudes in feet MSL; polygon coordinates WGS84 lon/lat in the KML',
+});
+const mvaProv = (sectorId: string, note: string): DataProvenance => ({
+  source: `FAA MVA/MIA digital product, chart ${MVA_CHART} (Atlantic City ATCT/TRACON)`,
+  url: MVA_URL,
+  retrievedOn: '2026-10-17',
+  notes: `Sector ${sectorId}. ${note} Effective date not stated in the product (not updated on a regular cycle); file last modified 2025-10-20. Visual reference only, not for navigation.`,
+});
+const mvaSectors: KacyMvaSector[] = mvaFile.sectors.map((sec) => ({
+  id: `ACY-MVA-${sec.id}`,
+  name: sec.id,
+  altitudeFt: sec.altitudeFt,
+  polygon: sec.outer.map(([lon, lat]) => pr(loc(lat, lon))),
+  holes: sec.holes.map((h) => h.map(([lon, lat]) => pr(loc(lat, lon)))),
+  ...(sec.remarks ? { remarks: sec.remarks } : {}),
+  ...(sec.controllingObstruction ? { controllingObstruction: sec.controllingObstruction } : {}),
+  provenance: mvaProv(sec.id, `${sec.altitudeFt} ft MSL; ${sec.holes.length} inner ring(s) (areas inside this sector that have their own altitude).${sec.remarks ? ` Remarks: ${sec.remarks}` : ''}${sec.controllingObstruction ? ` ${sec.controllingObstruction}.` : ''}`),
+}));
 
 // ---------------------------------------------------------------------------------------------
 // Hot spot, LAHSO, airport object
@@ -1087,6 +1139,7 @@ const airport: KacyAirport = {
   navaids,
   procedures,
   hotSpots: [hotSpot],
+  mvaSectors,
   towerHours: facility.tower.tower_hours,
   airspaceClass: facility.airspace.class_c ? 'C' : undefined,
   provenance: [
@@ -1095,6 +1148,7 @@ const airport: KacyAirport = {
     navProv('kacy-navaids.json (ACY VORTAC, VORs, ILS components, 36 fixes)'),
     dtppProv('https://www.faa.gov/air_traffic/flight_info/aeronav/digital_products/dtpp/', 'kacy-procedures.json: 13 IAPs, airport diagram, ATLANTIC CITY THREE DP, hot spot, LAHSO'),
     osmProv('Taxiways, aprons, parking lead-in lines, gates, buildings. Share-alike: the derived taxiway/apron dataset is an ODbL derivative.', true),
+    mvaProv('all', `${mvaSectors.length} sectors from ${MVA_CHART}`),
     dtppProv('https://aeronav.faa.gov/d-tpp/2610/00669AD.PDF', 'Taxiway identifier reconciliation against the airport diagram (label positions from pdftotext -bbox, georeferenced with the diagram graticule).'),
   ],
   buildings,
@@ -1163,6 +1217,12 @@ for (const e of edges) {
   dupKeys.add(k);
 }
 check('no duplicate edges', dups === 0, `${dups} duplicate node pairs`);
+{
+  const hit = mvaSectors.filter((m) => pointInPolygon({ x: 0, y: 0 }, m.polygon as P[]) && !m.holes.some((h) => pointInPolygon({ x: 0, y: 0 }, h as P[])));
+  check('the ARP lies inside exactly one MVA sector', hit.length === 1, hit.map((m) => m.name).join(', ') || 'none');
+  const badAlt = mvaSectors.filter((m) => m.polygon.length < 3 || m.altitudeFt < 1000 || m.altitudeFt > 10000);
+  check('every MVA sector has >= 3 vertices and 1000-10000 ft', badAlt.length === 0, badAlt.map((m) => m.name).join(', '));
+}
 // runway-crossing edges carry onRunwayId
 {
   const tadj = new Map<string, { other: string; e: KacyTaxiEdge }[]>();
@@ -1354,6 +1414,17 @@ R.push('');
 R.push(`Only the 10 airline gates (OSM \`parking_position\` ways ref 1-10, lead-in line from the lane to the stand; stand = last node) are real stand data. The 6 untagged \`parking_position\` ways (${unnamedParkingWays.join(', ')}) are curved lead-in alternatives that start at the same nodes as stands 2-5 and are not used as separate stands. OSM has NO GA, FBO, Coast Guard (apart from 4 helipad polygons), ANG or FAA stand features, so those are SYNTHETIC spots placed on a grid inside real OSM apron polygons (or at helipad centroids / in front of ANG hangars). They are flagged \`source: "synthetic"\`, \`approximate: true\` and are not FAA-charted stands. Each parking node is joined to the nearest taxi/apron edge by an apron connector edge (kind "apron_connector", taxiway "").`);
 R.push('');
 R.push(...mdTable(['id', 'name', 'category', 'zone', 'source', 'heading', 'connector m', 'flag'], parking.map((p) => [p.id, p.name, p.category, p.zone, p.source, p.headingDeg ?? '', p.connectorLengthM ?? '', p.connectorOverLimit ? `OVER ${CONFIG.parkingConnectMaxM} m / unconnected` : ''])));
+R.push('');
+R.push('## Minimum vectoring altitude sectors');
+R.push('');
+R.push(`Source: FAA MVA digital product, chart ${MVA_CHART} (Atlantic City ATCT/TRACON), ${MVA_URL} (also .pdf and AIXM .xml). No effective date is published in the product (MVA charts are not on a regular cycle); the file was last modified 2025-10-20. Visual reference only. Polygons are the outer rings in local metres; sectors that contain other sectors carry \`holes\`. FUS5 variant saved in data/sources/raw/mva/ (same letters/altitudes, slightly different geometry for B, D, E, H, I).`);
+R.push('');
+const ringArea = (r: Vec2[]): number => Math.abs(r.reduce((a, p, i) => a + p.x * r[(i + 1) % r.length].y - r[(i + 1) % r.length].x * p.y, 0)) / 2;
+R.push(...mdTable(['sector', 'MVA ft MSL', 'outer vertices', 'holes', 'area nm2 (outer-holes)', 'contains ARP', 'remarks'], mvaSectors.map((m) => [m.name, m.altitudeFt, m.polygon.length, m.holes.length, r2((ringArea(m.polygon as Vec2[]) - m.holes.reduce((a, h) => a + ringArea(h as Vec2[]), 0)) / 1852 ** 2), pointInPolygon({ x: 0, y: 0 }, m.polygon as P[]) && !m.holes.some((h) => pointInPolygon({ x: 0, y: 0 }, h as P[])) ? 'YES' : '', m.remarks ?? ''])));
+R.push('');
+R.push('## Published fix altitudes (plate transcriptions, data/sources/kacy-fix-altitudes.json)');
+R.push('');
+R.push(...mdTable(['procedure', 'fix', 'min ft', 'max ft', 'mandatory ft', 'note'], procedures.filter((p) => p.type === 'IAP').flatMap((p) => (p.fixAltitudes ?? []).map((f) => [p.name, f.fix, f.minAltitudeFt ?? '', f.maxAltitudeFt ?? '', f.mandatoryAltitudeFt ?? '', (f.note ?? '').replace(/\[transcribed.*$/, '').trim()]))));
 R.push('');
 R.push('## Approximate elements (summary)');
 R.push('');

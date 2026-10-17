@@ -164,6 +164,57 @@ describe('landing clearance (3-10-3)', () => {
   });
 });
 
+describe('landing behind a landed aircraft: the daylight distance exception (3-10-3)', () => {
+  /*
+   * JO 7110.65 3-10-3 (faa.gov): "Between sunrise and sunset, if you can determine distances by reference to suitable landmarks and
+   * the other aircraft has landed, it need not be clear of the runway if the following minimum distance from the landing threshold
+   * exists: When a Category I aircraft is landing behind a Category I or II- 3,000 feet. When a Category II aircraft is landing
+   * behind a Category I or II- 4,500 feet." (No figure for Category III.)
+   */
+  const DAY = Date.UTC(2026, 9, 17, 16, 0, 0); // sunrise ~11:11Z, sunset ~22:17Z
+  const NIGHT = Date.UTC(2026, 9, 17, 4, 0, 0);
+  const rolled = (succ: string, prec: string, alongFt: number, utcStartMs: number, mode: 'training' | 'free_play' = 'training') => {
+    registerPerformance({ ...C172, type: 'PA34', category: 'light' });
+    const e = makeEngine({
+      scenario: makeScenario({ spawns: [ARRIVING('LAND1', '13', 3, succ, 'TWR'), ARRIVING('PREC', '13', 3, prec, 'TWR')], mode }),
+      opts: { utcStartMs },
+    });
+    run(e, 1);
+    const p = find(e, 'PREC');
+    place(e, fixture, 'PREC', '13', alongFt + 0);
+    p.onGround = true;
+    p.altitudeFt = fixture.elevationFt;
+    p.phase = 'ROLLOUT';
+    p.groundSpeedKt = 30;
+    p.isDeparture = false;
+    return e.applyCommand(cmd('LAND', 'LAND1', { runwayEnd: '13' }));
+  };
+
+  it('daylight: Category I behind Category I needs 3,000 ft to the landed aircraft; inside it, refused', () => {
+    expect(rolled('C172', 'C172', 3300, DAY).status).toBe('accepted');
+    const r = rolled('C172', 'C172', 2400, DAY);
+    expect(r.status).toBe('rejected');
+    if (r.status === 'rejected') expect(r.reason).toMatch(/occupied by PREC/);
+  });
+
+  it('daylight: Category II behind Category I or II needs 4,500 ft; Category I behind Category II needs 3,000 ft', () => {
+    expect(rolled('PA34', 'C172', 4000, DAY).status).toBe('rejected');
+    expect(rolled('PA34', 'C172', 4800, DAY).status).toBe('accepted');
+    expect(rolled('PA34', 'PA34', 4800, DAY).status).toBe('accepted');
+    expect(rolled('C172', 'PA34', 3300, DAY).status).toBe('accepted');
+  });
+
+  it('Category III on either side: no exception (the paragraph gives no figure), the runway must be clear', () => {
+    expect(rolled('A320', 'C172', 5000, DAY).status).toBe('rejected');
+    expect(rolled('C172', 'A320', 5000, DAY).status).toBe('rejected');
+  });
+
+  it('night: the same geometry is refused (the exception is between sunrise and sunset only); free play flags it', () => {
+    expect(rolled('C172', 'C172', 3300, NIGHT).status).toBe('rejected');
+    expect(rolled('C172', 'C172', 3300, NIGHT, 'free_play').status).toBe('accepted'); // accepted, scored as unsafe
+  });
+});
+
 describe('same-runway separation on real KACY (10,001 ft runway 13)', () => {
   const kacy = loadKacy();
   it('A320 behind C172 at 4,000 ft refused, behind A320 at 6,500 ft allowed (from the Charlie hold)', () => {

@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { pickBestAlternative, scoreAviationPlausibility } from './aviationVocab.ts';
 import { buildDeepgramListenUrl, createDeepgramProvider, DEEPGRAM_WS_BASE, resolveDeepgramWsBase } from './deepgramProvider.ts';
-import { createResampler, floatToInt16 } from './pcmCapture.ts';
+import { createResampler, floatToInt16, hasTrackProcessor, startPcmCapture } from './pcmCapture.ts';
 import { appendTranscript, createWebSpeechProvider, describeWebSpeechError, sameStart } from './webSpeechProvider.ts';
 import { sttErrorCode } from './types.ts';
 
@@ -173,6 +173,62 @@ describe('deepgram', () => {
       });
     expect(await mk(true).isAvailable()).toBe(true);
     expect(await mk(false).isAvailable()).toBe(false);
+  });
+});
+
+describe('track-processor capture (no AudioContext, so no dependence on an audio output device)', () => {
+  /** 48 kHz stereo AudioData-like frames of 480 samples (10 ms) with a constant value per channel. */
+  const frame = (l: number, r: number) => ({
+    numberOfFrames: 480, numberOfChannels: 2, sampleRate: 48000,
+    copyTo(dest: Float32Array, o: { planeIndex: number }) { dest.fill(o.planeIndex === 0 ? l : r); },
+    close: vi.fn(),
+  });
+  function stubProcessor(frames: Array<ReturnType<typeof frame>>) {
+    class FakeProcessor {
+      readable: ReadableStream<unknown>;
+      constructor(_init: { track: unknown }) {
+        let i = 0;
+        this.readable = new ReadableStream({ pull(c) { if (i < frames.length) c.enqueue(frames[i++]); else c.close(); } });
+      }
+    }
+    vi.stubGlobal('MediaStreamTrackProcessor', FakeProcessor);
+  }
+  const fakeStream = () => {
+    const stop = vi.fn();
+    return { stop, stream: { getAudioTracks: () => [{ getSettings: () => ({ sampleRate: 48000 }) }], getTracks: () => [{ stop }] } as unknown as MediaStream };
+  };
+
+  it('is detected, downmixes to mono, resamples 48 kHz to 16 kHz and delivers 100 ms Int16 chunks', async () => {
+    const frames = Array.from({ length: 30 }, () => frame(0.5, -0.1)); // 300 ms
+    stubProcessor(frames);
+    try {
+      expect(hasTrackProcessor()).toBe(true);
+      const chunks: ArrayBuffer[] = [];
+      const { stream, stop } = fakeStream();
+      const cap = await startPcmCapture(stream, (c) => chunks.push(c));
+      await new Promise((r) => setTimeout(r, 20));
+      await cap.stop();
+      const samples = chunks.flatMap((c) => Array.from(new Int16Array(c)));
+      expect(samples.length).toBeGreaterThanOrEqual(4700); // about 0.3 s * 16000, minus resampler tail
+      expect(samples.length).toBeLessThanOrEqual(4800);
+      expect(chunks[0].byteLength).toBe(3200); // 1600 samples
+      expect(Math.abs(samples[100] - Math.round(0.2 * 32767))).toBeLessThanOrEqual(2); // (0.5 + -0.1) / 2
+      expect(stop).toHaveBeenCalled(); // microphone released
+      expect(frames.every((f) => f.close.mock.calls.length === 1)).toBe(true); // every AudioData closed
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it('falls back (returns null path) when the stream has no audio track', async () => {
+    stubProcessor([]);
+    try {
+      const noTrack = { getAudioTracks: () => [], getTracks: () => [] } as unknown as MediaStream;
+      // No AudioContext in node either, so the fallback path rejects with the Web Audio error rather than hanging.
+      await expect(startPcmCapture(noTrack, () => undefined)).rejects.toThrow(/Web Audio/);
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 });
 

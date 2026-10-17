@@ -10,6 +10,7 @@ import type {
 } from './types';
 import { mulberry32 } from './rng';
 import { emitEvent } from './context';
+import { setSimulationEpoch } from './solar';
 import type { SimContext } from './context';
 import { executeCommand } from './commandExecutor';
 import { updateGroundMovement } from './groundMovement';
@@ -29,6 +30,8 @@ export interface EngineOptionsExt extends EngineOptions {
   readbackErrorRate?: number;
   /** Continuous traffic source. Default: basic generator driven by scenario.traffic. */
   trafficGenerator?: TrafficGenerator;
+  /** Wall-clock UTC (ms since the epoch) of scenario time 0: drives sunrise / sunset (LAHSO, 3-10-3 daylight rule). Default: the real time at engine creation. */
+  utcStartMs?: number;
 }
 
 export const DEFAULT_WEATHER: Weather = {
@@ -76,6 +79,7 @@ export function createEngine(opts: EngineOptionsExt): SimulationEngine {
     score: newScoreCard(),
     seed: scenario.seed,
   };
+  setSimulationEpoch(state, opts.utcStartMs ?? Date.now());
   const ctx: SimContext = {
     state,
     rng,

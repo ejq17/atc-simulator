@@ -21,6 +21,8 @@ here knows about KACY. Tests run against the synthetic `__fixtures__/testAirport
 | `navigation.ts` | Lateral navigation over fixes: fix lookup (`Airport.navaids`), `distanceToFixNm`, `bearingToFixMag`, fly-by sequencing (`advanceNav`, `turnLeadM`) |
 | `approach.ts` | Instrument / visual approach analysis: procedure classification, `assessApproach` (route join, intercept geometry, weather, range) |
 | `missedApproach.ts` | Interpreter and guidance for the published missed approach text; published-hold lookup |
+| `solar.ts` | NOAA solar position at the airport: `isDaylight` / `sunriseSunsetUtc`, the engine epoch (`utcStartMs`) for sunrise-sunset rules |
+| `mva.ts` | Minimum vectoring altitude lookup (`Airport.mvaSectors`, optional `holes`), 2 nm look-ahead, exemptions |
 | `holding.ts` | Holding patterns with the AIM 5-3-8 direct / teardrop / parallel entries, `holdingText` parser |
 | `minima.ts` | Approach minima from `minimaText`, runway-in-sight test for the decision altitude |
 | `ifr.ts` | IFR clearance defaults (DP name from `airport.procedures`, squawk assignment) |
@@ -117,8 +119,8 @@ pilot readback (`onPilotTransmission` fires; callers must NOT speak the returned
     runway end or turned to avert any conflict" is the "past the end / turned away" case; the distance alternative needs
     landmark-determinable distance, which the simulator always has.
   * LAND: a preceding aircraft on the ground on the runway (landed and not clear, rolling, cleared for takeoff, in position) is
-    unsafe; the 3-10-3 sunrise-to-sunset exception (a landed aircraft need not be clear if 3,000 / 4,500 ft down the runway) is NOT
-    applied because the simulator has no time of day. A preceding airborne departure blocks unless it has crossed the runway end /
+    unsafe, except by the 3-10-3 sunrise-to-sunset exception (a landed aircraft need not be clear if its tail is 3,000 ft (Cat I
+    follower) / 4,500 ft (Cat II follower) from the landing threshold; no figure for Cat III; daylight from `solar.ts`, see below). A preceding airborne departure blocks unless it has crossed the runway end /
     turned away or is the categorical distance (same figures, 3-10-3 b) beyond the landing threshold.
   * Anticipating separation (3-9-5 / 3-10-6) is the conservative version: only the separation that ALREADY exists counts, a
     clearance given while the leader is still rolling is refused (training; the other modes flag it as `UNSAFE_CLEARANCE`).
@@ -129,8 +131,8 @@ pilot readback (`onPilotTransmission` fires; callers must NOT speak the returned
 * **Intersecting runways (3-9-8 departures, 3-10-4 arrivals, text fetched 2026-10-17)**: judged by position, not by a height: a
   departure on one runway is blocked until the preceding departure on the other runway "has departed and passed the intersection"
   (its position along its runway beyond the centreline intersection + 60 m), or a preceding arrival there is clear of the runway /
-  has passed the intersection (an arrival still rolling out before it blocks; the hold-short / exit-acknowledgement releases and
-  LAHSO are not modelled). An arrival that is still airborne on final does NOT by itself make a departure unsafe: only if it would
+  has passed the intersection (an arrival still rolling out before it blocks; the hold-short / exit-acknowledgement releases are
+  not modelled; land and hold short is, see below). An arrival that is still airborne on final does NOT by itself make a departure unsafe: only if it would
   cross its threshold before the departure clears the intersection (arrival: distance / ground speed; departure: 2.5 s roll
   delay + `sqrt(2 d / a)` with the type's acceleration). Likewise an arrival clearance is unsafe only if the arrival would reach its
   threshold before a departing aircraft on the other runway passes the intersection; between two arrivals, only if the one that
@@ -279,10 +281,12 @@ information alpha."*, pending request `APPROACH`.
   join point (intercept point, or the first on-course fix it will fly). The leader is advanced by `groundspeed x
   (distance still to fly to the join point / follower groundspeed)`, floor 0. Too close -> `UNSAFE_CLEARANCE` (training refuses,
   other modes flag and score). 3 nm is the terminal radar minimum of JO 7110.65 5-5-4 MINIMA (single-sensor ASR/FUSION; 5 nm
-  applies in STARS multi-sensor mode or beyond 40 mi, ignored). **Wake:** when the follower's `wakeCategory` is `light` (C172) and
-  the leader's is not (A320) the minimum is **5 nm**, and the reason text says "wake turbulence separation (simplified from the
-  7110.65 5-5-4 wake tables)". The category mapping is simplified to `AircraftPerformance.wakeCategory`; the tables' 6 mi on
-  approach, heavy / B757 categories and the 2.5 nm reduction are not modelled.
+  applies in STARS multi-sensor mode or beyond 40 mi, ignored). **Wake (`wake.ts`, JO 7110.65 5-5-4 TBL 5-5-3 / 5-5-4, cells read from
+  the faa.gov HTML tables on 2026-10-17):** aircraft in trail on the same final are "on approach" (TBL 5-5-4); the minimum is
+  `max(3 NM radar, table)` with the RECAT categories of JO 7110.126A Appendix A (`wakeRecatCategory`: A320 = F, C172 = I). F leader ->
+  I follower is **4 NM** on approach (nothing directly behind); F->F, I->F and I->I have blank cells (3 NM radar minimum). The reason
+  text cites "7110.65 5-5-4, TBL 5-5-4 on approach: Category F leader, Category I follower ... 4 NM". The whole tables are coded
+  (A-E leaders, e.g. B->I 6 NM, A->I 8 NM) but the simulator's two types only exercise F and I. The 2.5 NM reduction is not modelled.
 
 Procedure geometry (all relative to the runway end; no airport knowledge): *on-course* fixes (1-40 nm out, `|cross| <= 0.2 d +
 0.3 nm`) form the straight-in segment (farthest = IF/IAF, the one closest but >= 3 nm out = FAF); fixes listed *before* the
@@ -304,14 +308,78 @@ On acceptance (`rt.approach` is set; the clearance is `completeClearances`-ed wh
   FINAL logic) it turns onto the centreline and `nav` becomes the on-course fixes still ahead;
 * VISUAL (and legacy aircraft that navigate to the runway on their own): no route, runway guidance.
 
-Vertical: the assigned altitude is held. Once established inbound on the straight-in segment (on course and no more than 1 nm
-outside the IF) the aircraft intercepts the 3 degree path **from below** (level until the path arrives) or descends onto it from
-above at up to 1.3x the descent rate; no per-fix altitude restrictions. FINAL (the existing glidepath / decision-point logic)
+Vertical: with a published profile (`InstrumentProcedure.fixAltitudes`, see below) the approach descends along the plate; without one
+the assigned altitude is held. Once established inbound on the straight-in segment (on course and no more than 1 nm outside the IF)
+the aircraft intercepts the 3 degree path **from below** (level until the path arrives) or descends onto it from above at up to 1.3x
+the descent rate. FINAL (the existing glidepath / decision-point logic)
 starts when established inside **8 nm** (`APPROACH_FINAL_NM`; 7 nm jets / 4 nm light for aircraft without an approach
 clearance), the assigned speed is dropped to approach speed. On Approach the pilot reports *"established on the ILS runway one three."*
 (pending `FREQUENCY_CHANGE`); the controller hands off with `CONTACT_FREQUENCY TWR`; the pilot checks in with Tower *"Atlantic
 City Tower, Spirit four fifty one, seven mile final runway one three, full stop."* (pending `LANDING`); `LAND` as before
 (an approach-cleared aircraft keeps its route when LAND is issued; one that is not drops its route and flies to the runway).
+
+### Published fix altitudes (`InstrumentProcedure.fixAltitudes`, `flightDynamics.profileAltitude`)
+
+When an approach is accepted its `fixAltitudes` become `rt.approach.profile` (`fix`, `minAltitudeFt`, `maxAltitudeFt`,
+`mandatoryAltitudeFt`; KACY has them on all 13 IAPs: RNAV 22 KOPCE 1800 / FLDER 1600 / EFEWY 1100, ILS Z 13 MAYBN 1600, ILS 31 PRSTY
+1700). Along the fixes still ahead the aircraft flies the altitude implied by the restrictions: a *mandatory* altitude is met exactly,
+a *maximum* is met (descend to it), a *minimum* is the lowest allowed (the pilot descends to it and stops). Between fixes the descent
+is just in time at 80% of the type's descent rate, aiming to be at the fix altitude `PROFILE_LEAD_SEC` = 20 s before the fly-by
+sequencing point (the 10 s vertical-speed controller lags a ramp by ~10 s), the ceiling being the minimum over all later restricted
+fixes `reach_i + 0.8 * rate * (t_i - 20 s)`. The aircraft **never climbs** (target = min of the current altitude and that ceiling) and
+never goes below the next minimum. On a non-precision approach the 3 degree path is intercepted at the FAF altitude: the descent
+from the FAF fix starts `fafDM + 0.3 nm` out, replacing the old "hold the assigned altitude until established, then 3 degrees"
+simplification; precision approaches (ILS) still capture the glidepath from the intercept altitude, with the fix altitudes honoured
+before it. `INFO` events `"<cs> crossed <FIX> at <alt> ft"` carry `data.crossing = { fix, altitudeFt }`; they are also emitted for the
+fixes passed while on FINAL (the route is not flown there but the fixes are still sequenced). Measured on real KACY RNAV 22 from PIDVE
+at 4,000 ft, A320, 170 kt: KOPCE 1836 (plate 1800), FLDER 1621 (1600), EFEWY 1162 (1100): all within 100 ft, no climb above 10 ft.
+Without a profile (the fixture's other procedures, other airports) behaviour is unchanged.
+
+### Land and hold short (`commandExecutor.planLahso`, `flightDynamics.chooseExit`)
+
+JO 7110.65 3-10-4 / 3-10-5, AIM 4-3-11, JO 7110.118 (the 7/14/00 edition was fetched; the AIM paragraph 4-3-11 and 7110.65 3-10-3
+text were fetched from faa.gov on 2026-10-17). `LAND` with `holdShort` (`['RWY13']` or `['13/31']`) is validated in this order:
+(1) the runway end has a NASR LAHSO entry (`RunwayEnd.lahso`) naming that runway, else "we can't hold short of runway ..." (KACY: 4
+short of 13/31 ALD 3,550 ft; 13 short of 4/22 3,600 ft; 31 short of 4/22 5,750 ft); (2) `landingDistanceFt` of the type <= the
+published ALD, else the pilot is unable ("we're unable to hold short of runway one three") and the clearance is NOT issued
+(C172 1,335 ft yes, A320 4,500 ft no on runway 4); (3) conditions: ceiling >= 1,000 ft and visibility >= 3 sm (AIM 4-3-11 /
+7110.118 11a), a dry runway (no precipitation phenomena RA DZ SN GR PL IC UP SG TS), tailwind on the other runway < 3 kt, and
+**between sunrise and sunset** (NOAA solar position at the ARP, 0.833 degree refraction + disc, epoch `EngineOptionsExt.utcStartMs`,
+default `Date.now()`). Training refuses with the reasons; other modes accept and flag it ("Improper instruction accepted"). Discrepancy
+noted: 7110.118 does not forbid night LAHSO outright (it needs land-and-hold-short lights and, for air carriers, a visual glide-slope
+indicator, 11c / 11d) but the airport data states neither, so the simulator keeps the coordinator's sunrise-sunset limit. Not
+modelled: wind-shear reports, air-carrier minima (1,500 ft / 5 sm without PAPI/VASI), the appendix-1 aircraft list (the ALD test stands
+in), the traffic-information exchange. Readback: *"Runway four, cleared to land, hold short of runway one three, <callsign>"*.
+Effects: the clearance carries `holdShort`; the intersecting-runway issues (3-10-4) against the hold-short runway are not raised (either
+way round: a departure on 13 is allowed while a LAHSO arrival is on 4); `rt.lahso` makes `chooseExit` drop exits beyond the hold-short
+point and cap the stop target to `min(hold-short point, ALD) - length/2 - 10 m`. The C172 on KACY 4 stops with its nose at 3,411 ft,
+the hold-short point being at 3,550 ft. If the nose passes the point (not reachable with the planner, but guarded), `detectConflicts`
+raises a `RUNWAY_INCURSION` of the other runway.
+
+### Minimum vectoring altitude (`mva.ts`, `conflicts.assessMva`)
+
+JO 7110.65 5-6-1: vector aircraft "at or above the MVA or the minimum IFR altitude except as authorized for radar approaches, radar
+departures, special VFR, VFR operations, or by paragraph 5-6-3". With `Airport.mvaSectors` present, an `ALTITUDE` assignment below the
+MVA of the sector the aircraft is in or one it enters within 2 nm along its track (`MVA_LOOKAHEAD_NM`, sampled every 0.25 nm), or a
+`HEADING` whose new track (magnetic -> true) enters a sector whose MVA is above `min(altitude, assigned altitude)`, is unsafe
+(`UNSAFE_CLEARANCE`, reference `REF_MVA`): training refuses, free play accepts and scores it. Exempt: VFR, on the ground, INITIAL_CLIMB
+(radar departure), FINAL / LANDING / ROLLOUT, and nav modes `approach` / `missed` / `holding` (a published procedure segment; an
+aircraft still being vectored to intercept is not). Lookup: a point inside a sector's `holes` (inner rings, duck-typed) is not in it;
+the smallest containing sector wins (equal area: the higher altitude); outside every sector there is no restriction. KACY: the ARP
+resolves to 1,600 ft (sector A), a point in sector C to 2,500 ft. The approach-gate relaxation ("ceiling >= MVA + 500") still uses the
+simplified VMC approximation.
+
+### Same-runway landing behind a landed aircraft, daylight exception (3-10-3)
+
+"Between sunrise and sunset, if you can determine distances by reference to suitable landmarks and the other aircraft has landed, it
+need not be clear of the runway if the following minimum distance from the landing threshold exists: When a Category I aircraft is
+landing behind a Category I or II - 3,000 feet. When a Category II aircraft is landing behind a Category I or II - 4,500 feet."
+`conflicts.landedDistanceExceptionApplies`: the preceding aircraft must have landed (ROLLOUT / RUNWAY_EXIT / LANDING on the ground,
+same runway end), the tail of the preceding aircraft (position - length / 2) must be at least 3,000 ft (subject Category I) or 4,500 ft
+(subject Category II) from the subject's landing threshold, and it must be daytime (`solar.ts`, epoch `utcStartMs`). There is no figure
+for Category III on either side, so the exception never applies to the A320. The "suitable landmarks" are assumed. The airborne case
+(departed and crossed the runway end, or airborne beyond the categorical distance) has no daylight condition in the text and is
+unchanged.
 
 ### Published missed approach (`missedApproach.ts`)
 
@@ -430,7 +498,7 @@ surface carry `onRunwayId`; parking nodes of kind `parking`; GND/TWR frequencies
 * Pattern work is minimal (downwind -> base -> final, fixed 0.8 nm offset); holding patterns are not flown.
 * Pushback is a state change only (no motion). No vehicles, no de-icing, no helicopters.
 * After a go-around the aircraft flies runway heading at a fixed altitude until instructed.
-* IFR: no procedure turns, DME arcs, STARs, speed/altitude restrictions per fix; one transponder code per aircraft, no radar coverage model (everything is "radar
+* IFR: no procedure turns, DME arcs, STARs, speed restrictions per fix (published fix altitudes on approaches are flown); one transponder code per aircraft, no radar coverage model (everything is "radar
   contact" once identified); departure clearance has no void time; the missed approach is "2000 ft on runway heading" only when the plate text is unavailable or not interpretable.
 * Free-play traffic generation still spawns arrivals on the extended centreline, not at fixes (scenarios use `at_fix`).
 * `radioState` `RECEIVING` is not used (readbacks are instantaneous); no frequency congestion yet.

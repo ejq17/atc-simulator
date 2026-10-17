@@ -40,13 +40,13 @@ function kindOf(p: InstrumentProcedure): (typeof KIND_ORDER)[number] | undefined
 }
 
 /** The procedure the radar draws for a runway end: ILS first, then RNAV, LOC, VOR; the first listed among equals. */
-export function pickProcedure(airport: Pick<Airport, 'procedures'>, endId: string): { procedure: InstrumentProcedure; label: string } | undefined {
+export function pickProcedure(airport: Pick<Airport, 'procedures'>, endId: string, prefer?: string): { procedure: InstrumentProcedure; label: string } | undefined {
   let best: { p: InstrumentProcedure; rank: number; kind: string } | undefined;
   for (const p of airport.procedures) {
     if (p.type !== 'IAP' || p.runwayEnd !== endId || !p.fixes?.length) continue;
     const kind = kindOf(p);
     if (!kind) continue;
-    const rank = KIND_ORDER.indexOf(kind);
+    const rank = prefer && (kind === prefer || (prefer === 'LOC' && kind === 'ILS')) ? -1 : KIND_ORDER.indexOf(kind);
     if (!best || rank < best.rank) best = { p, rank, kind };
   }
   return best ? { procedure: best.p, label: `${best.kind} ${endId}` } : undefined;

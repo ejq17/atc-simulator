@@ -9,7 +9,7 @@ import { placeLabels } from './labels';
 import type { LabelRequest } from './labels';
 import { worldToScreen } from './viewTransform';
 import type { View } from './viewTransform';
-import { M_PER_NM, deg2rad, headingVec } from '../lib/geom';
+import { M_PER_NM, deg2rad, headingVec, polygonCentroid } from '../lib/geom';
 import { altHundreds, magHeading, phaseShort, trendArrow } from '../lib/format';
 import { navLetter } from '../lib/ifr';
 import { procedureGeometry } from '../lib/procedures';
@@ -21,6 +21,8 @@ export interface RadarLayers {
   rings: boolean;
   compass: boolean;
   approachPaths: boolean;
+  /** Minimum vectoring altitude sectors (`airport.mvaSectors`); drawn from 20 NM range up, and only when the airport data has them. */
+  mva: boolean;
   /** Instrument-procedure fixes (IF/FAF...) of the active landing runways and their final approach course. */
   procedures: boolean;
   /** Active route of the selected aircraft (dashed). */
@@ -35,12 +37,12 @@ export interface RadarLayers {
 }
 
 export const DEFAULT_RADAR_LAYERS: RadarLayers = {
-  rings: true, compass: true, approachPaths: true, procedures: true, routes: true, navaids: true, fixes: true, allFixes: false,
+  rings: true, compass: true, approachPaths: true, mva: true, procedures: true, routes: true, navaids: true, fixes: true, allFixes: false,
   labels: true, history: true, groundTargets: true, sweep: true,
 };
 
 export const RADAR_LAYER_LABELS: Record<keyof RadarLayers, string> = {
-  rings: 'Range rings', compass: 'Compass rose', approachPaths: 'Approach paths', procedures: 'Procedure fixes (landing rwy)',
+  rings: 'Range rings', compass: 'Compass rose', approachPaths: 'Approach paths', mva: 'MVA sectors (20 NM and up)', procedures: 'Procedure fixes (landing rwy)',
   routes: 'Selected aircraft route', navaids: 'Navaids', fixes: 'Approach fixes', allFixes: 'All fixes',
   labels: 'Data blocks', history: 'History dots', groundTargets: 'Ground targets', sweep: 'Sweep line (cosmetic)',
 };
@@ -63,6 +65,7 @@ export const RAD = {
   sweep: '57,211,83',
   route: '#c58cff',
   procFix: '#4fb3cf',
+  mva: '#8a6f3c',
   text: '#c9ded0',
 } as const;
 
@@ -271,6 +274,49 @@ function drawNavaids(ctx: CanvasRenderingContext2D, v: View, airport: Airport, r
       ctx.fillText(n.id, s.x + 8, s.y);
     }
   }
+}
+
+/** MVA sectors are drawn at 20 NM and wider, when the layer is on and the airport data has sectors. */
+export const MVA_MIN_RANGE_NM = 20;
+export function mvaVisible(airport: Pick<Airport, 'mvaSectors'>, layers: Pick<RadarLayers, 'mva'>, rangeNm: number): boolean {
+  return layers.mva && rangeNm >= MVA_MIN_RANGE_NM && !!airport.mvaSectors?.length;
+}
+
+/** Sector label: altitude in hundreds of feet ("025") at the sector centroid. */
+export function mvaLabel(sector: { polygon: Vec2[]; altitudeFt: number }): { text: string; at: Vec2 } {
+  return { text: altHundreds(sector.altitudeFt), at: polygonCentroid(sector.polygon) };
+}
+
+function drawMva(ctx: CanvasRenderingContext2D, v: View, airport: Airport): void {
+  ctx.save();
+  ctx.lineWidth = 1;
+  ctx.strokeStyle = RAD.mva;
+  ctx.fillStyle = RAD.mva;
+  ctx.globalAlpha = 0.7;
+  ctx.setLineDash([2, 3]);
+  for (const sec of airport.mvaSectors ?? []) {
+    if (sec.polygon.length < 3) continue;
+    ctx.beginPath();
+    sec.polygon.forEach((p, i) => {
+      const s = toScr(v, p);
+      if (i === 0) ctx.moveTo(s.x, s.y);
+      else ctx.lineTo(s.x, s.y);
+    });
+    ctx.closePath();
+    ctx.stroke();
+  }
+  ctx.setLineDash([]);
+  ctx.font = `600 11px ${FONT_MONO}`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  for (const sec of airport.mvaSectors ?? []) {
+    if (sec.polygon.length < 3) continue;
+    const l = mvaLabel(sec);
+    const s = toScr(v, l.at);
+    if (s.x < 0 || s.y < 0 || s.x > v.width || s.y > v.height) continue;
+    ctx.fillText(l.text, s.x, s.y);
+  }
+  ctx.restore();
 }
 
 function navaidPos(airport: Airport, id: string): Vec2 | undefined {
@@ -543,6 +589,7 @@ export function drawRadar(ctx: CanvasRenderingContext2D, frame: Frame, v: View, 
   ctx.fillRect(0, 0, v.width, v.height);
   drawRings(ctx, v, rangeNm, layers);
   if (layers.compass) drawCompassRose(ctx, v, rangeNm, airport.magneticVariationDeg);
+  if (mvaVisible(airport, layers, rangeNm)) drawMva(ctx, v, airport);
   if (layers.sweep) drawSweep(ctx, v, rangeNm, frame.nowMs);
   if (layers.approachPaths) drawApproachPaths(ctx, v, airport, state.activeRunways.landing, rangeNm, layers);
   drawAirport(ctx, v, airport);

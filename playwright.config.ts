@@ -58,6 +58,13 @@ export default defineConfig({
       use: { ...devices['Desktop Chrome'], channel: 'chrome', viewport: { width: 1440, height: 900 }, permissions: ['microphone'] },
     },
     {
+      // OPT-IN (REAL_MIC=1): real microphone + real speakers, no fake device. See e2e/realmic.spec.ts.
+      name: 'chrome-real-mic',
+      testMatch: 'realmic.spec.ts',
+      timeout: 300_000,
+      use: { ...devices['Desktop Chrome'], channel: 'chrome', viewport: { width: 1440, height: 900 }, permissions: ['microphone'] },
+    },
+    {
       name: 'chromium-deepgram-mock',
       testMatch: 'deepgram.spec.ts',
       timeout: 120_000,

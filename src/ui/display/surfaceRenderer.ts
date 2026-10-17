@@ -180,6 +180,47 @@ function drawTaxiwayIds(ctx: CanvasRenderingContext2D, v: View, airport: Airport
   }
 }
 
+export interface LahsoMark { endId: string; pos: Vec2; /** TRUE heading of the landing runway the point is on. */ headingDeg: number; availableFt: number; holdShortOfRunwayId: string }
+
+/** NASR LAHSO hold-short points of the runway ends that have them (KACY: 4, 13, 31). */
+export function lahsoMarks(airport: Pick<Airport, 'runways'>): LahsoMark[] {
+  const out: LahsoMark[] = [];
+  for (const rw of airport.runways) {
+    for (const e of rw.ends) {
+      const l = e.lahso;
+      if (l) out.push({ endId: e.id, pos: l.holdShortPoint.pos, headingDeg: e.trueHeadingDeg, availableFt: l.availableLandingDistanceFt, holdShortOfRunwayId: l.holdShortOfRunwayId });
+    }
+  }
+  return out;
+}
+
+const LAHSO_COLOR = '#e040fb';
+
+/** A short magenta tick across the landing runway at each LAHSO hold-short point, labelled "LAHSO". */
+function drawLahso(ctx: CanvasRenderingContext2D, v: View, airport: Airport): void {
+  const half = Math.max(8, 22 * v.scale * 2);
+  ctx.strokeStyle = LAHSO_COLOR;
+  ctx.fillStyle = LAHSO_COLOR;
+  ctx.lineWidth = 2.5;
+  ctx.setLineDash([]);
+  ctx.font = `600 10px ${FONT_MONO}`;
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'middle';
+  for (const m of lahsoMarks(airport)) {
+    const s = worldToScreen(v, m.pos);
+    if (s.x < -40 || s.y < -40 || s.x > v.width + 40 || s.y > v.height + 40) continue;
+    // Tick across the runway: perpendicular to its heading (screen: world (dx, dy) -> (dx, -dy)).
+    const r = (m.headingDeg * Math.PI) / 180;
+    const px = Math.cos(r);
+    const py = Math.sin(r);
+    ctx.beginPath();
+    ctx.moveTo(s.x - px * half, s.y - py * half);
+    ctx.lineTo(s.x + px * half, s.y + py * half);
+    ctx.stroke();
+    ctx.fillText('LAHSO', s.x + px * (half + 5), s.y + py * (half + 5));
+  }
+}
+
 function drawHoldLines(ctx: CanvasRenderingContext2D, v: View, airport: Airport): void {
   const st = buildSurfaceStatic(airport);
   const half = Math.max(7, 13 * v.scale * 2);
@@ -523,6 +564,7 @@ export function drawSurface(ctx: CanvasRenderingContext2D, frame: Frame, v: View
   drawRunwayNumbers(ctx, v, airport);
   if (layers.taxiwayIds) drawTaxiwayIds(ctx, v, airport);
   drawHoldLines(ctx, v, airport);
+  drawLahso(ctx, v, airport);
   if (layers.parking) drawParking(ctx, v, airport);
   drawMarkers(ctx, v, airport);
   if (layers.routes) drawRoutes(ctx, v, frame);

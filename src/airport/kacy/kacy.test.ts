@@ -6,6 +6,7 @@ import procSrc from '../../../data/sources/kacy-procedures.json';
 import { getAirport, OSM_ATTRIBUTION, listAirports } from '..';
 import { angleDiffDeg, bearingDeg } from '../projection';
 import { holdingPositionsForRunway, runwayEntryNodes, runwayExitNodes } from '../graphUtils';
+import { mvaAltitudeAt, mvaSectorAt } from '../mva';
 import { loadKacy } from '.';
 
 const ap = loadKacy();
@@ -276,6 +277,83 @@ describe('holding patterns (plate transcriptions)', () => {
       for (const h of p.holdingPatterns!) {
         expect(h.legNm !== undefined || h.legMinutes !== undefined, `${p.name} ${h.fix}`).toBe(true);
         expect((h as unknown as { source: string }).source, p.name).toMatch(/transcribed from plate P_.*\.png .* by visual read/);
+      }
+    }
+  });
+});
+
+describe('minimum vectoring altitude sectors (FAA MVA product, ACY)', () => {
+  const sectors = ap.mvaSectors ?? [];
+  const inRing = (p: { x: number; y: number }, ring: { x: number; y: number }[]) => {
+    let inside = false;
+    for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+      const a = ring[i];
+      const b = ring[j];
+      if (a.y > p.y !== b.y > p.y && p.x < ((b.x - a.x) * (p.y - a.y)) / (b.y - a.y) + a.x) inside = !inside;
+    }
+    return inside;
+  };
+
+  it('has sectors A-I, each with >= 3 vertices and an altitude between 1,000 and 10,000 ft', () => {
+    expect(sectors.map((s) => (s as { name?: string }).name)).toEqual(['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I']);
+    // sector table (also in build-report.md)
+    console.table(sectors.map((s) => ({ sector: (s as { name?: string }).name, altitudeFt: s.altitudeFt, vertices: s.polygon.length, holes: ((s as { holes?: unknown[] }).holes ?? []).length })));
+    for (const s of sectors) {
+      expect(s.polygon.length, s.id).toBeGreaterThanOrEqual(3);
+      expect(s.altitudeFt, s.id).toBeGreaterThanOrEqual(1000);
+      expect(s.altitudeFt, s.id).toBeLessThanOrEqual(10000);
+      expect(s.provenance.url).toMatch(/aeronav\.faa\.gov\/MVA_Charts\/.*ACY_MVA/);
+      expect(s.provenance.notes).toMatch(/Effective date not stated/);
+    }
+  });
+
+  it('the ARP lies inside exactly one sector (hole rings excluded): A at 1600 ft', () => {
+    const hits = sectors.filter((s) => inRing({ x: 0, y: 0 }, s.polygon) && !((s as { holes?: { x: number; y: number }[][] }).holes ?? []).some((h) => inRing({ x: 0, y: 0 }, h)));
+    expect(hits).toHaveLength(1);
+    expect(hits[0].altitudeFt).toBe(1600);
+    expect(mvaSectorAt(ap, { x: 0, y: 0 })?.id).toBe('ACY-MVA-A');
+    expect(mvaAltitudeAt(ap, { x: 0, y: 0 })).toBe(1600);
+  });
+
+  it('every runway threshold and the offshore/outer areas resolve to a published altitude', () => {
+    for (const r of ap.runways) for (const e of r.ends) expect(mvaAltitudeAt(ap, e.threshold), `${r.id} ${e.id}`).toBeGreaterThanOrEqual(1000);
+    // points ~40 nm out in the various directions are covered by some sector or none, never throw
+    for (const [x, y] of [[0, 74000], [74000, 0], [0, -74000], [-74000, 0]]) {
+      const a = mvaAltitudeAt(ap, { x, y });
+      if (a !== undefined) expect(a).toBeLessThanOrEqual(10000);
+    }
+  });
+});
+
+describe('published fix altitudes (plate transcriptions)', () => {
+  const alt = (proc: string, fix: string) => ap.procedures.find((p) => p.name === proc)!.fixAltitudes!.filter((f) => f.fix === fix);
+
+  it('RNAV (GPS) RWY 22: KOPCE 1800, FLDER 1600, EFEWY 1100 (minimums)', () => {
+    expect(alt('RNAV (GPS) RWY 22', 'KOPCE')[0].minAltitudeFt).toBe(1800);
+    expect(alt('RNAV (GPS) RWY 22', 'FLDER')[0].minAltitudeFt).toBe(1600);
+    expect(alt('RNAV (GPS) RWY 22', 'EFEWY')[0].minAltitudeFt).toBe(1100);
+  });
+
+  it('ILS Z 13 FAF MAYBN 1600 (GS intercept) with CARYL hold 2000-4500; ILS 31 FAF PRSTY 1700 with STEVV 2000', () => {
+    expect(alt('ILS Z OR LOC Z RWY 13', 'MAYBN')[0].minAltitudeFt).toBe(1600);
+    expect(alt('ILS Z OR LOC Z RWY 13', 'CARYL')[0]).toMatchObject({ minAltitudeFt: 2000, maxAltitudeFt: 4500 });
+    expect(alt('ILS OR LOC/DME RWY 31', 'PRSTY')[0].minAltitudeFt).toBe(1700);
+    expect(alt('ILS OR LOC/DME RWY 31', 'STEVV')[0].minAltitudeFt).toBe(2000);
+  });
+
+  it('mandatory altitudes and holds are distinguished from minimums', () => {
+    expect(alt('HI-ILS Y OR LOC Y RWY 13', 'ACY')[0].mandatoryAltitudeFt).toBe(4000);
+    expect(alt('HI-VOR OR TACAN RWY 31', 'ACY')[0].mandatoryAltitudeFt).toBe(4000);
+    expect(alt('HI-ILS Y OR LOC Y RWY 13', 'ZAPOM')[0]).toMatchObject({ minAltitudeFt: 14000, maxAltitudeFt: 17500 });
+    expect(alt('VOR RWY 04', 'MEADY').map((f) => f.minAltitudeFt)).toEqual([2000, 1700]);
+  });
+
+  it('every IAP has fix altitudes with plate provenance', () => {
+    for (const p of ap.procedures.filter((x) => x.type === 'IAP')) {
+      expect(p.fixAltitudes!.length, p.name).toBeGreaterThan(0);
+      for (const f of p.fixAltitudes!) {
+        expect(f.minAltitudeFt ?? f.maxAltitudeFt ?? f.mandatoryAltitudeFt, `${p.name} ${f.fix}`).toBeDefined();
+        expect(f.note, `${p.name} ${f.fix}`).toMatch(/transcribed from plate P_.*\.png .* by visual read/);
       }
     }
   });

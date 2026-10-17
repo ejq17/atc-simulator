@@ -4,6 +4,9 @@ Retrieved **2026-10-17**. Scope: check the simulator's behavioural parameters (`
 
 Verdict vocabulary: **match**, **acceptable simplification**, **should change to X**, **UNVERIFIED** (no primary source retrieved).
 
+
+> **Amendment (2026-10-17, orchestrator, from the final behaviour-accuracy review):** the wake-category assumption below (A320 as Category D, C172 as I, implying 5–6 NM) was wrong. Under FAA JO 7110.126A Appendix A the A320 is RECAT Category **F** and the C172 Category **I**; the 7110.65 5-5-4 wake table therefore gives 3 NM directly behind and 4 NM on approach for that pair, which the engine now applies (see docs/BEHAVIOUR-ACCURACY.md section 9).
+
 ## 0. Summary of discrepancies and recommended changes
 
 | # | Item | Sim value | Source value | Verdict |

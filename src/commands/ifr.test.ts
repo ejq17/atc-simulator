@@ -264,3 +264,24 @@ run({
     { say: `${S}, execute missed approach, contact departure one eighteen point one`, cmds: [{ kind: 'MISSED_APPROACH' }, { kind: 'CONTACT_FREQUENCY', frequencyId: 'DEP' }], clean: true },
   ],
 });
+
+run({
+  'land and hold short (LAHSO)': [
+    { say: `${S}, runway four, cleared to land, hold short of runway one three`, cmds: [{ kind: 'LAND', ...NKS, runwayEnd: '4', runwayId: '4/22', holdShort: ['RWY13'] }], clean: true, conf: [0.95, 1] },
+    { say: `${S}, cleared to land runway 4, hold short of runway one three, traffic landing runway one three`, cmds: [{ kind: 'LAND', runwayEnd: '4', holdShort: ['RWY13'] }], clean: true },
+    { say: `${S}, runway one three, cleared to land, hold short of runway two two`, cmds: [{ kind: 'LAND', runwayEnd: '13', holdShort: ['RWY22'] }], clean: true },
+    { say: `${S}, cleared to land runway 13, hold short of runway 22`, cmds: [{ kind: 'LAND', runwayEnd: '13', holdShort: ['RWY22'] }], clean: true },
+    { say: `${S}, cleared to land runway 22, hold short of runway 13`, cmds: [{ kind: 'LAND', runwayEnd: '22', runwayId: '4/22', holdShort: ['RWY13'] }], clean: true },
+    { say: `${S}, runway 31, cleared to land, hold short of taxiway alpha`, cmds: [{ kind: 'LAND', runwayEnd: '31', holdShort: ['A'] }], clean: true },
+    { say: `${S}, runway 4 cleared to land hold short runway 13`, cmds: [{ kind: 'LAND', runwayEnd: '4', holdShort: ['RWY13'] }], clean: true },
+    { say: `${S}, cleared to land runway 4, hold short of runway 13, traffic departing runway 13`, cmds: [{ kind: 'LAND', runwayEnd: '4', holdShort: ['RWY13'] }], clean: true },
+    { say: `${S}, cleared for the option runway 4, hold short of runway 13`, cmds: [{ kind: 'LAND', destination: 'option', holdShort: ['RWY13'] }], clean: true },
+    { say: `${S}, cleared to land runway 4, hold short of runway 9`, cmds: [{ kind: 'LAND', runwayEnd: '4', holdShort: ['RWY9'] }], issue: 'unknown runway 9', conf: [0.5, 0.9] },
+    { say: `${S}, cleared to land runway 4, hold short of runway 13, contact tower one two zero point three`,
+      cmds: [{ kind: 'LAND', holdShort: ['RWY13'] }, { kind: 'CONTACT_FREQUENCY', frequencyId: 'TWR' }], clean: true },
+    { say: `${S}, cleared to land runway 4`, cmds: [{ kind: 'LAND', runwayEnd: '4' }], clean: true },
+    { say: `${S}, cleared to land runway 4, hold short`, cmds: [{ kind: 'LAND', runwayEnd: '4' }, { kind: 'HOLD_SHORT' }], issue: 'missing hold short point' },
+    { say: `${S}, taxi to runway 4 via alpha, hold short of runway 13`, cmds: [{ kind: 'TAXI', destination: 'RWY4', route: ['A'], holdShort: ['RWY13'] }], clean: true },
+    { say: `${S}, hold short of runway 13`, cmds: [{ kind: 'HOLD_SHORT', holdShort: ['RWY13'] }], clean: true },
+  ],
+});

@@ -7,6 +7,7 @@ export * from './stt/deepgramProvider.ts';
 export * from './stt/localWhisperProvider.ts';
 export * from './stt/aviationPostProcess.ts';
 export * from './stt/mediaErrors.ts';
+export * from './stt/inputDevice.ts';
 export * from './stt/pcmCapture.ts';
 export * from './ptt.ts';
 export * from './voiceController.ts';

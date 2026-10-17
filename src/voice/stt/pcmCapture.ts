@@ -137,11 +137,105 @@ export async function warmUpAudio(): Promise<WarmAudio> {
   return { ctx, workletReady, close: () => ctx.close().catch(() => undefined) };
 }
 
+// ---- track-processor capture (preferred) ---------------------------------------------------------------------------------
+// MediaStreamTrackProcessor hands us the microphone's AudioData frames directly. Unlike the AudioContext/AudioWorklet path it does
+// not depend on an audio OUTPUT device: an AudioContext's clock is driven by the speakers/headphones, and when that device is
+// stalled (closed laptop lid, a Bluetooth headset in call mode) the worklet never runs and capture silently returns nothing.
+// It also needs no warm-up, so the first word is not clipped.
+
+interface AudioDataLike {
+  readonly numberOfFrames: number;
+  readonly numberOfChannels: number;
+  readonly sampleRate: number;
+  copyTo(dest: Float32Array, opts: { planeIndex: number; format: 'f32-planar' }): void;
+  close(): void;
+}
+type TrackProcessorCtor = new (init: { track: MediaStreamTrack }) => { readable: ReadableStream<AudioDataLike> };
+
+const trackProcessorCtor = (): TrackProcessorCtor | undefined =>
+  (globalThis as unknown as { MediaStreamTrackProcessor?: TrackProcessorCtor }).MediaStreamTrackProcessor;
+
+export const hasTrackProcessor = (): boolean => typeof trackProcessorCtor() === 'function';
+
+/** Chunk size handed to the consumer: 100 ms at 16 kHz (the processor itself delivers 10 ms frames). */
+const CHUNK_SAMPLES = TARGET_SAMPLE_RATE / 10;
+
+function startTrackProcessorCapture(stream: MediaStream, onChunk: (pcm: ArrayBuffer) => void): PcmCapture | null {
+  const Ctor = trackProcessorCtor();
+  const track = stream.getAudioTracks()[0];
+  if (!Ctor || !track) return null;
+  let reader: ReadableStreamDefaultReader<AudioDataLike>;
+  try {
+    reader = new Ctor({ track }).readable.getReader();
+  } catch {
+    return null;
+  }
+  let resampler: ReturnType<typeof createResampler> | null = null;
+  let rate = (track.getSettings().sampleRate as number | undefined) ?? 48000;
+  let pending = new Float32Array(0);
+  const send = (f: Float32Array) => {
+    const i16 = floatToInt16(f);
+    onChunk(i16.buffer.slice(i16.byteOffset, i16.byteOffset + i16.byteLength) as ArrayBuffer);
+  };
+  const push = (down: Float32Array) => {
+    if (!down.length) return;
+    const all = new Float32Array(pending.length + down.length);
+    all.set(pending, 0);
+    all.set(down, pending.length);
+    let o = 0;
+    while (all.length - o >= CHUNK_SAMPLES) {
+      send(all.subarray(o, o + CHUNK_SAMPLES));
+      o += CHUNK_SAMPLES;
+    }
+    pending = all.slice(o);
+  };
+
+  const loop = (async () => {
+    for (;;) {
+      const { value: data, done } = await reader.read();
+      if (done || !data) break;
+      try {
+        if (!resampler || data.sampleRate !== rate) {
+          rate = data.sampleRate;
+          resampler = createResampler(rate);
+        }
+        const n = data.numberOfFrames;
+        const mono = new Float32Array(n);
+        const plane = new Float32Array(n);
+        for (let c = 0; c < data.numberOfChannels; c++) {
+          data.copyTo(plane, { planeIndex: c, format: 'f32-planar' });
+          for (let i = 0; i < n; i++) mono[i] += plane[i] / data.numberOfChannels;
+        }
+        push(resampler.process(mono));
+      } finally {
+        data.close();
+      }
+    }
+  })().catch(() => undefined);
+
+  return {
+    get inputSampleRate() {
+      return rate;
+    },
+    async stop() {
+      await new Promise((r) => setTimeout(r, 30)); // let in-flight frames arrive
+      await reader.cancel().catch(() => undefined);
+      stream.getTracks().forEach((t) => t.stop());
+      await loop;
+      if (pending.length) send(pending);
+      pending = new Float32Array(0);
+    },
+  };
+}
+
 export async function startPcmCapture(
   stream: MediaStream,
   onChunk: (pcm: ArrayBuffer) => void,
   warm?: WarmAudio,
 ): Promise<PcmCapture> {
+  const viaTrack = startTrackProcessorCapture(stream, onChunk);
+  if (viaTrack) return viaTrack;
+
   const usable = warm && warm.ctx.state !== 'closed' ? warm : undefined;
   const w = usable ?? (await warmUpAudio());
   const ctx = w.ctx;

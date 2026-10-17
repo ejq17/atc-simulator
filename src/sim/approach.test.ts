@@ -448,19 +448,25 @@ describe('APPROACH clearance and separation (radar separation minima, 3 nm in tr
     expect(f.getState().score.unsafeInstructions).toBe(1);
   });
 
-  it('wake: a light aircraft behind an A320 needs 5 nm, an A320 behind an A320 only 3 nm', () => {
+  it('wake (TBL 5-5-4 on approach): Category I behind an A320 (Category F) needs 4 NM, an A320 behind an A320 only the 3 NM radar minimum', () => {
     const mk = (followerType: string) => {
       // leader A320 on 6.7 nm final (FINAL), follower over the IF (10.66 nm): 3.96 nm apart
       const e = makeEngine({ scenario: ifrScenario([ARRIVING('AAL100', '13', 6.7, 'A320', 'APP'), { ...AT_FIX('NKS451', 'FX13A', ['FX13A', 'FX13B'], '13', {}, 3000), type: followerType }], { mode: 'training' }) });
       return say(e, appr('NKS451', 'ILS', '13'), 'APP');
     };
-    expect(mk('A320').status).toBe('accepted'); // 3.96 nm >= 3 nm
+    expect(mk('A320').status).toBe('accepted'); // 3.96 nm >= 3 nm (F behind F: blank cell)
     const light = mk('C172');
     expect(light.status).toBe('rejected');
     if (light.status === 'rejected') {
       expect(light.unsafe).toBe(true);
-      expect(light.reason).toMatch(/wake turbulence separation \(simplified from the 7110\.65 5-5-4 wake tables\) needs 5 nm for NKS451 \(C172\) behind AAL100 \(A320\)/);
+      expect(light.reason).toMatch(/wake turbulence separation \(7110\.65 5-5-4, TBL 5-5-4 on approach: Category F leader, Category I follower\) needs 4 NM for NKS451 \(C172\) behind AAL100 \(A320\)/);
     }
+  });
+
+  it('wake: Category I behind an A320 is accepted from 4 NM (TBL 5-5-4 F->I), refused at 3.96 NM', () => {
+    // leader A320 on 6.3 nm final, follower over the IF (10.66 nm): about 4.3 nm apart
+    const e = makeEngine({ scenario: ifrScenario([ARRIVING('AAL100', '13', 6.3, 'A320', 'APP'), { ...AT_FIX('NKS451', 'FX13A', ['FX13A', 'FX13B'], '13', {}, 3000), type: 'C172' }], { mode: 'training' }) });
+    expect(say(e, appr('NKS451', 'ILS', '13'), 'APP').status).toBe('accepted');
   });
 
   it('wake: a light aircraft AHEAD of an A320 only needs the 3 nm radar minimum from the A320 clearance', () => {
