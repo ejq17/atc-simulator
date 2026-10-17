@@ -8,6 +8,8 @@ import { MAX_SCALE, MIN_SCALE, ZOOM_STEP, clampScale, fitScale, formatPercent, r
 export interface ChartViewerProps {
   /** Chart id (d-TPP file stem, e.g. "00669AD") to open first. Defaults to the airport diagram. */
   initialChartId?: string;
+  /** Airport whose charts are listed (default KACY). */
+  icao?: string;
   /** Called whenever the selected chart changes (including the first selection). */
   onChartChange?: (chart: ChartEntry) => void;
   /** Backend proxy endpoint. Defaults to `/api/charts/pdf`. */
@@ -29,8 +31,8 @@ function isCancel(err: unknown): boolean {
   return err instanceof Error && (err.name === 'RenderingCancelledException' || err.name === 'AbortError');
 }
 
-export function ChartViewer({ initialChartId, onChartChange, proxyBase = DEFAULT_PROXY_BASE, className = '' }: ChartViewerProps) {
-  const groups = useMemo(() => listChartGroups(), []);
+export function ChartViewer({ icao = 'KACY', initialChartId, onChartChange, proxyBase = DEFAULT_PROXY_BASE, className = '' }: ChartViewerProps) {
+  const groups = useMemo(() => listChartGroups(icao), [icao]);
   const charts = useMemo(() => groups.flatMap((g) => g.charts), [groups]);
   const [selectedId, setSelectedId] = useState<string>(() => (charts.find((c) => c.id === initialChartId) ?? charts[0]).id);
   const chart = charts.find((c) => c.id === selectedId) ?? charts[0];
@@ -298,9 +300,9 @@ export function ChartViewer({ initialChartId, onChartChange, proxyBase = DEFAULT
       className={`flex h-full min-h-0 w-full overflow-hidden border border-atc-border bg-atc-bg text-atc-text ${className}`}
     >
       {/* ---------------- chart list ---------------- */}
-      <nav aria-label="KACY charts" className="flex w-64 shrink-0 flex-col border-r border-atc-border bg-atc-panel">
+      <nav aria-label={`${icao} charts`} className="flex w-64 shrink-0 flex-col border-r border-atc-border bg-atc-panel">
         <div className="border-b border-atc-border px-3 py-2">
-          <div className="text-[10px] uppercase tracking-[0.2em] text-atc-muted">KACY charts</div>
+          <div className="text-[10px] uppercase tracking-[0.2em] text-atc-muted">{icao} charts</div>
           <div className="mt-0.5 text-[11px] text-atc-cyan">d-TPP {CYCLE.cycle} - {charts.length} charts</div>
         </div>
         <ul

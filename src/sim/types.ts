@@ -137,6 +137,8 @@ export interface InstrumentProcedure {
   runwayEnd?: string;
   chartPdfUrl: string;     // official FAA d-TPP URL
   fixes?: string[];        // named fixes in order (IAF..MAP) where verified
+  /** DP only: the altitude a clearance using this DP says to maintain ("Maintain 3000 or as assigned"); absent = the engine default. */
+  maintainAltitudeFt?: number;
   /** Transcribed from the plate (human transcription; see data/sources/README.md). */
   missedApproachText?: string;
   holdingText?: string;

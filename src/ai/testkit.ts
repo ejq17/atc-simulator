@@ -3,7 +3,7 @@ import { loadKacy } from '../airport';
 import { createEngine } from '../sim/engine';
 import type { SimulationEngine } from '../sim/api';
 import type {
-  Aircraft, CommandOutcome, ControllerPositionId, GameMode, ParsedCommand, Scenario, ScenarioAircraftSpawn, SimEvent,
+  Aircraft, Airport, CommandOutcome, ControllerPositionId, GameMode, ParsedCommand, Scenario, ScenarioAircraftSpawn, SimEvent,
 } from '../sim/types';
 import { createAiControllers } from './index';
 import type { AiControllers, AiTransmission } from './index';
@@ -33,6 +33,8 @@ export interface HarnessOptions {
   readbackErrorRate?: number;
   aiSeed?: number;
   reactionDelaySec?: [number, number];
+  /** Airport to work (default: KACY). */
+  airport?: Airport;
   /** Make the engine refuse every AI command of these kinds (tests the AI's back-off). */
   rejectKinds?: ParsedCommand['kind'][];
 }
@@ -65,7 +67,7 @@ export function createHarness(o: HarnessOptions): Harness {
     activeRunways: o.activeRunways ?? { departing: ['13'], landing: ['13'] },
     controllerPositions: ALL, playerPositions: o.player, spawns: o.spawns,
   };
-  const engine = createEngine({ airport: kacy, scenario, readbackErrorRate: o.readbackErrorRate ?? 0, utcStartMs: Date.UTC(2026, 5, 1, 16, 0, 0) });
+  const engine = createEngine({ airport: o.airport ?? kacy, scenario, readbackErrorRate: o.readbackErrorRate ?? 0, utcStartMs: Date.UTC(2026, 5, 1, 16, 0, 0) });
   const events: SimEvent[] = [];
   const transmissions: AiTransmission[] = [];
   const outcomes: AiOutcome[] = [];
@@ -97,7 +99,7 @@ export function createHarness(o: HarnessOptions): Harness {
     },
   };
   const controllers = createAiControllers({
-    engine: spied, airport: kacy, positions: ai, playerPositions: o.player, seed: o.aiSeed ?? o.seed ?? 4242,
+    engine: spied, airport: o.airport ?? kacy, positions: ai, playerPositions: o.player, seed: o.aiSeed ?? o.seed ?? 4242,
     reactionDelaySec: o.reactionDelaySec, onTransmission: (t) => transmissions.push(t),
   });
   engine.subscribe((s) => {

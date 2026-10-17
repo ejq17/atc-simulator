@@ -23,7 +23,7 @@ export function WeatherDrawer({ onClose }: { onClose: () => void }) {
   const applyLive = async () => {
     setBusy(true);
     try {
-      const live = await fetchLiveMetar('KACY');
+      const live = await fetchLiveMetar(st.airport.icao);
       setWeather(live.weather);
       addNotice('info', `Live weather applied: ${live.raw}`);
     } catch (err) {
@@ -53,7 +53,7 @@ export function WeatherDrawer({ onClose }: { onClose: () => void }) {
             </div>
           </Field>
           <p className="text-[11px] text-atc-muted">{WEATHER_PRESETS[preset].description}</p>
-          <Btn onClick={applyLive} disabled={busy} className="self-start">{busy ? 'Fetching…' : 'Use live KACY METAR'}</Btn>
+          <Btn onClick={applyLive} disabled={busy} className="self-start">{busy ? 'Fetching…' : `Use live ${st.airport.icao} METAR`}</Btn>
         </section>
         <section className="flex flex-col gap-2 border-t border-atc-border pt-4">
           <div className="grid grid-cols-2 gap-3">

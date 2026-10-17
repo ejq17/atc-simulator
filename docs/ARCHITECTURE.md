@@ -1,7 +1,7 @@
-# KACY ATC Simulator — Architecture
+# ATC Simulator (KACY, KMHT) — Architecture
 
-Single-player, browser-based, local-first ATC simulator for Atlantic City
-International Airport (KACY). This document is deliberately short: it records
+Single-player, browser-based, local-first ATC simulator for two airports, Atlantic City
+International (KACY, default) and Manchester-Boston Regional (KMHT). This document is deliberately short: it records
 the decisions and contracts that every module must respect. Progress and known
 gaps live in `docs/PROGRESS.md`; data provenance lives in `data/sources/README.md`.
 
@@ -26,8 +26,8 @@ gaps live in `docs/PROGRESS.md`; data provenance lives in `data/sources/README.m
 ```
 src/sim/        types.ts (contracts), api.ts (engine interface), engine.ts, aircraft physics,
                 state machines, runway occupancy, conflicts, pathfinding, scoring hooks
-src/airport/    projection (lat/lon <-> local metres), KACY dataset loader, taxiway graph
-                builder (OSM + FAA diagram reconciliation), validation
+src/airport/    projection (lat/lon <-> local metres), per-airport dataset loaders (kacy/, kmht/) and the registry
+                (`getAirport`, `listAirports`), graph queries
 src/commands/   normalisation (spoken numbers, phonetics), grammar, entity resolution,
                 callsign matching, confidence, clarification
 src/radio/      frequencies, who-hears-what, transmission queue, readback generation
@@ -43,7 +43,27 @@ src/ui/tower/   3D Tower tab (lazy chunk). Pure, unit-tested: geometry.ts (polyg
                 resource); TowerDisplay.tsx is the React shell and reads the store per animation frame like the Surface view
 server/         AWC proxy + cache, optional Deepgram token endpoint
 data/sources/   verified FAA/NASR/d-TPP/OSM extracts with provenance (raw/ is git-ignored)
+scripts/        build-airport.ts <ICAO>: one deterministic build for every airport (NASR/d-TPP JSON + OSM GeoJSON ->
+                src/airport/<icao>/<icao>.airport.json, build-report.md, debug-graph.svg); airports/<icao>.ts holds only what is
+                airport specific (taxiway identifiers of the diagram, parking-stand rules, frequency naming, MVA, hot spot)
 ```
+
+## Airports
+
+An airport is data, not code: a `src/sim/types.ts` `Airport` (runways, taxiway graph, parking, frequencies, navaids, procedures) produced by
+the build from `data/sources/<icao>-*.json` and `<icao>-taxiways.geojson`. Adding one means: extract the NASR rows
+(`scripts/extract-nasr-airport.ts`), fetch the OSM features (`scripts/osm-overpass-to-geojson.ts`), transcribe the plates into
+`<icao>-procedures.json`, write a profile `scripts/airports/<icao>.ts`, build, add a loader in `src/airport/<icao>/` and register it in
+`src/airport/index.ts`. Everything the UI, the engine, the AI controllers and the readbacks say about the airport is derived from that object:
+
+* Facility call names come from the frequency names in the data (`radio/frequencies.ts`: tower "Manchester", approach "Boston"), so a TRACON
+  with another city's radio call is spoken correctly; the ATIS, charts panel (`charts/chartIndex.ts`, `navaidData.ts` per ICAO) and live METAR use the airport's ICAO.
+* The default IFR initial altitude is the departure procedure's own (`InstrumentProcedure.maintainAltitudeFt`, KMHT MANCHESTER ONE: 3000), else 2000.
+* Runway preference in calm wind is `preferredEndOrder` (KACY keeps its documented order; others: longest runway, ILS ends first).
+* Career steps and training lessons name KACY's runway ends, taxiways and stands: scenario summaries carry `airports: ['KACY']`
+  and `game.listScenarios(icao)` hides them elsewhere; free play is airport-agnostic.
+* Graph contract the build guarantees: every holding position is adjacent to its runway node (the engine's rollout exit and entry rely on it);
+  KMHT's densely digitised OSM entrances need the `simplifyEntryChains` profile option and fillet collapsing to meet it.
 
 ## Key contracts
 
@@ -81,7 +101,7 @@ is the real UTC again; past times keep their own epoch (`utcAt`). Free-play traf
 
 WGS84 -> local tangent plane (equirectangular about the ARP) in metres, x east, y
 north. Headings in state are TRUE; controllers/pilots speak MAGNETIC. Magnetic
-variation comes from NASR for ACY. Altitudes in feet MSL; field elevation from NASR.
+variation comes from NASR per airport (KACY 10 W, KMHT 15 W). Altitudes in feet MSL; field elevation from NASR.
 
 ## Realism boundaries (documented, not hidden)
 

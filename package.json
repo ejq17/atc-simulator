@@ -9,6 +9,7 @@
     "build": "tsc -b && vite build",
     "lint": "oxlint",
     "preview": "vite preview",
+    "build:airport": "tsx scripts/build-airport.ts",
     "test": "vitest run",
     "typecheck": "tsc -b --noEmit",
     "test:e2e": "playwright test"

@@ -50,7 +50,7 @@ const PRESET_DEFS: { id: WeatherPresetId; label: string; description: string; in
   {
     id: 'light-crosswinds',
     label: 'Light crosswinds',
-    description: 'North-northwest 12 kt gusting 18, 40-50 degrees off both runways (crosswind 8-12 kt).',
+    description: 'North-northwest 12 kt gusting 18 (at KACY 40-50 degrees off both runways, crosswind 8-12 kt; the angle to the runways differs at other airports).',
     init: {
       windDirDeg: 340, windSpeedKt: 12, windGustKt: 18, visibilitySm: 10,
       clouds: [{ cover: 'FEW', baseFtAgl: 4500 }, { cover: 'SCT', baseFtAgl: 8000 }],

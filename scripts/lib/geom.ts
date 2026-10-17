@@ -1,4 +1,4 @@
-/** Small 2-D geometry helpers for the KACY build script (local metres). */
+/** Small 2-D geometry helpers for the airport build scripts (local metres). */
 export type P = { x: number; y: number };
 
 export const dist = (a: P, b: P): number => Math.hypot(a.x - b.x, a.y - b.y);

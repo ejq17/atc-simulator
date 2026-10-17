@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { game } from '../../game';
 import type { FreePlayOptions, ScenarioSummary } from '../../game';
-import { loadKacy } from '../../airport';
+import { DEFAULT_AIRPORT_ICAO, airportOrDefault, listAirports } from '../../airport';
+import { airportCallName } from '../../radio/frequencies';
 import type { ControllerPositionId, GameMode, Weather } from '../../sim/types';
 import { fetchLiveMetar } from '../../weather/liveWeather';
 import { WEATHER_PRESETS, WEATHER_PRESET_IDS, getPresetWeather } from '../../weather/presets';
@@ -54,16 +55,19 @@ function SectionTitle({ n, children }: { n: number; children: React.ReactNode })
 }
 
 export function SetupScreen() {
-  const airport = useMemo(() => loadKacy(), []);
+  const prev = useSimStore((s) => s.startOptions);
+  const [icao, setIcao] = useState<string>(prev?.icao ?? DEFAULT_AIRPORT_ICAO);
+  const airport = useMemo(() => airportOrDefault(icao), [icao]);
+  const callName = airportCallName(airport);
   const starting = useSimStore((s) => s.starting);
   const startStatus = useSimStore((s) => s.startStatus);
   const startSession = useSimStore((s) => s.startSession);
   const notices = useSimStore((s) => s.notices);
   const dismiss = useSimStore((s) => s.dismissNotice);
-  const prev = useSimStore((s) => s.startOptions);
 
   const [ifrFlows, setIfrFlows] = useState<boolean>(!!prev?.freePlay.ifrFlows);
-  const scenarios = useMemo(() => game.listScenarios(), []);
+  const scenarios = useMemo(() => game.listScenarios(icao), [icao]);
+  const authoredElsewhere = useMemo(() => game.listScenarios().filter((s) => s.airports && !s.airports.includes(icao)), [icao]);
   const progress = useMemo(() => game.loadCareerProgress(), []);
   const prov = useMemo(() => summariseProvenance(airport), [airport]);
   /**
@@ -110,11 +114,21 @@ export function SetupScreen() {
 
   const refreshLive = () => {
     setLive({ status: 'loading' });
-    fetchLiveMetar('KACY')
+    fetchLiveMetar(icao)
       .then((r) => setLive({ status: 'ok', weather: r.weather, raw: r.raw }))
       .catch((e: unknown) => setLive({ status: 'error', message: e instanceof Error ? e.message : String(e) }));
   };
-  useEffect(refreshLive, []);
+  useEffect(refreshLive, [icao]);
+  // Another airport: runway overrides and a scenario of the previous airport no longer apply.
+  const lastIcao = useRef(icao);
+  useEffect(() => {
+    if (lastIcao.current === icao) return;
+    lastIcao.current = icao;
+    setLanding('auto');
+    setDeparting('auto');
+    setScenarioId(CUSTOM);
+    setMode('free_play');
+  }, [icao]);
 
   const isCustom = mode === 'free_play' && scenarioId === CUSTOM;
   const list: ScenarioSummary[] = useMemo(() => {
@@ -184,6 +198,7 @@ export function SetupScreen() {
       startingScenario: starting_,
     };
     const opts: StartOptions = {
+      icao,
       mode,
       scenarioId: isCustom ? undefined : scenarioId,
       freePlay,
@@ -212,12 +227,18 @@ export function SetupScreen() {
       <div className="mx-auto flex min-h-full max-w-[1280px] flex-col px-6 pb-4 pt-8">
         <header className="mb-7 flex items-end justify-between gap-8 border-b border-atc-border pb-6">
           <div>
-            <div className="font-sans text-[11px] uppercase tracking-[0.34em] text-atc-cyan">Atlantic City International · KACY</div>
-            <h1 className="mt-2 font-sans text-[34px] font-bold uppercase leading-none tracking-[0.12em] text-atc-text">KACY ATC Simulator</h1>
+            <div className="font-sans text-[11px] uppercase tracking-[0.34em] text-atc-cyan">{airport.name} · {airport.icao}</div>
+            <h1 className="mt-2 font-sans text-[34px] font-bold uppercase leading-none tracking-[0.12em] text-atc-text">{airport.icao} ATC Simulator</h1>
             <p className="mt-3 max-w-xl font-sans text-[13px] leading-relaxed text-atc-muted">
-              Work Clearance Delivery, Ground, Tower, Departure and Approach at Atlantic City with real FAA runway, taxiway and procedure data. Speak or type your clearances; pilots read back, taxi, line up and fly.
+              Work Clearance Delivery, Ground, Tower, Departure and Approach at {callName} with real FAA runway, taxiway and procedure data. Speak or type your clearances; pilots read back, taxi, line up and fly.
               Entertainment and learning software, not ATC training.
             </p>
+            <label className="mt-4 flex items-center gap-3">
+              <span className={LABEL}>Airport</span>
+              <select className={SELECT} value={icao} onChange={(e) => setIcao(e.target.value)} aria-label="Airport" data-testid="airport-select">
+                {listAirports().map((code) => (<option key={code} value={code}>{code} · {airportOrDefault(code).name}</option>))}
+              </select>
+            </label>
           </div>
           <AirportGlyph airport={airport} className="hidden h-28 w-auto shrink-0 opacity-90 md:block" />
         </header>
@@ -295,7 +316,11 @@ export function SetupScreen() {
                   </label>
                 )}
                 {mode !== 'free_play' && list.length === 0 && (
-                  <div className="border border-atc-border bg-atc-panel p-4 text-xs text-atc-muted">No {mode} scenarios are available yet.</div>
+                  <div className="border border-atc-border bg-atc-panel p-4 text-xs text-atc-muted" data-testid="no-scenarios">
+                    {authoredElsewhere.some((s) => s.mode === mode)
+                      ? `The ${mode === 'career' ? 'career steps' : 'training lessons'} are written around ${authoredElsewhere.find((s) => s.mode === mode)!.airports!.join(', ')} (its real runway ends, taxiway names and parking stands) and are not offered at ${icao}. Use Free play here.`
+                      : `No ${mode} scenarios are available yet.`}
+                  </div>
                 )}
               </div>
             </section>
@@ -348,13 +373,13 @@ export function SetupScreen() {
                 <div className="col-span-2">
                   <Field label="Weather">
                     <select className={SELECT} value={weatherKey} onChange={(e) => setWeatherKey(e.target.value)} aria-label="Weather" data-testid="weather-select">
-                      <option value="live">Live weather (real METAR)</option>
+                      <option value="live">Live {icao} METAR</option>
                       {WEATHER_PRESET_IDS.map((id) => (<option key={id} value={`preset:${id}`}>Simulated: {WEATHER_PRESETS[id].label}</option>))}
                       {!isCustom && <option value="scenario">Scenario default</option>}
                     </select>
                   </Field>
                   <div className="mt-2 text-[11.5px] leading-snug text-atc-muted" data-testid="weather-preview">
-                    {weatherChoice.kind === 'live' && live.status === 'loading' && 'Fetching the current KACY METAR…'}
+                    {weatherChoice.kind === 'live' && live.status === 'loading' && `Fetching the current ${icao} METAR…`}
                     {weatherChoice.kind === 'live' && live.status === 'ok' && (<><b className="text-atc-green">Live</b> wind {windText(live.weather, airport.magneticVariationDeg)} (mag), {live.weather.visibilitySm} SM, {live.weather.flightCategory}<br /><code className="text-[10.5px]">{live.raw}</code></>)}
                     {weatherChoice.kind === 'live' && live.status === 'error' && (<span className="text-atc-amber">Live weather unavailable ({live.message}) — the session will fall back to a simulated clear day and tell you so. <button type="button" className="underline" onClick={refreshLive}>Retry</button></span>)}
                     {weatherChoice.kind === 'preset' && <>{WEATHER_PRESETS[weatherChoice.id].description} Wind {windText(previewWx, airport.magneticVariationDeg)} (mag).</>}

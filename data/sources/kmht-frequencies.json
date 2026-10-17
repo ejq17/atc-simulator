@@ -1,0 +1,306 @@
+{
+ "_provenance": {
+  "source": "FAA NASR 28-day subscription, cycle effective 2026-10-01; https://nfdc.faa.gov/webContent/28DaySub/extra/01_Oct_2026_FRQ_CSV.zip (FRQ.csv)",
+  "also_used": [
+   "ATC_BASE.csv",
+   "ATC_ATIS.csv (ATIS phone)",
+   "ATC_RMK.csv",
+   "FAA d-TPP KMHT airport diagram 00246AD.PDF cycle 2610 (cross-check of the printed frequencies)",
+   "FAA d-TPP departure procedure charts (departure facility name)"
+  ],
+  "retrieved": "2026-10-17",
+  "faa_cycle_effective": "2026-10-01",
+  "faa_cycle_next": "2026-10-29",
+  "method": "All rows in FRQ.csv where FACILITY==MHT or SERVICED_FACILITY==MHT, copied verbatim (scripts/extract-nasr-airport.ts). No values from memory.",
+  "raw": "raw/nasr_2026-10-01/x_FRQ_CSV/FRQ.csv"
+ },
+ "facility": {
+  "id": "MHT",
+  "name": "MANCHESTER BOSTON RGNL",
+  "type": "ATCT",
+  "tower_hours": "24",
+  "radio_call": "MANCHESTER",
+  "approach_radio_call": "BOSTON",
+  "departure_radio_call": "BOSTON",
+  "approach_provider": "A90",
+  "approach_provider_name": "BOSTON CONSOLIDATED TRACON",
+  "controlling_artcc": "ZBW (BOSTON)"
+ },
+ "summary_by_function": {
+  "ATIS": {
+   "vhf": "119.55",
+   "uhf": null,
+   "hours": "24",
+   "phone": "603-626-6902",
+   "note": "FRQ use code ATIS (facility type ATCT); phone from ATC_ATIS.csv. The ASOS row on the same frequency is the automated weather source."
+  },
+  "clearance_delivery": {
+   "vhf": "135.9",
+   "uhf": null,
+   "note": "FRQ CD/P; the airport diagram prints CLNC DEL 135.9"
+  },
+  "ground": {
+   "vhf": "121.9",
+   "uhf": null,
+   "note": "FRQ GND/P; the airport diagram prints GND CON 121.9"
+  },
+  "tower": {
+   "vhf": "121.3",
+   "uhf": "239.025",
+   "note": "FRQ LCL/P; the airport diagram prints MANCHESTER TOWER 121.3 239.025"
+  },
+  "approach_departure": {
+   "vhf": "124.9",
+   "uhf": "269.075",
+   "sectorization": null,
+   "chart_name": "BOSTON APP CON 124.9 269.075 (as printed on the approach plates; BOS DEP CON 124.9 269.075 on the departure charts)",
+   "facility": "A90",
+   "facility_name": "BOSTON CONSOLIDATED TRACON",
+   "radio_call": "BOSTON",
+   "note": "FRQ APCH/P DEP/P (BOSTON CONSOLIDATED TRACON, serving MHT); no sectorization bearings are published for this row. Approach and departure share this frequency."
+  },
+  "class_c_sector_frequencies": [
+   {
+    "freq_mhz": "124.9",
+    "sectorization": "MANCHESTER/CONCORD AREA",
+    "note": "FRQ use code CLASS C row (secondary Class C service frequency, named by area, not by bearings)"
+   },
+   {
+    "freq_mhz": "125.05",
+    "sectorization": "NH SEACOAST AREA",
+    "note": "FRQ use code CLASS C row (secondary Class C service frequency, named by area, not by bearings)"
+   },
+   {
+    "freq_mhz": "134.75",
+    "sectorization": "NH LAKES REGION",
+    "note": "FRQ use code CLASS C row (secondary Class C service frequency, named by area, not by bearings)"
+   }
+  ],
+  "emergency": {
+   "vhf": "121.5",
+   "uhf": "243.0"
+  },
+  "unicom": {
+   "vhf": "122.95",
+   "note": "FRQ use code UNICOM"
+  }
+ },
+ "all_frequencies_serving_airport": [
+  {
+   "freq_mhz": "124.9",
+   "use_code": "APCH/P DEP/P",
+   "sectorization": null,
+   "remark": null,
+   "facility": "A90",
+   "facility_name": "BOSTON CONSOLIDATED TRACON",
+   "facility_type": "TRACON",
+   "serviced_facility": "MHT",
+   "serviced_site_type": "AIRPORT",
+   "radio_call": "MANCHESTER",
+   "approach_radio_call": "BOSTON",
+   "band": "VHF"
+  },
+  {
+   "freq_mhz": "124.9",
+   "use_code": "CLASS C",
+   "sectorization": "MANCHESTER/CONCORD AREA",
+   "remark": null,
+   "facility": "A90",
+   "facility_name": "BOSTON CONSOLIDATED TRACON",
+   "facility_type": "TRACON",
+   "serviced_facility": "MHT",
+   "serviced_site_type": "AIRPORT",
+   "radio_call": "MANCHESTER",
+   "approach_radio_call": "BOSTON",
+   "band": "VHF"
+  },
+  {
+   "freq_mhz": "125.05",
+   "use_code": "CLASS C",
+   "sectorization": "NH SEACOAST AREA",
+   "remark": null,
+   "facility": "A90",
+   "facility_name": "BOSTON CONSOLIDATED TRACON",
+   "facility_type": "TRACON",
+   "serviced_facility": "MHT",
+   "serviced_site_type": "AIRPORT",
+   "radio_call": "MANCHESTER",
+   "approach_radio_call": "BOSTON",
+   "band": "VHF"
+  },
+  {
+   "freq_mhz": "134.75",
+   "use_code": "CLASS C",
+   "sectorization": "NH LAKES REGION",
+   "remark": null,
+   "facility": "A90",
+   "facility_name": "BOSTON CONSOLIDATED TRACON",
+   "facility_type": "TRACON",
+   "serviced_facility": "MHT",
+   "serviced_site_type": "AIRPORT",
+   "radio_call": "MANCHESTER",
+   "approach_radio_call": "BOSTON",
+   "band": "VHF"
+  },
+  {
+   "freq_mhz": "269.075",
+   "use_code": "APCH/P DEP/P",
+   "sectorization": null,
+   "remark": null,
+   "facility": "A90",
+   "facility_name": "BOSTON CONSOLIDATED TRACON",
+   "facility_type": "TRACON",
+   "serviced_facility": "MHT",
+   "serviced_site_type": "AIRPORT",
+   "radio_call": "MANCHESTER",
+   "approach_radio_call": "BOSTON",
+   "band": "UHF"
+  },
+  {
+   "freq_mhz": "119.55",
+   "use_code": "ATIS",
+   "sectorization": null,
+   "remark": null,
+   "facility": "MHT",
+   "facility_name": "MANCHESTER BOSTON RGNL",
+   "facility_type": "ATCT",
+   "serviced_facility": "MHT",
+   "serviced_site_type": "AIRPORT",
+   "radio_call": "MANCHESTER",
+   "approach_radio_call": "BOSTON",
+   "band": "VHF"
+  },
+  {
+   "freq_mhz": "121.3",
+   "use_code": "LCL/P",
+   "sectorization": null,
+   "remark": null,
+   "facility": "MHT",
+   "facility_name": "MANCHESTER BOSTON RGNL",
+   "facility_type": "ATCT",
+   "serviced_facility": "MHT",
+   "serviced_site_type": "AIRPORT",
+   "radio_call": "MANCHESTER",
+   "approach_radio_call": "BOSTON",
+   "band": "VHF"
+  },
+  {
+   "freq_mhz": "121.5",
+   "use_code": "EMERG",
+   "sectorization": null,
+   "remark": null,
+   "facility": "MHT",
+   "facility_name": "MANCHESTER BOSTON RGNL",
+   "facility_type": "ATCT",
+   "serviced_facility": "MHT",
+   "serviced_site_type": "AIRPORT",
+   "radio_call": "MANCHESTER",
+   "approach_radio_call": "BOSTON",
+   "band": "VHF"
+  },
+  {
+   "freq_mhz": "121.9",
+   "use_code": "GND/P",
+   "sectorization": null,
+   "remark": null,
+   "facility": "MHT",
+   "facility_name": "MANCHESTER BOSTON RGNL",
+   "facility_type": "ATCT",
+   "serviced_facility": "MHT",
+   "serviced_site_type": "AIRPORT",
+   "radio_call": "MANCHESTER",
+   "approach_radio_call": "BOSTON",
+   "band": "VHF"
+  },
+  {
+   "freq_mhz": "122.95",
+   "use_code": "UNICOM",
+   "sectorization": null,
+   "remark": null,
+   "facility": "MHT",
+   "facility_name": "MANCHESTER BOSTON RGNL",
+   "facility_type": "ATCT",
+   "serviced_facility": "MHT",
+   "serviced_site_type": "AIRPORT",
+   "radio_call": null,
+   "approach_radio_call": null,
+   "band": "VHF"
+  },
+  {
+   "freq_mhz": "135.9",
+   "use_code": "CD/P",
+   "sectorization": null,
+   "remark": null,
+   "facility": "MHT",
+   "facility_name": "MANCHESTER BOSTON RGNL",
+   "facility_type": "ATCT",
+   "serviced_facility": "MHT",
+   "serviced_site_type": "AIRPORT",
+   "radio_call": "MANCHESTER",
+   "approach_radio_call": "BOSTON",
+   "band": "VHF"
+  },
+  {
+   "freq_mhz": "239.025",
+   "use_code": "LCL/P",
+   "sectorization": null,
+   "remark": null,
+   "facility": "MHT",
+   "facility_name": "MANCHESTER BOSTON RGNL",
+   "facility_type": "ATCT",
+   "serviced_facility": "MHT",
+   "serviced_site_type": "AIRPORT",
+   "radio_call": "MANCHESTER",
+   "approach_radio_call": "BOSTON",
+   "band": "UHF"
+  },
+  {
+   "freq_mhz": "243.0",
+   "use_code": "EMERG",
+   "sectorization": null,
+   "remark": null,
+   "facility": "MHT",
+   "facility_name": "MANCHESTER BOSTON RGNL",
+   "facility_type": "ATCT",
+   "serviced_facility": "MHT",
+   "serviced_site_type": "AIRPORT",
+   "radio_call": "MANCHESTER",
+   "approach_radio_call": "BOSTON",
+   "band": "UHF"
+  },
+  {
+   "freq_mhz": "119.55",
+   "use_code": "MHT ASOS",
+   "sectorization": null,
+   "remark": null,
+   "facility": "MHT",
+   "facility_name": null,
+   "facility_type": "ASOS_AWOS",
+   "serviced_facility": "MHT",
+   "serviced_site_type": "ASOS",
+   "radio_call": null,
+   "approach_radio_call": null,
+   "band": "VHF"
+  },
+  {
+   "freq_mhz": "114.4/91X",
+   "use_code": "MHT DME",
+   "sectorization": null,
+   "remark": null,
+   "facility": "MHT",
+   "facility_name": "MANCHESTER",
+   "facility_type": "NAVAID",
+   "serviced_facility": "MHT",
+   "serviced_site_type": "DME",
+   "radio_call": null,
+   "approach_radio_call": null,
+   "band": "VHF"
+  }
+ ],
+ "notes": [
+  ">=225 MHz are UHF (military) frequencies; the sim ignores UHF.",
+  "NASR ATC remark 1: NOTE: FREQS 124.9 AND 305.4 ARE PHYSICALLY LCTD IN THE BOSTON ARTCC; FREQ 127.75 IS LCTD AT THE RADAR SITE AT NASHUA, NH.",
+  "NASR ATC remark 2: SAID IN USE. OPERATE TRANSPONDERS WITH ALTITUDE REPORTING MODE AND ADS-B (IF EQUIPPED) ENABLED ON ALL AIRPORT SURFACES.",
+  "The approach/departure facility (A90 BOSTON CONSOLIDATED TRACON) is a separate TRACON; its radio call is \"BOSTON\" while the tower call is \"MANCHESTER\"."
+ ]
+}

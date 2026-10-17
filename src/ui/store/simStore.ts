@@ -10,7 +10,7 @@
 import { create } from 'zustand';
 import { game, createScenarioEventRunner } from '../../game';
 import type { CareerProgress, DebriefReport, FreePlayOptions, TrainingStepState } from '../../game';
-import { loadKacy } from '../../airport';
+import { airportOrDefault, loadKacy } from '../../airport';
 import { createEngine } from '../../sim/engine';
 import type { Airport, GameMode, Scenario, SimEvent, SimulationState, Weather } from '../../sim/types';
 import { fetchLiveMetar } from '../../weather/liveWeather';
@@ -21,7 +21,7 @@ import { initialAtisLetter } from '../../weather/atisCycle';
 import { realTimeDensity } from '../../game/trafficDensity';
 import { getPresetWeather } from '../../weather/presets';
 import type { WeatherPresetId } from '../../weather/presets';
-import { recommendRunways } from '../../weather/runwaySelection';
+import { preferredEndOrder, recommendRunways } from '../../weather/runwaySelection';
 import type { SimulatedAtis } from '../../weather/atis';
 import { unlockAudio } from '../../voice';
 import type { VoiceStatus } from '../../voice';
@@ -43,6 +43,8 @@ export function choiceFromSetup(setup: ControllerSetup): PositionChoice {
 }
 
 export interface StartOptions {
+  /** Airport to work (ICAO); default KACY. */
+  icao?: string;
   mode: GameMode;
   /** Undefined = custom free play with generated traffic. */
   scenarioId?: string;
@@ -69,9 +71,9 @@ export interface Notice {
 }
 
 /** Runway configuration recommended for a weather snapshot (best headwind end, used for both arrivals and departures). */
-export function recommendedRunways(weather: Weather, airport: Pick<Airport, 'runways' | 'magneticVariationDeg'> = loadKacy()): { departing: string[]; landing: string[]; summary: string } {
+export function recommendedRunways(weather: Weather, airport: Pick<Airport, 'icao' | 'runways' | 'magneticVariationDeg'> = loadKacy()): { departing: string[]; landing: string[]; summary: string } {
   const ends = airport.runways.flatMap((r) => r.ends.map((e) => ({ id: e.id, magneticHeadingDeg: e.magneticHeadingDeg })));
-  const rec = recommendRunways(weather, ends, { preferredOrder: ['31', '13', '22', '4'], variationDeg: airport.magneticVariationDeg });
+  const rec = recommendRunways(weather, ends, { preferredOrder: preferredEndOrder(airport, 'high'), variationDeg: airport.magneticVariationDeg });
   const top = rec.ranking.find((r) => r.id === rec.primary);
   const summary = rec.calmWindRule
     ? `Wind calm or light: preferred runway ${rec.primary}`
@@ -183,7 +185,7 @@ export const useSimStore = create<SimStore>((set, get) => ({
     // Browsers only play audio after a user gesture: this runs synchronously inside the "Start session" click, before any await.
     unlockAudio();
     set({ starting: true, startStatus: 'Preparing airport data…', notices: [], scenarioComplete: false });
-    const airport = loadKacy();
+    const airport = airportOrDefault(opts.icao);
     const seed = opts.seed ?? Math.floor(Math.random() * 2 ** 31);
     const notices: Notice[] = [];
     const note = (level: Notice['level'], text: string) => notices.push({ id: ++noticeSeq, level, text });
@@ -205,9 +207,9 @@ export const useSimStore = create<SimStore>((set, get) => ({
         }
       }
       if (wantLive) {
-        set({ startStatus: 'Fetching live METAR for KACY…' });
+        set({ startStatus: `Fetching live METAR for ${airport.icao}…` });
         try {
-          const live = await fetchLiveMetar('KACY');
+          const live = await fetchLiveMetar(airport.icao);
           weather = live.weather;
           initialMetar = live;
           weatherNote = `Live METAR ${live.raw}`;

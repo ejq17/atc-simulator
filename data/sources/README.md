@@ -98,3 +98,78 @@ OSM taxiway `ref` values (90 taxiway ways: 24 with a ref, 66 with no ref): **A, 
 
 Query used for OSM (radius 2000 m around the NASR ARP): `[out:json][timeout:90]; nwr["aeroway"~"^(runway|taxiway|apron|parking_position|holding_position|helipad|terminal|gate|taxilane|aerodrome|hangar|stopway|navigationaid|windsock)$"](around:2000,39.45757583,-74.57715527); out geom;`
 Note: Overpass returned HTTP 406 until a User-Agent and Accept header were sent.
+
+---
+
+# KMHT (Manchester-Boston Regional, NH) - verified source data
+
+Built the same way as KACY, by `scripts/extract-nasr-airport.ts MHT KMHT` (NASR rows), `scripts/osm-overpass-to-geojson.ts` (OSM) and a plate transcription, then `npx tsx scripts/build-airport.ts KMHT`. Nothing was typed from memory; every value below was read from the downloaded files. The NASR CSV zips are the 2026-10-01 cycle files fetched on 2026-10-16 (shared with KACY, `raw/nasr_2026-10-01/`); the MHT rows were extracted, the OSM data fetched and the d-TPP charts checked on **2026-10-17**.
+
+**FAA cycle:** NASR 28-day subscription effective **2026-10-01** (next 2026-10-29); d-TPP cycle **2610** (2026-10-01 0901Z to 2026-10-29 0901Z), volume **NE-1**.
+
+## Files
+
+| File | What | Source (URL) | Retrieved | FAA cycle | License |
+|---|---|---|---|---|---|
+| `kmht-facility.json` | ARP, elevation, mag var, runways and runway ends (thresholds, displaced thresholds, TDZE, lighting, VGSI, declared distances), tower hours, remarks, Class C flag, ownership, ILS summary, arresting system | NASR CSV zips `https://nfdc.faa.gov/webContent/28DaySub/extra/01_Oct_2026_{APT,ATC,CLS_ARSP,ILS}_CSV.zip` (page `https://www.faa.gov/air_traffic/flight_info/aeronav/aero_data/NASR_Subscription/2026-10-01/`); charted magnetic headings from the airport diagram | 2026-10-17 (zips 2026-10-16) | NASR 2026-10-01 | US Government work, public domain (FAA). Not for navigation. |
+| `kmht-frequencies.json` | Every FRQ.csv row for MHT (tower, ground, clearance, ATIS, UNICOM, emergency, Boston TRACON approach/departure and Class C area frequencies), ATIS phone, radio calls, ATC remarks | `.../01_Oct_2026_FRQ_CSV.zip`, `ATC_CSV.zip` | 2026-10-17 | NASR 2026-10-01 | same |
+| `kmht-navaids.json` | MHT DME, CON and GDM VOR/DMEs, ILS/LOC/GS/DME/marker components for runways 6, 17, 35, 26 approach fixes with lat/lon and the NASR charting list, fix roles from the plates | `.../01_Oct_2026_{NAV,ILS,FIX}_CSV.zip`; roles and minima read from the d-TPP plates | 2026-10-17 | NASR 2026-10-01 / d-TPP 2610 | same |
+| `kmht-procedures.json` | All 18 KMHT d-TPP PDFs (diagram, 11 IAPs, 2 DPs, 2 STAR pages, takeoff and alternate minimums pages) with URL, HTTP check and size; transcription of 7 approaches (fixes and roles, minima, missed approach), the diagram's taxiway identifiers and charted runway headings, the DPs | `https://aeronav.faa.gov/d-tpp/2610/xml_data/d-TPP_Metafile.xml` and `https://aeronav.faa.gov/d-tpp/2610/<pdf>`; page `https://www.faa.gov/air_traffic/flight_info/aeronav/digital_products/dtpp/` | 2026-10-17 | d-TPP 2610 | same |
+| `kmht-taxiways.geojson` | OSM aeroway features within 2 km of the ARP (226 features: 76 taxiways, 14 gates, 63 parking_position nodes, 13 aprons, 26 holding_position nodes, ...) | Overpass API `https://overpass-api.de/api/interpreter` (OSM base timestamp 2026-10-17T20:44:11Z); raw `raw/overpass_kmht_raw.json`; converted by `scripts/osm-overpass-to-geojson.ts` | 2026-10-17 | n/a (not FAA) | **ODbL 1.0, (c) OpenStreetMap contributors**: same terms as the KACY layer above (attribution required; the derived taxiway/apron dataset is share-alike; keep it separate from the FAA layers) |
+
+Query used for OSM (radius 2000 m around the NASR ARP): `[out:json][timeout:90]; nwr["aeroway"~"^(runway|taxiway|apron|parking_position|holding_position|helipad|terminal|gate|taxilane|aerodrome|hangar|stopway|navigationaid|windsock)$"](around:2000,42.93280555,-71.43575); out geom;` (sent with a User-Agent and `Accept: application/json`).
+
+PDF check: every URL got an HTTP HEAD (200, `application/pdf`, Content-Length) and a GET; each file starts with `%PDF` and has the HEAD size. Table: `raw/kmht_dtpp_http_head_checks.tsv` (18 rows, UTC times). The d-TPP metadata XML is saved as `raw/d-TPP_Metafile_2610.xml`.
+
+## Key facts (NASR 2026-10-01 unless noted)
+
+**Airport:** MANCHESTER BOSTON RGNL, FAA ID MHT, ICAO KMHT, Hillsborough County NH, publicly owned (City of Manchester). ARP **42.93280555 N, 71.43575 W** (42-55-58.1N, 071-26-8.7W; third-party survey 2014-03-12). Field elevation **266.4 ft**. Mag var **15 W, epoch 2020** (diagram: "VAR 15 W, JANUARY 2020, annual rate of change 0.1 E"). ARTCC ZBW. FAR 139 class "I C". **ATCT, FAA-operated, 24 hours** (TWR_HRS 24); ATIS 24 h, phone 603-626-6902. **Class C** (CLS_ARSP). Approach/departure control is the **Boston Consolidated TRACON (A90)**, radio call "BOSTON"; the tower radio call is "MANCHESTER". Beacon SS-SR, white/green; PCR 700 F/C/X/T on both runways; EMAS 300 x 170 ft at the departure end of runway 6 (NASR arresting-system remark).
+
+### Runways
+| Runway | Length x width (ft) | Surface | End | True hdg | Charted mag hdg (diagram) | Threshold (pavement end) lat, lon | Thr elev / TDZE (ft) | Displaced thr | Approach lights | ILS |
+|---|---|---|---|---|---|---|---|---|---|---|
+| 06/24 | 7651 x 150 | ASPH, grooved, fair, HIRL | 06 | 42 | 057 | 42.92829138, -71.44906066 | 220.9 / 223.7 | 442 ft | none (REIL) | ILS, I-MJE 109.95, CAT I |
+| | | | 24 | 222 | 237 | 42.94378619, -71.42978836 | 241.5 / 241.5 | none | none (REIL) | none (RNAV GPS only) |
+| 17/35 | 9250 x 150 | ASPH, grooved, fair, HIRL | 17 | 157 | 172 | 42.94176577, -71.43956863 | 216.1 / 229.1 | 336 ft | MALSR, TDZ + CL lights | ILS/DME, I-MNA 109.1, CAT I |
+| | | | 35 | 337 | 352 | 42.91848847, -71.42581063 | 266.4 / 265.4 | 850 ft | ALSF-2, TDZ + CL lights | ILS/DME, I-MHT 109.1, CAT III |
+
+NASR RWY_END_LAT/LONG is the pavement end; the displaced thresholds (NASR DISPLACED_THR_*) are recorded in the dataset but not modelled. Declared distances (TORA/TODA/ASDA/LDA ft): 06 7650/7650/7650/7208, 24 7650/7650/6850/6850, 17 9250/9250/9250/8914, 35 9250/9250/8500/7650. VGSI: 06 and 24 P4L, 17 P4R, 35 P4L. No LAHSO (no NASR LAHSO fields for any end; no LAHSO page in the d-TPP metadata).
+
+### Frequencies (MHz; UHF where stated)
+| Function | VHF | Notes |
+|---|---|---|
+| ATIS | 119.55 | 24 h; phone 603-626-6902 (the MHT ASOS shares 119.55) |
+| Clearance delivery | 135.9 | FRQ CD/P; printed on the diagram as CLNC DEL |
+| Ground | 121.9 | FRQ GND/P |
+| Tower | 121.3 (UHF 239.025) | FRQ LCL/P; "MANCHESTER TOWER" |
+| Approach / departure | 124.9 (UHF 269.075) | Boston Consolidated TRACON (A90), "BOSTON APP CON" / "BOS DEP CON"; no sector bearings are published |
+| Class C area frequencies | 124.9 (Manchester/Concord area), 125.05 (NH Seacoast), 134.75 (NH Lakes Region) | FRQ CLASS C rows, named by area; listed in the dataset as non-position ("OTHER") frequencies |
+| UNICOM | 122.95 | FRQ row UNICOM |
+| Emergency | 121.5 / 243.0 | |
+
+### Navaids
+There is **no VOR or VORTAC at MHT**: the airport's own navaid is the MHT DME (114.4 MHz, channel 91X, OPERATIONAL IFR, 42.86852991 N 71.3695345 W, about 4.8 NM from the ARP on true bearing about 143, computed). The plates use CONCORD CON VOR/DME 112.9 (76X, OPERATIONAL RESTRICTED) and GARDNER GDM VOR/DME 116.95 (116Y). ILS: runway 6 I-MJE 109.95 (course 057.42 mag, GS 3.00, 333.65, no DME), runway 17 I-MNA 109.1 (171.52, GS 3.10, 331.4, DME 28X), runway 35 I-MHT 109.1 (351.53, GS 3.00, 331.4, DME 28X, inner and middle marker). 26 fixes with NASR coordinates (PELAN, YOULL, MNTIN, XOHWI, SHOWZ, IHOBB, ELEEE, BLUUM, ORDIE, SITLE, BLSSM, LYLAC, PURBL, TEETO, PROES, JAAZZ, FITZY, KHRIS, FOSAN, HAKAM, CUXOV, PUTRE, FABIG, WAVBO, ONGEE, MANCH); NASR FIX_CHRT lists every one of them as charted on an IAP.
+
+### Procedures
+11 instrument approach charts: ILS or LOC 06 / 17 / 35, ILS 35 (SA CAT I), ILS 35 (CAT II and III), RNAV (GPS) 06 / 24 / Y 17 / Y 35, RNAV (RNP) Z 17 / Z 35. Departures: MANCHESTER ONE (radar vectors; "Maintain 3000"; turbojets turn on runways 6 and 17) and PPORT FOUR (RNAV, turbojets). STAR: ROZZE TWO (RNAV, two pages). The special-authorization ILS/RNP charts are listed but not transcribed. The 7 transcribed approaches carry fixes with roles, minima and the missed approach (see the files); missed-approach texts are written in the engine's grammar with the redundant "continue climb-in-hold to <alt>" dropped (the verbatim plate text is kept in `missed_approach_verbatim`).
+
+## Taxiways: OSM versus the FAA airport diagram (00246AD.PDF, cycle 2610)
+
+Diagram identifiers (read from the chart text and a render): A A1 A2 A3 A5 B C D E F G H J J1 K K1 K2 L M M1 N Z. Of those, **A5, C and K2 have no OSM way** with that ref; OSM has **D1** (two ways), which is not on the diagram (excluded). 30 of the 76 OSM taxiway ways have no ref: 10 are turn-on fillets that the build collapses (below), 13 take the identifier of the way they continue (no diagram label positions were georeferenced for KMHT), 7 stay unnamed. OSM maps each runway entrance as the straight crossing plus short untagged fillets to the centreline; the build collapses those fillets (they would be extra runway entries far from their hold line) and derives each hold line 250 ft from the centreline. OSM also has 26 `holding_position` nodes: on runway 17/35 ten of 11 derived hold lines fall within 2 m of one (on 6/24 the agreement is weaker), which supports the 250 ft simplification; they are compared in `src/airport/kmht/build-report.md`, not used as the source. Parking: the 14 terminal gates (OSM `gate` nodes refs 1-12, 14, 15, inside the terminal) are paired with the OSM `parking_position` node of the same ref; FBO and GA stands are OSM `parking_position` nodes inside the apron "FBO Ramp"; the four cargo spots are synthetic grid points inside the OSM cargo apron polygons.
+
+## KACY layers with no KMHT equivalent (left empty, never invented)
+- **LAHSO**: none in NASR or the d-TPP metadata for KMHT.
+- **Hot spot**: no d-TPP hot-spot page; the diagram prints only "BE ALERT TO RUNWAY CROSSING CLEARANCES. READBACK OF ALL RUNWAY HOLDING INSTRUCTIONS IS REQUIRED."
+- **MVA sectors**: the Boston Consolidated TRACON (A90) MVA chart was not downloaded; `mvaSectors` is absent.
+- **Holding patterns and fix altitudes** of the plates: not transcribed; every KMHT procedure has empty `holdingPatterns` and `fixAltitudes`.
+- **Diagram label georeferencing** (used for KACY to name untagged ways by proximity): not done.
+
+## Not verified (KMHT)
+- Current (2026) magnetic declination; NASR variation is 15 W with epoch 2020.
+- Class C dimensions (shape files not downloaded); traffic pattern altitude (blank in NASR); Chart Supplement text was not consulted (NASR CSV used).
+- Plate transcriptions (fix roles, DA/MDA/RVR values, missed approaches, the order of fixes in the simulator route) are human readings of the rendered PDFs. The ILS 17 SITLE role ("LOC step-down fix") and which fixes the plates treat as localizer-only final approach fixes are the least certain.
+- OSM: positional accuracy beyond the runway endpoints was not assessed; the OSM runway ways (with `displaced_threshold` segments) were not compared with NASR; the OSM gate positions are inside the terminal (level 2), the stands are the `parking_position` nodes.
+- Taxiways A5, C and K2: on the diagram, absent from OSM.
+
+## Raw files (`raw/`, not committed)
+`nasr_2026-10-01/x_*_CSV/` (NASR CSVs, shared), `d-TPP_Metafile_2610.xml`, `kmht_dtpp_2610_pdfs/` (18 PDFs), `kmht_dtpp_http_head_checks.tsv`, `overpass_kmht_raw.json`.

@@ -1,5 +1,5 @@
 /**
- * Planar-graph construction for the KACY taxiway network.
+ * Planar-graph construction for an airport taxiway network.
  *
  * Input: polylines (OSM ways) in local metres. Output: a planar arrangement
  * where every shared point is a node, ways that cross or touch are split at the
@@ -290,6 +290,42 @@ export class Planar {
       const sorted = [...set].filter((n) => this.alive[n]).sort((p, q) => projectOnSegment(this.pos[p], r.a, r.b).t - projectOnSegment(this.pos[q], r.a, r.b).t);
       this.ways.push({ key: `RWY${r.id}`, osmId: null, ref: `RWY${r.id}`, origRef: `RWY${r.id}`, kind: 'runway', runwayId: r.id, nodes: sorted });
     }
+  }
+
+  /**
+   * 5b. Collapse mapped turn-on fillets. Some airports map each runway entrance as the straight crossing taxiway PLUS short untagged
+   * curves from that taxiway to the runway centreline on either side. Those curves would each become an extra runway entry whose
+   * hold line is far from the runway node, so the exit/entry logic (runway node adjacent to its hold) cannot use them. An untagged
+   * taxiway way is dropped when one end is pinned to a runway centreline, it is shorter than `maxLenM`, and its other end lies on a
+   * NAMED way that itself reaches the same runway centreline within `reachM` along its own nodes. Returns the dropped ways.
+   */
+  collapseFillets(maxLenM: number, reachM: number): PWay[] {
+    const dropped: PWay[] = [];
+    const lenOf = (w: PWay): number => w.nodes.slice(1).reduce((s, n, i) => s + dist(this.pos[w.nodes[i]], this.pos[n]), 0);
+    for (const w of [...this.ways]) {
+      if (w.kind !== 'taxiway' || w.ref || w.origRef) continue;
+      const a = w.nodes[0];
+      const b = w.nodes[w.nodes.length - 1];
+      for (const [runEnd, far] of [[a, b], [b, a]] as [number, number][]) {
+        if (!this.pinned.has(runEnd) || this.pinned.has(far)) continue;
+        if (lenOf(w) > maxLenM) continue;
+        const rids = [...this.runwayNodes.entries()].filter(([, set]) => set.has(runEnd)).map(([id]) => id);
+        if (rids.length !== 1) continue;
+        const set = this.runwayNodes.get(rids[0])!;
+        const through = this.ways.find((v) => {
+          if (v === w || v.kind !== 'taxiway' || !v.ref || !v.nodes.includes(far)) return false;
+          return v.nodes.some((n) => n !== far && set.has(n) && dist(this.pos[n], this.pos[far]) <= reachM);
+        });
+        if (!through) continue;
+        dropped.push(w);
+        break;
+      }
+    }
+    if (dropped.length) {
+      const gone = new Set(dropped);
+      this.ways = this.ways.filter((w) => !gone.has(w));
+    }
+    return dropped;
   }
 
   /** Insert `node` into every way that has the consecutive pair (a, b). Returns how many ways were updated. */

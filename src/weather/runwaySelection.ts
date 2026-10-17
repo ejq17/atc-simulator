@@ -121,3 +121,19 @@ export function recommendRunways(
   const best = ranking.filter((r) => maxHw - r.headwindKt <= toleranceKt).map((r) => r.id);
   return { best, primary: best[0], ranking, calmWindRule: false };
 }
+
+/**
+ * Runway ends in the order a calm wind (or a headwind tie) should prefer them. KACY keeps its documented operator preferences
+ * (13/31 first: the longer pair); any other airport: longest runway first, ILS ends before non-ILS ends, then by end number
+ * (`calm: 'high'` prefers the higher-numbered end first).
+ */
+export function preferredEndOrder(
+  airport: { icao: string; runways: { lengthFt: number; ends: { id: string; ils?: unknown }[] }[] },
+  calm: 'low' | 'high' = 'low',
+): string[] {
+  if (airport.icao === 'KACY') return calm === 'high' ? ['31', '13', '22', '4'] : ['13', '31', '22', '4'];
+  const num = (id: string): number => parseInt(id, 10);
+  return [...airport.runways]
+    .sort((a, b) => b.lengthFt - a.lengthFt)
+    .flatMap((r) => [...r.ends].sort((a, b) => Number(!!b.ils) - Number(!!a.ils) || (calm === 'high' ? num(b.id) - num(a.id) : num(a.id) - num(b.id))).map((e) => e.id));
+}

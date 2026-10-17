@@ -1,4 +1,4 @@
-/** Debug rendering of the built KACY graph, north up (x east, y north; SVG y flipped). */
+/** Debug rendering of a built airport graph, north up (x east, y north; SVG y flipped). */
 import type { KacyAirport } from '../../src/airport/types.ts';
 
 const PALETTE: Record<string, string> = {
@@ -34,7 +34,7 @@ export function renderDebugSvg(ap: KacyAirport, diagramLabels: { id: string; x: 
   const pts = (poly: { x: number; y: number }[]): string => poly.map((p) => `${X(p.x)},${Y(p.y)}`).join(' ');
   const out: string[] = [];
   out.push(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W.toFixed(0)} ${H.toFixed(0)}" width="${Math.round(W * 0.6)}" height="${Math.round(H * 0.6)}" font-family="Helvetica, Arial, sans-serif">`);
-  out.push(`<title>KACY taxiway graph (debug) - north up. Source: FAA NASR/d-TPP + OpenStreetMap (c) OpenStreetMap contributors, ODbL 1.0</title>`);
+  out.push(`<title>${ap.icao} taxiway graph (debug) - north up. Source: FAA NASR/d-TPP + OpenStreetMap (c) OpenStreetMap contributors, ODbL 1.0</title>`);
   out.push(`<rect width="100%" height="100%" fill="#fbfbf8"/>`);
   // grid every 500 m
   for (let gx = Math.ceil(minX / 500) * 500; gx < maxX; gx += 500) out.push(`<line x1="${X(gx)}" y1="0" x2="${X(gx)}" y2="${H}" stroke="#e6e6e0" stroke-width="1.5"/>`);
@@ -55,7 +55,7 @@ export function renderDebugSvg(ap: KacyAirport, diagramLabels: { id: string; x: 
   // taxiway polylines
   const nodeById = g.nodes;
   for (const [id, lines] of Object.entries(g.taxiwayPolylines)) {
-    const col = PALETTE[id] ?? '#8a8a8a';
+    const col = PALETTE[id] ?? PALETTE[id.slice(0, 1)] ?? '#8a8a8a';
     for (const l of lines) {
       out.push(`<polyline points="${pts(l)}" fill="none" stroke="${col}" stroke-width="${id === 'UNNAMED' ? 3 : 5}" stroke-linejoin="round" stroke-linecap="round" ${id === 'UNNAMED' ? 'stroke-dasharray="8 6" opacity="0.9"' : 'opacity="0.9"'}/>`);
     }
@@ -70,7 +70,7 @@ export function renderDebugSvg(ap: KacyAirport, diagramLabels: { id: string; x: 
   // identifier labels (one per way polyline, at the middle vertex)
   for (const [id, lines] of Object.entries(g.taxiwayPolylines)) {
     if (id === 'UNNAMED') continue;
-    const col = PALETTE[id] ?? '#444';
+    const col = PALETTE[id] ?? PALETTE[id.slice(0, 1)] ?? '#444';
     for (const l of lines) {
       let total = 0;
       for (let i = 1; i < l.length; i++) total += Math.hypot(l[i].x - l[i - 1].x, l[i].y - l[i - 1].y);
@@ -128,7 +128,7 @@ export function renderDebugSvg(ap: KacyAirport, diagramLabels: { id: string; x: 
   }
   // legend
   out.push(`<g font-size="22"><rect x="10" y="10" width="360" height="150" fill="#fff" stroke="#999" opacity="0.92"/>`);
-  out.push(`<text x="20" y="38" font-weight="700">KACY debug graph (north up)</text>`);
+  out.push(`<text x="20" y="38" font-weight="700">${ap.icao} debug graph (north up)</text>`);
   out.push(`<line x1="20" y1="58" x2="60" y2="58" stroke="#e00000" stroke-width="6"/><text x="70" y="65">holding position (derived)</text>`);
   out.push(`<circle cx="40" cy="86" r="7" fill="#0057b8"/><text x="70" y="93">parking (dashed ring = synthetic)</text>`);
   out.push(`<line x1="20" y1="112" x2="60" y2="112" stroke="#888" stroke-width="3" stroke-dasharray="8 6"/><text x="70" y="119">unnamed lane</text>`);

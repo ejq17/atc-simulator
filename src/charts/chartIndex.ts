@@ -1,15 +1,16 @@
 /**
- * Typed index of the official FAA d-TPP charts for KACY.
+ * Typed index of the official FAA d-TPP charts per airport (KACY, KMHT).
  *
- * Built at import time from `data/sources/kacy-procedures.json` (verified d-TPP
+ * Built at import time from `data/sources/<icao>-procedures.json` (verified d-TPP
  * cycle 2610, every PDF URL checked HTTP 200 by the research pass). Nothing is
  * invented here: a chart exists in this index only if it is a record in that
  * file, and every entry carries `isOfficialFaa: true` plus the official
  * aeronav.faa.gov URL.
  */
 import rawProcedures from '../../data/sources/kacy-procedures.json';
+import rawKmhtProcedures from '../../data/sources/kmht-procedures.json';
 
-export type ChartCategory = 'DIAGRAM' | 'IAP' | 'DP' | 'HOT_SPOT' | 'LAHSO' | 'MINIMUMS';
+export type ChartCategory = 'DIAGRAM' | 'IAP' | 'DP' | 'STAR' | 'HOT_SPOT' | 'LAHSO' | 'MINIMUMS';
 
 export interface ChartEntry {
   /** Stable id: the d-TPP file stem, e.g. "00669AD". */
@@ -67,10 +68,11 @@ interface IapRecord {
 }
 interface SimpleChartRecord { chart_name: string; pdf_name: string; pdf: PdfRef }
 interface ProceduresFile {
-  _provenance: { cycle: string; effective_from: string; effective_to: string; retrieved: string };
+  _provenance: { cycle: string; effective_from: string; effective_to: string; retrieved: string; volume?: string };
   airport_diagram: SimpleChartRecord;
   instrument_approaches: IapRecord[];
-  departure_procedures: Array<{ chart_name: string; faa_id?: string; printed_date?: string; pdf: PdfRef; radar_required?: boolean }>;
+  departure_procedures: Array<{ chart_name: string; type?: string; faa_id?: string; printed_date?: string; pdf: PdfRef; radar_required?: boolean }>;
+  stars?: Array<{ chart_name: string; pdf_name: string; type?: string; pdf: PdfRef }>;
   supporting_charts: {
     /** Holds both the TAKEOFF MINIMUMS and ALTERNATE MINIMUMS booklet pages. */
     takeoff_minimums_pdf: SimpleChartRecord[];
@@ -79,11 +81,15 @@ interface ProceduresFile {
   };
 }
 
-const data = rawProcedures as unknown as ProceduresFile;
+const DATASETS: Record<string, ProceduresFile> = {
+  KACY: rawProcedures as unknown as ProceduresFile,
+  KMHT: rawKmhtProcedures as unknown as ProceduresFile,
+};
+const DEFAULT_ICAO = 'KACY';
 
 const isoDate = (s: string): string => s.slice(0, 10);
 
-export const CYCLE: CycleInfo = (() => {
+function cycleOf(data: ProceduresFile): CycleInfo {
   const p = data._provenance;
   const effectiveFrom = isoDate(p.effective_from);
   const effectiveTo = isoDate(p.effective_to);
@@ -95,7 +101,19 @@ export const CYCLE: CycleInfo = (() => {
     expiresAtMs: Date.parse(`${effectiveTo}T09:01:00Z`),
     retrieved: p.retrieved,
   };
-})();
+}
+
+/** The charted cycle of the default airport (all airports are built from the same d-TPP cycle). */
+export const CYCLE: CycleInfo = cycleOf(DATASETS[DEFAULT_ICAO]);
+
+/** Charted cycle of an airport's chart set. */
+export function cycleFor(icao: string = DEFAULT_ICAO): CycleInfo {
+  return cycleOf(datasetFor(icao));
+}
+
+function datasetFor(icao: string): ProceduresFile {
+  return DATASETS[icao.toUpperCase()] ?? DATASETS[DEFAULT_ICAO];
+}
 
 /** True while `nowMs` is inside the charted cycle's validity. */
 export function isCycleCurrent(nowMs: number = Date.now()): boolean {
@@ -105,23 +123,6 @@ export function isCycleCurrent(nowMs: number = Date.now()): boolean {
 function stem(pdfName: string): string {
   return pdfName.replace(/\.pdf$/i, '');
 }
-
-function base(rec: { pdf_name?: string; pdf: PdfRef }, name: string, category: ChartCategory): ChartEntry {
-  const pdfName = rec.pdf_name ?? rec.pdf.url.split('/').pop() ?? '';
-  return {
-    id: stem(pdfName),
-    name,
-    category,
-    pdfName,
-    pdfUrl: rec.pdf.url,
-    cycle: CYCLE.cycle,
-    effectiveFrom: CYCLE.effectiveFrom,
-    effectiveTo: CYCLE.effectiveTo,
-    isOfficialFaa: true,
-  };
-}
-
-const RUNWAY_ORDER = ['04', '13', '22', '31'];
 
 /** ILS first, then RNAV (GPS), RNAV (RNP), VOR/TACAN, helicopter last. */
 function approachRank(name: string): number {
@@ -134,7 +135,28 @@ function approachRank(name: string): number {
   return 8;
 }
 
-function buildCharts(): ChartEntry[] {
+/** "NE-2 (printed on charts as ...)" -> "Northeast 2". */
+function volumeName(volume: string): string {
+  const m = /^NE-(\d)/.exec(volume);
+  return m ? `Northeast ${m[1]}` : volume.split(' ')[0];
+}
+
+function buildCharts(data: ProceduresFile, icao: string): ChartEntry[] {
+  const cycle = cycleOf(data);
+  const base = (rec: { pdf_name?: string; pdf: PdfRef }, name: string, category: ChartCategory): ChartEntry => {
+    const pdfName = rec.pdf_name ?? rec.pdf.url.split('/').pop() ?? '';
+    return {
+      id: stem(pdfName),
+      name,
+      category,
+      pdfName,
+      pdfUrl: rec.pdf.url,
+      cycle: cycle.cycle,
+      effectiveFrom: cycle.effectiveFrom,
+      effectiveTo: cycle.effectiveTo,
+      isOfficialFaa: true,
+    };
+  };
   const out: ChartEntry[] = [];
 
   out.push(base(data.airport_diagram, data.airport_diagram.chart_name, 'DIAGRAM'));
@@ -145,52 +167,60 @@ function buildCharts(): ChartEntry[] {
       e.runway = r.runway;
       e.approachType = r.approach_type;
       if (r.printed_amendment_on_plate) e.printedAmendment = r.printed_amendment_on_plate;
-      if (/authorization required/i.test(r.approach_type)) e.note = 'Special aircraft and aircrew authorization required (RNP AR).';
+      if (/authorization required|special authorization|special aircrew/i.test(r.approach_type)) e.note = 'Special aircraft and aircrew authorization required.';
       if (/^HI-/i.test(r.chart_name)) e.note = 'High-altitude (USAF-designated) procedure; DME or radar required.';
       if (/^COPTER/i.test(r.chart_name)) e.note = 'Helicopter procedure.';
       return e;
     })
     .sort((a, b) => {
-      const ra = RUNWAY_ORDER.indexOf(a.runway ?? '');
-      const rb = RUNWAY_ORDER.indexOf(b.runway ?? '');
+      const ra = Number(a.runway);
+      const rb = Number(b.runway);
       return ra - rb || approachRank(a.name) - approachRank(b.name) || a.name.localeCompare(b.name);
     });
   out.push(...iaps);
 
   for (const dp of data.departure_procedures) {
     const e = base(dp, dp.chart_name, 'DP');
-    e.note = 'Radar vector departure (runway heading, then vectors); not a SID with a named route.';
+    e.note = /radar vector/i.test(dp.type ?? 'radar vector') ? 'Radar vector departure (runway heading, then vectors); not a SID with a named route.' : (dp.type ?? '');
     if (dp.printed_date) e.printedAmendment = dp.printed_date;
     out.push(e);
   }
+  for (const st of data.stars ?? []) out.push({ ...base(st, st.chart_name, 'STAR'), ...(st.type ? { note: st.type } : {}) });
   for (const r of data.supporting_charts.hot_spot) out.push(base(r, r.chart_name, 'HOT_SPOT'));
   for (const r of data.supporting_charts.lahso) out.push(base(r, r.chart_name, 'LAHSO'));
   for (const r of data.supporting_charts.takeoff_minimums_pdf) {
-    out.push({ ...base(r, r.chart_name, 'MINIMUMS'), note: 'Northeast 2 booklet page (covers many airports; find the KACY entry).' });
+    out.push({ ...base(r, r.chart_name, 'MINIMUMS'), note: `${volumeName(data._provenance.volume ?? '')} booklet page (covers many airports; find the ${icao} entry).` });
   }
   return out;
 }
 
-const CHARTS: readonly ChartEntry[] = Object.freeze(buildCharts());
+const cache = new Map<string, readonly ChartEntry[]>();
+function chartsOf(icao: string): readonly ChartEntry[] {
+  const key = DATASETS[icao.toUpperCase()] ? icao.toUpperCase() : DEFAULT_ICAO;
+  let c = cache.get(key);
+  if (!c) cache.set(key, (c = Object.freeze(buildCharts(DATASETS[key], key))));
+  return c;
+}
 
 export const CATEGORY_LABELS: Record<ChartCategory, string> = {
   DIAGRAM: 'Airport Diagram',
   IAP: 'Instrument Approaches',
   DP: 'Departure Procedures',
+  STAR: 'Arrival Procedures',
   HOT_SPOT: 'Hot Spots',
   LAHSO: 'LAHSO',
   MINIMUMS: 'Takeoff / Alternate Minimums',
 };
 
-/** Flat list in display order: diagram, IAPs (by runway), DP, hot spot, LAHSO, minimums. */
-export function listCharts(): ChartEntry[] {
-  return CHARTS.map((c) => ({ ...c }));
+/** Flat list in display order: diagram, IAPs (by runway), DP, STAR, hot spot, LAHSO, minimums. */
+export function listCharts(icao: string = DEFAULT_ICAO): ChartEntry[] {
+  return chartsOf(icao).map((c) => ({ ...c }));
 }
 
 /** Charts grouped for the side list. IAPs get one group per runway. */
-export function listChartGroups(): ChartGroup[] {
+export function listChartGroups(icao: string = DEFAULT_ICAO): ChartGroup[] {
   const groups: ChartGroup[] = [];
-  for (const c of CHARTS) {
+  for (const c of chartsOf(icao)) {
     const id = c.category === 'IAP' ? `IAP-${c.runway}` : c.category;
     let g = groups.find((x) => x.id === id);
     if (!g) {
@@ -208,11 +238,11 @@ export function listChartGroups(): ChartGroup[] {
   return groups;
 }
 
-export function getChart(id: string): ChartEntry | undefined {
-  const c = CHARTS.find((x) => x.id === id);
+export function getChart(id: string, icao: string = DEFAULT_ICAO): ChartEntry | undefined {
+  const c = chartsOf(icao).find((x) => x.id === id);
   return c ? { ...c } : undefined;
 }
 
-export function chartsByCategory(category: ChartCategory): ChartEntry[] {
-  return CHARTS.filter((c) => c.category === category).map((c) => ({ ...c }));
+export function chartsByCategory(category: ChartCategory, icao: string = DEFAULT_ICAO): ChartEntry[] {
+  return chartsOf(icao).filter((c) => c.category === category).map((c) => ({ ...c }));
 }

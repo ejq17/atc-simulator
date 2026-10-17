@@ -17,6 +17,8 @@ export interface ScenarioSummary {
   /** Career index (1..12) when mode === 'career'. */
   careerStep?: number;
   estimatedMinutes?: number;
+  /** ICAO codes the scenario is authored for (taxiway names, runway ends, parking ids); undefined = every airport. */
+  airports?: readonly string[];
 }
 
 export interface FreePlayOptions {
@@ -87,7 +89,8 @@ export interface CareerProgress {
 }
 
 export interface GameApi {
-  listScenarios(): ScenarioSummary[];
+  /** All scenarios; with an airport (ICAO), only those playable there. */
+  listScenarios(icao?: string): ScenarioSummary[];
   /** Build a full Scenario (with spawns resolved against the airport) ready for createEngine. */
   buildScenario(id: string, airport: Airport, options?: FreePlayOptions): Scenario;
   buildFreePlay(airport: Airport, options: FreePlayOptions): Scenario;
