@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { Suspense, lazy, useEffect } from 'react';
 import { useSimStore } from '../store/simStore';
 import { useUiStore, viewBus } from '../store/uiStore';
 import { TopBar } from '../components/TopBar';
@@ -12,6 +12,9 @@ import { NoticeBar, TrainingBanner } from '../components/Banners';
 import { Segmented } from '../components/ui';
 import { SurfaceDisplay } from '../display/SurfaceDisplay';
 import { RadarDisplay } from '../display/RadarDisplay';
+
+// three.js lives in its own chunk, fetched only when the Tower tab is first opened.
+const TowerDisplay = lazy(() => import('../tower/TowerDisplay'));
 import { ChartsDrawer } from '../drawers/ChartsDrawer';
 import { NavaidsDrawer } from '../drawers/NavaidsDrawer';
 import { SettingsDrawer } from '../drawers/SettingsDrawer';
@@ -43,6 +46,7 @@ function useShortcuts() {
           break;
         case '1': ui.setView('surface'); break;
         case '2': ui.setView('radar'); break;
+        case '3': ui.setView('tower'); break;
         case '+': case '=': viewBus.emit({ type: 'zoom', factor: 1.4 }); break;
         case '-': case '_': viewBus.emit({ type: 'zoom', factor: 1 / 1.4 }); break;
         case 'p': case 'P': sim.togglePause(); break;
@@ -90,14 +94,23 @@ export function SimScreen() {
               options={[
                 { value: 'surface', label: <span data-testid="tab-surface">Surface <span className="opacity-60">1</span></span> },
                 { value: 'radar', label: <span data-testid="tab-radar">Radar <span className="opacity-60">2</span></span> },
+                { value: 'tower', label: <span data-testid="tab-tower">Tower <span className="opacity-60">3</span></span> },
               ]}
             />
             <span className="hidden font-sans text-[10.5px] uppercase tracking-wider text-atc-muted md:inline">
-              {view === 'surface' ? 'Wheel zoom · drag pan · click aircraft to select · +/− zoom' : 'Wheel / +/− change range · drag pan · click target to select'}
+              {view === 'surface'
+                ? 'Wheel zoom · drag pan · click aircraft to select · +/− zoom'
+                : view === 'radar'
+                  ? 'Wheel / +/− change range · drag pan · click target to select'
+                  : 'Drag look · wheel zoom · [ ] runway ends · F follow · B binoculars · click aircraft to select'}
             </span>
           </div>
           <div className="relative min-h-0 flex-1" data-testid="display-area">
-            {view === 'surface' ? <SurfaceDisplay key="surface" /> : <RadarDisplay key="radar" />}
+            {view === 'surface' ? <SurfaceDisplay key="surface" /> : view === 'radar' ? <RadarDisplay key="radar" /> : (
+              <Suspense fallback={<div className="flex h-full items-center justify-center text-xs text-atc-muted" data-testid="tower-loading">Loading tower view…</div>}>
+                <TowerDisplay key="tower" />
+              </Suspense>
+            )}
           </div>
         </div>
         <aside className="flex w-[380px] shrink-0 flex-col border-l border-atc-border bg-atc-panel xl:w-[400px]">

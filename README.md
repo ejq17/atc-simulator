@@ -63,7 +63,7 @@ to lock back to the wall clock. To start a session on the old sim clock instead,
 * **Push-to-talk:** hold **Space** (configurable in Settings) and speak, e.g.
   "Cessna seven two three echo juliet, runway one three, cleared for takeoff".
 * **Typed fallback:** press **Enter**, type the same transmission, Enter to send.
-* **1 / 2** switch Surface and Radar views; **+ / −** zoom; **Esc** deselects.
+* **1 / 2 / 3** switch Surface, Radar and Tower views; **+ / −** zoom; **Esc** deselects.
 * Charts, Navaids, ATIS, Weather & Runways and Settings open from the top bar.
 
 Speech recognition providers, all three exercised end to end in automation: **Local Whisper**
@@ -72,6 +72,28 @@ Speech API** (zero setup; Chrome sends audio to Google; pause a beat after keyin
 see `.env.example`; about $0.0048 per audio minute at the time of writing). The key never
 reaches the browser: the backend mints short-lived tokens. No recordings are stored.
 Pilot voices use the browser's speech synthesis with per-aircraft voice/pitch variation.
+
+## Tower view
+
+The **Tower 3** tab is a 3D view from the control tower cab (three.js, loaded only when first opened, so Surface and Radar start-up is
+unchanged). Runways with markings and numbers, taxiways with centrelines, hold lines, taxiway letters, aprons and buildings are all
+built from the airport data; aircraft are low-poly models scaled from `src/sim/performance.ts`, with callsign tags that stay readable out to
+the radar range. The sky follows the simulated UTC (day, dusk, night with runway, taxiway and aircraft lights), fog follows visibility, and a low
+BKN/OVC ceiling draws an overcast deck. KACY has no tower in the OSM extract, so the cab is placed at the centroid of the terminal building
+(eye height 30 m, an assumption); the view says so in its corner label.
+
+| Control | Action |
+| --- | --- |
+| Drag | Look around (true bearing, shown as a magnetic heading strip along the top) |
+| Wheel, **+ / −** | Zoom (field of view) |
+| **[ / ]** or the RWY buttons | Snap to the previous / next runway end (**C**: first end) |
+| **F** or Follow | Keep the selected aircraft in view (any drag cancels it) |
+| **B** or Binoculars | Toggle a 7 degree binocular view |
+| Arrow keys | Nudge the view |
+| Click an aircraft | Select it (cyan ring and tag) |
+
+The e2e test (`e2e/tower.spec.ts`) needs WebGL; headless Chromium uses SwiftShader (software GL), requested with
+`--use-angle=swiftshader --enable-unsafe-swiftshader`. `node e2e/shoot-tower.mjs` captures screenshots (`TIME=2026-10-17T03:30:00Z` for a night view).
 
 ## Commands
 
