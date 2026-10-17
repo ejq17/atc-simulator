@@ -19,3 +19,14 @@ input, select { font-family: inherit; }
 @keyframes atc-pulse-ring { 0% { box-shadow: 0 0 0 0 rgba(255, 77, 79, 0.55); } 100% { box-shadow: 0 0 0 10px rgba(255, 77, 79, 0); } }
 .atc-tx { animation: atc-pulse-ring 1s ease-out infinite; }
 :focus-visible { outline: 1px solid #39c5e8; outline-offset: 1px; }
+@keyframes atc-wave { 0%, 100% { opacity: 0.25; } 50% { opacity: 1; } }
+.atc-wave { animation: atc-wave 0.9s ease-in-out infinite; }
+.atc-wave-2 { animation-delay: 0.25s; }
+@media (prefers-reduced-motion: reduce) { .atc-wave, .atc-blink, .atc-tx { animation: none; } }
+
+/* Flight strips: a freshly printed strip drops in with a cyan flash; a strip handed to another bay slides in from the left. */
+@keyframes strip-print { 0% { transform: translateY(-14px); opacity: 0; background-color: rgba(57, 197, 232, 0.35); } 40% { transform: translateY(0); opacity: 1; } 100% { background-color: transparent; } }
+@keyframes strip-move { 0% { transform: translateX(-26px); opacity: 0.2; background-color: rgba(242, 179, 61, 0.28); } 45% { transform: translateX(0); opacity: 1; } 100% { background-color: transparent; } }
+.strip-print { animation: strip-print 1.4s ease-out; }
+.strip-move { animation: strip-move 1.4s ease-out; }
+@media (prefers-reduced-motion: reduce) { .strip-print, .strip-move { animation: none; } }

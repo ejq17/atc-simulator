@@ -281,6 +281,11 @@ export function holdingShortCall(aircraft: Aircraft, env: ReadbackEnv, runwayEnd
   return `${facility(aircraft, env)}, ${aircraft.spokenCallsign}, holding short runway ${runwayRef(runwayEnd)}${tail}.`;
 }
 
+/** Check-in on Tower while still taxiing to the hold: "Atlantic City Tower, Cessna 723, approaching the hold runway one three, ready for departure." */
+export function approachingHoldCall(aircraft: Aircraft, env: ReadbackEnv, runwayEnd: string): string {
+  return `${facility(aircraft, env)}, ${aircraft.spokenCallsign}, approaching the hold runway ${runwayRef(runwayEnd)}, ready for departure.`;
+}
+
 export function holdingShortCrossingCall(aircraft: Aircraft, env: ReadbackEnv, runwayId: string, taxiway?: string): string {
   const at = taxiway ? ` at ${spokenTaxiway(taxiway)}` : '';
   return `${facility(aircraft, env)}, ${aircraft.spokenCallsign}, holding short of runway ${runwayRef(runwayId)}${at}.`;

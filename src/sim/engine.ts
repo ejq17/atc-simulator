@@ -12,7 +12,8 @@ import { mulberry32 } from './rng';
 import { emitEvent } from './context';
 import { setSimulationEpoch } from './solar';
 import type { SimContext } from './context';
-import { executeCommand } from './commandExecutor';
+import { executeCommand, validateCommand } from './commandExecutor';
+import type { SimulationEngineExtras } from './engineExtras';
 import { updateGroundMovement } from './groundMovement';
 import { updateFlightDynamics } from './flightDynamics';
 import { updateRunwayOccupancy } from './runwayOccupancy';
@@ -50,7 +51,7 @@ export const DEFAULT_WEATHER: Weather = {
 const HISTORY_LEN = 60;
 const MAX_STEPS_PER_ADVANCE = 2000;
 
-export function createEngine(opts: EngineOptionsExt): SimulationEngine {
+export function createEngine(opts: EngineOptionsExt): SimulationEngine & SimulationEngineExtras {
   const { airport, scenario } = opts;
   const dt = opts.dtSec ?? 0.1;
   const rng = mulberry32(scenario.seed);
@@ -138,7 +139,7 @@ export function createEngine(opts: EngineOptionsExt): SimulationEngine {
     }
   };
 
-  const engine: SimulationEngine = {
+  const engine: SimulationEngine & SimulationEngineExtras = {
     getState: () => state,
     subscribe(listener): Unsubscribe {
       listeners.add(listener);
@@ -169,6 +170,9 @@ export function createEngine(opts: EngineOptionsExt): SimulationEngine {
       const out = executeCommand(ctx, cmd, o);
       notify();
       return out;
+    },
+    validateCommand(cmd: ParsedCommand, o): CommandOutcome {
+      return validateCommand(ctx, cmd, o); // dry run: no events, no readback, no scoring, no notification
     },
     spawnAircraft(spec: Scenario['spawns'][number]): Aircraft {
       const ac = spawnFromSpec(ctx, spec);

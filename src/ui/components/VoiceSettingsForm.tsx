@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { STT_PROVIDER_NOTES, VOICE_PRIVACY_NOTES, TRANSCRIPT_STORAGE_KEY, createWebSpeechProvider, getLocalWhisperProvider } from '../../voice';
+import { STT_PROVIDER_NOTES, VOICE_PRIVACY_NOTES, TRANSCRIPT_STORAGE_KEY, createBrowserTts, createWebSpeechProvider, getLocalWhisperProvider, unlockAudio } from '../../voice';
 import type { SttProviderId, WhisperProgress } from '../../voice';
 import { voiceSettings, useVoiceSettings } from '../store/voiceSettings';
 import { keyLabel } from '../lib/voiceStatus';
@@ -33,6 +33,36 @@ function useProviderAvailability(id: SttProviderId): { checking: boolean; availa
     return () => { cancelled = true; };
   }, [id]);
   return state;
+}
+
+/** One shared speech provider for the "Play test call" button (the session has its own). */
+let testTts: ReturnType<typeof createBrowserTts> | undefined;
+
+function PilotVoiceTest() {
+  const [state, setState] = useState<{ voices: number; supported: boolean; playing: boolean }>({ voices: 0, supported: true, playing: false });
+  useEffect(() => {
+    testTts ??= createBrowserTts();
+    const tts = testTts;
+    let alive = true;
+    void tts.whenVoicesReady().then((n) => alive && setState((s) => ({ ...s, voices: n, supported: tts.isSupported() })));
+    return () => { alive = false; };
+  }, []);
+  const play = async () => {
+    unlockAudio();
+    testTts ??= createBrowserTts();
+    const s = voiceSettings.get();
+    setState((x) => ({ ...x, playing: true }));
+    await testTts.speak({ text: 'Atlantic City Tower, Cessna seven two three echo juliet, holding short runway one three, ready for departure.', voiceId: 'voice-1', rate: s.ttsRate, volume: s.ttsVolume });
+    setState((x) => ({ ...x, playing: false }));
+  };
+  return (
+    <div className="flex items-center gap-2 border border-atc-border px-2 py-1.5" data-testid="pilot-voice-test">
+      <Btn size="xs" onClick={() => { void play(); }} disabled={!state.supported || state.playing} data-testid="play-test-call">{state.playing ? 'Speaking…' : 'Play test call'}</Btn>
+      <span className={state.supported && state.voices > 0 ? 'text-atc-muted' : 'text-atc-amber'}>
+        {!state.supported ? 'This browser has no speech synthesis: pilots can only be read, not heard.' : state.voices === 0 ? 'No speech voices found yet. Install a system voice or try Chrome / Edge.' : `${state.voices} voices available; each aircraft gets its own voice.`}
+      </span>
+    </div>
+  );
 }
 
 function LocalModelControls() {
@@ -76,7 +106,7 @@ export function VoiceSettingsForm({ compact = false }: { compact?: boolean }) {
   return (
     <div className="flex flex-col gap-4 text-xs">
       <section className="flex flex-col gap-2.5">
-        <h3 className="font-sans text-[11px] font-semibold uppercase tracking-[0.18em] text-atc-cyan">Speech input</h3>
+        <h3 className="font-sans text-[11px] font-semibold uppercase tracking-[0.18em] text-atc-cyan">Speech input (microphone)</h3>
         <Field label="Recognition provider">
           <select className={SELECT} value={s.providerId} onChange={(e) => voiceSettings.update({ providerId: e.target.value as SttProviderId })} aria-label="Recognition provider">
             {(Object.keys(STT_PROVIDER_NOTES) as SttProviderId[]).map((id) => (
@@ -109,7 +139,9 @@ export function VoiceSettingsForm({ compact = false }: { compact?: boolean }) {
 
       <section className="flex flex-col gap-1">
         <h3 className="mb-1 font-sans text-[11px] font-semibold uppercase tracking-[0.18em] text-atc-cyan">Pilot voices and radio</h3>
-        <Toggle checked={s.ttsEnabled} onChange={(v) => voiceSettings.update({ ttsEnabled: v })} label="Speak pilot transmissions" hint="Browser text-to-speech, one voice profile per aircraft. Off = text only." />
+        <Toggle checked={s.ttsEnabled} onChange={(v) => voiceSettings.update({ ttsEnabled: v })} label="Pilot audio" hint="Pilots (and AI controllers you can hear) are spoken aloud by browser text-to-speech, one voice per aircraft. Off = text only. This is separate from the microphone." />
+        <Toggle checked={s.monitorAll} onChange={(v) => voiceSettings.update({ monitorAll: v })} label="Monitor all frequencies" hint="Also hear the positions you do not work (AI Tower, Ground...) and their pilots, at lower volume. Default: only your own frequencies." />
+        <PilotVoiceTest />
         <div className="grid grid-cols-2 gap-3 py-1">
           <Field label={`Volume ${Math.round(s.ttsVolume * 100)}%`}>
             <input type="range" min={0} max={1} step={0.05} value={s.ttsVolume} onChange={(e) => voiceSettings.update({ ttsVolume: Number(e.target.value) })} className="accent-[#39c5e8]" aria-label="Pilot voice volume" />

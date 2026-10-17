@@ -11,7 +11,7 @@ export interface VoiceStatusView {
 /** Human-readable mic/voice status for the radio panel. */
 export function describeVoiceStatus(status: VoiceStatus, providerId: SttProviderId, message?: string, pttKeyLabel = 'SPACE'): VoiceStatusView {
   if (providerId === 'none') {
-    return { badge: 'VOICE OFF', text: 'Speech input is off. Type your transmissions below.', tone: 'off' };
+    return { badge: 'MIC OFF', text: 'Speech input (microphone) is off. Type your transmissions below. Pilot audio is a separate setting.', tone: 'off' };
   }
   switch (status) {
     case 'unsupported':

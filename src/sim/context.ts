@@ -3,7 +3,7 @@
  * bookkeeping lives in per-aircraft `AircraftRuntime` records here so determinism and the public
  * type surface are unaffected.
  */
-import type { Aircraft, AircraftPerformance, ApproachType, Clearance, ClearanceKind, ConflictAlert, FlightPhase, SimEvent, SimulationState } from './types';
+import type { Aircraft, AircraftPerformance, ApproachType, Clearance, ClearanceKind, ConflictAlert, ControllerPositionId, FlightPhase, SimEvent, SimulationState } from './types';
 import type { EngineOptions } from './api';
 import type { Rng } from './rng';
 import { getPerformance } from './performance';
@@ -49,6 +49,8 @@ export interface ApproachRuntime {
 }
 
 export interface AircraftRuntime {
+  /** The player (not an AI controller) has issued an accepted command to this aircraft: only then does it count as "handled" once an AI is active. */
+  playerTouched?: boolean;
   /** AUTO = the aircraft flies its own approach/departure logic; HEADING = flies the assigned heading. */
   navMode: 'AUTO' | 'HEADING';
   /** Current turn rate (deg/s, + right) so bank builds smoothly. */
@@ -127,6 +129,12 @@ export interface SimContext {
   clearanceAlerts: { alert: ConflictAlert; expiresAtSec: number }[];
   waitStats: { count: number; totalSec: number; delaySec: number };
   spawnedIdx: Set<number>;
+  /** Dry run (`validateCommand`): nothing is logged, spoken, scored or changed. */
+  dryRun?: boolean;
+  /** Position of the AI controller whose command is being executed: its scored events carry `aiPosition`. */
+  currentAi?: ControllerPositionId;
+  /** An AI-issued command has been seen: the score then counts only the player's own actions. */
+  aiSeen?: boolean;
 }
 
 export function newRuntime(firstCallAtSec: number): AircraftRuntime {
@@ -162,7 +170,12 @@ export function nowSec(ctx: SimContext): number {
   return ctx.state.clock.timeSec;
 }
 
+/** Event kinds an AI command produces that the score would otherwise attribute to the player. */
+const AI_ATTRIBUTED = new Set(['COMMAND_ACCEPTED', 'COMMAND_REJECTED', 'CLARIFICATION', 'CONFLICT', 'READBACK_ERROR']);
+
 export function emitEvent(ctx: SimContext, ev: Omit<SimEvent, 'id' | 'timeSec'>): SimEvent {
+  if (ctx.dryRun) return { id: 'ev-dry', timeSec: ctx.state.clock.timeSec, ...ev };
+  if (ctx.currentAi && ev.aiPosition === undefined && AI_ATTRIBUTED.has(ev.kind)) ev = { ...ev, aiPosition: ctx.currentAi };
   const full: SimEvent = { id: `ev-${++ctx.eventSeq}`, timeSec: ctx.state.clock.timeSec, ...ev };
   const events = ctx.state.events;
   events.push(full);
@@ -178,6 +191,7 @@ export function speechDurationSec(text: string): number {
 
 /** A pilot "speaks": logs a TRANSMISSION event, updates radio state, notifies the voice layer. */
 export function pilotSay(ctx: SimContext, ac: Aircraft, text: string, data?: Record<string, unknown>): SimEvent {
+  if (ctx.dryRun) return { id: 'ev-dry', timeSec: ctx.state.clock.timeSec, kind: 'TRANSMISSION', text, severity: 'info', speaker: 'PILOT' };
   const rt = getRuntime(ctx, ac);
   const ev = emitEvent(ctx, {
     kind: 'TRANSMISSION',

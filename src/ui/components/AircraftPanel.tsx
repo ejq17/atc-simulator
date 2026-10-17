@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import type { Aircraft, SimulationState } from '../../sim/types';
 import { sameFrequency } from '../../radio/frequencies';
-import { controllerFrequencies } from '../commands/transmit';
+import { aiPositionOf, controllerFrequencies } from '../commands/transmit';
 import { useSimState, useSimStore } from '../store/simStore';
 import { TONE_COLOR, formatMhz, phaseLabel, statusTone } from '../lib/format';
 import { navLetter, requestBadge, stripClearance } from '../lib/ifr';
@@ -65,6 +65,7 @@ export function AircraftPanel() {
                   {ac.flags.readbackErrorPending && (
                     <span title="Readback error pending: re-issue the instruction" className="border border-atc-red px-1 text-[9px] font-semibold leading-4 text-atc-red">RB ERR</span>
                   )}
+                  {aiPositionOf(state, controller, ac) && <span title={`With the AI ${aiPositionOf(state, controller, ac)!.position} controller: you cannot instruct it until it is handed to you`} className="border border-[#b79cff]/50 px-1 text-[9px] font-semibold leading-4 text-[#b79cff]" data-testid="ai-tag">AI</span>}
                   <span className="text-[10.5px] tabular-nums text-atc-muted">{freqLabel(state, ac.frequencyMhz)}</span>
                 </span>
               </span>

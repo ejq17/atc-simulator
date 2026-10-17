@@ -15,6 +15,9 @@ import type { BrowserContext, Page } from '@playwright/test';
  * Chrome) or fails with NotSupportedError (headless shell).
  * Chrome restarts the file from its first sample every time the page opens a new microphone stream (each PTT press).
  */
+/** Same port override as playwright.config.ts (E2E_PORT), so these persistent browsers can run against a build too. */
+const DEFAULT_BASE_URL = `http://localhost:${process.env.E2E_PORT ?? 5173}`;
+
 export const FIXTURE_DIR = path.resolve(import.meta.dirname);
 export const PROFILE_DIR = path.resolve(import.meta.dirname, '../../.cache/playwright-profile');
 
@@ -53,7 +56,7 @@ export interface LaunchOptions {
 }
 
 export async function launchVoiceBrowser(clip: ClipName, opts: LaunchOptions = {}): Promise<VoiceBrowser> {
-  const { baseURL = 'http://localhost:5173', channel, headless = true, profileDir = PROFILE_DIR } = opts;
+  const { baseURL = DEFAULT_BASE_URL, channel, headless = true, profileDir = PROFILE_DIR } = opts;
   const context = await chromium.launchPersistentContext(profileDir, {
     headless,
     channel,
@@ -73,7 +76,7 @@ export async function launchVoiceBrowser(clip: ClipName, opts: LaunchOptions = {
  */
 export const REAL_MIC_PROFILE_DIR = path.resolve(import.meta.dirname, '../../.cache/playwright-profile-chrome-real');
 
-export async function launchRealMicBrowser(baseURL = 'http://localhost:5173', headless = true): Promise<VoiceBrowser> {
+export async function launchRealMicBrowser(baseURL = DEFAULT_BASE_URL, headless = true): Promise<VoiceBrowser> {
   const context = await chromium.launchPersistentContext(REAL_MIC_PROFILE_DIR, {
     headless,
     channel: 'chrome',

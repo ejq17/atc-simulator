@@ -14,6 +14,10 @@ export interface QueuedTransmission {
   frequencyMhz: number;
   /** Higher = sooner (e.g. emergency 10, normal 0). Default 0. */
   priority?: number;
+  /** Volume multiplier on top of the user's pilot-voice volume (0..1). Used for traffic the controller only monitors. Default 1. */
+  volume?: number;
+  /** Who is talking, for the UI's "speaking" lamp and the debug log: a pilot callsign or "TWR (AI)". */
+  speaker?: string;
 }
 
 export interface TransmissionSpeaker {
@@ -26,7 +30,7 @@ export type TransmissionEvent =
   | { type: 'start'; item: QueuedTransmission }
   | { type: 'end'; item: QueuedTransmission }
   | { type: 'stepped_on'; item: QueuedTransmission; attempt: number }
-  | { type: 'dropped'; item: QueuedTransmission; reason: 'wrong_frequency' | 'too_many_retries' | 'cleared' };
+  | { type: 'dropped'; item: QueuedTransmission; reason: 'wrong_frequency' | 'too_many_retries' | 'cleared' | 'audio_off' };
 
 export interface TransmissionQueueOptions {
   speaker: TransmissionSpeaker;
@@ -34,6 +38,15 @@ export interface TransmissionQueueOptions {
   radio?: { playPttOpen(): void; playPttClose(): void };
   onEvent?: (e: TransmissionEvent) => void;
   monitoredFrequencyMhz?: number;
+  /** Several monitored frequencies at once (a controller working Tower + Ground hears both). Wins over `monitoredFrequencyMhz`. */
+  monitoredFrequenciesMhz?: number[];
+  /**
+   * Safety net: a controller key that is still down this long after it was pressed is treated as released (a lost key-up,
+   * a window that lost focus mid-call, a toggle-mode press nobody undid). Without it pilots would stay silent forever.
+   */
+  maxControllerKeyMs?: number;
+  /** Safety net: speech that has neither finished nor failed after this long is abandoned so the queue keeps moving. */
+  maxSpeakMs?: number;
   steppedOnDelayMs?: number;
   /** Quiet gap after a transmission before the next pilot keys up. */
   gapMs?: number;
@@ -47,7 +60,10 @@ export interface TransmissionQueue {
   /** Returns false if the frequency is not the monitored one (inaudible, dropped). */
   enqueue(t: QueuedTransmission): boolean;
   setControllerTransmitting(transmitting: boolean): void;
+  isControllerTransmitting(): boolean;
   setMonitoredFrequency(mhz: number): void;
+  /** Replace the audible frequency set. `undefined` = everything is audible. Items waiting on a frequency that is no longer audible are dropped. */
+  setMonitoredFrequencies(mhz: number[] | undefined): void;
   clear(): void;
   isSpeaking(): boolean;
   pendingCount(): number;
@@ -69,8 +85,10 @@ export function createTransmissionQueue(opts: TransmissionQueueOptions): Transmi
   const gapMs = opts.gapMs ?? 300;
   const resumeDelayMs = opts.resumeDelayMs ?? 400;
   const maxRetries = opts.maxSteppedOnRetries ?? 3;
+  const maxKeyMs = opts.maxControllerKeyMs ?? 30_000;
+  const maxSpeakMs = opts.maxSpeakMs ?? 60_000;
 
-  let monitored = opts.monitoredFrequencyMhz;
+  let monitored: number[] | undefined = opts.monitoredFrequenciesMhz ?? (opts.monitoredFrequencyMhz !== undefined ? [opts.monitoredFrequencyMhz] : undefined);
   let controllerKeyed = false;
   let queue: Entry[] = [];
   let speaking: Entry | null = null;
@@ -78,10 +96,12 @@ export function createTransmissionQueue(opts: TransmissionQueueOptions): Transmi
   let seq = 0;
   let blockedUntil = 0;
   let timer: ReturnType<typeof setTimeout> | null = null;
+  let keyTimer: ReturnType<typeof setTimeout> | null = null;
+  let speakTimer: ReturnType<typeof setTimeout> | null = null;
   let disposed = false;
 
   const emit = (e: TransmissionEvent) => opts.onEvent?.(e);
-  const audible = (mhz: number) => monitored === undefined || sameFreq(mhz, monitored);
+  const audible = (mhz: number) => monitored === undefined || monitored.some((m) => sameFreq(mhz, m));
 
   function schedule(delayMs: number) {
     if (disposed) return;
@@ -125,11 +145,26 @@ export function createTransmissionQueue(opts: TransmissionQueueOptions): Transmi
     const myGen = ++generation;
     emit({ type: 'start', item: next.item });
     opts.radio?.playPttOpen();
+    if (speakTimer) clearTimeout(speakTimer);
+    speakTimer = setTimeout(() => {
+      speakTimer = null;
+      if (myGen !== generation || speaking !== next) return;
+      // The speaker never reported back: abandon this call and carry on.
+      generation++;
+      speaking = null;
+      opts.speaker.cancel();
+      opts.radio?.playPttClose();
+      emit({ type: 'end', item: next.item });
+      blockedUntil = now() + gapMs;
+      schedule(gapMs);
+    }, maxSpeakMs);
     opts.speaker
       .speak(next.item)
       .catch(() => undefined)
       .then(() => {
         if (myGen !== generation) return; // stepped on / cleared
+        if (speakTimer) clearTimeout(speakTimer);
+        speakTimer = null;
         speaking = null;
         opts.radio?.playPttClose();
         emit({ type: 'end', item: next.item });
@@ -143,6 +178,8 @@ export function createTransmissionQueue(opts: TransmissionQueueOptions): Transmi
     if (!e) return;
     generation++; // ignore the speaker's completion
     speaking = null;
+    if (speakTimer) clearTimeout(speakTimer);
+    speakTimer = null;
     opts.speaker.cancel();
     e.steppedOn += 1;
     if (e.steppedOn > maxRetries) {
@@ -152,6 +189,26 @@ export function createTransmissionQueue(opts: TransmissionQueueOptions): Transmi
     e.notBefore = now() + steppedOnDelayMs;
     emit({ type: 'stepped_on', item: e.item, attempt: e.steppedOn });
     queue.push(e);
+  }
+
+  function setMonitored(list: number[] | undefined) {
+    monitored = list ? [...list] : undefined;
+    if (speaking && !audible(speaking.item.frequencyMhz)) {
+      generation++;
+      const s = speaking;
+      speaking = null;
+      if (speakTimer) clearTimeout(speakTimer);
+      speakTimer = null;
+      opts.speaker.cancel();
+      emit({ type: 'dropped', item: s.item, reason: 'wrong_frequency' });
+    }
+    const keep: Entry[] = [];
+    for (const e of queue) {
+      if (audible(e.item.frequencyMhz)) keep.push(e);
+      else emit({ type: 'dropped', item: e.item, reason: 'wrong_frequency' });
+    }
+    queue = keep;
+    pump();
   }
 
   return {
@@ -167,38 +224,37 @@ export function createTransmissionQueue(opts: TransmissionQueueOptions): Transmi
     setControllerTransmitting(transmitting) {
       if (transmitting === controllerKeyed) return;
       controllerKeyed = transmitting;
+      if (keyTimer) clearTimeout(keyTimer);
+      keyTimer = null;
       if (transmitting) {
         if (timer) {
           clearTimeout(timer);
           timer = null;
         }
         stepOn();
+        // Never let a stuck key silence the pilots for good.
+        keyTimer = setTimeout(() => {
+          keyTimer = null;
+          if (controllerKeyed && !disposed) {
+            controllerKeyed = false;
+            blockedUntil = Math.max(blockedUntil, now() + resumeDelayMs);
+            schedule(resumeDelayMs);
+          }
+        }, maxKeyMs);
       } else {
         blockedUntil = Math.max(blockedUntil, now() + resumeDelayMs);
         schedule(resumeDelayMs);
       }
     },
-    setMonitoredFrequency(mhz) {
-      monitored = mhz;
-      if (speaking && !audible(speaking.item.frequencyMhz)) {
-        generation++;
-        const s = speaking;
-        speaking = null;
-        opts.speaker.cancel();
-        emit({ type: 'dropped', item: s.item, reason: 'wrong_frequency' });
-      }
-      const keep: Entry[] = [];
-      for (const e of queue) {
-        if (audible(e.item.frequencyMhz)) keep.push(e);
-        else emit({ type: 'dropped', item: e.item, reason: 'wrong_frequency' });
-      }
-      queue = keep;
-      pump();
-    },
+    isControllerTransmitting: () => controllerKeyed,
+    setMonitoredFrequency: (mhz) => setMonitored([mhz]),
+    setMonitoredFrequencies: (list) => setMonitored(list),
     clear() {
       if (speaking) {
         generation++;
         speaking = null;
+        if (speakTimer) clearTimeout(speakTimer);
+        speakTimer = null;
         opts.speaker.cancel();
       }
       for (const e of queue) emit({ type: 'dropped', item: e.item, reason: 'cleared' });
@@ -213,7 +269,11 @@ export function createTransmissionQueue(opts: TransmissionQueueOptions): Transmi
     dispose() {
       disposed = true;
       if (timer) clearTimeout(timer);
+      if (keyTimer) clearTimeout(keyTimer);
+      if (speakTimer) clearTimeout(speakTimer);
       timer = null;
+      keyTimer = null;
+      speakTimer = null;
       queue = [];
       if (speaking) opts.speaker.cancel();
       speaking = null;

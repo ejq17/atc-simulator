@@ -13,6 +13,9 @@ interface UiState {
   view: DisplayView;
   sideTab: SideTab;
   setSideTab(t: SideTab): void;
+  /** Aircraft details under the strip board: collapsed by default there, so the board gets the column. */
+  stripDetailsOpen: boolean;
+  setStripDetailsOpen(open: boolean): void;
   drawer: DrawerId;
   surfaceLayers: SurfaceLayers;
   radarLayers: RadarLayers;
@@ -34,6 +37,8 @@ export const useUiStore = create<UiState>((set) => ({
   view: 'surface',
   sideTab: 'list',
   setSideTab: (sideTab) => set({ sideTab }),
+  stripDetailsOpen: false,
+  setStripDetailsOpen: (stripDetailsOpen) => set({ stripDetailsOpen }),
   drawer: null,
   surfaceLayers: { ...DEFAULT_SURFACE_LAYERS },
   radarLayers: { ...DEFAULT_RADAR_LAYERS },

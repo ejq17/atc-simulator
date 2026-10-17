@@ -15,14 +15,20 @@ import { altimeterText, windText } from '../lib/format';
 import { atisNeedsUpdate, generateAtis, nextAtisLetter } from '../../weather/atis';
 import type { SimulatedAtis } from '../../weather/atis';
 import {
-  createBrowserTts, createPilotVoice, createRadioEffects, createTranscriptLog, createVoiceController,
+  MONITOR_ALL_VOLUME, createBrowserTts, createPilotVoice, createRadioEffects, createTranscriptLog, createVoiceController,
 } from '../../voice';
-import type { TranscriptLog, TransmissionQueue, VoiceController, VoiceStatusEvent } from '../../voice';
+import { createAiControllers } from '../../ai';
+import type { AiControllers, AiTransmission } from '../../ai';
+import type { SpeechSynthesisProvider, TranscriptLog, TransmissionQueue, VoiceController, VoiceStatusEvent } from '../../voice';
 import { createRenderBuffer } from '../display/renderBuffer';
 import type { RenderBuffer } from '../display/renderBuffer';
 import { controllerFrequencies, transmit } from '../commands/transmit';
 import type { ControllerSetup, TransmitResult } from '../commands/transmit';
 import { voiceSettings } from './voiceSettings';
+import { aiPositionsFor } from '../lib/positions';
+import { frequencyForPosition } from '../../radio/frequencies';
+import { createStripBoard } from '../strips/stripModel';
+import type { StripBoard } from '../strips/stripModel';
 
 export const AIRPORT_CALL_NAME = 'Atlantic City';
 
@@ -37,6 +43,16 @@ export interface SessionHooks {
   onAtis(atis: SimulatedAtis): void;
   onScenarioComplete(): void;
   onNotice(level: 'info' | 'warn' | 'error', text: string): void;
+  /** The browser really started / stopped speaking a transmission (`who` = callsign or "TWR (AI)"). */
+  onSpeaking?(speaking: boolean, who?: string): void;
+}
+
+/** One AI-worked position for the Radio panel's "Other positions (AI)" list. */
+export interface AiPositionView {
+  position: ControllerPositionId;
+  mhz?: number;
+  /** The controller's own status line (`AiControllers.status()`); empty until it has something to say. */
+  text: string;
 }
 
 export interface SessionParams {
@@ -51,6 +67,13 @@ export interface SessionParams {
   hooks: SessionHooks;
   /** Set false in tests / non-browser contexts. */
   enableVoice?: boolean;
+  /** Default true: positions in `scenario.controllerPositions` the player does not work are run by AI controllers. False = they stay unstaffed. */
+  enableAi?: boolean;
+  /** Test seam: replaces `createAiControllers`. */
+  createAi?: typeof createAiControllers;
+  /** Test seam: replaces the browser speech synthesis provider. */
+  tts?: SpeechSynthesisProvider & { isSupported?(): boolean };
+  seed?: number;
   /** Provide the pilot-transmission sink; the engine must have been created with `pilotSink`. */
   pilotSink: PilotSink;
 }
@@ -72,8 +95,14 @@ export interface Session {
   readonly startUtcMs: number;
   readonly voice: VoiceController | null;
   readonly transcript: TranscriptLog;
+  /** Flight progress strips (bays, marks, notes). Updated with the state; see `strips/stripModel.ts`. */
+  readonly strips: StripBoard;
   atis: SimulatedAtis;
   getController(): ControllerSetup;
+  /** Positions an AI controller works right now, with their status lines. */
+  aiPositions(): AiPositionView[];
+  /** Pilot audio facts for the Radio panel. */
+  audioInfo(): { supported: boolean; voices: number };
   setController(setup: ControllerSetup): void;
   submit(text: string, source: 'voice' | 'typed'): TransmitResult;
   setSpeed(speed: number): void;
@@ -136,34 +165,92 @@ export function applyAtisToEngine(state: SimulationState, atis: SimulatedAtis): 
 export function startSession(p: SessionParams): Session {
   const { engine, hooks } = p;
   const buffer = createRenderBuffer();
-  let controller: ControllerSetup = { positions: [...p.controller.positions] };
+  let controller: ControllerSetup = { positions: [...p.controller.positions], aiPositions: [] };
   let atis = makeAtis(engine.getState(), p.atisLetter, p.startUtcMs);
   engine.setAtis(atis);
   hooks.onAtis(atis);
 
   // ----- voice -------------------------------------------------------------------------------------------------
   const enableVoice = p.enableVoice ?? typeof window !== 'undefined';
-  const tts = createBrowserTts();
+  const tts: SpeechSynthesisProvider & { isSupported?(): boolean } = p.tts ?? createBrowserTts();
   const radio = enableVoice ? createRadioEffects({ enabled: voiceSettings.get().radioEffectsEnabled }) : undefined;
   const transcript = createTranscriptLog(voiceSettings);
-  const pilots: TransmissionQueue = createPilotVoice({ tts, settings: voiceSettings, radio });
-  const monitoredMhz = () => controllerFrequencies(engine.getState(), controller);
+  const pilots: TransmissionQueue = createPilotVoice({
+    tts, settings: voiceSettings, radio,
+    onSpeaking: (on, item) => hooks.onSpeaking?.(on, item.speaker),
+  });
+  /** Frequencies of the positions the player works. */
+  const playerFrequencies = () => controllerFrequencies(engine.getState(), controller);
+  const isPlayerFrequency = (mhz: number) => playerFrequencies().some((m) => sameFrequency(m, mhz));
+  /** Every frequency of a position in the session (player or AI): what "Monitor all frequencies" lets the player hear. */
+  const sessionFrequencies = () => {
+    const st = engine.getState();
+    const out: number[] = [];
+    for (const pos of new Set([...p.scenario.controllerPositions, ...controller.positions])) {
+      const f = frequencyForPosition(st.airport, pos);
+      if (f && !out.some((m) => sameFrequency(m, f.mhz))) out.push(f.mhz);
+    }
+    return out;
+  };
+  /**
+   * Which frequencies are audible: the player's own, plus (setting "Monitor all frequencies") every other one in the session.
+   * All of them at once: a player working Tower + Ground hears both, not just the one that spoke last.
+   */
   const syncMonitored = () => {
-    const m = monitoredMhz();
-    pilots.setMonitoredFrequency(m[0] ?? engine.getState().controllerFrequencyMhz);
+    const own = playerFrequencies();
+    const list = voiceSettings.get().monitorAll ? [...own, ...sessionFrequencies().filter((m) => !own.some((o) => sameFrequency(o, m)))] : own;
+    pilots.setMonitoredFrequencies(list.length ? list : [engine.getState().controllerFrequencyMhz]);
   };
   syncMonitored();
+  // "Monitor all frequencies" can be switched at any time (Radio panel, Settings).
+  const unsubMonitor = voiceSettings.subscribe(() => syncMonitored());
+  const volumeFor = (mhz: number) => (isPlayerFrequency(mhz) ? 1 : MONITOR_ALL_VOLUME);
 
   p.pilotSink.handler = (t) => {
     // Informational instructions (RADAR_CONTACT) have an empty readback: nothing is said, so nothing is queued or spoken.
     if (!t.text || !t.text.trim()) return;
-    // Only audible on a frequency the controller is working; the engine already logged the text.
-    if (!monitoredMhz().some((m) => sameFrequency(m, t.frequencyMhz))) return;
+    const mine = isPlayerFrequency(t.frequencyMhz);
+    // Inaudible unless it is on a frequency the player works (or they chose to monitor everything); the engine already logged the text.
+    if (!mine && !voiceSettings.get().monitorAll) return;
     transcript.add({ text: `${t.callsign}: ${t.text}`, source: 'pilot' });
-    // Combined positions monitor several frequencies; the queue knows one, so retarget it to this call.
-    pilots.setMonitoredFrequency(t.frequencyMhz);
-    pilots.enqueue({ text: t.text, voiceId: t.voiceId, frequencyMhz: t.frequencyMhz });
+    pilots.enqueue({ text: t.text, voiceId: t.voiceId, frequencyMhz: t.frequencyMhz, volume: volumeFor(t.frequencyMhz), speaker: t.callsign });
   };
+
+  // ----- AI controllers ------------------------------------------------------------------------------------------
+  const aiEnabled = p.enableAi ?? true;
+  const makeAi = p.createAi ?? createAiControllers;
+  let ai: AiControllers | null = null;
+  let lastAiTick = -1;
+  let inAi = false;
+  const onAiTransmission = (t: AiTransmission) => {
+    const mine = isPlayerFrequency(t.frequencyMhz);
+    if (!mine && !voiceSettings.get().monitorAll) return;
+    transcript.add({ text: `${t.position} (AI): ${t.text}`, source: 'ai' });
+    pilots.enqueue({ text: t.spokenText || t.text, voiceId: t.voiceId, frequencyMhz: t.frequencyMhz, volume: volumeFor(t.frequencyMhz), speaker: `${t.position} (AI)` });
+  };
+  const buildAi = () => {
+    ai?.dispose();
+    ai = null;
+    const positions = aiEnabled ? aiPositionsFor(p.scenario.controllerPositions, controller.positions) : [];
+    controller = { positions: controller.positions, aiPositions: positions };
+    if (positions.length === 0) return;
+    try {
+      ai = makeAi({
+        engine, airport: engine.getAirport(), positions, playerPositions: [...controller.positions],
+        onTransmission: onAiTransmission, seed: p.seed ?? engine.getState().seed,
+      });
+      lastAiTick = -1;
+    } catch (err) {
+      console.error('[ui] AI controllers failed to start', err);
+      controller = { positions: controller.positions, aiPositions: [] };
+      hooks.onNotice('error', `AI controllers could not start (${err instanceof Error ? err.message : String(err)}); ${positions.join(', ')} stay unstaffed.`);
+    }
+  };
+  buildAi();
+
+  // ----- strips ----------------------------------------------------------------------------------------------------
+  const strips = createStripBoard({ startUtcMs: p.startUtcMs });
+  strips.update(engine.getState());
 
   const submit = (text: string, source: 'voice' | 'typed', confidence?: number): TransmitResult => {
     transcript.add({ text, source: source === 'voice' ? 'speech' : 'typed', confidence });
@@ -178,6 +265,7 @@ export function startSession(p: SessionParams): Session {
     }
     hooks.onTransmitResult(r);
     hooks.onTraining(training ? training.update(engine.getState()) : null);
+    strips.update(engine.getState());
     hooks.onRev();
     return r;
   };
@@ -195,7 +283,11 @@ export function startSession(p: SessionParams): Session {
       pilots.setControllerTransmitting(on);
       hooks.onTransmitting(on);
     });
-    voice.onStatusChange((e) => hooks.onVoiceStatus(e));
+    voice.onStatusChange((e) => {
+      // A recogniser that errors out or goes idle while the key is "down" would otherwise leave the pilots muted for good.
+      if ((e.status === 'idle' || e.status === 'error') && pilots.isControllerTransmitting()) pilots.setControllerTransmitting(false);
+      hooks.onVoiceStatus(e);
+    });
     voice.onPartial((t) => hooks.onPartial(t));
     void voice.setProvider(s.providerId);
     let lastProvider = s.providerId;
@@ -220,8 +312,21 @@ export function startSession(p: SessionParams): Session {
   let lastBump = 0;
   let lastCompleteCheck = 0;
   let completeNotified = false;
-  const unsubEngine = engine.subscribe(() => {
+  const unsubEngine = engine.subscribe((st) => {
     dirty = true;
+    // Every engine step, after the engine advanced: the AI controllers read the state and act through engine.applyCommand.
+    // (Their own commands notify subscribers again within the same tick; the tick guard keeps this from re-entering.)
+    if (ai && !inAi && st.clock.tick !== lastAiTick) {
+      lastAiTick = st.clock.tick;
+      inAi = true;
+      try {
+        ai.update(st);
+      } catch (err) {
+        console.error('[ui] AI controller update failed', err);
+      } finally {
+        inAi = false;
+      }
+    }
   });
   const nowMs = () => (typeof performance !== 'undefined' ? performance.now() : Date.now());
   let last = nowMs();
@@ -252,6 +357,7 @@ export function startSession(p: SessionParams): Session {
       dirty = false;
       lastBump = t;
       if (training) hooks.onTraining(training.update(st));
+      strips.update(st);
       if (!completeNotified && t - lastCompleteCheck > 1000) {
         lastCompleteCheck = t;
         if (game.isScenarioComplete(st)) {
@@ -282,12 +388,20 @@ export function startSession(p: SessionParams): Session {
     startUtcMs: p.startUtcMs,
     voice,
     transcript,
+    strips,
     atis,
     getController: () => controller,
+    aiPositions() {
+      const st = engine.getState();
+      const status = ai?.status() ?? {};
+      return (controller.aiPositions ?? []).map((position) => ({ position, mhz: frequencyForPosition(st.airport, position)?.mhz, text: status[position] ?? '' }));
+    },
+    audioInfo: () => ({ supported: tts.isSupported?.() ?? true, voices: tts.listVoices().length }),
     setController(setup) {
-      controller = { positions: [...setup.positions] };
+      controller = { positions: [...setup.positions], aiPositions: [] };
       const primary: ControllerPositionId = controller.positions[0] ?? 'TWR';
       engine.setControllerPosition(primary);
+      buildAi(); // the positions the player no longer works go to AI, the ones now worked are released
       syncMonitored();
       hooks.onRev();
     },
@@ -326,7 +440,10 @@ export function startSession(p: SessionParams): Session {
       if (typeof cancelAnimationFrame !== 'undefined') cancelAnimationFrame(raf);
       unsubEngine();
       unsubSettings?.();
+      unsubMonitor();
       voice?.dispose();
+      ai?.dispose();
+      ai = null;
       pilots.clear();
       pilots.dispose();
       tts.cancel();

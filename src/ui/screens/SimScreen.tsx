@@ -46,12 +46,21 @@ function useShortcuts() {
         case '+': case '=': viewBus.emit({ type: 'zoom', factor: 1.4 }); break;
         case '-': case '_': viewBus.emit({ type: 'zoom', factor: 1 / 1.4 }); break;
         case 'p': case 'P': sim.togglePause(); break;
+        // Strip board (only while the Strips tab is showing, so the keys never surprise anyone looking at the aircraft list).
+        case 's': case 'S': if (ui.sideTab === 'strips') { e.preventDefault(); sim.strikeStrip(); } break;
+        case 'x': case 'X': if (ui.sideTab === 'strips') { e.preventDefault(); sim.dropStrip(); } break;
         default:
       }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, []);
+}
+
+function selectedCallsign(id: string | undefined): string {
+  const st = useSimStore.getState().session?.engine.getState();
+  const ac = id && st ? st.aircraft[id] : undefined;
+  return ac ? `· ${ac.callsign}` : '';
 }
 
 export function SimScreen() {
@@ -61,6 +70,10 @@ export function SimScreen() {
   const setDrawer = useUiStore((s) => s.setDrawer);
   const sideTab = useUiStore((s) => s.sideTab);
   const setSideTab = useUiStore((s) => s.setSideTab);
+  const detailsOpen = useUiStore((s) => s.stripDetailsOpen);
+  const setDetailsOpen = useUiStore((s) => s.setStripDetailsOpen);
+  const selectedId = useSimStore((s) => s.session?.engine.getState().selectedAircraftId);
+  useSimStore((s) => s.rev);
   useShortcuts();
   const close = () => setDrawer(null);
   return (
@@ -98,15 +111,29 @@ export function SimScreen() {
                 { value: 'strips', label: <span data-testid="tab-strips">Strips</span> },
               ]}
             />
-            <span className="font-sans text-[10px] uppercase tracking-wider text-atc-muted">{sideTab === 'list' ? 'requests first' : 'one bay per frequency'}</span>
+            <span className="font-sans text-[10px] uppercase tracking-wider text-atc-muted">{sideTab === 'list' ? 'requests first' : 'one bay per position'}</span>
           </div>
           {sideTab === 'list' ? <AircraftPanel /> : <FlightStrips />}
-          <div className="max-h-[62%] shrink-0 overflow-y-auto border-t border-atc-border">
-            <AircraftDetails />
-          </div>
+          {sideTab === 'strips' && (
+            <button
+              type="button"
+              data-testid="details-toggle"
+              aria-expanded={detailsOpen}
+              onClick={() => setDetailsOpen(!detailsOpen)}
+              className="flex h-7 shrink-0 items-center justify-between border-t border-atc-border bg-atc-panel-2 px-3 font-sans text-[10.5px] font-semibold uppercase tracking-[0.18em] text-atc-text hover:text-atc-cyan"
+            >
+              <span>Aircraft details {selectedCallsign(selectedId)}</span>
+              <span className="text-atc-muted">{detailsOpen ? '▾' : '▸'}</span>
+            </button>
+          )}
+          {(sideTab !== 'strips' || detailsOpen) && (
+            <div className={`${sideTab === 'strips' ? 'max-h-[34%]' : 'max-h-[62%]'} shrink-0 overflow-y-auto border-t border-atc-border`}>
+              <AircraftDetails />
+            </div>
+          )}
         </aside>
       </div>
-      <div className="flex h-[290px] shrink-0 border-t border-atc-border">
+      <div className="flex h-[348px] shrink-0 border-t border-atc-border">
         <div className="flex min-w-0 flex-1 flex-col">
           <AlertsStrip />
           <div className="min-h-0 flex-1"><CommsLog /></div>

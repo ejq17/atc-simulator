@@ -22,6 +22,7 @@ export const game: GameApi = {
   isScenarioComplete,
 };
 
+export { defaultPlayerPositions, DEFAULT_PLAYER_POSITIONS } from './scenarios';
 export { scenarioWeatherSchedule, scenarioEvents, createScenarioEventRunner } from './scenarios/events';
 export type { WeatherChange, ScenarioEventRunner, EventRunnerOptions } from './scenarios/events';
 export { REFERENCES, TRAINING_DISCLAIMER, KACY_READBACK_NOTE, refText } from './references';

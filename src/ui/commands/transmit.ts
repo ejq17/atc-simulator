@@ -23,11 +23,16 @@ import { parseTransmission } from '../../commands';
 import type { AircraftRef, FixInfo } from '../../commands';
 import type { SimulationEngine } from '../../sim/api';
 import type { Aircraft, CommandOutcome, ControllerPositionId, ParsedCommand, SimulationState } from '../../sim/types';
-import { frequencyForPosition, sameFrequency } from '../../radio/frequencies';
+import { frequencyForPosition, positionWord, sameFrequency } from '../../radio/frequencies';
 
 /** The positions the controller is currently working. The first is primary. */
 export interface ControllerSetup {
   positions: ControllerPositionId[];
+  /**
+   * Positions in the session that an AI controller works. The player cannot instruct an aircraft that is on one of their frequencies
+   * (it is "with AI Tower"): the call is refused here and never reaches the engine.
+   */
+  aiPositions?: ControllerPositionId[];
 }
 
 export type TransmitSummary = 'accepted' | 'rejected' | 'clarify' | 'empty';
@@ -53,6 +58,8 @@ export interface TransmitResult {
   offFrequency?: boolean;
   /** Frequency (MHz) of the position that carried the first command, for the Radio panel's TX indicator. */
   txMhz?: number;
+  /** Set when the call was refused because the aircraft is with an AI controller (the player does not work its frequency). */
+  aiBlocked?: { callsign: string; position: ControllerPositionId; mhz: number };
 }
 
 let seq = 0;
@@ -119,6 +126,26 @@ function findAircraft(state: SimulationState, callsign: string | null): Aircraft
   return Object.values(state.aircraft).find((a) => a.callsign.toUpperCase() === up);
 }
 
+/** "120.3", "124.6", "127.85": a frequency the way a controller says it, without padding zeros. */
+export function mhzText(mhz: number): string {
+  return String(Number(mhz.toFixed(3)));
+}
+
+/** The AI position an aircraft is currently with, if its frequency is an AI one and not also one of the player's. */
+export function aiPositionOf(state: Pick<SimulationState, 'airport'>, setup: ControllerSetup, ac: Pick<Aircraft, 'frequencyMhz'> | undefined): { position: ControllerPositionId; mhz: number } | undefined {
+  if (!ac || !setup.aiPositions?.length) return undefined;
+  if (controllerFrequencies(state, setup).some((m) => sameFrequency(m, ac.frequencyMhz))) return undefined;
+  for (const p of setup.aiPositions) {
+    const f = frequencyForPosition(state.airport, p);
+    if (f && sameFrequency(f.mhz, ac.frequencyMhz)) return { position: p, mhz: f.mhz };
+  }
+  return undefined;
+}
+
+export function aiRefusal(callsign: string, position: ControllerPositionId, mhz: number): string {
+  return `${callsign} is with AI ${positionWord(position)} on ${mhzText(mhz)}; wait for the handoff.`;
+}
+
 function describe(cmd: ParsedCommand): string {
   return `${cmd.kind.replace(/_/g, ' ').toLowerCase()}${cmd.callsign ? ` ${cmd.callsign}` : ''}`;
 }
@@ -160,8 +187,20 @@ export function transmit(input: TransmitInput): TransmitResult {
 
   const results: CommandResult[] = [];
   let clarification: string | undefined;
+  let aiBlocked: TransmitResult['aiBlocked'];
   for (const command of parsed.commands) {
-    const position = positionFor(engine.getState(), controller, findAircraft(engine.getState(), command.callsign));
+    const target = findAircraft(engine.getState(), command.callsign);
+    const withAi = aiPositionOf(engine.getState(), controller, target);
+    if (withAi && target) {
+      // The aircraft is on a frequency an AI controller works. Refuse here: the engine would answer "Not on frequency" and the player
+      // would not learn why. Nothing is sent, no pilot speaks, nothing is scored.
+      const reason = aiRefusal(target.callsign, withAi.position, withAi.mhz);
+      aiBlocked = { callsign: target.callsign, position: withAi.position, mhz: withAi.mhz };
+      results.push({ command, outcome: { status: 'rejected', reason }, position: withAi.position });
+      engine.logEvent({ kind: 'INFO', text: reason, severity: 'warning', speaker: 'SYSTEM', aircraftId: target.id, callsign: target.callsign, frequencyMhz: withAi.mhz });
+      break;
+    }
+    const position = positionFor(engine.getState(), controller, target);
     const outcome = engine.applyCommand(command, { position, source, transmissionId });
     results.push({ command, outcome, position });
     if (outcome.status === 'clarify') {
@@ -174,7 +213,10 @@ export function transmit(input: TransmitInput): TransmitResult {
   const rejected = results.filter((r) => r.outcome.status === 'rejected' && r.command.kind !== 'SAY_AGAIN');
   let summary: TransmitSummary;
   let message: string;
-  if (clarification) {
+  if (aiBlocked) {
+    summary = 'rejected';
+    message = (results[results.length - 1].outcome as Extract<CommandOutcome, { status: 'rejected' }>).reason;
+  } else if (clarification) {
     summary = 'clarify';
     message = `Clarification needed: ${clarification}`;
   } else if (rejected.length > 0) {
@@ -187,7 +229,7 @@ export function transmit(input: TransmitInput): TransmitResult {
       ? `Issued: ${accepted.map((r) => describe(r.command)).join(', ')}`
       : `Pilot repeated last transmission${results[0]?.command.callsign ? ` (${results[0].command.callsign})` : ''}.`;
   }
-  const offFrequency = rejected.some((r) => (r.outcome as Extract<CommandOutcome, { status: 'rejected' }>).reason.startsWith('Not on frequency'));
-  const txMhz = results[0] ? frequencyForPosition(engine.getState().airport, results[0].position)?.mhz : undefined;
-  return { transmissionId, text, source, commands: parsed.commands, results, summary, message, clarification, offFrequency, txMhz };
+  const offFrequency = !aiBlocked && rejected.some((r) => (r.outcome as Extract<CommandOutcome, { status: 'rejected' }>).reason.startsWith('Not on frequency'));
+  const txMhz = results[0] && !aiBlocked ? frequencyForPosition(engine.getState().airport, results[0].position)?.mhz : undefined;
+  return { transmissionId, text, source, commands: parsed.commands, results, summary, message, clarification, offFrequency, txMhz, aiBlocked };
 }

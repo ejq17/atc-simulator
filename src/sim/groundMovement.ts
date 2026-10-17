@@ -47,12 +47,15 @@ function isHardStopNode(ac: Aircraft, node: TaxiNode, isLast: boolean): boolean 
   return route.stopAtNodeIds.includes(node.id) && !nodeAuthorized(ac, node);
 }
 
-function findLeader(ctx: SimContext, ac: Aircraft): { gap: number; minGap: number } | undefined {
+export function findLeader(ctx: SimContext, ac: Aircraft): { gap: number; minGap: number } | undefined {
   const h = headingToVec(ac.headingDeg);
   const perf = perfOf(ac);
   let best: { gap: number; minGap: number } | undefined;
   for (const o of Object.values(ctx.state.aircraft)) {
     if (o === ac || !o.onGround || o.phase === 'PARKED' || o.phase === 'ARRIVED') continue;
+    // An aircraft waiting at its parking position (READY, or standing on a stand with no route) is not traffic on the taxiway: it
+    // does not hold up an aircraft passing on the apron connector. Only aircraft on the graph edges count for spacing.
+    if (o.phase === 'READY' || (!o.route && o.groundSpeedKt < 0.1 && ctx.state.airport.parking.some((p) => dist(p.pos, o.pos) < 8))) continue;
     const r = vSub(o.pos, ac.pos);
     const along = vDot(r, h);
     if (along <= 0 || along > 250) continue;

@@ -83,7 +83,8 @@ describe('departure on 22 vs traffic on 13/31 (fixture)', () => {
       return takeoff(e);
     };
     expect(at(5).status).toBe('accepted');
-    expect(at(3).status).toBe('accepted'); // ~67 s to the threshold, the C172 passes the intersection in ~40 s
+    expect(at(4).status).toBe('accepted'); // ~90 s to the threshold; from the hold the C172 needs ~30 s to line up plus ~40 s of roll to pass the intersection
+    expect(at(3).status).toBe('rejected'); // ~67 s to the threshold: now refused, the line-up time is part of the departure's occupancy
     const close = at(1);
     expect(close.status).toBe('rejected');
     if (close.status === 'rejected') expect(close.reason).toMatch(/ARR would cross the threshold of runway 13\/31 in \d+ s, before the departure passes the intersection/);

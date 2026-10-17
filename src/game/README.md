@@ -74,6 +74,22 @@ engine produce no CONFLICT / INCURSION / SEPARATION events.
 Airport facts that shape the scenarios: the terminal and GA ramp are south-west of 13/31; taxiway Bravo crosses 4/22 on the way
 to the 13 threshold, and taxiway Alpha crosses 13/31 on the way to runway 22 (both are also the KACY hot spot HS 1).
 
+## Player positions and AI (`FreePlayOptions.playerPositions`, `scenario.playerPositions`)
+
+`scenario.controllerPositions` is the full set of positions that exist in the session (the traffic generator reads it for IFR flows). `scenario.playerPositions` (optional, default = all) is
+the subset the human works; every other position is worked by an AI controller (src/ai, wired by the UI session). `game.buildScenario(id, airport, { playerPositions })` and
+`game.buildFreePlay(airport, { playerPositions })` set it (de-duplicated; the positions are not forced to be a subset of `controllerPositions`, so a player may work a position
+the scenario lists no traffic for). When the option is absent, **career and training scenarios default to the position they are about** (`DEFAULT_PLAYER_POSITIONS` / `defaultPlayerPositions(id)`):
+
+| Scenario | Player works | AI works |
+|---|---|---|
+| career-03 single landing, career-04 multiple departures, career-06 pattern, train-03 / 05 / 06 / 07 | TWR | GND |
+| career-05 ground taxi, train-02 taxi | GND | TWR |
+| career-08 IFR, train-09 approach | APP + DEP | TWR, GND (train-09: TWR) |
+| everything else (career 1, 2, 7, 9-12, train-01 / 04 / 08, free play) | unset = all they list | none |
+
+Free play leaves it unset; the UI's default there is Tower with AI on the rest.
+
 ## Free play
 
 `buildFreePlay(airport, options)` honours every `FreePlayOptions` field: `seed`, `weather` (preset id | `'random'` (seeded) | `'live'` |

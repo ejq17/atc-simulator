@@ -15,6 +15,8 @@ export * from './tts/types.ts';
 export * from './tts/browserTts.ts';
 export * from './tts/voiceAssignment.ts';
 export * from './tts/prepareForTts.ts';
+export * from './tts/ttsDebug.ts';
+export * from './audio/unlock.ts';
 export * from './audio/radioEffects.ts';
 export * from './transmissionQueue.ts';
 export * from './pilotVoice.ts';

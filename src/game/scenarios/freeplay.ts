@@ -116,6 +116,7 @@ export function buildFreePlay(airport: Airport, options: FreePlayOptions = {}, i
     weather,
     activeRunways: { departing: [...active.departing], landing: [...active.landing] },
     controllerPositions: positions,
+    ...(options.playerPositions?.length ? { playerPositions: [...new Set(options.playerPositions)] } : {}),
     spawns,
     traffic: { enabled: true, arrivalsPerHour, departuresPerHour, gaFraction, maxAircraft },
     difficulty,

@@ -17,6 +17,7 @@ import type { RunwayEndGeom } from './runways';
 import { neighborIds, shortestDistances } from './pathfinding';
 import { goingAroundCall } from '../radio/readback';
 import { advanceNav, fixPosition, turnLeadM } from './navigation';
+import { landedDistanceExceptionApplies, precedingArrivalBlockers } from './conflicts';
 import { holdGuidance } from './holding';
 import { missedGuidance, startPublishedMissed } from './missedApproach';
 import { resolveMinima, runwayInSight } from './minima';
@@ -26,6 +27,8 @@ export const GLIDEPATH_DEG = 3;
 export const TCH_FT = 50;
 const TAN_GP = Math.tan(deg2rad(GLIDEPATH_DEG));
 export const DECISION_POINT_M = nmToM(0.5);
+/** Inside this distance a cleared arrival that is still high goes around if the runway is occupied. */
+const LAST_CHANCE_M = nmToM(0.25);
 const ROLL_ACCEL_DEG_PER_SEC2 = 6;
 const VS_ACCEL_FPM_PER_SEC = 600;
 const APPROACH_RANGE_NM = 25;
@@ -153,7 +156,7 @@ export function exitSpeedMps(angleDeg: number, holdDistM: number): number {
 }
 const TAXI_DECEL_PLAN_FOR_EXIT = 0.9;
 
-interface RolloutPlan {
+export interface RolloutPlan {
   exitNodeId?: string;
   holdNodeId?: string;
   exitSpeedMps: number;
@@ -186,8 +189,9 @@ function chooseExit(ctx: SimContext, ac: Aircraft, g: RunwayEndGeom, tdAlong: nu
   if (lahsoStopAlong !== undefined) {
     for (let i = cands.length - 1; i >= 0; i--) if (cands[i].along > lahsoStopAlong) cands.splice(i, 1);
   }
-  const pickHold = (c: { id: string; holds: string[] }): string => {
-    // the side from which parking is closest by taxi
+  // The hold on the side from which parking is closest by taxi WITHOUT crossing any runway (`shortestDistances` never uses runway
+  // surfaces): cost = Infinity when every side needs a runway crossing (re-crossing the landing or an intersecting runway).
+  const pickHold = (c: { id: string; holds: string[] }): { hold: string; cost: number } => {
     let bestHold = c.holds[0];
     let bestCost = Infinity;
     for (const h of c.holds) {
@@ -199,21 +203,29 @@ function chooseExit(ctx: SimContext, ac: Aircraft, g: RunwayEndGeom, tdAlong: nu
         bestHold = h;
       }
     }
-    return bestHold;
+    return { hold: bestHold, cost: bestCost };
   };
+  // The first reachable exit, but an exit whose taxi route to parking needs no runway crossing is preferred over earlier ones that
+  // lead onto a hold beyond which the aircraft must cross a runway again (if none exists the first exit is used: the aircraft
+  // stops at the hold and asks for the crossing).
   const evaluate = (limit: number): RolloutPlan | undefined => {
+    let firstAny: RolloutPlan | undefined;
     for (const c of cands) {
       const d = c.along - tdAlong;
       if (d < 20) continue;
-      const hold = pickHold(c);
+      const { hold, cost } = pickHold(c);
       const from = graph.nodes[c.id].pos;
       const to = graph.nodes[hold].pos;
       const angle = Math.abs(headingDiff(g.headingDeg, bearingDeg(from, to)));
       const vC = exitSpeedMps(angle, dist(from, to));
       const aReq = vTd > vC ? (vTd * vTd - vC * vC) / (2 * d) : 0;
-      if (aReq <= limit) return { exitNodeId: c.id, holdNodeId: hold, exitSpeedMps: vC, brakeMps2: Math.max(aReq, 0.5 * normal) };
+      if (aReq <= limit) {
+        const plan: RolloutPlan = { exitNodeId: c.id, holdNodeId: hold, exitSpeedMps: vC, brakeMps2: Math.max(aReq, 0.5 * normal) };
+        if (Number.isFinite(cost)) return plan;
+        firstAny ??= plan;
+      }
     }
-    return undefined;
+    return firstAny;
   };
   const plan = evaluate(normal) ?? evaluate(maxBrake);
   if (plan) return plan;
@@ -226,6 +238,11 @@ function chooseExit(ctx: SimContext, ac: Aircraft, g: RunwayEndGeom, tdAlong: nu
   );
   const room = Math.max(1, stopTarget - tdAlong);
   return { exitSpeedMps: 0, brakeMps2: clamp((vTd * vTd) / (2 * room), normal, maxBrake), stopAlongM: stopTarget };
+}
+
+/** The rollout plan for an aircraft of `type` touching down (or already rolling) at `tdAlongM` with `vTdMps`; pure, for predictions. */
+export function predictRolloutPlan(state: SimContext['state'], type: string, g: RunwayEndGeom, tdAlongM: number, vTdMps: number): RolloutPlan {
+  return chooseExit({ state } as SimContext, { type } as Aircraft, g, tdAlongM, vTdMps);
 }
 
 function touchdown(ctx: SimContext, ac: Aircraft, rt: AircraftRuntime, g: RunwayEndGeom): void {
@@ -431,7 +448,13 @@ function inCaptureZone(g: RunwayEndGeom, ac: Aircraft, perf: AircraftPerformance
 }
 
 function otherOnRunway(ctx: SimContext, ac: Aircraft, g: RunwayEndGeom): Aircraft | undefined {
-  return Object.values(ctx.state.aircraft).find((o) => o !== ac && o.occupyingRunways.includes(g.runway.id));
+  // an aircraft already far enough down the runway by day (JO 7110.65 3-10-3, 3,000 / 4,500 ft) does not block the landing
+  return Object.values(ctx.state.aircraft).find((o) => o !== ac && o.occupyingRunways.includes(g.runway.id) && !landedDistanceExceptionApplies(ctx.state, ac, o, g));
+}
+
+/** At the decision point: traffic on the runway now, or a preceding arrival that will still be on it when this one crosses the threshold (3-10-3). */
+function runwayBlocker(ctx: SimContext, ac: Aircraft, g: RunwayEndGeom): Aircraft | undefined {
+  return otherOnRunway(ctx, ac, g) ?? precedingArrivalBlockers(ctx.state, ac, g)[0]?.other;
 }
 
 /** Distance (m) before the threshold at which FINAL (3 degree path logic) starts; cleared approaches join farther out. */
@@ -494,12 +517,20 @@ function approachGuidance(ctx: SimContext, ac: Aircraft, rt: AircraftRuntime, g:
     if (ac.phase === 'FINAL' && !rt.decisionDone && d <= DECISION_POINT_M) {
       rt.decisionDone = true;
       const cleared = rt.landingEnd === g.end.id && !!activeClearance(ac, 'LAND');
-      const blocker = cleared ? otherOnRunway(ctx, ac, g) : undefined;
+      const blocker = cleared ? runwayBlocker(ctx, ac, g) : undefined;
       const unstable = Math.abs(cross) > 250 || Math.abs(headingDiff(ac.headingDeg, g.headingDeg)) > 25;
       const reason = !cleared ? 'no landing clearance' : blocker ? 'traffic on the runway' : unstable ? 'unstable approach' : undefined;
       if (reason) initiateGoAround(ctx, ac, { reason, announce: true });
       else setPhase(ctx, ac, 'LANDING', 'cleared to land');
       if (reason) {
+        return { desiredHeading: g.headingDeg, altTargetFt: ac.target.altitudeFt, speedKt: perf.climbSpeedKt };
+      }
+    }
+    // Last chance: cleared and about to cross the threshold with the runway still occupied (the leader did not clear as projected).
+    if (ac.phase === 'LANDING' && d > 0 && d < LAST_CHANCE_M && ac.altitudeFt - g.elevationFt > 25) {
+      const blocker = otherOnRunway(ctx, ac, g);
+      if (blocker) {
+        initiateGoAround(ctx, ac, { reason: 'traffic on the runway', announce: true });
         return { desiredHeading: g.headingDeg, altTargetFt: ac.target.altitudeFt, speedKt: perf.climbSpeedKt };
       }
     }

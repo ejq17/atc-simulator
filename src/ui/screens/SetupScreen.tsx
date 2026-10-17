@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { game } from '../../game';
 import type { FreePlayOptions, ScenarioSummary } from '../../game';
 import { loadKacy } from '../../airport';
@@ -10,7 +10,7 @@ import { formatMhz, windText } from '../lib/format';
 import { summariseProvenance } from '../lib/provenance';
 import { recommendedRunways, useSimStore } from '../store/simStore';
 import type { StartOptions, WeatherChoice } from '../store/simStore';
-import { POSITION_CHOICES, POSITION_LABEL, POSITION_NOTE, POSITION_ORDER, POSITION_WORD, frequencyRows, rowLabel, suggestPosition } from '../lib/positions';
+import { POSITION_CHOICES, POSITION_LABEL, POSITION_NOTE, POSITION_ORDER, aiPositionsFor, choiceFromPositions, frequencyRows, positionListText, rowLabel, suggestPosition } from '../lib/positions';
 import type { PositionChoice } from '../lib/positions';
 import { AirportGlyph } from '../components/AirportGlyph';
 import { VoiceSettingsForm } from '../components/VoiceSettingsForm';
@@ -66,12 +66,18 @@ export function SetupScreen() {
   const scenarios = useMemo(() => game.listScenarios(), []);
   const progress = useMemo(() => game.loadCareerProgress(), []);
   const prov = useMemo(() => summariseProvenance(airport), [airport]);
-  /** Controller positions each ready-made scenario calls for (`scenario.controllerPositions`). */
-  const needs = useMemo(() => {
+  /**
+   * Positions each ready-made scenario has (`scenario.controllerPositions`) and the ones the player works by default
+   * (`scenario.playerPositions`: the position a lesson is about; free play: unset, the setup suggests Tower).
+   */
+  const { needs, playerDefaults } = useMemo(() => {
     const m = new Map<string, ControllerPositionId[]>();
+    const d = new Map<string, ControllerPositionId[]>();
     for (const sc of scenarios) {
       try {
-        m.set(sc.id, game.buildScenario(sc.id, airport, { seed: 1, ...(sc.mode === 'free_play' ? { ifrFlows } : {}) }).controllerPositions);
+        const built = game.buildScenario(sc.id, airport, { seed: 1, ...(sc.mode === 'free_play' ? { ifrFlows } : {}) });
+        m.set(sc.id, built.controllerPositions);
+        if (built.playerPositions) d.set(sc.id, built.playerPositions);
       } catch {
         /* unknown / unbuildable scenario: no positions shown */
       }
@@ -81,7 +87,7 @@ export function SetupScreen() {
     } catch {
       /* ignore */
     }
-    return m;
+    return { needs: m, playerDefaults: d };
   }, [scenarios, airport, ifrFlows]);
 
   const [mode, setMode] = useState<GameMode>(prev?.mode ?? 'free_play');
@@ -98,6 +104,7 @@ export function SetupScreen() {
   const [landing, setLanding] = useState<string>('auto');
   const [departing, setDeparting] = useState<string>('auto');
   const [position, setPosition] = useState<PositionChoice>(prev?.controller ?? 'TWR');
+  const [aiOn, setAiOn] = useState<boolean>(prev?.ai ?? true);
   const [live, setLive] = useState<LiveState>({ status: 'loading' });
 
   const refreshLive = () => {
@@ -126,17 +133,30 @@ export function SetupScreen() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mode]);
   // Picking a ready-made scenario adopts its own weather and the controller positions it calls for.
+  const mounted = useRef(false);
   useEffect(() => {
+    const changed = mounted.current; // false on the first run: keep what a previous session (Play again) chose
+    mounted.current = true;
     if (isCustom) {
       setWeatherKey((k) => (k === 'scenario' ? 'live' : k));
+      // Custom free play: Tower, and AI works the rest (all five positions when IFR flows are on).
+      if (changed) setPosition(ifrFlows ? 'ALL' : 'TWR');
       return;
     }
     if (!scenarioId) return;
     setWeatherKey('scenario');
+    // The position the scenario is about (Ground lessons: Ground only); free play: Tower, with AI on the rest.
+    const own = playerDefaults.get(scenarioId);
     const wanted = needs.get(scenarioId);
-    if (wanted) setPosition(suggestPosition(wanted));
+    if (own) setPosition(choiceFromPositions(own));
+    else if (selectedMode(scenarioId) === 'free_play') setPosition('TWR');
+    else if (wanted) setPosition(suggestPosition(wanted));
     // eslint-disable-next-line react-hooks/exhaustive-deps -- only when the selected scenario changes
   }, [scenarioId, isCustom]);
+
+  function selectedMode(id: string): GameMode | undefined {
+    return scenarios.find((x) => x.id === id)?.mode;
+  }
 
   function isUnlocked(s: ScenarioSummary): boolean {
     if (s.mode !== 'career') return true;
@@ -169,17 +189,20 @@ export function SetupScreen() {
       weather: weatherChoice,
       seed: seed !== undefined && Number.isFinite(seed) ? seed : undefined,
       controller: position,
+      ai: aiOn,
       runways: landing === 'auto' && departing === 'auto' ? 'auto' : { landing: landing === 'auto' ? rec.landing[0] : landing, departing: departing === 'auto' ? rec.departing[0] : departing },
     };
     void startSession(opts);
   };
 
   const scenarioNeeds: ControllerPositionId[] | undefined = needs.get(isCustom ? CUSTOM : scenarioId);
-  const suggested: PositionChoice | undefined = scenarioNeeds ? suggestPosition(scenarioNeeds) : undefined;
+  const suggested: PositionChoice | undefined = scenarioNeeds ? (playerDefaults.get(scenarioId) ? choiceFromPositions(playerDefaults.get(scenarioId)!) : suggestPosition(scenarioNeeds)) : undefined;
+  /** Positions that exist in the session but are not the player's; AI works them when "AI works the rest" is on. */
+  const aiWorks: ControllerPositionId[] = scenarioNeeds ? aiPositionsFor(scenarioNeeds, POSITION_CHOICES[position]) : [];
   const POSITIONS = POSITION_ORDER.map((value) => {
     const rows = frequencyRows(airport, POSITION_CHOICES[value]);
-    const covers = scenarioNeeds ? scenarioNeeds.every((p) => POSITION_CHOICES[value].includes(p)) : true;
-    return { value, label: POSITION_LABEL[value], rows, note: POSITION_NOTE[value], covers };
+    const rest = scenarioNeeds ? aiPositionsFor(scenarioNeeds, POSITION_CHOICES[value]) : [];
+    return { value, label: POSITION_LABEL[value], rows, note: POSITION_NOTE[value], rest };
   });
 
   return (
@@ -358,14 +381,23 @@ export function SetupScreen() {
             </section>
 
             <section>
-              <SectionTitle n={isCustom ? 5 : 4}>Controller position</SectionTitle>
+              <SectionTitle n={isCustom ? 5 : 4}>I work</SectionTitle>
               {scenarioNeeds && (
-                <p className="mb-2 text-[11.5px] leading-snug text-atc-muted" data-testid="position-needs">
-                  {isCustom ? 'Custom free play uses' : 'This scenario needs'}: <b className="text-atc-text">{scenarioNeeds.map((p) => POSITION_WORD[p]).join(', ')}</b>.
-                  {' '}Working fewer positions leaves aircraft on the others unheard (&ldquo;not on frequency&rdquo;).
-                </p>
+                <div className="mb-2 flex flex-col gap-1 text-[11.5px] leading-snug text-atc-muted" data-testid="position-needs">
+                  <span>
+                    {isCustom ? 'Custom free play has' : 'This scenario has'} <b className="text-atc-text">{positionListText(scenarioNeeds)}</b>.
+                    {' '}Pick the position you work; <b className="font-semibold text-[#b79cff]">AI controllers work the rest</b>.
+                  </span>
+                  <span data-testid="ai-works" className="flex flex-wrap items-baseline gap-x-2">
+                    <span className="font-sans text-[10px] uppercase tracking-[0.16em]">{aiOn ? 'AI works' : 'Unstaffed'}</span>
+                    {aiWorks.length > 0
+                      ? <b className={`text-[12.5px] font-semibold ${aiOn ? 'text-[#b79cff]' : 'text-atc-amber'}`}>{positionListText(aiWorks)}</b>
+                      : <span className="text-atc-text">nothing: you work every position</span>}
+                    {aiWorks.length > 0 && !aiOn && <span className="text-atc-amber">aircraft there will be &ldquo;not on frequency&rdquo;</span>}
+                  </span>
+                </div>
               )}
-              <div className="flex flex-col gap-1.5" role="radiogroup" aria-label="Controller position">
+              <div className="flex flex-col gap-1.5" role="radiogroup" aria-label="I work">
                 {POSITIONS.map((p) => (
                   <button
                     key={p.value}
@@ -374,14 +406,18 @@ export function SetupScreen() {
                     aria-checked={position === p.value}
                     data-testid={`position-${p.value}`}
                     onClick={() => setPosition(p.value)}
-                    className={`flex items-start justify-between gap-3 border px-3 py-2 text-left transition-colors ${position === p.value ? 'border-atc-cyan bg-atc-cyan/10' : 'border-atc-border bg-atc-panel hover:border-atc-muted'} ${p.covers ? '' : 'opacity-70'}`}
+                    className={`flex items-start justify-between gap-3 border px-3 py-2 text-left transition-colors ${position === p.value ? 'border-atc-cyan bg-atc-cyan/10' : 'border-atc-border bg-atc-panel hover:border-atc-muted'}`}
                   >
                     <span className="min-w-0">
                       <span className={`block text-[13px] font-semibold ${position === p.value ? 'text-atc-cyan' : 'text-atc-text'}`}>
                         {p.label}
                         {p.value === suggested && <span className="ml-2 font-sans text-[9.5px] font-normal uppercase tracking-wider text-atc-green">suggested</span>}
-                        {p.value === 'TWR' && !scenarioNeeds && <span className="ml-2 font-sans text-[9.5px] font-normal uppercase tracking-wider text-atc-muted">default</span>}
-                        {scenarioNeeds && !p.covers && <span className="ml-2 font-sans text-[9.5px] font-normal uppercase tracking-wider text-atc-amber">missing {scenarioNeeds.filter((n) => !POSITION_CHOICES[p.value].includes(n)).join(' ')}</span>}
+                        {!scenarioNeeds && p.value === 'TWR' && <span className="ml-2 font-sans text-[9.5px] font-normal uppercase tracking-wider text-atc-muted">default</span>}
+                        {scenarioNeeds && p.rest.length > 0 && (
+                          <span className={`ml-2 font-sans text-[9.5px] font-normal uppercase tracking-wider ${aiOn ? 'text-[#b79cff]' : 'text-atc-amber'}`}>
+                            {aiOn ? 'AI works' : 'unstaffed'} {p.rest.join(' ')}
+                          </span>
+                        )}
                       </span>
                       <span className="block text-[11px] leading-snug text-atc-muted">{p.note}</span>
                     </span>
@@ -395,6 +431,16 @@ export function SetupScreen() {
                   </button>
                 ))}
               </div>
+              <label className="mt-2 flex cursor-pointer items-start gap-2.5 border border-atc-border bg-atc-panel p-3" data-testid="ai-option">
+                <input type="checkbox" className="mt-0.5 accent-[#b79cff]" checked={aiOn} aria-label="AI controllers work the other positions" data-testid="ai-toggle" onChange={(e) => setAiOn(e.target.checked)} />
+                <span>
+                  <span className="block text-[13px] font-semibold text-atc-text">AI controllers work the other positions</span>
+                  <span className="block text-[11.5px] leading-snug text-atc-muted">
+                    Each position you do not work gets a rule-based AI controller. It speaks on its own frequency, hands aircraft to you on yours, and you cannot instruct aircraft that are with it.
+                    Off: those frequencies stay empty and aircraft on them cannot be reached.
+                  </span>
+                </span>
+              </label>
             </section>
 
             <section>

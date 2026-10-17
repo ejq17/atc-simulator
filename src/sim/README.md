@@ -21,6 +21,9 @@ here knows about KACY. Tests run against the synthetic `__fixtures__/testAirport
 | `navigation.ts` | Lateral navigation over fixes: fix lookup (`Airport.navaids`), `distanceToFixNm`, `bearingToFixMag`, fly-by sequencing (`advanceNav`, `turnLeadM`) |
 | `approach.ts` | Instrument / visual approach analysis: procedure classification, `assessApproach` (route join, intercept geometry, weather, range) |
 | `missedApproach.ts` | Interpreter and guidance for the published missed approach text; published-hold lookup |
+| `runwayTiming.ts` | Pure time projections: arrival threshold / touchdown / rollout-clear times, rollout distance vs time, crossing windows |
+| `wake.ts` | JO 7110.65 5-5-4 wake tables (TBL 5-5-3 / 5-5-4) by RECAT category |
+| `engineExtras.ts` | Types for engine methods beyond `api.ts`: `validateCommand` (dry run) |
 | `solar.ts` | NOAA solar position at the airport: `isDaylight` / `sunriseSunsetUtc`, the engine epoch (`utcStartMs`) for sunrise-sunset rules |
 | `mva.ts` | Minimum vectoring altitude lookup (`Airport.mvaSectors`, optional `holes`), 2 nm look-ahead, exemptions |
 | `holding.ts` | Holding patterns with the AIM 5-3-8 direct / teardrop / parallel entries, `holdingText` parser |
@@ -456,6 +459,66 @@ to the decision point) and the weather is the scenario's single METAR-like obser
 | `HOLD_AT_FIX` | `hold`: `fix`, `turns`, `asPublished`, optional `inboundCourseDeg` (magnetic, to the fix), `legMinutes`, `legNm`, `efcZulu` |
 | `RESUME_OWN_NAVIGATION`, `RADAR_CONTACT`, `MISSED_APPROACH` | none |
 | `CONTACT_FREQUENCY` | `frequencyId` `CLNC`/`GND`/`TWR`/`APP`/`DEP` (or `frequencyMhz`) |
+
+## Runway traffic, AI scoring and dry runs (AI-controller round)
+
+Gaps found by `src/ai` driving the engine with continuous traffic. Projections live in `runwayTiming.ts` (pure functions of the
+state): an arrival crosses the threshold at `min(groundspeed, 1.15 x approach speed)` (when more than 2 nm out), touches down at the
+typical point (390 m light / 490 m jets, later when high), then `projectRollout` runs the same exit selection as the flight
+dynamics (`predictRolloutPlan` = `chooseExit`: normal then maximum braking to the first usable exit at its exit speed) and the exit
+connector until the tail is off the runway polygon (no exit: stopped + 45 s). C172 on KACY 13 touching down at 390 m is clear ~29 s
+after touchdown on the fixture; A320 ~30 s.
+
+1. **Arrival over the runway blocks a departure.** `arrivalsOverRunway`: an airborne arrival (LANDING / FINAL / LAND clearance) inside
+   the runway polygon at any height counts for `TAKEOFF` and `LINE_UP_AND_WAIT` (before only aircraft below 50 ft AGL or ground
+   traffic did, and the 2 nm final rule stopped at 50 m past the threshold).
+2. **Landing behind an airborne arrival (3-10-3).** `precedingArrivalBlockers`: for every arrival ahead on the same final (same
+   runway end, within 900 m of the centreline) the follower's projected threshold crossing must be at least 3 s after the leader's
+   projected "clear of the runway" time, or - by day, Cat I/II only - the leader must already be landed with its tail 3,000 / 4,500 ft
+   from the threshold at that moment (`landedExceptionHolds`, the same daylight rule as for a leader on the ground). Training refuses,
+   other modes flag. Example (fixture, two C172 on 13): 25 s apart -> "it would cross the threshold of runway 13 in 103 s, but L1 ahead
+   on the same final lands in 88 s and is not clear of the runway until about 117 s"; the boundary is ~41 s of spacing. In flight, the
+   decision point (0.5 nm) re-evaluates the same blockers and goes around ("traffic on the runway"), and a new last-chance check
+   (cleared, inside 0.25 nm, still above 25 ft) goes around if an aircraft is physically on the runway (a leader that satisfies the
+   daylight rule does not block).
+3. **Crossings against intersecting-runway traffic (3-9-8 / 3-10-4).** The crossing aircraft is on the surface of the crossed runway
+   for a window computed along its own route (`crossingPath` over the runway nodes, `surfaceWindow`: start delay 3 s, 0.6 x taxi speed,
+   10 m of nose/wingtip margin). Traffic on a runway that crosses it is on that same surface when it passes the intersection point:
+   departures rolling or cleared (line-up time included), arrivals rolling out, arrivals on final within 3 nm (projected touchdown and
+   rollout), and aircraft standing on the surface there. `CROSS_RUNWAY` is unsafe if the traffic's time at the intersection +- 45 m
+   (+ its length) overlaps the window by less than 4 s. Real KACY (C172 crossing 4/22 at Bravo, A320 landing 13): refused while the A320 would reach the
+   intersection inside the crossing window (13-28 s from now; from about 0.3 nm out until it has passed) ("... L1 is rolling out on runway 13/31 and reaches the intersection in about 9 s"),
+   accepted once it has passed. The reverse is checked too: a `TAKEOFF` / `LAND` is refused while an aircraft cleared across the
+   intersecting runway would still be on it when the subject reaches the intersection.
+4. **AI vs player.** `applyCommand(..., { aiPosition })`: COMMAND_ACCEPTED / COMMAND_REJECTED / CLARIFICATION / CONFLICT (unsafe
+   clearance) / READBACK_ERROR events produced by that command carry `aiPosition` (`ctx.currentAi`); the pilot's readback does not.
+   Scoring ignores those events: correct clearances, communication errors, unsafe instructions and the request-wait statistics count
+   the player's own actions only; incursions and separation violations stay global. Once any AI command has been seen
+   (`ctx.aiSeen`), `aircraftHandled` counts a DESPAWN only if the player gave that aircraft an accepted instruction
+   (`DESPAWN.data.byPlayer`); with the AI doing everything the count is 0.
+   `engine.validateCommand(cmd, opts)` (typed in `engineExtras.ts`; `createEngine` returns `SimulationEngine & SimulationEngineExtras`,
+   `api.ts` is unchanged) is a dry run of `applyCommand`: same validation, safety gate and `CommandOutcome`, with no events, no pilot
+   transmission, no alert, no score change, no state change, no duplicate-window entry. Training: unsafe -> `rejected` with
+   `unsafe: true`; other modes -> `accepted` (the real call would flag it). The accepted clearance is a preview (`id: 'dry-run'`) and
+   `readback` is the correct readback text.
+5. **READY aircraft are not lane traffic.** `groundMovement.findLeader` skips aircraft that are READY or standing without a route on
+   a parking position (within 8 m); only aircraft on the taxiway edges count for spacing.
+6. **Ground proximity.** Alert below `min(30 m, 0.8 x (1.5 x longer length + 20 m))` (C172 pair 26.0 m, anything with an A320 30 m),
+   critical below 15 m, and never for two aircraft standing still in the same queue (TAXIING / HOLDING_SHORT / READY, same heading, off
+   the runway) unless they are closer than 15 m.
+7. **Check-in near the hold.** A departure that checks in on Tower within 400 m (`HOLD_CHECKIN_RANGE_M`) of the departure hold at the
+   end of its route says "holding short runway one three, ready for departure" when stopped at it, else "approaching the hold runway
+   one three, ready for departure", with `pendingRequest = DEPARTURE` (the later standard hold call is not repeated).
+8. **Line-up time.** A takeoff clearance given at the hold sets `rollAtSec = now + max(2.5, lineUpTimeSec)`: 3 s + path / line-up
+   speed + the 90 degree turn, never less than 10 s (C172) / 17 s (A320). The aircraft really needs 25.7 s (C172) / 26.1 s (A320) from
+   KACY HP13-31-C-1 to start rolling (measured); the intersecting-runway estimates (`intersectingIssues`) and the crossing checks use the
+   same line-up time instead of 2.5 s, which makes a departure from the hold on 22 unsafe with a 13 arrival 3 nm out (67 s) where it
+   was accepted before (about 70 s needed: 30 s line-up + 40 s to pass the intersection).
+9. **Exits that avoid a re-crossing.** `chooseExit` takes the first reachable exit whose hold has a taxi route to parking without
+   crossing any runway (`shortestDistances` never uses runway surfaces); if none of the reachable exits does, the first reachable exit
+   is used and the aircraft stops at the hold (RUNWAY_EXIT) and asks for the crossing as before. On the unmodified KACY data every
+   exit chosen for 4 / 22 / 13 / 31, both types and touchdown points of 250-800 m already has such a route (test); with Bravo cut
+   off from parking the C172 on 22 skips Bravo for the next exit.
 
 ## Landing rollout and runway exit
 

@@ -1,5 +1,5 @@
 /** The scenario catalogue: career, training and free-play presets. */
-import type { Airport } from '../../sim/types';
+import type { Airport, ControllerPositionId } from '../../sim/types';
 import type { FreePlayOptions, ScenarioSummary } from '../index';
 import type { GameScenario } from '../types';
 import { CAREER_SCENARIOS } from './career';
@@ -34,10 +34,39 @@ export function listScenarioSummaries(): ScenarioSummary[] {
   return ALL_SCENARIOS.map((d) => ({ ...d.summary }));
 }
 
+/**
+ * The position(s) a career / training scenario is about, when that is fewer than the positions it lists (the rest is AI work):
+ * Ground lessons give GND only, Tower lessons TWR only (AI Ground moves the landed aircraft), the approach lessons APP + DEP.
+ * Scenarios that exercise several positions together (career 2 and 7, 9-12, the crossing and IFR-clearance lessons) are absent:
+ * the player keeps everything they list. The setup screen lets the player override any of this.
+ */
+export const DEFAULT_PLAYER_POSITIONS: Readonly<Record<string, readonly ControllerPositionId[]>> = {
+  'career-03-single-landing': ['TWR'],
+  'career-04-multiple-departures': ['TWR'],
+  'career-05-ground-taxi': ['GND'],
+  'career-06-pattern': ['TWR'],
+  'career-08-ifr': ['APP', 'DEP'],
+  'train-02-taxi': ['GND'],
+  'train-03-runway-safety': ['TWR'],
+  'train-05-sequencing': ['TWR'],
+  'train-06-pattern': ['TWR'],
+  'train-07-go-around': ['TWR'],
+  'train-09-approach': ['APP', 'DEP'],
+};
+
+export function defaultPlayerPositions(id: string): ControllerPositionId[] | undefined {
+  const p = DEFAULT_PLAYER_POSITIONS[id];
+  return p ? [...p] : undefined;
+}
+
 export function buildCatalogueScenario(id: string, airport: Airport, options?: FreePlayOptions): GameScenario {
   const d = findScenarioDef(id);
   if (!d) throw new Error(`Unknown scenario "${id}"`);
-  return d.build(airport, options);
+  const sc = d.build(airport, options);
+  // Explicit option wins; otherwise a career/training scenario defaults to the position it is about (free play: all positions).
+  const wanted = options?.playerPositions?.length ? [...new Set(options.playerPositions)] : d.summary.mode === 'free_play' ? undefined : defaultPlayerPositions(id);
+  if (wanted) sc.playerPositions = wanted;
+  return sc;
 }
 
 export { CAREER_SCENARIOS, TRAINING_SCENARIOS };

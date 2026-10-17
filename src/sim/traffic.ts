@@ -17,7 +17,7 @@ import { assignSquawk } from './ifr';
 import { spokenCallsign as buildSpokenCallsign } from '../radio/spoken';
 import {
   approachCheckInCall, arrivalTowerCheckInCall, checkInCall, clearOfRunwayCall, departureCheckInCall, establishedCall, finalCall, goAroundEstablishedCall,
-  holdingShortCall, holdingShortCrossingCall, ifrClearanceRequestCall, inboundCall, missedApproachCheckInCall, readyToTaxiCall, stoppedOnRunwayCall,
+  holdingShortCall, approachingHoldCall, holdingShortCrossingCall, ifrClearanceRequestCall, inboundCall, missedApproachCheckInCall, readyToTaxiCall, stoppedOnRunwayCall,
 } from '../radio/readback';
 import type { ReadbackEnv } from '../radio/readback';
 
@@ -292,18 +292,22 @@ export function processScheduledSpawns(ctx: SimContext): void {
 export function removeAircraft(ctx: SimContext, id: string, handled = false, why = 'removed'): void {
   const ac = ctx.state.aircraft[id];
   if (!ac) return;
+  const byPlayer = !!ctx.runtime.get(id)?.playerTouched;
   delete ctx.state.aircraft[id];
   ctx.runtime.delete(id);
   if (ctx.state.selectedAircraftId === id) ctx.state.selectedAircraftId = undefined;
   emitEvent(ctx, {
     kind: 'DESPAWN', aircraftId: id, callsign: ac.callsign, severity: 'info', speaker: 'SYSTEM',
-    text: `${ac.callsign} ${why}`, data: { handled },
+    text: `${ac.callsign} ${why}`, data: { handled, byPlayer },
   });
 }
 
 // ---------------------------------------------------------------------------
 // Frequency changes
 // ---------------------------------------------------------------------------
+
+/** Within this distance of its departure hold an aircraft that checks in on Tower makes the departure call. */
+export const HOLD_CHECKIN_RANGE_M = 400;
 
 export function applyPendingFrequencyChanges(ctx: SimContext): void {
   const now = ctx.state.clock.timeSec;
@@ -515,6 +519,19 @@ export function updatePilotRequests(ctx: SimContext): void {
           rt.calls.add('final');
           pilotSay(ctx, ac, arrivalTowerCheckInCall(ac, env, { distanceNm: mToNm(-alongCross(g, ac.pos).along), runwayEnd: g.end.id }), { checkIn: true, request: 'LANDING' });
           ac.pendingRequest = { kind: 'LANDING', text: 'inbound, requesting landing clearance', sinceSec: now };
+          continue;
+        }
+      }
+      // Handed to Tower at or near the hold: the check-in IS the departure call (not a generic one).
+      if (ac.onGround && ac.isDeparture && pos === 'TWR') {
+        const gDep = findRunwayEnd(airport, ac.assignedRunwayEnd);
+        const lastId = ac.route ? ac.route.nodeIds[ac.route.nodeIds.length - 1] : rt.stoppedAtNodeId;
+        const hold = lastId ? graph.nodes[lastId] : undefined;
+        if (gDep && hold && hold.kind === 'holding_position' && hold.runwayId === gDep.runway.id && (!hold.protectsRunwayEnd || hold.protectsRunwayEnd === gDep.end.id) && dist(hold.pos, ac.pos) <= HOLD_CHECKIN_RANGE_M) {
+          const atHold = ac.phase === 'HOLDING_SHORT' || (ac.groundSpeedKt < 1 && dist(hold.pos, ac.pos) <= 25);
+          rt.calls.add(`hold:${hold.id}`); // this call replaces the standard "holding short" call
+          pilotSay(ctx, ac, atHold ? holdingShortCall(ac, env, gDep.end.id, true) : approachingHoldCall(ac, env, gDep.end.id), { checkIn: true, request: 'DEPARTURE' });
+          ac.pendingRequest = { kind: 'DEPARTURE', text: `${atHold ? 'holding short' : 'approaching the hold'} runway ${gDep.end.id}, ready for departure`, sinceSec: now };
           continue;
         }
       }

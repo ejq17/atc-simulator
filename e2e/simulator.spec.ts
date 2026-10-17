@@ -45,10 +45,10 @@ test('a typed takeoff clearance gets the pilot readback and the aircraft departs
 });
 
 test('an invalid clearance is rejected and the rejection shows in the log', async ({ page }) => {
-  // Training lesson 2 parks N482KB on the ramp (Ground frequency); Tower + Ground lets us talk to it.
+  // Training lesson 2 parks N482KB on the ramp (Ground frequency). The lesson is about Ground, so Ground is the default position (AI works Tower).
   await startScenario(page, { mode: 'training', scenario: 'train-02-taxi' });
   await expect(page.getByTestId('strip-N482KB')).toBeVisible();
-  await expect(page.getByTestId('position-select')).toHaveValue('TWR+GND');
+  await expect(page.getByTestId('position-select')).toHaveValue('GND');
 
   await sendCommand(page, 'Cessna four eight two kilo bravo, runway one three, cleared for takeoff');
 
@@ -250,13 +250,17 @@ test('Clearance Delivery: the IFR clearance is read back with the departure and 
   await expect(page.getByTestId('last-result')).toHaveAttribute('data-off-frequency', 'true');
 });
 
-test('the Strips tab lists traffic by frequency and the radar offers 60 NM and All fixes', async ({ page }) => {
+test('the Strips tab is a strip board with a bay per position, and the radar offers 60 NM and All fixes', async ({ page }) => {
   await startScenario(page, { mode: 'training', scenario: 'train-08-ifr-clearance' });
   await page.getByTestId('tab-strips').click();
-  const bay = page.getByTestId('bay-127.850');
+  const bay = page.getByTestId('bay-CLNC');
   await expect(bay).toBeVisible();
-  await expect(bay.getByTestId('fps-NKS451')).toContainText('IFR');
-  await expect(bay.getByTestId('fps-NKS451')).toContainText('KACY → KPHL');
+  await expect(bay).toHaveAttribute('data-owner', 'player');
+  await expect(bay).toContainText('127.85');
+  const strip = bay.getByTestId('fps-NKS451');
+  await expect(strip.getByTestId('strip-rules')).toHaveText('IFR');
+  await expect(strip.getByTestId('strip-route-od')).toHaveText('KACY→KPHL');
+  await expect(strip.getByTestId('strip-type')).toHaveText('A320/L');
   await page.getByTestId('fps-NKS451').click();
   await page.getByTestId('tab-list').click();
   await expect(page.getByTestId('strip-NKS451')).toHaveAttribute('aria-pressed', 'true');
@@ -270,4 +274,155 @@ test('the Strips tab lists traffic by frequency and the radar offers 60 NM and A
   await expect(allFixes).toHaveAttribute('aria-pressed', 'true');
   await page.waitForTimeout(400);
   expect((await litPixels(page, 'radar-canvas')).lit).toBeGreaterThan(1500);
+});
+
+// ------------------------------------------------------------------------------------------------------------------
+// Flight strips: marks from accepted clearances, notes, strike / drop, resequencing
+// ------------------------------------------------------------------------------------------------------------------
+
+test('strips record the clearances the engine accepts, with times; notes persist; S strikes and X drops', async ({ page }) => {
+  await startScenario(page);
+  await page.getByTestId('speed-4').click();
+  await expect(page.getByTestId('strip-N723EJ').getByTestId('phase')).toHaveAttribute('data-phase', 'HOLDING_SHORT', { timeout: 20_000 });
+  await page.getByTestId('tab-strips').click();
+  const strip = page.getByTestId('bay-TWR').getByTestId('fps-N723EJ');
+  await expect(strip).toBeVisible();
+  await expect(strip.getByTestId('strip-printed')).toHaveText(/^\d{4}Z$/);
+  await expect(strip.getByTestId('strip-mark')).toHaveCount(0);
+
+  // A refused clearance writes nothing.
+  await sendCommand(page, 'runway one three, cleared for takeoff'); // no callsign -> clarification
+  await expect(strip.getByTestId('strip-mark')).toHaveCount(0);
+
+  // Notes are typed on the strip and survive re-renders and the handoff to another bay.
+  await strip.getByTestId('strip-notes-N723EJ').fill('departing VFR, left turn out');
+  await sendCommand(page, 'Cessna seven two three echo juliet, runway one three, line up and wait');
+  await expect(strip.getByTestId('strip-mark').first()).toHaveText('LUAW');
+  await sendCommand(page, TAKEOFF_CALL);
+  await expect(strip.getByTestId('strip-mark').nth(1)).toHaveText('CTO 13');
+  await expect(strip.getByTestId('strip-mark').filter({ hasText: /^T\/O \d{4}Z$/ })).toHaveCount(1, { timeout: 40_000 });
+  await expect(strip.getByTestId('strip-notes-N723EJ')).toHaveValue('departing VFR, left turn out');
+
+  // Keyboard: click selects, S strikes (strike-through, handled), X drops a struck strip.
+  await strip.getByTestId('strip-callsign').click();
+  await expect(strip).toHaveAttribute('aria-pressed', 'true');
+  await page.keyboard.press('x');
+  await expect(page.getByTestId('strip-hint')).toContainText('Strike the strip');
+  await expect(strip).toBeVisible();
+  await page.keyboard.press('s');
+  await expect(strip).toHaveAttribute('data-struck', 'true');
+  await expect(strip.getByTestId('strip-callsign')).toHaveClass(/line-through/);
+  await page.keyboard.press('x');
+  await expect(strip).toHaveCount(0);
+});
+
+test('strips can be resequenced inside a bay by dragging, and the legend explains the marking', async ({ page }) => {
+  await startScenario(page, { mode: 'free', scenario: 'free-play-busy-departures' });
+  await page.getByTestId('position-select').selectOption('TWR+GND');
+  await page.getByTestId('tab-strips').click();
+  const bay = page.getByTestId('bay-GND');
+  await expect(bay.locator('[data-testid^="fps-"]').nth(1)).toBeVisible({ timeout: 20_000 });
+  const order = async () => bay.locator('[data-testid^="fps-"]').evaluateAll((els) => els.map((e) => e.getAttribute('data-testid')!.replace('fps-', '')));
+  const before = await order();
+  expect(before.length).toBeGreaterThanOrEqual(2);
+  // Pick the last strip and drag its grip onto the top half of the first one.
+  const last = before[before.length - 1];
+  await page.getByTestId(`strip-grip-${last}`).dragTo(bay.getByTestId(`fps-${before[0]}`), { targetPosition: { x: 80, y: 4 } });
+  await expect.poll(order).toEqual([last, ...before.slice(0, -1)]);
+
+  // Alt+ArrowDown on a focused strip moves it one place later (keyboard equivalent).
+  await bay.getByTestId(`fps-${last}`).focus();
+  await page.keyboard.press('Alt+ArrowDown');
+  await expect.poll(order).toEqual([before[0], last, ...before.slice(1, -1)]);
+
+  const legend = page.getByTestId('strip-legend');
+  await legend.getByRole('button', { name: /Strip marking/ }).click();
+  await expect(legend).toHaveAttribute('data-open', 'true');
+  await expect(legend).toContainText('C 13');
+  await expect(legend).toContainText('LUAW');
+  await expect(legend).toContainText('T/O 1203Z');
+  await expect(legend).toContainText('L 1210Z');
+  await expect(legend).toContainText('X 13/31');
+  await expect(legend).toContainText('H/S 13');
+  await expect(legend).toContainText('LAHSO 13');
+});
+
+// ------------------------------------------------------------------------------------------------------------------
+// Single-position play: the player works one position, AI controllers work the rest
+// ------------------------------------------------------------------------------------------------------------------
+
+test('setup: "I work" defaults to the position a lesson is about and says explicitly what AI works', async ({ page }) => {
+  await page.goto('/');
+  await page.getByTestId('mode-training').click();
+  await page.getByTestId('scenario-train-02-taxi').click();
+  await expect(page.getByTestId('position-GND')).toHaveAttribute('aria-checked', 'true');
+  await expect(page.getByTestId('ai-works')).toContainText('AI works');
+  await expect(page.getByTestId('ai-works')).toContainText('Tower');
+  await expect(page.getByTestId('ai-toggle')).toBeChecked();
+  // Override: working both leaves nothing for AI.
+  await page.getByTestId('position-TWR+GND').click();
+  await expect(page.getByTestId('ai-works')).toContainText('nothing');
+  // Free play defaults to Tower; Ground is AI.
+  await page.getByTestId('mode-free').click();
+  await page.getByTestId('scenario-__custom__').click();
+  await expect(page.getByTestId('position-TWR')).toHaveAttribute('aria-checked', 'true');
+  await expect(page.getByTestId('ai-works')).toContainText('Ground');
+  // Switching AI off says the positions are unstaffed.
+  await page.getByTestId('ai-toggle').uncheck();
+  await expect(page.getByTestId('ai-works')).toContainText('Unstaffed');
+});
+
+test.describe('Ground only, AI Tower', () => {
+  test.setTimeout(300_000);
+
+  test('an inbound arrival is printed in the AI Tower bay, the AI clears it and hands it off, and the strip moves to my Ground bay with its notes', async ({ page }) => {
+    await startScenario(page, { mode: 'free', scenario: 'free-play-busy-arrivals', seed: '21' });
+    await page.getByTestId('position-select').selectOption('GND');
+    await expect(page.getByTestId('ai-works')).toHaveText(/AI works:\s*Tower/); // in the Other positions (AI) panel
+    await expect(page.getByTestId('freq-121.900')).toBeVisible();
+    await expect(page.getByTestId('freq-120.300')).toHaveCount(0); // Tower is not mine: not a workable frequency
+    const ai = page.getByTestId('ai-positions');
+    await expect(ai).toContainText('Other positions (AI)');
+    await expect(ai.getByTestId('ai-TWR')).toContainText('TWR·AI');
+    await expect(ai.getByTestId('ai-TWR')).toContainText('120.3');
+    await page.getByTestId('speed-4').click();
+    await page.getByTestId('tab-strips').click();
+
+    const twr = page.getByTestId('bay-TWR');
+    const gnd = page.getByTestId('bay-GND');
+    await expect(twr).toHaveAttribute('data-owner', 'ai');
+    await expect(gnd).toHaveAttribute('data-owner', 'player');
+    await expect(page.getByTestId('bay-title-TWR')).toHaveText('TWR·AI');
+
+    // The first airliner on final is with AI Tower.
+    const strip = twr.locator('[data-testid^="fps-"]', { has: page.locator('[data-testid="strip-callsign"]') }).first();
+    await expect(strip).toBeVisible({ timeout: 30_000 });
+    const callsign = ((await strip.getAttribute('data-testid')) ?? '').replace('fps-', '');
+    expect(callsign).toMatch(/^[A-Z0-9]+$/);
+
+    // I cannot instruct it: the transmit pipeline explains why, and nothing reaches the engine.
+    await sendCommand(page, `${callsign}, runway one three, cleared to land`);
+    await expect(page.getByTestId('last-result')).toContainText(`${callsign} is with AI Tower on 120.3; wait for the handoff.`);
+    await expect(page.getByTestId('last-result')).toHaveAttribute('data-ai-blocked', 'true');
+
+    // A note typed now is still there after the handoff.
+    await strip.getByTestId(`strip-notes-${callsign}`).fill('wake: watch spacing');
+
+    // The AI clears it to land (tagged TWR·AI in the log), the aircraft lands and the AI hands it to Ground.
+    const log = page.getByTestId('comms-log');
+    await expect(log.locator('[data-testid="log-atc"][data-ai="TWR"]').filter({ hasText: /cleared to land/i }).first()).toBeVisible({ timeout: 120_000 });
+    await expect(log.locator('[data-ai="TWR"] [data-testid="log-tag"]').first()).toHaveText('TWR·AI');
+    await expect(twr.getByTestId(`fps-${callsign}`).getByTestId('strip-mark').filter({ hasText: /^CTL 13|^CTL 31|^CTL 22|^CTL 4$/ })).toHaveCount(1);
+
+    const moved = gnd.getByTestId(`fps-${callsign}`);
+    await expect(moved).toBeVisible({ timeout: 240_000 });
+    await expect(moved).toHaveAttribute('data-entry', 'move');
+    await expect(twr.getByTestId(`fps-${callsign}`)).toHaveCount(0);
+    await expect(moved.getByTestId(`strip-notes-${callsign}`)).toHaveValue('wake: watch spacing');
+    await expect(moved.getByTestId('strip-mark').filter({ hasText: /^L \d{4}Z$/ })).toHaveCount(1);
+    // Now it is on my frequency and I can work it.
+    await moved.getByTestId('strip-callsign').click();
+    await sendCommand(page, `${callsign}, hold position`);
+    await expect(page.getByTestId('last-result')).not.toHaveAttribute('data-ai-blocked', 'true');
+  });
 });

@@ -3,10 +3,11 @@
 import { chromium } from '@playwright/test';
 
 const which = process.argv[2] ?? 'all';
-const browser = await chromium.launch();
+// Real Chrome so pilot audio is genuinely available (volume 0: the screenshot run makes no sound).
+const browser = await chromium.launch({ channel: 'chrome' });
 const ctx = await browser.newContext({ baseURL: process.env.BASE_URL ?? 'http://localhost:5173', viewport: { width: 1440, height: 900 }, deviceScaleFactor: 1 });
 await ctx.addInitScript(() => {
-  localStorage.setItem('kacy.voice.settings', JSON.stringify({ providerId: 'none', ttsEnabled: false, radioEffectsEnabled: false }));
+  localStorage.setItem('kacy.voice.settings', JSON.stringify({ providerId: 'none', ttsEnabled: true, ttsVolume: 0, radioEffectsEnabled: false }));
 });
 const page = await ctx.newPage();
 page.on('console', (m) => { if (m.type() === 'error') console.log('[console.error]', m.text()); });

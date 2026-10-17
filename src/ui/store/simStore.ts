@@ -18,6 +18,7 @@ import { getPresetWeather } from '../../weather/presets';
 import type { WeatherPresetId } from '../../weather/presets';
 import { recommendRunways } from '../../weather/runwaySelection';
 import type { SimulatedAtis } from '../../weather/atis';
+import { unlockAudio } from '../../voice';
 import type { VoiceStatus } from '../../voice';
 import type { TransmitResult, ControllerSetup } from '../commands/transmit';
 import { POSITION_CHOICES, choiceFromPositions } from '../lib/positions';
@@ -43,7 +44,10 @@ export interface StartOptions {
   freePlay: FreePlayOptions;
   weather: WeatherChoice;
   seed?: number;
+  /** What the player works ("I work"). Every other position of the scenario is run by AI controllers unless `ai` is false. */
   controller: PositionChoice;
+  /** AI controllers work the positions the player does not (default true). False leaves them unstaffed (aircraft there are "not on frequency"). */
+  ai?: boolean;
   /** 'auto' = recommended from the wind; otherwise explicit ends. */
   runways: 'auto' | { landing: string; departing: string };
 }
@@ -77,6 +81,8 @@ interface SimStore {
   weatherNote: string;
   controller: ControllerSetup;
   voice: { status: VoiceStatus; message?: string; partial: string; transmitting: boolean };
+  /** Pilot audio: the browser is speaking right now (and who). */
+  audio: { speaking: boolean; who?: string };
   training: TrainingStepState | null;
   lastTransmit?: TransmitResult;
   typedHistory: string[];
@@ -99,6 +105,15 @@ interface SimStore {
   submitTyped(text: string): TransmitResult | undefined;
   setWeather(w: Weather): void;
   setActiveRunways(cfg: { departing: string[]; landing: string[] }): void;
+  /** Re-render views after a change that lives outside the engine state (strip order, notes, strike). */
+  touch(): void;
+  /** Strip board: toggle "handled" on a strip (default: the selected aircraft's). Returns the new struck state. */
+  strikeStrip(aircraftId?: string): boolean | undefined;
+  /** Strip board: drop a strip that is struck or whose aircraft has left. Returns false (with the reason in `stripHint`) otherwise. */
+  dropStrip(aircraftId?: string): boolean;
+  /** One-line feedback from the last strip action (cleared by the strip board after a few seconds). */
+  stripHint: string | null;
+  setStripHint(text: string | null): void;
 }
 
 let noticeSeq = 0;
@@ -112,8 +127,9 @@ export const useSimStore = create<SimStore>((set, get) => ({
   session: null,
   notices: [],
   weatherNote: '',
-  controller: { positions: ['TWR'] },
+  controller: { positions: ['TWR'], aiPositions: [] },
   voice: { status: 'idle', partial: '', transmitting: false },
+  audio: { speaking: false },
   training: null,
   typedHistory: [],
   scenarioComplete: false,
@@ -127,6 +143,8 @@ export const useSimStore = create<SimStore>((set, get) => ({
 
   async startSession(opts) {
     if (get().starting) return false;
+    // Browsers only play audio after a user gesture: this runs synchronously inside the "Start session" click, before any await.
+    unlockAudio();
     set({ starting: true, startStatus: 'Preparing airport data…', notices: [], scenarioComplete: false });
     const airport = loadKacy();
     const seed = opts.seed ?? Math.floor(Math.random() * 2 ** 31);
@@ -172,7 +190,8 @@ export const useSimStore = create<SimStore>((set, get) => ({
         const rec = recommendedRunways(refWeather, airport);
         runways = { departing: rec.departing, landing: rec.landing };
       }
-      const fp: FreePlayOptions = { ...opts.freePlay, seed, weather: weather ?? opts.freePlay.weather, ...(runways ? { activeRunways: runways } : {}) };
+      const positions = POSITION_CHOICES[opts.controller];
+      const fp: FreePlayOptions = { ...opts.freePlay, seed, weather: weather ?? opts.freePlay.weather, playerPositions: [...positions], ...(runways ? { activeRunways: runways } : {}) };
       const scenario: Scenario = opts.scenarioId
         ? game.buildScenario(opts.scenarioId, airport, fp)
         : game.buildFreePlay(airport, fp);
@@ -191,7 +210,6 @@ export const useSimStore = create<SimStore>((set, get) => ({
         trafficGenerator: game.createTrafficGenerator(scenario, airport),
       });
       engine.setWeather(weather);
-      const positions = POSITION_CHOICES[opts.controller];
       engine.setControllerPosition(positions[0]);
       const training = game.createTrainingController(scenario);
       const runner = createScenarioEventRunner(engine, scenario, { onPilotTransmission: (t) => sink.handler?.(t) });
@@ -202,7 +220,9 @@ export const useSimStore = create<SimStore>((set, get) => ({
       const session = startEngineSession({
         engine,
         scenario,
-        controller: { positions },
+        controller: { positions: [...positions] },
+        enableAi: opts.ai !== false,
+        seed,
         startUtcMs,
         atisLetter: String.fromCharCode(65 + new Date(startUtcMs).getUTCHours()),
         training,
@@ -221,6 +241,7 @@ export const useSimStore = create<SimStore>((set, get) => ({
           onAtis: (atis) => set({ atis }),
           onScenarioComplete: () => set({ scenarioComplete: true }),
           onNotice: (level, text) => get().addNotice(level, text),
+          onSpeaking: (speaking, who) => set({ audio: { speaking, who: speaking ? who : undefined } }),
         },
       });
 
@@ -233,9 +254,10 @@ export const useSimStore = create<SimStore>((set, get) => ({
         startOptions: opts,
         notices,
         weatherNote,
-        controller: { positions },
+        controller: session.getController(),
         lastTransmit: undefined,
         voice: { status: 'idle', partial: '', transmitting: false },
+        audio: { speaking: false },
         rev: get().rev + 1,
       });
       return true;
@@ -307,15 +329,43 @@ export const useSimStore = create<SimStore>((set, get) => ({
   setControllerChoice(choice) {
     const s = get().session;
     if (!s) return;
-    const setup = { positions: POSITION_CHOICES[choice] };
-    s.setController(setup);
-    set({ controller: setup });
+    s.setController({ positions: [...POSITION_CHOICES[choice]] });
+    set({ controller: s.getController() });
   },
 
   submitTyped(text) {
     const s = get().session;
     if (!s || !text.trim()) return undefined;
     return s.submit(text, 'typed');
+  },
+
+  stripHint: null,
+  setStripHint: (stripHint) => set({ stripHint }),
+  touch: () => set((s) => ({ rev: s.rev + 1 })),
+  strikeStrip(id) {
+    const sess = get().session;
+    const target = id ?? sess?.engine.getState().selectedAircraftId;
+    if (!sess || !target) {
+      set({ stripHint: 'Select a strip first (click it), then press S to strike it.' });
+      return undefined;
+    }
+    const r = sess.strips.strike(target);
+    set((s) => ({ rev: s.rev + 1, stripHint: r === undefined ? 'No strip for that aircraft.' : r ? 'Strip struck: handled, moved to the bottom of its bay.' : 'Strip restored.' }));
+    return r;
+  },
+  dropStrip(id) {
+    const sess = get().session;
+    const target = id ?? sess?.engine.getState().selectedAircraftId;
+    if (!sess || !target) {
+      set({ stripHint: 'Select a strip first (click it), then press X to drop it.' });
+      return false;
+    }
+    const ok = sess.strips.drop(target);
+    set((s) => ({
+      rev: s.rev + 1,
+      stripHint: ok ? 'Strip dropped.' : sess.strips.get(target) ? 'Strike the strip (S) or wait until the aircraft has left before dropping it (X).' : 'No strip for that aircraft.',
+    }));
+    return ok;
   },
 
   setWeather: (w) => get().session?.setWeather(w),

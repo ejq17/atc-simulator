@@ -3,11 +3,17 @@ import type { SttProviderId } from './stt/types.ts';
 
 export const VOICE_SETTINGS_KEY = 'kacy.voice.settings';
 
+/** Volume multiplier for traffic heard only because "Monitor all frequencies" is on (frequencies the player does not work). */
+export const MONITOR_ALL_VOLUME = 0.45;
+
 export interface VoiceSettings {
   providerId: SttProviderId;
   pttKey: string;
   pttMode: PttMode;
+  /** "Pilot audio": speak pilot (and monitored AI controller) transmissions. */
   ttsEnabled: boolean;
+  /** Hear every frequency in the session, including AI-worked positions the player does not work (at reduced volume). Default: own frequencies only. */
+  monitorAll: boolean;
   radioEffectsEnabled: boolean;
   /** 0..1 */
   ttsVolume: number;
@@ -22,6 +28,7 @@ export const DEFAULT_VOICE_SETTINGS: Readonly<VoiceSettings> = Object.freeze({
   pttKey: 'Space',
   pttMode: 'hold',
   ttsEnabled: true,
+  monitorAll: false,
   radioEffectsEnabled: true,
   ttsVolume: 1,
   ttsRate: 1,
@@ -43,6 +50,7 @@ export function sanitizeVoiceSettings(raw: unknown): VoiceSettings {
     pttKey: typeof r.pttKey === 'string' && r.pttKey.length > 0 && r.pttKey.length <= 32 ? r.pttKey : d.pttKey,
     pttMode: r.pttMode === 'toggle' || r.pttMode === 'hold' ? r.pttMode : d.pttMode,
     ttsEnabled: typeof r.ttsEnabled === 'boolean' ? r.ttsEnabled : d.ttsEnabled,
+    monitorAll: typeof r.monitorAll === 'boolean' ? r.monitorAll : d.monitorAll,
     radioEffectsEnabled: typeof r.radioEffectsEnabled === 'boolean' ? r.radioEffectsEnabled : d.radioEffectsEnabled,
     ttsVolume: clamp(r.ttsVolume, 0, 1, d.ttsVolume),
     ttsRate: clamp(r.ttsRate, 0.5, 2, d.ttsRate),

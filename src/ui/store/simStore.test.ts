@@ -45,7 +45,7 @@ describe('voice status text', () => {
     expect(describeVoiceStatus('permission_denied', 'webspeech').text).toMatch(/permission/i);
     expect(describeVoiceStatus('listening', 'webspeech').badge).toBe('TRANSMITTING');
     expect(describeVoiceStatus('idle', 'webspeech', undefined, 'SPACE').text).toMatch(/hold SPACE/);
-    expect(describeVoiceStatus('idle', 'none').badge).toBe('VOICE OFF');
+    expect(describeVoiceStatus('idle', 'none').badge).toBe('MIC OFF');
     expect(describeVoiceStatus('error', 'deepgram', 'network down').text).toMatch(/network down/);
   });
   it('labels keys', () => {

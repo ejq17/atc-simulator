@@ -1,5 +1,5 @@
 // IFR review screenshots into docs/screenshots/: approach.png (arrival on the ILS 13 fixes, radar 20 NM),
-// strips.png (free play with IFR flows and All positions, Strips tab) and setup-ifr.png (controller positions).
+// strips.png (free play with IFR flows, I work Ground, AI works the rest, Strips tab; strips-legend.png has the "Strip marking" legend open) and setup-ifr.png (controller positions).
 // Needs `npm run dev` + `npm run server` running. Usage: node e2e/shoot-ifr.mjs [approach|strips|setup|all]
 import { chromium } from '@playwright/test';
 
@@ -54,18 +54,29 @@ if (want('approach')) {
 }
 
 if (want('strips')) {
+  // The strip board: IFR free play (CLNC, GND, TWR, APP/DEP all exist), I work Ground, AI works the rest. Wait until the AI has cleared
+  // something so the strips carry marks (C 13, CLR, TX ..., CTL ..., T/O ...), then open the "Strip marking" legend.
   await page.goto('/');
   await page.getByTestId('weather-select').selectOption('preset:clear');
   await page.getByTestId('ifr-flows').check();
   await page.getByLabel('Landing runway').selectOption('13');
   await page.getByLabel('Departing runway').selectOption('13');
+  await page.getByTestId('position-GND').click();
   await page.getByTestId('seed-input').fill('1');
   await page.getByTestId('start-session').click();
   await page.waitForSelector('[data-testid="sim-screen"]');
   await page.getByTestId('speed-4').click();
-  await page.waitForTimeout(9000);
   await page.getByTestId('tab-strips').click();
+  await page.waitForFunction(() => document.querySelectorAll('[data-testid="strip-mark"]').length >= 4, null, { timeout: 150_000 });
+  await page.waitForTimeout(1500);
+  const first = page.locator('[data-testid^="fps-"]').first();
+  const cs = ((await first.getAttribute('data-testid')) ?? '').replace('fps-', '');
+  await page.getByTestId(`strip-notes-${cs}`).fill('wants 31 if wind shifts');
+  await first.getByTestId('strip-callsign').click();
   await page.waitForTimeout(600);
   await page.screenshot({ path: 'docs/screenshots/strips.png' });
+  await page.getByTestId('strip-legend').getByRole('button', { name: /Strip marking/ }).click();
+  await page.waitForTimeout(400);
+  await page.screenshot({ path: 'docs/screenshots/strips-legend.png' });
 }
 await browser.close();

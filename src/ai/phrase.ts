@@ -1,0 +1,151 @@
+/**
+ * ATC phraseology for the AI controllers. Every phrase exists twice: `text` (what a UI shows: digits where a controller
+ * would write them) and `spoken` (TTS-ready, every number as words). Callsign FIRST for controller transmissions
+ * (7110.65 2-4-14), unlike the pilot calls in `src/radio/readback.ts` (callsign last in readbacks).
+ */
+import type { Aircraft, Airport, ApproachType } from '../sim/types';
+import { facilityCallName, frequencyById, frequencyByMhz, positionWord } from '../radio/frequencies';
+import {
+  digitsSpoken, spokenAirportName, spokenAltitude, spokenFrequency, spokenFrequencyDecimal, spokenRunway, spokenSpeed, spokenTaxiway, titleCase,
+} from '../radio/spoken';
+import { approachWord, spokenFix } from '../radio/readback';
+
+export interface Phrase {
+  text: string;
+  spoken: string;
+}
+
+type Seg = string | Phrase;
+
+const seg = (s: Seg): Phrase => (typeof s === 'string' ? { text: s, spoken: s } : s);
+
+/** Join segments with ", " (the usual comma-separated clause style of 7110.65 phraseology). */
+export function clauses(...segs: (Seg | undefined | false)[]): Phrase {
+  const ps = segs.filter((s): s is Seg => !!s).map(seg);
+  return { text: ps.map((p) => p.text).join(', '), spoken: ps.map((p) => p.spoken).join(', ') };
+}
+
+/** Join segments with a space (inside one clause). */
+export function words(...segs: (Seg | undefined | false)[]): Phrase {
+  const ps = segs.filter((s): s is Seg => !!s).map(seg);
+  return { text: ps.map((p) => p.text).join(' '), spoken: ps.map((p) => p.spoken).join(' ') };
+}
+
+const stripZero = (id: string): string => id.replace(/^0+(?=\d)/, '');
+
+/** "13" -> one three; a runway pair ("4/22") is named by its first end, as spokenRunway does. */
+export const rwy = (id: string): Phrase => ({ text: stripZero(id.toUpperCase().replace(/^(RUNWAY|RWY)\s*/, '').split('/')[0]), spoken: spokenRunway(id) });
+export const taxiwayList = (ids: string[]): Phrase => {
+  const s = ids.map(spokenTaxiway).join(', ');
+  return { text: s, spoken: s };
+};
+export const altitude = (ft: number): Phrase => ({ text: ft >= 18000 ? `FL${Math.round(ft / 100)}` : String(Math.round(ft)), spoken: spokenAltitude(ft) });
+export const speed = (kt: number): Phrase => ({ text: String(Math.round(kt)), spoken: spokenSpeed(kt) });
+
+const trimMhz = (mhz: number): string => mhz.toFixed(3).replace(/0+$/, '').replace(/\.$/, '');
+
+/** Frequency as a controller says it; Ground 121.6-121.99 is abbreviated "point niner" like the pilots' readbacks. */
+export function frequency(airport: Airport, mhz: number, id?: string): Phrase {
+  const f = (id ? frequencyById(airport, id) : undefined) ?? frequencyByMhz(airport, mhz);
+  const abbreviated = f?.position === 'GND' && mhz >= 121.6 && mhz < 122;
+  return {
+    text: abbreviated ? `point ${mhz.toFixed(3).replace(/0+$/, '').split('.')[1] ?? '0'}` : trimMhz(mhz),
+    spoken: abbreviated ? spokenFrequencyDecimal(mhz) : spokenFrequency(mhz),
+  };
+}
+
+export const callsign = (ac: Pick<Aircraft, 'spokenCallsign'>): Phrase => ({ text: ac.spokenCallsign, spoken: ac.spokenCallsign });
+
+export function facilityWord(airport: Airport, mhz: number, id?: string): string {
+  return facilityCallName(airport, mhz, id);
+}
+
+// ---------------------------------------------------------------------------------------------------------------------
+// Phrases per instruction
+// ---------------------------------------------------------------------------------------------------------------------
+
+export function ifrClearance(
+  ac: Aircraft, facility: string,
+  c: { destination: string; departureProcedure?: string; initialAltitudeFt: number; expectAltitudeFt?: number; departureFrequencyMhz: number; squawk: string },
+  airport: Airport,
+): Phrase {
+  const dest = spokenAirportName(c.destination);
+  return clauses(
+    callsign(ac),
+    facility,
+    `cleared to ${dest} airport`,
+    c.departureProcedure ? `${titleCase(c.departureProcedure)} departure, radar vectors` : 'as filed',
+    { text: `maintain ${altitude(c.initialAltitudeFt).text}`, spoken: `maintain ${spokenAltitude(c.initialAltitudeFt)}` },
+    c.expectAltitudeFt ? { text: `expect ${altitude(c.expectAltitudeFt).text}, 10 minutes after departure`, spoken: `expect ${spokenAltitude(c.expectAltitudeFt)}, one zero minutes after departure` } : undefined,
+    { text: `departure frequency ${frequency(airport, c.departureFrequencyMhz).text}`, spoken: `departure frequency ${spokenFrequency(c.departureFrequencyMhz)}` },
+    { text: `squawk ${c.squawk}`, spoken: `squawk ${digitsSpoken(c.squawk)}` },
+  );
+}
+
+export function taxiToRunway(ac: Aircraft, runwayEnd: string, via: string[], holdShort: string[]): Phrase {
+  return clauses(
+    callsign(ac),
+    words('runway', rwy(runwayEnd)),
+    via.length ? words('taxi via', taxiwayList(via)) : 'taxi',
+    ...holdShort.map((r) => words('hold short of runway', rwy(r))),
+  );
+}
+
+export function taxiToParking(ac: Aircraft, spot: { id: string; category: string }, via: string[], holdShort: string[]): Phrase {
+  const digits = /(\d+)/.exec(spot.id)?.[1];
+  const where =
+    spot.category === 'airline' && digits
+      ? { text: `gate ${Number(digits)}`, spoken: `gate ${digitsSpoken(String(Number(digits)))}` }
+      : { text: 'the ramp', spoken: 'the ramp' };
+  return clauses(callsign(ac), words('taxi to', where, via.length ? words('via', taxiwayList(via)) : undefined), ...holdShort.map((r) => words('hold short of runway', rwy(r))));
+}
+
+export const crossRunway = (ac: Aircraft, runwayId: string): Phrase => clauses(callsign(ac), words('cross runway', rwy(runwayId)));
+
+export const lineUpAndWait = (ac: Aircraft, runwayEnd: string): Phrase => clauses(callsign(ac), words('runway', rwy(runwayEnd)), 'line up and wait');
+
+export const clearedForTakeoff = (ac: Aircraft, runwayEnd: string, runwayHeading: boolean): Phrase =>
+  clauses(callsign(ac), words('runway', rwy(runwayEnd)), runwayHeading && 'fly runway heading', 'cleared for takeoff');
+
+export const clearedToLand = (ac: Aircraft, runwayEnd: string): Phrase => clauses(callsign(ac), words('runway', rwy(runwayEnd)), 'cleared to land');
+
+export const continueApproach = (ac: Aircraft): Phrase => clauses(callsign(ac), 'continue approach');
+
+export const goAround = (ac: Aircraft): Phrase => clauses(callsign(ac), 'go around');
+
+export const enterPattern = (ac: Aircraft, runwayEnd: string, leg: string): Phrase =>
+  clauses(callsign(ac), words(leg, 'runway', rwy(runwayEnd)));
+
+/** "contact tower one two zero point three" / "contact ground point niner" / "contact departure one two four point six". */
+export function contact(ac: Aircraft, airport: Airport, frequencyId: string, mhz: number): Phrase {
+  const f = frequencyById(airport, frequencyId) ?? frequencyByMhz(airport, mhz);
+  const word = f && f.position !== 'OTHER' && f.position !== 'ATIS' ? positionWord(f.position).toLowerCase() : 'next controller';
+  return clauses(callsign(ac), words('contact', word, frequency(airport, mhz, f?.id)));
+}
+
+export const radarContact = (ac: Aircraft, facility: string): Phrase => clauses(callsign(ac), facility, 'radar contact');
+
+export function descendMaintain(ft: number, currentFt: number): Phrase {
+  const verb = currentFt > ft + 50 ? 'descend and maintain' : currentFt < ft - 50 ? 'climb and maintain' : 'maintain';
+  return { text: `${verb} ${altitude(ft).text}`, spoken: `${verb} ${spokenAltitude(ft)}` };
+}
+
+export const direct = (airport: Airport, fix: string): Phrase => {
+  const n = spokenFix(airport, fix);
+  return { text: `proceed direct ${n}`, spoken: `proceed direct ${n}` };
+};
+
+export const clearedApproach = (type: ApproachType, runwayEnd: string): Phrase =>
+  type === 'VISUAL'
+    ? words('cleared visual approach runway', rwy(runwayEnd))
+    : words('cleared', approachWord(type), 'runway', rwy(runwayEnd), 'approach');
+
+export const reduceSpeed = (kt: number): Phrase => ({ text: `reduce speed to ${kt}`, spoken: `reduce speed to ${spokenSpeed(kt)}` });
+
+export const holdAsPublished = (airport: Airport, fix: string): Phrase => {
+  const n = spokenFix(airport, fix);
+  return { text: `hold at ${n} as published`, spoken: `hold at ${n} as published` };
+};
+
+/** Re-issue after a wrong readback: "negative, ..." (7110.65 2-4-3: have the pilot correct a faulty readback). */
+export const negative = (p: Phrase): Phrase => ({ text: `negative, ${p.text}`, spoken: `negative, ${p.spoken}` });

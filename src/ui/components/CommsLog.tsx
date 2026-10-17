@@ -16,6 +16,27 @@ export type LogFilter = 'comms' | 'all';
 /** The session logs its own weather line (with METAR/ATIS context), so the engine's "Weather updated" note is hidden to avoid a duplicate. */
 const isEngineWeatherNote = (e: SimEvent) => e.kind === 'INFO' && e.text.startsWith('Weather updated:');
 
+/**
+ * Handoffs that an AI controller made: the engine logs the frequency change as a SYSTEM event, so it is matched to the AI's own
+ * "contact ..." call for the same aircraft shortly before it. Returns event id -> the AI position that handed the aircraft off.
+ */
+export function aiHandoffs(events: readonly SimEvent[], windowSec = 90): Map<string, NonNullable<SimEvent['aiPosition']>> {
+  const out = new Map<string, NonNullable<SimEvent['aiPosition']>>();
+  const lastContact = new Map<string, { position: NonNullable<SimEvent['aiPosition']>; timeSec: number }>();
+  for (const e of events) {
+    if (!e.callsign) continue;
+    if (e.speaker === 'ATC' && e.aiPosition && /\bcontact\b/i.test(e.text)) lastContact.set(e.callsign, { position: e.aiPosition, timeSec: e.timeSec });
+    else if (e.kind === 'HANDOFF' && !e.aiPosition) {
+      const c = lastContact.get(e.callsign);
+      if (c && e.timeSec - c.timeSec <= windowSec) {
+        out.set(e.id, c.position);
+        lastContact.delete(e.callsign);
+      }
+    }
+  }
+  return out;
+}
+
 export function filterEvents(events: readonly SimEvent[], filter: LogFilter): SimEvent[] {
   if (filter === 'all') return events.filter((e) => !isEngineWeatherNote(e));
   events = events.filter((e) => !isEngineWeatherNote(e));
@@ -32,6 +53,9 @@ function freqTag(state: SimulationState, e: SimEvent): string {
   return `${formatMhz(e.frequencyMhz)}${f ? ` ${f.id.replace(/-N$/, '')}` : ''}`;
 }
 
+/** An AI controller's call or decision: the position it works, tagged "TWR·AI". */
+const AI_STYLE = { cls: 'text-[#b79cff]', border: 'border-l-[#b79cff]' } as const;
+
 const SPEAKER_STYLE = {
   ATC: { tag: 'ATC', cls: 'text-atc-cyan', border: 'border-l-atc-cyan' },
   PILOT: { tag: 'PLT', cls: 'text-atc-green', border: 'border-l-atc-green-dim' },
@@ -47,6 +71,7 @@ export function CommsLog() {
   const events = state?.events;
   const lastId = events?.[events.length - 1]?.id;
   const rows = useMemo(() => (events ? filterEvents(events, filter).slice(-300) : []), [events, filter, lastId, events?.length]);
+  const handoffs = useMemo(() => (events ? aiHandoffs(events) : new Map<string, never>()), [events, lastId, events?.length]);
 
   useEffect(() => {
     const el = boxRef.current;
@@ -80,7 +105,9 @@ export function CommsLog() {
         {rows.length === 0 && <div className="px-3 py-3 text-xs text-atc-muted">No transmissions yet. Hold the PTT key or type a command to talk to traffic.</div>}
         {rows.map((e) => {
           const sp = speakerOf(e);
-          const st = SPEAKER_STYLE[sp];
+          const aiPos = e.aiPosition ?? handoffs.get(e.id);
+          const ai = aiPos ? AI_STYLE : undefined;
+          const st = ai ? { tag: `${aiPos}·AI`, ...ai } : SPEAKER_STYLE[sp];
           const sev = e.severity === 'critical' ? 'text-atc-red' : e.severity === 'warning' ? 'text-atc-amber' : sp === 'SYSTEM' ? 'text-atc-muted' : 'text-atc-text';
           const id = idFor(e);
           return (
@@ -88,11 +115,12 @@ export function CommsLog() {
               key={e.id}
               data-testid={`log-${sp.toLowerCase()}`}
               data-kind={e.kind}
+              data-ai={aiPos ?? undefined}
               className={`flex items-baseline gap-2 border-l-2 px-3 py-[2px] text-[12px] leading-[1.45] hover:bg-atc-panel-2 ${st.border}`}
             >
               <span className="w-[58px] shrink-0 tabular-nums text-atc-muted">{formatElapsed(e.timeSec)}</span>
               <span className="w-[74px] shrink-0 truncate tabular-nums text-[10.5px] text-atc-muted">{freqTag(state, e)}</span>
-              <span className={`w-7 shrink-0 font-semibold ${st.cls}`}>{st.tag}</span>
+              <span className={`w-[46px] shrink-0 whitespace-nowrap font-semibold ${st.cls}`} data-testid="log-tag">{st.tag}</span>
               {e.callsign ? (
                 <button type="button" disabled={!id} onClick={() => id && select(id)} className={`w-[64px] shrink-0 truncate text-left font-semibold hover:underline ${st.cls}`}>
                   {e.callsign}
@@ -103,6 +131,7 @@ export function CommsLog() {
               <span className={`min-w-0 flex-1 ${sev} ${sp === 'SYSTEM' ? 'italic' : ''}`}>
                 {e.kind === 'COMMAND_REJECTED' && <b className="not-italic text-atc-amber">REJECTED · </b>}
                 {e.kind === 'CLARIFICATION' && <b className="not-italic text-atc-amber">CLARIFY · </b>}
+                {handoffs.has(e.id) && <b className="not-italic text-[#b79cff]">HANDOFF · </b>}
                 {e.text}
               </span>
             </div>

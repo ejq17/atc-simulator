@@ -77,6 +77,10 @@ export function computeScore(card: ScoreCard): number {
 export function applyEventToScore(ctx: SimContext, ev: SimEvent): void {
   const s = ctx.state.score;
   const d = ev.data ?? {};
+  // Commands issued by an AI controller (`aiPosition`) are not the player's: correct clearances, communication errors, unsafe
+  // instructions, missed readbacks and wait statistics count the player's own actions only. Incursions and separation violations
+  // stay global (they are the airport's, whoever caused them), and so does everything that is not an instruction.
+  if (ev.aiPosition && (ev.kind === 'COMMAND_ACCEPTED' || ev.kind === 'COMMAND_REJECTED' || ev.kind === 'CLARIFICATION' || ev.kind === 'CONFLICT' || ev.kind === 'READBACK_ERROR')) return;
   switch (ev.kind) {
     case 'RUNWAY_INCURSION':
       s.runwayIncursions++;
@@ -107,7 +111,8 @@ export function applyEventToScore(ctx: SimContext, ev: SimEvent): void {
       }
       break;
     case 'DESPAWN':
-      if (d.handled) s.aircraftHandled++;
+      // once an AI controller is active an aircraft is "handled" only if the player gave it an accepted instruction
+      if (d.handled && (!ctx.aiSeen || d.byPlayer)) s.aircraftHandled++;
       break;
     default:
       break;

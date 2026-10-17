@@ -96,3 +96,28 @@ export function frequencyRows(airport: Pick<Airport, 'frequencies'>, positions: 
 export function rowLabel(row: FrequencyRow): string {
   return row.positions.join('/');
 }
+
+/**
+ * Positions that exist in the session but are not the player's: an AI controller works each of them.
+ * Order follows the scenario's own list; a position the player works is never AI.
+ */
+export function aiPositionsFor(scenarioPositions: readonly ControllerPositionId[], playerPositions: readonly ControllerPositionId[]): ControllerPositionId[] {
+  const mine = new Set(playerPositions);
+  return [...new Set(scenarioPositions)].filter((p) => !mine.has(p));
+}
+
+/** "Tower, Approach/Departure": the plain-language list shown for AI positions. APP and DEP read as one when both are listed. */
+export function positionListText(positions: readonly ControllerPositionId[]): string {
+  const out: string[] = [];
+  const set = new Set(positions);
+  for (const p of positions) {
+    if (p === 'DEP' && set.has('APP')) continue;
+    out.push(p === 'APP' && set.has('DEP') ? 'Approach/Departure' : POSITION_WORD[p]);
+  }
+  return out.join(', ');
+}
+
+/** Short tag for a position: "TWR". */
+export function positionTag(p: ControllerPositionId): string {
+  return p;
+}

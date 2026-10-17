@@ -27,7 +27,7 @@ import { assessClearanceSafety, recordUnsafeClearance } from './conflicts';
 import { frequencyById, frequencyByMhz, frequencyForPosition, hearsFrequency, formatMhz } from '../radio/frequencies';
 import { buildReadback, buildSayAgain, buildUnable } from '../radio/readback';
 import { spokenRunway } from '../radio/spoken';
-import { SPEED_LIMIT_BELOW_10K_KT } from './performance';
+import { SPEED_LIMIT_BELOW_10K_KT, lineUpTimeSec } from './performance';
 import { findNavFix, indexOfFix } from './navigation';
 import { startHold } from './holding';
 import { publishedHoldFor } from './missedApproach';
@@ -78,11 +78,36 @@ const unable = (env: Env, reason: string, phrase: string, commError = true): { r
 // Entry point
 // ---------------------------------------------------------------------------
 
-export function executeCommand(
-  ctx: SimContext,
-  cmdIn: ParsedCommand,
-  opts?: { position?: ControllerPositionId; source?: 'voice' | 'typed' | 'ai'; transmissionId?: string; aiPosition?: ControllerPositionId },
-): CommandOutcome {
+type ExecOpts = { position?: ControllerPositionId; source?: 'voice' | 'typed' | 'ai'; transmissionId?: string; aiPosition?: ControllerPositionId };
+
+/** Execute a command. Events produced by an AI controller's command (`opts.aiPosition`) carry that `aiPosition` and are not scored for the player. */
+export function executeCommand(ctx: SimContext, cmdIn: ParsedCommand, opts?: ExecOpts): CommandOutcome {
+  const prevAi = ctx.currentAi;
+  ctx.currentAi = opts?.aiPosition;
+  if (opts?.aiPosition) ctx.aiSeen = true;
+  try {
+    return executeInner(ctx, cmdIn, opts);
+  } finally {
+    ctx.currentAi = prevAi;
+  }
+}
+
+/**
+ * Dry run: the same validation, safety gate and outcome as `executeCommand`, without executing, logging, speaking or scoring
+ * anything (no events, no pilot call, no alert, no state change). Training: an unsafe clearance is `rejected` with `unsafe`;
+ * other modes: `accepted` (the real call would flag it). The returned clearance is a preview (`id: 'dry-run'`).
+ */
+export function validateCommand(ctx: SimContext, cmdIn: ParsedCommand, opts?: ExecOpts): CommandOutcome {
+  const prevDry = ctx.dryRun;
+  ctx.dryRun = true;
+  try {
+    return executeInner(ctx, cmdIn, opts);
+  } finally {
+    ctx.dryRun = prevDry;
+  }
+}
+
+function executeInner(ctx: SimContext, cmdIn: ParsedCommand, opts?: ExecOpts): CommandOutcome {
   const { state } = ctx;
   const airport = state.airport;
   const now = state.clock.timeSec;
@@ -90,7 +115,7 @@ export function executeCommand(
   const ctrlFreq = frequencyForPosition(airport, position)?.mhz ?? state.controllerFrequencyMhz;
 
   const tid = opts?.transmissionId;
-  if (!tid || !ctx.loggedTransmissions.has(tid)) {
+  if (!ctx.dryRun && (!tid || !ctx.loggedTransmissions.has(tid))) {
     if (tid) ctx.loggedTransmissions.add(tid);
     emitEvent(ctx, {
       kind: 'TRANSMISSION', callsign: cmdIn.callsign ?? undefined, text: cmdIn.rawText, severity: 'info', speaker: 'ATC',
@@ -158,7 +183,7 @@ export function executeCommand(
   const env: Env = { ctx, ac, rt, cmd, g, airport, now, position };
 
   // --- readback-error correction -------------------------------------------
-  if (rt.readbackError && rt.readbackError.kind === (cmd.kind as string)) {
+  if (!ctx.dryRun && rt.readbackError && rt.readbackError.kind === (cmd.kind as string)) {
     const original = ac.clearances.find((c) => c.id === rt.readbackError!.clearanceId);
     if (original && sameParams(original, cmd, g)) {
       const rb = buildReadback(ac, original, { airport });
@@ -195,11 +220,16 @@ export function executeCommand(
   const training = state.scenario.mode === 'training';
   if (!assessment.safe) {
     if (training) {
-      recordUnsafeClearance(ctx, ac, assessment, true);
+      if (!ctx.dryRun) recordUnsafeClearance(ctx, ac, assessment, true);
       const detail = assessment.issues.map((i) => `${i.text}. See ${i.reference}.`).join(' ');
       return reject(ac, { reason: `Unsafe clearance not issued (training mode). ${detail}`, commError: false }, { unsafe: true });
     }
-    recordUnsafeClearance(ctx, ac, assessment, false);
+    if (!ctx.dryRun) recordUnsafeClearance(ctx, ac, assessment, false);
+  }
+
+  if (ctx.dryRun) {
+    const preview: Clearance = { id: 'dry-run', kind: cmd.kind as ClearanceKind, issuedAtSec: now, byPosition: position, ...result.plan.patch };
+    return { status: 'accepted', clearance: preview, readback: buildReadback(ac, preview, { airport }).text };
   }
 
   // --- commit ---------------------------------------------------------------
@@ -211,6 +241,7 @@ export function executeCommand(
     ...result.plan.patch,
   };
   result.plan.commit(clr);
+  if (!ctx.currentAi) rt.playerTouched = true;
   const flagged = result.plan.flag;
   if (flagged) {
     emitEvent(ctx, { kind: 'INFO', aircraftId: ac.id, callsign: ac.callsign, text: `Improper instruction accepted: ${flagged}`, severity: 'warning', speaker: 'SYSTEM', data: { improper: true, kind: cmd.kind } });
@@ -685,9 +716,17 @@ function planTakeoff(env: Env): PlanResult {
       patch: { runwayEnd: g.end.id, runwayId: g.runway.id },
       flag,
       commit: () => {
+        // from the hold: the roll starts after the line-up (taxi onto the runway and turn), not 2.5 s after the clearance
+        let pathM = 0;
+        let prev = ac.pos;
+        for (const id of entry.nodeIds) {
+          const p = env.airport.taxiwayGraph.nodes[id].pos;
+          pathM += dist(prev, p);
+          prev = p;
+        }
         applyRunwayEntry(env, g, entry.hold, entry.entry, entry.nodeIds);
         rt.takeoffCleared = true;
-        rt.rollAtSec = now + 2.5;
+        rt.rollAtSec = now + Math.max(2.5, lineUpTimeSec(perfOf(ac), pathM));
         setPhase(ctx, ac, 'CLEARED_FOR_TAKEOFF');
       },
     },

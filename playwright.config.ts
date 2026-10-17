@@ -10,6 +10,14 @@ export const FAKE_MIC_DEFAULT_WAV = path.resolve(import.meta.dirname, 'e2e/fixtu
 
 
 /**
+ * Port and server kind can be overridden so the suite can run against a production build while the dev server is busy
+ * (another session editing src/ makes Vite hot-reload and reset a running simulator):
+ *   npm run build && E2E_PREVIEW=1 E2E_PORT=5174 npx playwright test --project=chromium
+ */
+const PORT = Number(process.env.E2E_PORT ?? 5173);
+const PREVIEW = process.env.E2E_PREVIEW === '1';
+
+/**
  * E2E runs against the real dev server and the real local backend (live weather + chart proxy).
  * Both servers are started here and reused when already running.
  */
@@ -24,14 +32,14 @@ export default defineConfig({
   reporter: [['list']],
   outputDir: 'test-results',
   use: {
-    baseURL: 'http://localhost:5173',
+    baseURL: `http://localhost:${PORT}`,
     headless: true,
     screenshot: 'only-on-failure',
     trace: 'retain-on-failure',
     viewport: { width: 1440, height: 900 },
   },
   projects: [
-    { name: 'chromium', use: { ...devices['Desktop Chrome'], viewport: { width: 1440, height: 900 } } },
+    { name: 'chromium', testIgnore: 'pilot-tts.spec.ts', use: { ...devices['Desktop Chrome'], viewport: { width: 1440, height: 900 } } },
     {
       name: 'chromium-fake-mic',
       testMatch: 'voice.spec.ts',
@@ -65,6 +73,13 @@ export default defineConfig({
       use: { ...devices['Desktop Chrome'], channel: 'chrome', viewport: { width: 1440, height: 900 }, permissions: ['microphone'] },
     },
     {
+      // Installed Google Chrome, new headless: pilots are really spoken through speechSynthesis. See e2e/pilot-tts.spec.ts.
+      name: 'chrome-pilot-tts',
+      testMatch: 'pilot-tts.spec.ts',
+      timeout: 180_000,
+      use: { ...devices['Desktop Chrome'], channel: 'chrome', viewport: { width: 1440, height: 900 } },
+    },
+    {
       name: 'chromium-deepgram-mock',
       testMatch: 'deepgram.spec.ts',
       timeout: 120_000,
@@ -73,9 +88,9 @@ export default defineConfig({
   ],
   webServer: [
     {
-      command: 'npm run dev',
-      url: 'http://localhost:5173',
-      reuseExistingServer: true,
+      command: PREVIEW ? `npx vite preview --port ${PORT} --strictPort` : 'npm run dev',
+      url: `http://localhost:${PORT}`,
+      reuseExistingServer: !PREVIEW,
       timeout: 60_000,
     },
     {

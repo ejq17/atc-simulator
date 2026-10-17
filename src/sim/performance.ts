@@ -86,6 +86,18 @@ export function wakeRecatCategory(type: string): WakeCategory {
   return w === 'light' ? 'I' : w === 'medium' ? 'F' : 'D';
 }
 
+/**
+ * Time (s) from the takeoff clearance, given to an aircraft holding short or still taxiing to the hold, until it starts its roll:
+ * the pilot's reaction, the taxi over `pathM` to the runway centreline at the line-up speed, and the 90 degree turn onto the runway
+ * heading, never less than the floor of 10 s (light single, C172) / 17 s (jets, A320): an aircraft cleared from the hold is not
+ * rolling 2.5 s later. (Typical pilot practice; there is no FAA figure.)
+ */
+export function lineUpTimeSec(perf: AircraftPerformance, pathM: number): number {
+  const floor = perf.category === 'light' ? 10 : 17;
+  const natural = 3 + pathM / Math.max(1, (perf.taxiTurnSpeedKt * 1852) / 3600) + 90 / Math.max(1, perf.groundTurnRateDegPerSec);
+  return Math.max(floor, natural);
+}
+
 /** Register extra aircraft types (regional jets, helicopters...) without touching the engine. */
 export function registerPerformance(perf: AircraftPerformance): void {
   registry[perf.type] = perf;

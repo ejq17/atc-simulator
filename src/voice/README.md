@@ -13,7 +13,9 @@ src/voice/
   voiceController.ts   PTT + provider orchestration, status events
   tts/        browserTts (speechSynthesis), voiceAssignment, prepareForTts
   audio/      radioEffects (WebAudio clicks + static)
-  transmissionQueue.ts, pilotVoice.ts   one speaker at a time, stepped-on handling
+  audio/unlock.ts   unlockAudio() (call from a click) + the page-wide AudioContext
+  transmissionQueue.ts, pilotVoice.ts   one speaker at a time, several audible frequencies, stepped-on handling, stuck-key watchdog
+  tts/ttsDebug.ts   window.__kacyTts (what the app asked Chrome to say and what Chrome did)
   settings.ts (localStorage `kacy.voice.settings`, VOICE_PRIVACY_NOTES), transcriptLog.ts
 server/voice/deepgramToken.ts   short-lived Deepgram token endpoint
 ```
@@ -61,13 +63,42 @@ voice.onPartial((text) => setLivePartial(text));
 settings.subscribe((s) => { voice.ptt?.setKey(s.pttKey); voice.ptt?.setMode(s.pttMode); void voice.setProvider(s.providerId); });
 voice.ptt?.bindButton(onScreenButtonEl);            // mouse/touch button
 
-// Engine pilot readback -> speech (only audible on the monitored frequency):
-pilots.enqueue({ text: readback.spokenText, voiceId: aircraft.voiceId, frequencyMhz: aircraft.frequencyMhz });
-pilots.setMonitoredFrequency(121.9);                // when the controller retunes
+// Engine pilot readback -> speech (only audible on a monitored frequency):
+pilots.enqueue({ text: readback.spokenText, voiceId: aircraft.voiceId, frequencyMhz: aircraft.frequencyMhz, volume: 1, speaker: callsign });
+pilots.setMonitoredFrequencies([120.3, 121.9]);     // all frequencies the controller works (or every one, quieter, with "Monitor all")
+pilots.setMonitoredFrequency(121.9);                // single-frequency shorthand
 voice.simulateTransmission('Spirit one two three taxi runway one three'); // typed fallback
 ```
 
 Call `radio.startStatic()` only if you want the faint static bed (it starts audio, so do it after a user gesture).
+
+## Pilot audibility (why pilots can be silent, and what prevents it)
+
+`unlockAudio()` **must run inside a click** (the app calls it from `startSession`, i.e. the Start session / Play again click): it resumes the shared AudioContext (radio clicks use it;
+`createRadioEffects` takes `getSharedAudioContext()` by default and no longer closes it on dispose), primes speech synthesis with a silent utterance (`volume 0`) and starts the voice
+list loading. Without it Chrome refuses `speak()` ("not-allowed") and a suspended AudioContext makes no click.
+
+| Cause of silence | Fix |
+|---|---|
+| No user gesture before audio | `unlockAudio()` in the Start click |
+| `getVoices()` is empty until `voiceschanged` (measured in Chrome 155: 0 voices at first, 180 about a second later) | `createBrowserTts().whenVoicesReady()`; the first `speak()` waits up to `voicesTimeoutMs` (2 s) so each pilot gets its voice |
+| Queue only played the *one* monitored frequency, so a player on Tower + Ground lost calls | `monitoredFrequenciesMhz` / `setMonitoredFrequencies([...])`; items carry `volume` (monitored-only traffic is quieter) and `speaker` |
+| Controller PTT stuck "down" blocked pilots for ever | `maxControllerKeyMs` watchdog (30 s) releases it; the session also releases on recogniser idle/error; `maxSpeakMs` (60 s) abandons speech that never reports back |
+| Paused speech queue, or the utterance object garbage-collected | `synth.resume()` before `speak`, in-flight utterances kept in a module-level set |
+| Cancelled by re-renders | Speech belongs to the framework-free session, not to React; `cancel()` is called only for step-on, Pilot audio off, ATIS "Listen" and teardown |
+| Muted without noticing | the UI has a separate **Pilot audio: on/off** switch with a live "speaking" lamp (`createPilotVoice({ onSpeaking })`) and says "no voices loaded" / "no speech support"; `Mic off` refers only to speech input |
+
+Settings: `ttsEnabled` ("Pilot audio", default **on**; off = nothing is queued, no radio clicks, speech in progress is cut), `monitorAll` ("Monitor all frequencies", default off, then
+`MONITOR_ALL_VOLUME` = 0.45 of the user's volume for frequencies the player does not work).
+
+### Proof in real Chrome (`chrome-pilot-tts`)
+
+`window.__kacyTts` (non-production builds, or localStorage `kacy.debug.tts=1`) records every utterance: `text` (what the engine's pilot said), `utterance` (after `prepareForTts`), voice, rate,
+pitch, volume, `startedAtMs` (the utterance's `onstart`), `endedAtMs`, `outcome` (`end`, `error:<code>`, `cancelled`, `timeout`), plus `voices`, `started[]`, `ended[]`, `errors[]` and the
+unlock result. `npx playwright test --project=chrome-pilot-tts` (installed Google Chrome, new headless, macOS system voices, no network) types a takeoff clearance and asserts that Chrome
+started and finished the readback utterance with text equal to the readback, that `getVoices().length > 0`, that different aircraft get different voice profiles, that Pilot audio off silences
+it, that AI Tower is silent by default and spoken at 45 % volume with Monitor all, and that the Settings "Play test call" speaks. Observed on the build machine (Chrome 155, macOS): 180 voices;
+"Runway one three, cleared for takeoff, Cessna seven two three echo juliet" spoken by "Ralph" (rate 1.22, pitch 0.94) from `onstart` to `end` in about 3.7 s.
 
 ## Providers and what they cost
 
@@ -218,7 +249,7 @@ default mode first, then `audioSource: 'track'`) to hear them and the aircraft t
 * **Pilot voice cannot be radio-filtered.** `speechSynthesis` output is not routable through WebAudio, so the 300-3000 Hz band-pass, distortion and compression apply only to the PTT open/close clicks and static. `RadioEffects.getInputNode()` exposes the chain for a future cloud TTS.
 * Browser voices differ by OS/browser; with few voices pilots are told apart by rate/pitch only. Voice lists load asynchronously in Chrome.
 * Web Speech: Chrome ends recognition on pauses, so the provider restarts it while the key is held; accuracy on callsigns and numbers is lower than Deepgram. Firefox has no Web Speech recognition; Safari support is partial.
-* Browsers require a user gesture before audio plays and HTTPS (or localhost) for the microphone.
+* Browsers require a user gesture before audio plays (`unlockAudio()`, see above) and HTTPS (or localhost) for the microphone.
 * Local Whisper: tiny.en is less accurate than Deepgram on callsigns. The model and ONNX runtime need the network once.
   **Build size:** by default `vite build` emits onnxruntime-web's 27 MB `ort-wasm-simd-threaded.asyncify.wasm` into `dist/assets` even though
   it is never loaded (transformers.js points the runtime at jsdelivr before use). There is no documented switch for this; `optimizeDeps.exclude`

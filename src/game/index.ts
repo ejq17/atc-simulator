@@ -4,7 +4,7 @@
  * This file is the interface the UI depends on. The gameplay builder fills in
  * src/game/* behind these exports; the signatures below must stay stable.
  */
-import type { Airport, GameMode, Scenario, SimulationState, Weather } from '../sim/types';
+import type { Airport, ControllerPositionId, GameMode, Scenario, SimulationState, Weather } from '../sim/types';
 import type { TrafficGenerator } from '../sim/traffic';
 
 export interface ScenarioSummary {
@@ -39,6 +39,12 @@ export interface FreePlayOptions {
    * `controllerPositions`. Free-play builds list only TWR and GND, so a UI that offers other positions should pass this option.
    */
   ifrFlows?: boolean;
+  /**
+   * Positions the human works; sets `scenario.playerPositions`. Every other position in `scenario.controllerPositions` (the full set that
+   * exists in the session, unchanged by this option) is worked by an AI controller. Unset: catalogue career/training scenarios use the
+   * position each one is about (see `defaultPlayerPositions`, e.g. the Ground lessons give GND only), free play leaves it unset (= all).
+   */
+  playerPositions?: ControllerPositionId[];
 }
 
 export interface DebriefReport {

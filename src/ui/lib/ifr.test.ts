@@ -4,7 +4,7 @@ import type { Aircraft, SimEvent } from '../../sim/types';
 import { choiceFromPositions, frequencyRows, POSITION_CHOICES, POSITION_ORDER, rowLabel, suggestPosition } from './positions';
 import { approachFixAltitudes, approachInfo, fixAltitudeText, ifrClearanceSummary, lahsoBadge, navDescription, navLetter, requestBadge, stripClearance } from './ifr';
 import { pickProcedure, procedureGeometry } from './procedures';
-import { groupByFrequency } from '../components/FlightStrips';
+import { bayFrequencies } from '../components/FlightStrips';
 import { lastActivity } from '../components/RadioPanel';
 
 const airport = loadKacy();
@@ -93,14 +93,10 @@ describe('procedure geometry for the radar', () => {
 });
 
 describe('strips and frequency activity', () => {
-  it('groups aircraft by frequency in position order, requests first', () => {
-    const a = base({ id: '1', callsign: 'AAL1', frequencyMhz: 124.6 });
-    const b = base({ id: '2', callsign: 'N1', frequencyMhz: 127.85, flightRules: 'VFR' });
-    const c = base({ id: '3', callsign: 'AAL0', frequencyMhz: 124.6, pendingRequest: { kind: 'APPROACH', text: 't', sinceSec: 0 } });
-    const d = base({ id: '4', callsign: 'N2', frequencyMhz: 120.3 });
-    const groups = groupByFrequency({ airport }, [a, b, c, d]);
-    expect(groups.map((g) => g.label)).toEqual(['CLNC', 'TWR', 'APP/DEP']);
-    expect(groups[2].aircraft.map((x) => x.callsign)).toEqual(['AAL0', 'AAL1']);
+  it('lists each bay\'s frequencies from the airport data (APP and DEP share one bay and one frequency; sector frequencies are not repeated)', () => {
+    expect(bayFrequencies({ airport }, 'CLNC')).toEqual([127.85]);
+    expect(bayFrequencies({ airport }, 'TWR')).toEqual([120.3]);
+    expect(bayFrequencies({ airport }, 'APPDEP')).toEqual([124.6]);
   });
   it('reports the most recent call per frequency', () => {
     const ev = (id: string, t: number, mhz: number, speaker: SimEvent['speaker'], callsign: string): SimEvent => ({ id, timeSec: t, kind: 'TRANSMISSION', text: 'x', severity: 'info', frequencyMhz: mhz, speaker, callsign });

@@ -3,7 +3,7 @@ import type { VoiceSettingsStore } from './settings.ts';
 export interface TranscriptEntry {
   at: number;
   text: string;
-  source: 'speech' | 'typed' | 'pilot';
+  source: 'speech' | 'typed' | 'pilot' | 'ai';
   confidence?: number;
 }
 

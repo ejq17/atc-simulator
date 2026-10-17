@@ -10,15 +10,16 @@
  */
 import type { Aircraft, ConflictAlert, ParsedCommand, SimulationState } from './types';
 import { dist, headingDiff, ktToMps, magneticToTrue, mToFt, mToNm, nmToM, pointInPolygon } from './geo';
+import { projectArrival, surfaceWindow, timeToThreshold } from './runwayTiming';
 import { highestMvaAhead, MVA_LOOKAHEAD_NM, mvaExempt } from './mva';
 import { alongCross, crossingRunways, findRunway, findRunwayEnd, isOnFinal, runwayIntersection } from './runways';
-import type { Runway } from './types';
+import type { Runway, Vec2 } from './types';
 import { assessApproach, courseGeom } from './approach';
 import { computeRunwayActivity } from './runwayOccupancy';
 import { TAXI_PHASES } from './stateMachines';
 import { activeClearance, emitEvent, perfOf } from './context';
 import { isDaylight, simUtcMs } from './solar';
-import { getPerformance, srsCategory, wakeRecatCategory } from './performance';
+import { getPerformance, lineUpTimeSec, srsCategory, wakeRecatCategory } from './performance';
 import { wakeMinimumNm } from './wake';
 import type { RunwayEndGeom } from './runways';
 import type { SimContext } from './context';
@@ -97,15 +98,19 @@ export function srsMinimumFt(succeedingType: string, precedingType: string): num
 export function landedDistanceExceptionApplies(state: SimulationState, subject: Aircraft, other: Aircraft, g: RunwayEndGeom): boolean {
   if (!other.onGround || other.isDeparture && other.phase !== 'ROLLOUT' && other.phase !== 'RUNWAY_EXIT') return false; // "has landed"
   if (other.phase !== 'ROLLOUT' && other.phase !== 'RUNWAY_EXIT' && other.phase !== 'LANDING') return false;
-  if (!isDaylight(state.airport.arp, simUtcMs(state))) return false;
   const og = findRunwayEnd(state.airport, other.assignedRunwayEnd);
   if (!og || og.end.id !== g.end.id) return false;
+  if (Math.abs(alongCross(g, other.pos).cross) >= TURNED_AWAY_M) return false;
+  return landedExceptionHolds(state, subject, other, alongCross(g, other.pos).along - perfOf(other).lengthM / 2);
+}
+
+/** The 3-10-3 daylight rule given the preceding (landed) aircraft's TAIL position `tailAlongM` from the landing threshold. */
+function landedExceptionHolds(state: SimulationState, subject: Aircraft, other: Aircraft, tailAlongM: number): boolean {
+  if (!isDaylight(state.airport.arp, simUtcMs(state))) return false;
   const s = srsCategory(subject.type);
   const p = srsCategory(other.type);
   if (s === 3 || p === 3) return false;
-  const needFt = s === 1 ? 3000 : 4500;
-  const rearM = alongCross(g, other.pos).along - perfOf(other).lengthM / 2; // the tail of the preceding aircraft
-  return mToFt(rearM) >= needFt && Math.abs(alongCross(g, other.pos).cross) < TURNED_AWAY_M;
+  return mToFt(tailAlongM) >= (s === 1 ? 3000 : 4500);
 }
 
 /** Aircraft whose lateral offset from the centreline exceeds this have "turned to avert any conflict" (3-9-6 a). */
@@ -182,7 +187,9 @@ function intersectingIssues(state: SimulationState, ac: Aircraft, kind: 'TAKEOFF
   if (kind === 'TAKEOFF') {
     const startAlong = alongCross(g, ac.pos).along;
     const dist2 = Math.max(0, sSubjectInt + INTERSECTION_PASS_MARGIN_M - startAlong);
-    tSubjectDepClear = ROLL_START_DELAY_SEC + timeToCover(dist2, 0, ktToMps(subjectPerf.accelKtPerSec));
+    // cleared from the hold (not yet lined up): the line-up takes 10-17+ s before the roll
+    const delay = ac.phase === 'LINE_UP_AND_WAIT' ? ROLL_START_DELAY_SEC : lineUpTimeSec(subjectPerf, Math.abs(alongCross(g, ac.pos).cross) + 20);
+    tSubjectDepClear = delay + timeToCover(dist2, 0, ktToMps(subjectPerf.accelKtPerSec));
   } else {
     tSubjectThr = dist(ac.pos, g.end.threshold) / Math.max(ktToMps(ac.groundSpeedKt), ktToMps(30));
   }
@@ -208,7 +215,8 @@ function intersectingIssues(state: SimulationState, ac: Aircraft, kind: 'TAKEOFF
       if (passed) continue; // "has departed and passed the intersection"
       const rolling = o.phase === 'TAKEOFF_ROLL' || !o.onGround;
       const v0 = ktToMps(o.groundSpeedKt);
-      const tClear = (rolling ? 0 : ROLL_START_DELAY_SEC) + (o.onGround ? timeToCover(sInt + INTERSECTION_PASS_MARGIN_M - sO, rolling ? v0 : 0, ktToMps(oPerf.accelKtPerSec)) : (sInt + INTERSECTION_PASS_MARGIN_M - sO) / Math.max(v0, 1));
+      const startDelay = rolling ? 0 : o.phase === 'CLEARED_FOR_TAKEOFF' && !onSurface ? lineUpTimeSec(oPerf, Math.abs(alongCross(og, o.pos).cross) + 20) : ROLL_START_DELAY_SEC;
+      const tClear = startDelay + (o.onGround ? timeToCover(sInt + INTERSECTION_PASS_MARGIN_M - sO, rolling ? v0 : 0, ktToMps(oPerf.accelKtPerSec)) : (sInt + INTERSECTION_PASS_MARGIN_M - sO) / Math.max(v0, 1));
       if (kind === 'TAKEOFF') {
         out.push(issue(`${verb} for ${ac.callsign} on runway ${g.runway.id} before ${o.callsign} departing runway ${other.id} has passed the intersection (${Math.max(0, Math.round(mToFt(sInt - sO)))} ft short of it)`));
       } else if (tSubjectThr < tClear) {
@@ -357,6 +365,10 @@ export function assessClearanceSafety(state: SimulationState, cmd: ParsedCommand
     if (lu.length) push(`${verb} for ${ac.callsign} while ${cs(state, lu)} is in position on runway ${runwayId}`, REF_SAME_RUNWAY, lu);
     const crossing = others(act.crossing).filter((i) => !occ.includes(i));
     if (crossing.length) push(`${verb} for ${ac.callsign} while ${cs(state, crossing)} is cleared to cross runway ${runwayId}`, REF_TAXI, crossing);
+    // an arrival in the flare / over the runway surface (any height) is on the runway for the departure rules, however far past the threshold
+    const rwy = airport.runways.find((r) => r.id === runwayId);
+    const over = rwy ? arrivalsOverRunway(state, rwy, ac.id).filter((o) => !occ.includes(o.id)) : [];
+    if (over.length) push(`${verb} for ${ac.callsign} while ${over.map((o) => o.callsign).join(', ')} is landing over runway ${runwayId}`, REF_LANDING, over.map((o) => o.id));
     if (cmd.kind === 'TAKEOFF') {
       const arr = arrivalsOnFinal(state, runwayId, FINAL_TAKEOFF_NM, ac.id);
       if (arr.length) {
@@ -381,6 +393,7 @@ export function assessClearanceSafety(state: SimulationState, cmd: ParsedCommand
     if (lu.length) push(`Landing clearance for ${ac.callsign} while ${cs(state, lu)} is in position on runway ${runwayId}`, REF_LANDING, lu);
     const crossing = others(act.crossing).filter((i) => !occ.includes(i));
     if (crossing.length) push(`Landing clearance for ${ac.callsign} while ${cs(state, crossing)} is cleared to cross runway ${runwayId}`, REF_TAXI, crossing);
+    if (gLand) issues.push(...precedingArrivalIssues(state, ac, gLand));
   } else if (cmd.kind === 'CROSS_RUNWAY') {
     const occ = others(act.occupants);
     if (occ.length) push(`Crossing clearance for ${ac.callsign} over runway ${runwayId} while it is occupied by ${cs(state, occ)}`, REF_TAXI, occ);
@@ -392,6 +405,8 @@ export function assessClearanceSafety(state: SimulationState, cmd: ParsedCommand
       const ids = [...landing.map((a) => a.id), ...rolling];
       push(`Crossing clearance for ${ac.callsign} over runway ${runwayId} with ${cs(state, ids)} landing`, REF_TAXI, ids);
     }
+    const crossed = airport.runways.find((r) => r.id === runwayId);
+    if (crossed) issues.push(...crossingTrafficIssues(state, ac, crossed));
   }
 
   // Intersecting runways (e.g. 13/31 and 4/22): JO 7110.65 3-9-8 (departures) and 3-10-4 (arrivals).
@@ -400,7 +415,13 @@ export function assessClearanceSafety(state: SimulationState, cmd: ParsedCommand
     // Land and hold short (3-10-4 / 3-10-5): the clearance names the intersecting runway to hold short of, so the arrival is not
     // required to have the other runway's traffic clear of the intersection; the hold-short itself is validated by the executor.
     const holdShortIds = cmd.kind === 'LAND' ? (cmd.holdShort ?? []).map((r) => findRunway(airport, r)?.id) : [];
-    if (gEnd) for (const other of crossingRunways(airport, runwayId)) if (!holdShortIds.includes(other.id)) issues.push(...intersectingIssues(state, ac, cmd.kind, gEnd, other));
+    if (gEnd) {
+      for (const other of crossingRunways(airport, runwayId)) {
+        if (holdShortIds.includes(other.id)) continue;
+        issues.push(...intersectingIssues(state, ac, cmd.kind, gEnd, other));
+        issues.push(...crossingAgainstIssues(state, ac, cmd.kind, gEnd, other, activity));
+      }
+    }
   }
   // Wake turbulence time interval for an intersection departure (3-9-7).
   if (cmd.kind === 'TAKEOFF') {
@@ -408,6 +429,196 @@ export function assessClearanceSafety(state: SimulationState, cmd: ParsedCommand
     if (gEnd) issues.push(...intersectionWakeIssues(state, ac, gEnd));
   }
   return { safe: issues.length === 0, issues };
+}
+
+
+// ---------------------------------------------------------------------------
+// Arrival behind an arrival (3-10-3), airborne arrivals over the runway, crossings against intersecting-runway traffic
+// ---------------------------------------------------------------------------
+
+const ARRIVAL_CLEAR_MARGIN_SEC = 3;
+const CROSSING_MARGIN_SEC = 4;
+/** Lateral offset beyond which an arrival is not on the final of the runway (pattern / other approach). */
+const FINAL_LATERAL_M = 900;
+
+const isArriving = (o: Aircraft): boolean => !o.onGround && (o.phase === 'FINAL' || o.phase === 'LANDING' || !!activeClearance(o, 'LAND'));
+
+/** Airborne arrivals (LANDING / FINAL / cleared to land) that are over the surface of the runway: they occupy it for the departure rules. */
+function arrivalsOverRunway(state: SimulationState, rw: Runway, excludeId: string): Aircraft[] {
+  return Object.values(state.aircraft).filter(
+    (o) => o.id !== excludeId && !o.onGround && isArriving(o) && findRunwayEnd(state.airport, o.assignedRunwayEnd)?.runway.id === rw.id && pointInPolygon(o.pos, rw.polygon),
+  );
+}
+
+/**
+ * JO 7110.65 3-10-3 for an arrival behind a preceding ARRIVAL that is still airborne on the same final: "ensuring that the arriving
+ * aircraft does not cross the landing threshold until ... the other aircraft has landed and is clear of the runway" (or, by day, is the
+ * categorical distance down the runway). Judged at the clearance by projecting both aircraft (`runwayTiming.projectArrival`): the
+ * preceding aircraft's threshold crossing, touchdown and rollout / exit time against the follower's projected threshold crossing,
+ * with a 3 s margin.
+ */
+export function precedingArrivalBlockers(state: SimulationState, ac: Aircraft, g: RunwayEndGeom): { other: Aircraft; tMine: number; tTd: number; tClear: number }[] {
+  const out: { other: Aircraft; tMine: number; tTd: number; tClear: number }[] = [];
+  if (ac.onGround) return out;
+  const myAlong = alongCross(g, ac.pos).along;
+  const tMine = timeToThreshold(ac, g);
+  for (const o of Object.values(state.aircraft)) {
+    if (o.id === ac.id || o.onGround || o.assignedRunwayEnd !== g.end.id || !isArriving(o)) continue;
+    const { along, cross } = alongCross(g, o.pos);
+    if (along <= myAlong || Math.abs(cross) > FINAL_LATERAL_M) continue; // behind the subject: it is the follower
+    const proj = projectArrival(state, o, g);
+    if (tMine >= proj.tClear + ARRIVAL_CLEAR_MARGIN_SEC) continue; // landed and clear when the follower crosses the threshold
+    if (tMine >= proj.tTd && landedExceptionHolds(state, ac, o, proj.alongAt(tMine) - perfOf(o).lengthM / 2)) continue; // by day, 3,000 / 4,500 ft down the runway
+    out.push({ other: o, tMine, tTd: proj.tTd, tClear: proj.tClear });
+  }
+  return out;
+}
+
+function precedingArrivalIssues(state: SimulationState, ac: Aircraft, g: RunwayEndGeom): SafetyIssue[] {
+  return precedingArrivalBlockers(state, ac, g).map(({ other: o, tMine, tTd, tClear }) => ({
+    kind: 'RUNWAY_CONFLICT' as const,
+    text: `Landing clearance for ${ac.callsign}: it would cross the threshold of runway ${g.end.id} in ${Math.round(tMine)} s, but ${o.callsign} ahead on the same final ` +
+      `lands in ${Math.round(tTd)} s and is not clear of the runway until about ${Math.round(tClear)} s (3-10-3: no crossing of the threshold until it has landed and is clear)`,
+    reference: REF_LANDING, aircraftIds: [ac.id, o.id], runwayId: g.runway.id,
+  }));
+}
+
+/** The path (aircraft position, then route nodes) over which `ac` crosses runway `rw`: from its hold, over the runway nodes, to the far hold. */
+export function crossingPath(state: SimulationState, ac: Aircraft, rw: Runway): Vec2[] | undefined {
+  const route = ac.route;
+  if (!route) return undefined;
+  const graph = state.airport.taxiwayGraph;
+  const path: Vec2[] = [ac.pos];
+  let sawRunway = false;
+  let started = false;
+  for (let i = Math.max(0, route.progressIndex - 1); i < route.nodeIds.length && path.length < 14; i++) {
+    const n = graph.nodes[route.nodeIds[i]];
+    if (!n) continue;
+    const isHold = n.kind === 'holding_position' && n.runwayId === rw.id;
+    if (!started && !isHold && !(n.kind === 'runway' && n.runwayId === rw.id)) continue; // before the near hold
+    started = true;
+    path.push(n.pos);
+    if (n.kind === 'runway' && n.runwayId === rw.id) sawRunway = true;
+    if (isHold && sawRunway) return path;
+  }
+  return started && sawRunway ? path : undefined;
+}
+
+/** Does the subject's movement (`timeAtAlong`, seconds to reach `s` m along the runway) overlap the crossing window at `sX`? */
+function overlapsCrossing(timeAtAlong: (s: number) => number, sX: number, win: { tEnter: number; tLeave: number }, lenM: number): boolean {
+  const tArrive = timeAtAlong(sX - 45);
+  const tPassed = timeAtAlong(sX + 45 + lenM);
+  return tArrive < win.tLeave + CROSSING_MARGIN_SEC && tPassed > win.tEnter - CROSSING_MARGIN_SEC;
+}
+
+/** Seconds for a departure to reach `s` m along its runway (rolling, or cleared and not yet rolling); Infinity if not departing. */
+function departureTimeAtAlong(state: SimulationState, o: Aircraft, og: RunwayEndGeom): ((s: number) => number) | undefined {
+  const rolling = o.phase === 'TAKEOFF_ROLL';
+  if (!(rolling || o.phase === 'CLEARED_FOR_TAKEOFF')) return undefined;
+  const perf = perfOf(o);
+  const sO = alongCross(og, o.pos).along;
+  const onSurface = o.occupyingRunways.includes(og.runway.id);
+  const delay = rolling ? 0 : !onSurface ? lineUpTimeSec(perf, Math.abs(alongCross(og, o.pos).cross) + 20) : ROLL_START_DELAY_SEC;
+  const v0 = rolling ? ktToMps(o.groundSpeedKt) : 0;
+  void state;
+  return (s) => (s <= sO ? 0 : delay + timeToCover(s - sO, v0, ktToMps(perf.accelKtPerSec)));
+}
+
+/**
+ * Traffic on runway `q` against a window (seconds from now) during which an aircraft occupies the part of `q` it crosses. Departures
+ * rolling / cleared, arrivals rolling out or on short final (projected touchdown and rollout), and aircraft standing on the surface
+ * there all count. `win.enterAt` is where the crossing aircraft first meets the surface of `q`.
+ */
+function trafficOnRunwayIssues(state: SimulationState, subject: Aircraft, q: Runway, win: { tEnter: number; tLeave: number; enterAt: Vec2 }, verb: string, reference: string): SafetyIssue[] {
+  const out: SafetyIssue[] = [];
+  for (const o of Object.values(state.aircraft)) {
+    if (o.id === subject.id) continue;
+    const og = findRunwayEnd(state.airport, o.assignedRunwayEnd);
+    if (!og || og.runway.id !== q.id) continue;
+    const sX = alongCross(og, win.enterAt).along;
+    const len = perfOf(o).lengthM;
+    const issue = (what: string): SafetyIssue => ({
+      kind: 'RUNWAY_CONFLICT', reference, aircraftIds: [subject.id, o.id], runwayId: q.id,
+      text: `${verb} for ${subject.callsign}: it would be on the crossed runway from about ${Math.round(win.tEnter)} to ${Math.round(win.tLeave)} s, while ${o.callsign} ${what}`,
+    });
+    const dep = departureTimeAtAlong(state, o, og);
+    if (dep) {
+      if (overlapsCrossing(dep, sX, win, len)) out.push(issue(`is ${o.phase === 'TAKEOFF_ROLL' ? 'rolling' : 'cleared for takeoff'} on runway ${q.id} and reaches the intersection in about ${Math.round(dep(sX - 45))} s`));
+      continue;
+    }
+    if (o.onGround && (o.phase === 'ROLLOUT' || o.phase === 'LANDING')) {
+      const proj = projectArrival(state, o, og);
+      if (overlapsCrossing(proj.timeAtAlong, sX, win, len)) out.push(issue(`is rolling out on runway ${q.id} and reaches the intersection in about ${Math.round(proj.timeAtAlong(sX - 45))} s`));
+      continue;
+    }
+    if (isArriving(o)) {
+      const { along, cross } = alongCross(og, o.pos);
+      if (Math.abs(cross) > FINAL_LATERAL_M || along > sX + 45 + len || -along > nmToM(3)) continue;
+      const proj = projectArrival(state, o, og);
+      if (overlapsCrossing(proj.timeAtAlong, sX, win, len)) out.push(issue(`is ${along < 0 ? `on ${mToNm(-along).toFixed(1)} nm final` : 'landing'} for runway ${og.end.id} and reaches the intersection in about ${Math.round(proj.timeAtAlong(sX - 45))} s`));
+      continue;
+    }
+    // standing on the surface in the way (lined up, stopped on the runway)
+    if (o.onGround && o.groundSpeedKt < 1 && o.occupyingRunways.includes(q.id)) {
+      const sO = alongCross(og, o.pos).along;
+      if (Math.abs(sO - sX) < 45 + len) out.push(issue(`is standing on runway ${q.id} at that point`));
+    }
+  }
+  return out;
+}
+
+/**
+ * Crossing clearance against traffic on the runways that intersect the one being crossed (JO 7110.65 3-9-8 / 3-10-4 logic applied to
+ * the crossing aircraft): the aircraft must be able to clear the intersecting runway's surface before any aircraft using it (departing
+ * roll, landing rollout, arrival on short final) reaches the crossing point. The crossing path is the aircraft's own route over the runway.
+ */
+function crossingTrafficIssues(state: SimulationState, ac: Aircraft, rw: Runway): SafetyIssue[] {
+  const path = crossingPath(state, ac, rw);
+  if (!path) return [];
+  const out: SafetyIssue[] = [];
+  for (const q of crossingRunways(state.airport, rw.id)) {
+    // The crossing aircraft is on the surface of `rw` for a window; traffic on `q` is on that same surface when it passes the point
+    // where the two runways cross (it rolls through the intersection), so it must not get there inside the window.
+    const p = runwayIntersection(rw, q);
+    const win = p && surfaceWindow(path, rw.polygon, ac.type, CROSSING_WINGTIP_M, CROSSING_START_DELAY_SEC);
+    if (win && p) out.push(...trafficOnRunwayIssues(state, ac, q, { ...win, enterAt: p }, `Crossing clearance over runway ${rw.id}`, REF_INTERSECTING));
+  }
+  return out;
+}
+const CROSSING_START_DELAY_SEC = 3;
+/** The crossing aircraft counts as on the runway this far (m) before its edge (nose, wingtips). */
+const CROSSING_WINGTIP_M = 10;
+
+/** The reverse: a takeoff / landing on `g` against aircraft already cleared across the runway `other` that intersects it. */
+function crossingAgainstIssues(state: SimulationState, ac: Aircraft, kind: 'TAKEOFF' | 'LAND', g: RunwayEndGeom, other: Runway, activity: Record<string, { crossing: string[] }>): SafetyIssue[] {
+  const out: SafetyIssue[] = [];
+  const verb = kind === 'TAKEOFF' ? 'Takeoff clearance' : 'Landing clearance';
+  for (const id of activity[other.id]?.crossing ?? []) {
+    const o = state.aircraft[id];
+    if (!o || o.id === ac.id) continue;
+    const path = crossingPath(state, o, other);
+    if (!path) continue;
+    const p = runwayIntersection(g.runway, other);
+    const win = p && surfaceWindow(path, other.polygon, o.type, CROSSING_WINGTIP_M, 0);
+    if (!win || !p) continue;
+    const sX = alongCross(g, p).along;
+    const len = perfOf(o).lengthM;
+    let timeAt: (s: number) => number;
+    if (kind === 'LAND') timeAt = projectArrival(state, ac, g).timeAtAlong;
+    else {
+      const perf = perfOf(ac);
+      const sO = alongCross(g, ac.pos).along;
+      const delay = ac.phase === 'LINE_UP_AND_WAIT' ? ROLL_START_DELAY_SEC : lineUpTimeSec(perf, Math.abs(alongCross(g, ac.pos).cross) + 20);
+      timeAt = (s) => (s <= sO ? 0 : delay + timeToCover(s - sO, 0, ktToMps(perf.accelKtPerSec)));
+    }
+    if (overlapsCrossing(timeAt, sX, win, len)) {
+      out.push({
+        kind: 'RUNWAY_CONFLICT', reference: REF_INTERSECTING, aircraftIds: [ac.id, o.id], runwayId: g.runway.id,
+        text: `${verb} for ${ac.callsign} on runway ${g.runway.id}: ${o.callsign} is cleared across runway ${other.id} and is on its surface from about ${Math.round(win.tEnter)} to ${Math.round(win.tLeave)} s, when ${ac.callsign} reaches the intersection`,
+      });
+    }
+  }
+  return out;
 }
 
 /**
@@ -463,6 +674,16 @@ interface Candidate {
 }
 
 export const GROUND_PROXIMITY_M = 30;
+/** The normal following distance of the taxi model (`groundMovement.findLeader`): 1.5 x the longer aircraft + 20 m. */
+export const followingDistanceM = (a: Aircraft, b: Aircraft): number => 1.5 * Math.max(perfOf(a).lengthM, perfOf(b).lengthM) + 20;
+/** Alert when an aircraft is closer than its following target by 20% (0.8 x), but never at more than 30 m. */
+export const groundProximityM = (a: Aircraft, b: Aircraft): number => Math.min(GROUND_PROXIMITY_M, 0.8 * followingDistanceM(a, b));
+/** Two aircraft standing still one behind the other in the same queue (holding short / waiting to taxi): not a proximity event. */
+function sameQueue(state: SimulationState, a: Aircraft, b: Aircraft): boolean {
+  const q = (x: Aircraft) => x.groundSpeedKt < 1 && (x.phase === 'TAXIING' || x.phase === 'HOLDING_SHORT' || x.phase === 'READY') && x.occupyingRunways.length === 0;
+  void state;
+  return q(a) && q(b) && Math.abs(headingDiff(a.headingDeg, b.headingDeg)) < 60;
+}
 
 /** Parked, shut down, or standing still on a parking position (stands can be closer than 30 m). */
 function parkedLike(state: SimulationState, ac: Aircraft): boolean {
@@ -573,7 +794,7 @@ export function detectConflicts(ctx: SimContext): void {
       const d = dist(a.pos, b.pos);
       if (a.onGround && b.onGround) {
         if (parkedLike(state, a) || parkedLike(state, b)) continue;
-        if (d < GROUND_PROXIMITY_M) {
+        if (d < groundProximityM(a, b) && !(d >= 15 && sameQueue(state, a, b))) {
           candidates.push({
             key: `GND:${[a.id, b.id].sort().join('+')}`,
             alert: { kind: 'GROUND_PROXIMITY', aircraftIds: [a.id, b.id], text: `${a.callsign} and ${b.callsign} are ${Math.round(d)} m apart on the ground`, severity: d < 15 ? 'critical' : 'warning' },

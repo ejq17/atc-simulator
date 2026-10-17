@@ -9,6 +9,8 @@
  * can be piped through the same 300-3000 Hz, lightly distorted, compressed path.
  */
 
+import { getSharedAudioContext } from './unlock.ts';
+
 export interface RadioEffects {
   isSupported(): boolean;
   setEnabled(enabled: boolean): void;
@@ -33,10 +35,9 @@ export interface RadioEffectsOptions {
   contextFactory?: () => AudioContext | null;
 }
 
+/** Default: the page-wide context that `unlockAudio()` resumed on the user's click. */
 function defaultFactory(): AudioContext | null {
-  const g = globalThis as unknown as { AudioContext?: typeof AudioContext; webkitAudioContext?: typeof AudioContext };
-  const Ctor = g.AudioContext ?? g.webkitAudioContext;
-  return Ctor ? new Ctor() : null;
+  return getSharedAudioContext();
 }
 
 function distortionCurve(amount: number): Float32Array<ArrayBuffer> {
@@ -54,6 +55,8 @@ export function createRadioEffects(options: RadioEffectsOptions = {}): RadioEffe
   let master = options.masterVolume ?? 0.6;
   const staticLevel = options.staticGain ?? 0.012;
   const factory = options.contextFactory ?? defaultFactory;
+  /** The shared context outlives one session: dispose only disconnects from it. */
+  const sharedContext = !options.contextFactory;
 
   let ctx: AudioContext | null = null;
   let chainIn: GainNode | null = null;
@@ -205,7 +208,14 @@ export function createRadioEffects(options: RadioEffectsOptions = {}): RadioEffe
     dispose() {
       wantStatic = false;
       stopStaticNow();
-      void ctx?.close().catch(() => undefined);
+      if (sharedContext) {
+        try {
+          masterGain?.disconnect();
+          chainIn?.disconnect();
+        } catch { /* already disconnected */ }
+      } else {
+        void ctx?.close().catch(() => undefined);
+      }
       ctx = null;
       chainIn = null;
       masterGain = null;
