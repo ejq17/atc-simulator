@@ -13,6 +13,7 @@ import type { RunwayEndGeom } from '../sim/runways';
 import { frequencyForPosition } from '../radio/frequencies';
 import { KT_TO_MPS } from '../sim/geo';
 import { getPerformance } from '../sim/performance';
+import { holdTooShort } from '../sim/holdSelection';
 import { hasActive, mkCmd } from './core';
 import type { Agent, AgentView, Plan } from './core';
 import {
@@ -139,6 +140,20 @@ export function createTowerAgent(): Agent {
       const waiting = ac.phase === 'HOLDING_SHORT' && atDepartureHold(v, ac, g);
       const lined = ac.phase === 'LINE_UP_AND_WAIT' && stationary(ac) && ac.occupyingRunways.includes(g.runway.id);
       if (!waiting && !lined) continue;
+      // An intersection hold with too little runway for the type is never cleared (the pilot would refuse every time):
+      // the aircraft goes back to Ground for a taxi to full length.
+      const hold = holdNodeAt(airport, ac);
+      if (waiting && hold && holdTooShort(g, hold, ac)) {
+        const gnd = v.staffed.has('GND') ? frequencyForPosition(airport, 'GND') : undefined;
+        if (gnd) {
+          plans.push({
+            key: `${ac.id}:short:${hold.id}`, aircraftId: ac.id, callsign: ac.callsign, priority: 55, once: true,
+            cmds: [mkCmd('CONTACT_FREQUENCY', ac, { frequencyId: gnd.id })],
+            phrase: say.contact(ac, airport, gnd.id, gnd.mhz), summary: `${ac.callsign}: runway ${g.end.id} too short from ${hold.taxiways[0] ?? 'that intersection'}, back to Ground for full length`,
+          });
+        }
+        continue;
+      }
       const ready = ac.pendingRequest?.kind === 'DEPARTURE' || v.settled(ac) >= 8 || lined;
       if (!ready) continue;
       const k = `hold:${ac.id}`;
@@ -231,10 +246,13 @@ export function createTowerAgent(): Agent {
             });
           }
         } else if (!ifr && pending === 'LANDING' && ac.assignedRunwayEnd) {
+          // After a runway change the pattern re-entry is for the runway now in use, not the one the go-around was flown from.
+          const active = state.activeRunways.landing;
+          const end = active.includes(ac.assignedRunwayEnd) || !active.length ? ac.assignedRunwayEnd : active[0];
           plans.push({
             key: `${ac.id}:pattern`, aircraftId: ac.id, callsign: ac.callsign, priority: 50,
-            cmds: [mkCmd('ENTER_PATTERN', ac, { runwayEnd: ac.assignedRunwayEnd, patternLeg: 'left_downwind' })],
-            phrase: say.enterPattern(ac, ac.assignedRunwayEnd, 'left downwind'), cooldownSec: 30, summary: `${ac.callsign} left downwind runway ${ac.assignedRunwayEnd}`,
+            cmds: [mkCmd('ENTER_PATTERN', ac, { runwayEnd: end, patternLeg: 'left_downwind' })],
+            phrase: say.enterPattern(ac, end, 'left downwind'), cooldownSec: 30, summary: `${ac.callsign} left downwind runway ${end}`,
           });
         }
         continue;

@@ -1,4 +1,5 @@
-import { GA_PREFIXES } from './lexicon';
+import { GA_PREFIXES, N_PREFIX_WORDS } from './lexicon';
+import { editDistance } from './normalize';
 import type { Token } from './tokens';
 
 export interface AircraftRef { callsign: string; spokenCallsign: string; type: string }
@@ -59,9 +60,13 @@ function findMentions(tokens: readonly Token[]): Mention[] {
     let explicit = false;
     if (tokens[j].kind === 'gaPrefix') { gaPrefix = tokens[j].text; explicit = true; j++; }
     if (tokens[j]?.kind === 'letter' && tokens[j].text === 'n' && isInt(tokens[j + 1])) { explicit = true; j++; }
+    // "number 678 mike victor": a misheard "november"; only with the registration letters after the digits ("runway number 4" is not one)
+    else if (tokens[j]?.kind === 'word' && N_PREFIX_WORDS.has(tokens[j].text) && isInt(tokens[j + 1]) && (tokens[j + 2]?.kind === 'letter' || (isInt(tokens[j + 2]) && tokens[j + 3]?.kind === 'letter'))) { explicit = true; j++; }
     if (isInt(tokens[j])) {
-      const digits = tokens[j].text;
+      let digits = tokens[j].text;
       let k = j + 1;
+      // "november 4, 5, romeo tango": STT punctuation split the digits into separate number tokens
+      while (isInt(tokens[k]) && digits.length + tokens[k].text.length <= 5) { digits += tokens[k].text; k++; }
       let letters = '';
       while (letters.length < 2 && tokens[k]?.kind === 'letter') { letters += tokens[k].text.toUpperCase(); k++; }
       const prev = tokens[i - 1];
@@ -92,6 +97,24 @@ function prefixAdjust(m: Mention, ac: AircraftRef): number {
   return -0.05;
 }
 
+const splitId = (id: string): { digits: string; letters: string } => {
+  const m = /^(\d*)([A-Z]*)$/.exec(id);
+  return { digits: m?.[1] ?? id, letters: m?.[2] ?? '' };
+};
+
+/**
+ * An explicitly prefixed N-number ("november ...", "cessna ...") whose digits are off by one inserted or dropped digit while
+ * the letters match: "november 60004 tango" for N6004T, "november 604 tango" for N6004T. A substituted digit is NOT
+ * accepted this way (that could be another aircraft); see the hamming rule.
+ */
+function digitSlip(m: Mention, full: string): boolean {
+  if (!m.explicitPrefix || m.id.length < 4) return false;
+  const a = splitId(m.id);
+  const b = splitId(full);
+  return a.letters === b.letters && b.letters.length > 0 && Math.abs(a.digits.length - b.digits.length) === 1
+    && editDistance(a.digits, b.digits) === 1;
+}
+
 /** Score one mention against one aircraft, 0..1. */
 function scoreMention(m: Mention, ac: AircraftRef): number {
   const cs = ac.callsign.toUpperCase();
@@ -103,6 +126,9 @@ function scoreMention(m: Mention, ac: AircraftRef): number {
     const full = nNum[1];
     if (m.id === full) s = m.explicitPrefix ? 1 : 0.97;
     else if (m.id.length >= 3 && m.id.length < full.length && full.endsWith(m.id)) s = m.id.length >= 4 ? 0.93 : 0.9;
+    // "november 467" / "cessna 467 echo" for N467ES: all the digits, letters missing or garbled by STT
+    else if (m.explicitPrefix && m.id.length >= 3 && m.id.length < full.length && full.startsWith(m.id) && splitId(m.id).digits === splitId(full).digits) s = 0.8;
+    else if (digitSlip(m, full)) s = 0.8;
     else if (m.id.length >= 3 && m.id.length <= full.length && hamming(m.id, full.slice(-m.id.length)) === 1) s = m.id.length >= 4 ? 0.6 : 0.5;
     else if (m.id.length < 3 && full.endsWith(m.id)) s = 0.4;
     if (s > 0) s += prefixAdjust(m, ac);

@@ -64,7 +64,7 @@ export function parseTaxiways(t: Toks, i: number): { ids: string[]; next: number
     j = skipWords(t, j, TAXIWAY_JOINERS);
     const one = parseOneTaxiway(t, j);
     if (!one) break;
-    ids.push(one.id);
+    if (ids[ids.length - 1] !== one.id) ids.push(one.id); // "via november november papa": a stuttered or STT-doubled id is one taxiway
     j = end = one.next;
   }
   return { ids, next: end };
@@ -86,6 +86,6 @@ export function parseParking(t: Toks, i: number): { dest: string; next: number }
     ?? tryPat('terminal', 'TERMINAL')
     ?? tryPat('hangar', 'HANGAR')
     ?? tryPat('ramp', 'RAMP')
-    ?? tryPat('parking', 'PARKING')
+    ?? tryPat('parking|park', 'PARKING')
     ?? tryPat('apron', 'APRON');
 }

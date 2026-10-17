@@ -62,7 +62,7 @@ function viaPhrase(route?: string[]): string {
 
 function holdShortPhrase(hs?: string[]): string {
   if (!hs || !hs.length) return '';
-  return hs.map((r) => `, hold short of runway ${runwayRef(r)}`).join('');
+  return hs.map((r) => (/^(RWY|RUNWAY)?\s*\d/i.test(r) ? `, hold short of runway ${runwayRef(r)}` : `, hold short of ${spokenTaxiway(r.replace(/^TWY\s*/i, ''))}`)).join('');
 }
 
 function allEndIds(airport: Airport): string[] {
@@ -133,16 +133,19 @@ export function buildReadback(aircraft: Aircraft, c: Clearance, env: ReadbackEnv
         if (rwy) head = `Runway ${runwaySpoken(rwy)}, taxi`; // 7110.65 3-7-2: RUNWAY (number), TAXI VIA ...
         else if (c.destination) {
           const up = c.destination.toUpperCase();
+          const twy = /^TWY\s*([A-Z]{1,2}\d{0,2})$/.exec(up)?.[1];
           const park = env.airport.parking.find((p) => p.id.toUpperCase() === up || p.name.toUpperCase() === up);
-          head = `Taxi to ${park ? spokenParking(park) : spokenText(c.destination)}`;
+          head = `Taxi to ${park ? spokenParking(park) : twy ? spokenTaxiway(twy) : spokenText(c.destination)}`;
         }
         else head = c.kind === 'TAXI_TO_PARKING' ? 'Taxi to parking' : 'Taxi';
         return `${head}${viaPhrase(c.route)}${holdShortPhrase(c.holdShort)}`;
       }
       case 'HOLD_POSITION':
         return 'Holding position';
-      case 'HOLD_SHORT':
-        return `Hold short of runway ${runwayRef((c.holdShort && c.holdShort[0]) ?? c.runwayId ?? c.runwayEnd ?? '')}`;
+      case 'HOLD_SHORT': {
+        const ref = (c.holdShort && c.holdShort[0]) ?? c.runwayId ?? c.runwayEnd ?? '';
+        return /^(RWY|RUNWAY)?\s*\d/i.test(ref) ? `Hold short of runway ${runwayRef(ref)}` : `Hold short of ${spokenTaxiway(ref.replace(/^TWY\s*/i, ''))}`;
+      }
       case 'CROSS_RUNWAY':
         return `Cross runway ${runwaySpoken(c.runwayId ?? c.runwayEnd ?? '')}`;
       case 'GO_AROUND':
@@ -276,7 +279,10 @@ export function readyToTaxiCall(aircraft: Aircraft, env: ReadbackEnv, parking?: 
   return `${facility(aircraft, env)}, ${aircraft.spokenCallsign}, ${at}, ready to taxi, ${rules} to ${spokenAirportName(aircraft.flightPlan?.destination ?? aircraft.destination)}.`;
 }
 
-export function holdingShortCall(aircraft: Aircraft, env: ReadbackEnv, runwayEnd: string, readyForDeparture: boolean): string {
+export function holdingShortCall(aircraft: Aircraft, env: ReadbackEnv, runwayEnd: string, readyForDeparture: boolean, o: { requestFullLengthAt?: string } = {}): string {
+  if (o.requestFullLengthAt) {
+    return `${facility(aircraft, env)}, ${aircraft.spokenCallsign}, holding short runway ${runwayRef(runwayEnd)} at ${spokenTaxiway(o.requestFullLengthAt)}, unable intersection departure, request full length.`;
+  }
   const tail = readyForDeparture ? ', ready for departure' : '';
   return `${facility(aircraft, env)}, ${aircraft.spokenCallsign}, holding short runway ${runwayRef(runwayEnd)}${tail}.`;
 }

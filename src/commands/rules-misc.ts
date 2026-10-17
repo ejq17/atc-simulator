@@ -1,6 +1,6 @@
 import { cmdHit, fillerHit, makeDraft, type Rule } from './draft';
 import { parseRunway, parseTaxiways } from './entities';
-import { FACILITIES, FILLERS } from './lexicon';
+import { FACILITIES, FILLERS, TOWER_MISHEARD } from './lexicon';
 import { intAt, isOneOf, seq, skipWords, txt } from './match';
 
 const COMM_MIN_MHZ = 108;
@@ -19,7 +19,7 @@ export const ruleContact: Rule = (t, i) => {
     d.fields.destination = 'MY_FREQUENCY';
     return cmdHit(mine, d);
   }
-  const facility = FACILITIES.get(txt(t, j));
+  const facility = FACILITIES.get(txt(t, j)) ?? (strong && TOWER_MISHEARD.has(txt(t, j)) ? 'TWR' : undefined);
   let gotObject = false;
   if (facility) { d.fields.frequencyId = facility; gotObject = true; j++; }
   j = skipWords(t, j, ['on', 'frequency', 'the', 'delivery']);

@@ -1,5 +1,5 @@
 import {
-  AIRLINES, ALIASES, DISFLUENCIES, GA_PREFIXES, HOMOPHONE_DIGITS, KEEP_WORDS, NATO, PHRASES, TAXIWAY_CONTEXT,
+  AIRLINES, ALIASES, DISFLUENCIES, FILLERS, GA_PREFIXES, HOMOPHONE_DIGITS, KEEP_WORDS, NATO, PHRASES, TAXIWAY_CONTEXT,
 } from './lexicon';
 import { digitValue, evaluateNumberWords, numberWordClass } from './numbers';
 import type { NormalizedText, Token, TokenKind } from './tokens';
@@ -34,6 +34,7 @@ export function normalize(raw: string, opts: NormalizeOptions = {}): NormalizedT
   items = applyPhrases(items);
   items = applyAliases(items);
   const lead = new Set<string>([...airlines.keys(), ...GA_PREFIXES.keys(), 'november', 'delta']);
+  items = repairNato(items, known, lead);
   items = numberPass(items, lead);
   const tokens = resolveTokens(items, airlines);
   return { raw, rawWords, tokens, text: tokens.map((t) => t.text).join(' ') };
@@ -44,6 +45,7 @@ function cleanWord(rw: string, known: (w: string) => boolean): string[] {
   const s = rw
     .toLowerCase()
     .replace(/(\d),(?=\d{3}(\D|$))/g, '$1')
+    .replace(/\b(\d+)(?:st|nd|rd|th)\b/g, '$1') // "4th" is a spoken "four" (STT ordinal guess), never letters t h
     .replace(/['’]/g, '')
     .replace(/[^a-z0-9.]+/g, ' ')
     .replace(/\.(?!\d)/g, ' ');
@@ -83,6 +85,70 @@ function applyAliases(items: Item[]): Item[] {
   });
 }
 
+/** Levenshtein edit distance. */
+export function editDistance(a: string, b: string): number {
+  const prev: number[] = Array.from({ length: b.length + 1 }, (_, k) => k);
+  for (let i = 1; i <= a.length; i++) {
+    let diag = prev[0];
+    prev[0] = i;
+    for (let j = 1; j <= b.length; j++) {
+      const tmp = prev[j];
+      prev[j] = Math.min(prev[j] + 1, prev[j - 1] + 1, diag + (a[i - 1] === b[j - 1] ? 0 : 1));
+      diag = tmp;
+    }
+  }
+  return prev[b.length];
+}
+
+const NATO_WORDS = [...NATO.keys()].filter((w) => w.length >= 4 && NATO.get(w) !== 'n' && NATO.get(w) !== 'd');
+const natoTolerance = (target: string): number => Math.floor(target.length / 3);
+
+/** A NATO word within tolerance of `piece`, or null. */
+function nearestNato(piece: string, maxExtra = 0): string | null {
+  let best: string | null = null;
+  let bestD = Infinity;
+  for (const w of NATO_WORDS) {
+    const d = editDistance(piece, w);
+    if (d <= natoTolerance(w) + maxExtra && d < bestD) { best = w; bestD = d; }
+  }
+  return best;
+}
+
+/**
+ * Repair mangled NATO words next to a callsign or taxiway ("november 467 ecosira" -> echo sierra, "via baravo" -> bravo).
+ * Whisper tiny.en writes the sound it heard, often fusing two phonetic letters into one made-up word. Only words the
+ * lexicon does not know, directly after a digit, a NATO word or a taxiway joiner, are touched.
+ */
+function repairNato(items: Item[], known: (w: string) => boolean, lead: ReadonlySet<string>): Item[] {
+  const out: Item[] = [];
+  const context = (prev: Item | undefined): boolean =>
+    prev !== undefined && !prev.pre && (NATO.has(prev.w) || numberWordClass(prev.w) !== null || /^\d+$/.test(prev.w)
+      || TAXIWAY_CONTEXT.has(prev.w) || lead.has(prev.w));
+  for (const it of items) {
+    const prev = out[out.length - 1];
+    const w = it.w;
+    const candidate = !it.pre && w.length >= 5 && /^[a-z]+$/.test(w) && !known(w) && !FILLERS.has(w)
+      && numberWordClass(w) === null && !HOMOPHONE_DIGITS.has(w) && context(prev);
+    if (!candidate) { out.push(it); continue; }
+    const one = nearestNato(w);
+    if (one && editDistance(w, one) <= 1) { out.push({ ...it, w: one }); continue; }
+    let split: [string, string] | null = null;
+    let splitD = Infinity;
+    if (w.length >= 6) {
+      for (let cut = 3; cut <= w.length - 3; cut++) {
+        const a = nearestNato(w.slice(0, cut));
+        const b = nearestNato(w.slice(cut));
+        if (!a || !b) continue;
+        const d = editDistance(w.slice(0, cut), a) + editDistance(w.slice(cut), b);
+        if (d < splitD) { split = [a, b]; splitD = d; }
+      }
+    }
+    if (split) out.push({ ...it, w: split[0] }, { ...it, w: split[1] });
+    else out.push(it);
+  }
+  return out;
+}
+
 /** Collapse runs of number words into single digit tokens ("one two one point niner" -> "121.9"). */
 function numberPass(items: Item[], lead: ReadonlySet<string>): Item[] {
   const n = items.length;
@@ -95,15 +161,25 @@ function numberPass(items: Item[], lead: ReadonlySet<string>): Item[] {
     return strict(k) || strict(m);
   };
   const fracDigit = (j: number): boolean => { const w = wordAt(j); return w !== undefined && (w === 'oh' || numberWordClass(w) === 'digit'); };
-  const numeric = (j: number): boolean => {
+  /** The run beginning at i follows a callsign lead word ("november", "cessna", "spirit"): it is an aircraft identifier. */
+  const afterLead = (i: number): boolean => {
+    const prev = wordAt(i - 1);
+    return (prev !== undefined && lead.has(prev)) || items[i - 1]?.pre === 'airline';
+  };
+  const natoAt = (j: number): boolean => { const w = wordAt(j); return w !== undefined && NATO.has(w); };
+  const isDigits = (j: number): boolean => /^\d+$/.test(wordAt(j) ?? '');
+  const numeric = (j: number, inCallsign = false): boolean => {
     const w = wordAt(j);
     if (w === undefined) return false;
     if (numberWordClass(w)) return true;
     if (w === 'oh') return ohOk(j);
     if (HOMOPHONE_DIGITS.has(w)) {
       const prev = wordAt(j - 1);
-      const prevOk = strict(j - 1) || (prev !== undefined && lead.has(prev)) || items[j - 1]?.pre === 'airline';
-      return prevOk && digitish(j + 1);
+      // "runway for": the word after "runway" is always its number
+      if (prev === 'runway' && !digitish(j + 1)) return true;
+      const prevOk = strict(j - 1) || isDigits(j - 1) || (prev !== undefined && lead.has(prev)) || items[j - 1]?.pre === 'airline';
+      // "six zero zero for tango": inside a callsign a homophone digit may be the last digit before the letters
+      return prevOk && (digitish(j + 1) || (inCallsign && natoAt(j + 1)));
     }
     return false;
   };
@@ -115,12 +191,22 @@ function numberPass(items: Item[], lead: ReadonlySet<string>): Item[] {
   let i = 0;
   while (i < n) {
     const it = items[i];
-    if (!it.pre && /^\d*\.?\d+$/.test(it.w) && it.w.length > 1) { out.push({ ...it, pre: 'number' }); i++; continue; }
+    if (!it.pre && /^\d*\.?\d+$/.test(it.w) && it.w.length > 1) {
+      // "november 6000 for tango": a digit string, then a homophone digit, then the callsign letters
+      const h = wordAt(i + 1);
+      if (isDigits(i) && !it.brk && afterLead(i) && h !== undefined && HOMOPHONE_DIGITS.has(h) && natoAt(i + 2)) {
+        out.push({ w: it.w + String(HOMOPHONE_DIGITS.get(h)), pre: 'number', rawStart: it.rawStart, rawEnd: items[i + 1].rawEnd });
+        i += 2;
+        continue;
+      }
+      out.push({ ...it, pre: 'number' }); i++; continue;
+    }
     const startsDecimal = wordAt(i) === 'point' && fracDigit(i + 1);
     if (!it.pre && (numeric(i) || startsDecimal)) {
       let j = i;
+      const inCallsign = afterLead(i);
       const words: string[] = [];
-      while (numeric(j)) { words.push(toDigitWord(items[j].w)); j++; if (items[j - 1].brk) break; }
+      while (numeric(j, inCallsign)) { words.push(toDigitWord(items[j].w)); j++; if (items[j - 1].brk) break; }
       const cut = words.length > 1 && /^minutes?$/.test(wordAt(j) ?? '') ? minuteCut(words, items[i - 1]?.w === 'fl') : 0;
       if (cut > 0) { words.length = cut; j = i + cut; }
       let text = words.length ? evaluateNumberWords(words) : '';

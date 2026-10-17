@@ -11,6 +11,7 @@ import { findTaxiRoute, nearestNode, shortestDistances } from '../sim/pathfindin
 import type { TaxiRoute } from '../sim/pathfinding';
 import { freeParkingCandidates } from '../sim/parkingResolver';
 import { getPerformance } from '../sim/performance';
+import { pickRunwayHold } from '../sim/holdSelection';
 import { runwayEntryNodes } from '../airport/graphUtils';
 
 // ---------------------------------------------------------------------------------------------------------------------
@@ -84,24 +85,10 @@ interface PickedHold {
   route: TaxiRoute;
 }
 
-/** Mirror of the target selection in `commandExecutor.planTaxi` for a "taxi to runway <end> via ..." instruction. */
+/** The target selection of `commandExecutor.planTaxi` for a "taxi to runway <end> via ..." instruction (full length by default). */
 export function simulateRunwayTaxiPick(airport: Airport, startId: string, end: RunwayEndGeom, via: string[]): PickedHold | undefined {
-  const graph = airport.taxiwayGraph;
-  const holds = Object.values(graph.nodes).filter((n) => n.kind === 'holding_position' && n.runwayId === end.runway.id);
-  const explicit = holds.filter((h) => h.protectsRunwayEnd && normalizeRunwayEndId(h.protectsRunwayEnd) === normalizeRunwayEndId(end.end.id));
-  const implicit = holds.filter((h) => !h.protectsRunwayEnd);
-  let cands = explicit.length ? explicit : implicit;
-  const lastVia = via[via.length - 1]?.toUpperCase();
-  if (lastVia) {
-    const m = [...explicit, ...implicit].filter((h) => h.taxiways.some((t) => t.toUpperCase() === lastVia));
-    if (m.length) cands = m;
-  }
-  let best: PickedHold | undefined;
-  for (const h of cands) {
-    const res = findTaxiRoute(graph, startId, h.id, { via, avoidRunways: true, allowedRunwayIds: allRunwayIds(airport) });
-    if (res.route && (!best || res.route.lengthM < best.route.lengthM)) best = { hold: h, route: res.route };
-  }
-  return best;
+  const r = pickRunwayHold(airport, startId, end, via);
+  return r.pick ? { hold: r.pick.hold, route: r.pick.route } : undefined;
 }
 
 export interface DeparturePlan {

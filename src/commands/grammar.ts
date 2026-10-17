@@ -3,7 +3,7 @@ import type { ParseContext } from './context';
 import { makeFixMatcher } from './fixes';
 import type { Toks } from './match';
 import {
-  ruleCross, ruleHoldPosition, ruleHoldShort, ruleLineUp, ruleTaxi, ruleTaxiIntoPosition,
+  makeClearedToParkingRule, makeContinueTaxiRule, makeTaxiRule, ruleCancel, ruleCross, ruleHoldPosition, ruleHoldShort, ruleLineUp, ruleTaxiIntoPosition,
 } from './rules-ground';
 import { ruleHoldAtFix, ruleMissedApproach } from './rules-hold';
 import { makeAltitudeRule, ruleHeading, rulePattern, ruleSpeed } from './rules-flight';
@@ -30,12 +30,12 @@ import { ruleContinue, ruleGoAround, ruleLand, rulePushback, ruleTakeoff } from 
  *  - the positional "N miles from X" filler sits after the runway / route refs
  * Fix-aware rules (direct, until, position text) need `ctx.fixes`, so the list is built per parse.
  */
-export function buildRules(ctx: Pick<ParseContext, 'fixes'> = {}): readonly Rule[] {
+export function buildRules(ctx: Pick<ParseContext, 'fixes' | 'taxiways'> = {}): readonly Rule[] {
   const fixes = makeFixMatcher(ctx.fixes);
   return [
     ruleWind, ruleSayAgain, ruleTaxiIntoPosition, ruleLineUp, ruleTakeoff, ruleLand, ruleHoldAtFix(fixes),
-    ruleMissedApproach, ruleGoAround, rulePushback, ruleRadarContact(fixes), ruleResumeNav, ruleApproach, ruleDirectFix(fixes),
-    ruleIfrClearance, ruleContact, ruleHoldShort, ruleHoldPosition, ruleCross, ruleTaxi,
+    ruleMissedApproach, ruleGoAround, rulePushback, ruleRadarContact(fixes), ruleResumeNav, makeClearedToParkingRule(ctx.taxiways), ruleApproach, ruleDirectFix(fixes),
+    ruleIfrClearance, ruleContact, ruleHoldShort, ruleHoldPosition, ruleCancel, ruleCross, makeContinueTaxiRule(ctx.taxiways), makeTaxiRule(ctx.taxiways),
     ruleHeading, ruleSpeed, makeAltitudeRule(fixes), rulePattern, ruleContinue, ruleUnsupported,
     ruleRunwayRef, ruleRoute, rulePosition(fixes), ruleFiller,
   ];

@@ -1,4 +1,4 @@
-# Claude Code — KACY ATC Simulator
+# KACY ATC Simulator — project goal
 ## Complete Project Goal & Development Instructions
 
 ### 1. Project Overview

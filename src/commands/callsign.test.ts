@@ -35,6 +35,12 @@ const resolved: [string, string][] = [
   ['southwest seventeen seventeen', 'SWA1717'],
   ['fedex ten eleven', 'FDX1011'],
   ['contact tower one two zero point three spirit four fifty one', 'NKS451'],
+  // STT damage with an explicit prefix: split digits, garbled or missing letters, one inserted/dropped digit
+  ['november 7, 2, 3, echo juliet taxi', 'N723EJ'],
+  ['november 723 echo zero contact tower', 'N723EJ'],
+  ['cessna 723 contact tower', 'N723EJ'],
+  ['november 7023 echo juliet taxi', 'N723EJ'],
+  ['november 72 echo juliet taxi', 'N723EJ'],
 ];
 
 describe('resolveCallsign', () => {
@@ -75,6 +81,15 @@ describe('resolveCallsign', () => {
     const r = resolve('november seven two four echo juliet');
     expect(r.callsign).toBeNull();
     expect(r.candidates[0]?.callsign).toBe('N723EJ');
+  });
+
+  it('does not accept missing letters or a dropped digit without an explicit prefix', () => {
+    expect(resolve('723 contact tower').callsign).toBeNull();
+    expect(resolve('72 echo juliet taxi').callsign).toBeNull();
+  });
+
+  it('does not accept a dropped digit when the letters differ', () => {
+    expect(resolve('november 72 echo kilo taxi').callsign).toBeNull();
   });
 
   it('rejects a two-character abbreviation', () => {

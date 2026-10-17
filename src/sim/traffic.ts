@@ -8,6 +8,7 @@ import {
 } from './geo';
 import { glideAltitudeFt, finalStartNm } from './flightDynamics';
 import { findRunwayEnd, alongCross } from './runways';
+import { holdTooShort } from './holdSelection';
 import { emitEvent, getRuntime, newRuntime, perfOf, pilotSay, setPhase } from './context';
 import type { SimContext } from './context';
 import { mulberry32, rngInt, rngPick } from './rng';
@@ -410,10 +411,15 @@ export function updatePilotRequests(ctx: SimContext): void {
       if (departureHold && ac.phase === 'HOLDING_SHORT' && !rt.calls.has(`hold:${node.id}`)) {
         rt.calls.add(`hold:${node.id}`);
         const onTower = frequencyByMhz(airport, ac.frequencyMhz)?.position === 'TWR';
-        pilotSay(ctx, ac, holdingShortCall(ac, env, g!.end.id, onTower), { request: onTower ? 'DEPARTURE' : 'FREQUENCY_CHANGE' });
-        ac.pendingRequest = onTower
-          ? { kind: 'DEPARTURE', text: `holding short runway ${g!.end.id}, ready for departure`, sinceSec: now }
-          : { kind: 'FREQUENCY_CHANGE', text: `holding short runway ${g!.end.id}`, sinceSec: now };
+        // An intersection with too little runway for the type: the pilot does not accept an intersection departure from here.
+        const tooShort = holdTooShort(g!, node, ac);
+        const at = tooShort ? node.taxiways[0] : undefined;
+        pilotSay(ctx, ac, holdingShortCall(ac, env, g!.end.id, onTower && !tooShort, at ? { requestFullLengthAt: at } : {}), { request: tooShort ? 'TAXI' : onTower ? 'DEPARTURE' : 'FREQUENCY_CHANGE' });
+        ac.pendingRequest = tooShort
+          ? { kind: 'TAXI', text: `holding short runway ${g!.end.id} at ${at}, request full length`, sinceSec: now }
+          : onTower
+            ? { kind: 'DEPARTURE', text: `holding short runway ${g!.end.id}, ready for departure`, sinceSec: now }
+            : { kind: 'FREQUENCY_CHANGE', text: `holding short runway ${g!.end.id}`, sinceSec: now };
         continue;
       }
       if (!routeDone && node.kind === 'holding_position' && node.runwayId && !rt.calls.has(`holdX:${node.id}`) && ac.route.stopAtNodeIds.includes(node.id)) {

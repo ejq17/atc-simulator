@@ -10,16 +10,19 @@
  * src/radio/readback.ts.
  */
 import type {
-  Aircraft, Airport, Clearance, ClearanceKind, CommandOutcome, ControllerPositionId, ParsedCommand, TaxiNode,
+  Aircraft, Airport, Clearance, ClearanceKind, CommandOutcome, ControllerPositionId, ParsedCommand, Runway, TaxiNode, TaxiwayGraph, Vec2,
 } from './types';
 import { dist, ftToM, magneticToTrue } from './geo';
 import {
-  advancePhase, completeClearances, emitEvent, getRuntime, perfOf, pilotSay, setPhase, speechDurationSec,
+  activeClearance, advancePhase, completeClearances, emitEvent, getRuntime, perfOf, pilotSay, setPhase, speechDurationSec,
 } from './context';
 import type { AircraftRuntime, ReadbackErrorRecord, SimContext } from './context';
 import { findRunway, findRunwayEnd, alongCross, normalizeRunwayEndId } from './runways';
 import type { RunwayEndGeom } from './runways';
-import { findTaxiRoute, nearestNode, neighborIds, runwayCrossingsAlong } from './pathfinding';
+import { findTaxiRoute, nearestNode, neighborIds, runwayCrossingsAlong, shortestDistances } from './pathfinding';
+import type { TaxiRoute } from './pathfinding';
+import { pickRunwayHold, runwayHoldCandidates, runwayRemainingM, takeoffRunM } from './holdSelection';
+import { spokenTaxiway } from '../radio/spoken';
 import { computeStopNodes } from './groundMovement';
 import { initiateGoAround } from './flightDynamics';
 import { freeParkingCandidates, parkingOccupant, resolveParkingQuery } from './parkingResolver';
@@ -465,11 +468,30 @@ function planTaxi(env: Env): PlanResult {
   // Destination.
   let targets: string[] = [];
   let runwayEnd: string | undefined;
-  const destRaw = cmd.destination ?? (cmd.runwayEnd ? `RWY${cmd.runwayEnd}` : undefined);
+  let runwayG: RunwayEndGeom | undefined;
+  let destRaw = cmd.destination ?? (cmd.runwayEnd ? `RWY${cmd.runwayEnd}` : undefined);
+  let via = cmd.route ?? [];
+  let kind = cmd.kind;
+  // "continue taxiing": the destination of the taxi clearance in force, from here (a hold-short on the way is released).
+  if (destRaw === 'CONTINUE') {
+    const prev = activeClearance(ac, 'TAXI') ?? activeClearance(ac, 'TAXI_TO_PARKING');
+    if (!prev || prev.completedAtSec !== undefined) return unable(env, `${ac.callsign} has no taxi clearance to continue.`, "we don't have a taxi clearance");
+    destRaw = prev.destination ?? (prev.runwayEnd ? `RWY${prev.runwayEnd}` : undefined);
+    kind = prev.kind as typeof kind;
+    via = [];
+  }
   const isRunwayWord = !!destRaw && /^\s*(RWY|RUNWAY)/i.test(destRaw);
-  const pq = !isRunwayWord && (destRaw || cmd.kind === 'TAXI_TO_PARKING') ? resolveParkingQuery(airport, destRaw) : ({ kind: 'unknown' } as const);
-  if (!destRaw && cmd.kind !== 'TAXI_TO_PARKING') return unable(env, 'No taxi destination given.', 'say destination', false);
-  if (pq.kind === 'spot') {
+  const twyDest = destRaw ? /^TWY\s*([A-Z]{1,2}\d{0,2})$/i.exec(destRaw.trim())?.[1]?.toUpperCase() : undefined;
+  const pq = !isRunwayWord && !twyDest && (destRaw || kind === 'TAXI_TO_PARKING') ? resolveParkingQuery(airport, destRaw) : ({ kind: 'unknown' } as const);
+  if (!destRaw && kind !== 'TAXI_TO_PARKING') return unable(env, 'No taxi destination given.', 'say destination', false);
+  if (twyDest) {
+    // "taxi to kilo via bravo": the nearest point of taxiway K (by taxi distance, never over a runway), reached via the route.
+    const onTwy = Object.values(graph.nodes).filter((n) => n.kind !== 'runway' && n.kind !== 'parking' && n.taxiways.some((t) => t.toUpperCase() === twyDest) && dist(n.pos, ac.pos) > 5);
+    if (!onTwy.length) return unable(env, `Taxiway ${twyDest} does not exist on this airport.`, `we can't find taxiway ${spokenTaxiway(twyDest)}`);
+    const dm = shortestDistances(graph, start.id);
+    const reachable = onTwy.filter((n) => dm.has(n.id)).sort((a, b) => dm.get(a.id)! - dm.get(b.id)!);
+    targets = (reachable.length ? reachable : onTwy).slice(0, 3).map((n) => n.id);
+  } else if (pq.kind === 'spot') {
     const occ = parkingOccupant(ctx.state, pq.parking, ac.id);
     if (occ) return unable(env, `Parking ${pq.parking.id} is occupied by ${occ.callsign}.`, 'that parking spot is occupied');
     targets = [pq.parking.nodeId];
@@ -491,55 +513,103 @@ function planTaxi(env: Env): PlanResult {
       );
     }
     runwayEnd = g.end.id;
-    const holds = Object.values(graph.nodes).filter((n) => n.kind === 'holding_position' && n.runwayId === g.runway.id);
-    const explicit = holds.filter((h) => h.protectsRunwayEnd && normalizeRunwayEndId(h.protectsRunwayEnd) === normalizeRunwayEndId(g.end.id));
-    const implicit = holds.filter((h) => !h.protectsRunwayEnd);
-    let cands = explicit.length ? explicit : implicit;
-    const lastVia = cmd.route?.[cmd.route.length - 1]?.toUpperCase();
-    if (lastVia) {
-      const m = [...explicit, ...implicit].filter((h) => h.taxiways.some((t) => t.toUpperCase() === lastVia));
-      if (m.length) cands = m;
-    }
-    if (!cands.length) return unable(env, `No holding position serves runway ${g.end.id}.`, `we can't find a holding position for runway ${g.end.id}`);
-    targets = cands.map((h) => h.id);
+    runwayG = g;
   }
   if (runwayEnd && ac.isDeparture === false) return unable(env, 'Arriving aircraft cannot be taxied to a departure runway.', 'we are an arrival');
 
-  let best: { route: NonNullable<ReturnType<typeof findTaxiRoute>['route']>; target: string } | undefined;
+  // The route: the taxiways in the order given; failing that, the same taxiways with one of them left out (the controller named a
+  // taxiway the route cannot use in that order, e.g. one that only branches off at the hold): accepted, read back as flown, flagged.
+  let best: { route: TaxiRoute; target: string } | undefined;
   let why = '';
-  for (const t of targets) {
-    const res = findTaxiRoute(graph, start.id, t, { via: cmd.route, avoidRunways: true, allowedRunwayIds: allRunwayIds(airport) });
-    if (res.route && (!best || res.route.lengthM < best.route.lengthM)) best = { route: res.route, target: t };
-    else if (!res.route && !why) why = res.reason ?? '';
+  let usedVia = via;
+  const knownTwy = new Set(graph.edges.map((e) => e.taxiway.toUpperCase()));
+  const unknownVia = via.filter((v) => !knownTwy.has(v.toUpperCase()));
+  if (unknownVia.length) return unable(env, `Invalid taxi route for ${ac.callsign} via ${via.join(', ')}: Taxiway ${unknownVia.join(', ')} does not exist on this airport.`, `that route isn't available`);
+  const touchesTarget = (twy: string, nodeId: string): boolean => {
+    const t = twy.toUpperCase();
+    return [nodeId, ...neighborIds(graph, nodeId)].some((id) => graph.nodes[id]?.taxiways.some((x) => x.toUpperCase() === t));
+  };
+  for (const attempt of viaAttempts(via)) {
+    // Only a taxiway that merely meets the destination (named as "where it ends": "runway 31 via bravo kilo") may be dropped.
+    if (attempt !== via) {
+      const dropped = via.find((v, k) => attempt[k] !== v) ?? via[via.length - 1];
+      const ends = runwayG ? runwayHoldCandidates(airport, runwayG, attempt[attempt.length - 1]).map((h) => h.id) : targets;
+      if (!ends.some((id) => touchesTarget(dropped, id))) continue;
+    }
+    if (runwayG) {
+      const r = pickRunwayHold(airport, start.id, runwayG, attempt);
+      if (r.pick) best = { route: r.pick.route, target: r.pick.hold.id };
+      else if (!why) why = r.reason ?? '';
+    } else {
+      for (const t of targets) {
+        const res = findTaxiRoute(graph, start.id, t, { via: attempt, avoidRunways: true, allowedRunwayIds: allRunwayIds(airport) });
+        if (res.route && (!best || res.route.lengthM < best.route.lengthM)) best = { route: res.route, target: t };
+        else if (!res.route && !why) why = res.reason ?? '';
+      }
+    }
+    if (best) { usedVia = attempt; break; }
   }
   if (!best) {
-    return unable(env, `Invalid taxi route for ${ac.callsign}${cmd.route?.length ? ` via ${cmd.route.join(', ')}` : ''}: ${why}.`, `that route isn't available`);
+    return unable(env, `Invalid taxi route for ${ac.callsign}${via.length ? ` via ${via.join(', ')}` : ''}: ${why}.`, `that route isn't available`);
   }
   const route = best.route;
   const dest = airport.parking.find((p) => p.nodeId === best!.target);
+  const flag = usedVia !== via ? `taxi route via ${via.join(', ')} is not usable in that order for ${ac.callsign}; taxiing via ${usedVia.join(', ') || 'the direct route'} (${why})` : undefined;
+  const tooShort = runwayG && runwayRemainingM(runwayG, graph.nodes[best.target]) < takeoffRunM(ac)
+    ? `runway ${runwayEnd} from ${graph.nodes[best.target].taxiways[0] ?? 'that intersection'} leaves ${Math.round(runwayRemainingM(runwayG, graph.nodes[best.target]) / 0.3048)} ft, ${ac.type} needs about ${perfOf(ac).takeoffDistanceFt} ft; the pilot will ask for full length`
+    : undefined;
 
   return {
     plan: {
-      patch: { route: cmd.route, holdShort: cmd.holdShort, destination: dest?.id ?? (runwayEnd ? `RWY${runwayEnd}` : cmd.destination), runwayEnd },
+      patch: { route: usedVia, holdShort: cmd.holdShort, destination: dest?.id ?? (runwayEnd ? `RWY${runwayEnd}` : twyDest ? `TWY${twyDest}` : destRaw), runwayEnd },
+      flag: flag ?? tooShort,
       commit: () => {
         const stops = new Set(computeStopNodes(graph, route.nodeIds, ac.runwayAuthorizations));
         for (const rid of cmd.holdShort ?? []) {
           const rw = findRunway(airport, rid);
-          if (!rw) continue;
-          const holds = route.nodeIds.filter((id) => graph.nodes[id].kind === 'holding_position' && graph.nodes[id].runwayId === rw.id);
-          if (holds.length && !holds.some((id) => stops.has(id))) stops.add(holds[0]);
+          if (rw) {
+            const holds = route.nodeIds.filter((id) => graph.nodes[id].kind === 'holding_position' && graph.nodes[id].runwayId === rw.id);
+            if (holds.length && !holds.some((id) => stops.has(id))) stops.add(holds[0]);
+            continue;
+          }
+          const twyStop = taxiwayStopNode(graph, route.nodeIds, 0, rid, ac.pos);
+          if (twyStop) stops.add(twyStop);
         }
         ac.route = { nodeIds: route.nodeIds, taxiways: route.taxiways, stopAtNodeIds: [...stops], progressIndex: 0 };
+        rt.stoppedAtNodeId = undefined;
         ac.flags.holdingPosition = false;
         rt.lineUp = undefined;
         rt.takeoffCleared = false;
         completeClearances(ctx, ac, ['TAXI', 'TAXI_TO_PARKING', 'HOLD_POSITION']);
         if (runwayEnd) ac.assignedRunwayEnd = runwayEnd;
         if (arrivalPhases.includes(ac.phase)) setPhase(ctx, ac, 'TAXI_TO_PARKING');
+        else if (ac.phase === 'HOLDING_SHORT') setPhase(ctx, ac, 'TAXIING', 'taxi instruction');
         else advancePhase(ctx, ac, 'TAXIING');
       },
     },
   };
+}
+
+/** The via list as given, then (when it has 2+ taxiways) the same list with one taxiway dropped, last first. */
+function viaAttempts(via: string[]): string[][] {
+  const out: string[][] = [via];
+  if (via.length >= 2) for (let i = via.length - 1; i >= 0; i--) out.push(via.filter((_, k) => k !== i));
+  return out;
+}
+
+/**
+ * Node at which a route first reaches taxiway `twy` (the intersection the aircraft holds short of). Nodes at the aircraft's own
+ * position are skipped (it is already there). Undefined when the route never touches the taxiway.
+ */
+export function taxiwayStopNode(graph: TaxiwayGraph, nodeIds: readonly string[], from: number, twy: string, pos: Vec2): string | undefined {
+  const t = twy.toUpperCase();
+  for (let k = from; k < nodeIds.length; k++) {
+    const n = graph.nodes[nodeIds[k]];
+    if (!n || !n.taxiways.some((x) => x.toUpperCase() === t)) continue;
+    if (dist(n.pos, pos) < 5) continue;
+    return n.id;
+  }
+  return undefined;
 }
 
 function planHoldPosition(env: Env): PlanResult {
@@ -550,25 +620,38 @@ function planHoldPosition(env: Env): PlanResult {
 
 function planHoldShort(env: Env): PlanResult {
   const { ac, cmd, airport } = env;
+  const graph = airport.taxiwayGraph;
   if (!ac.onGround) return unable(env, `${ac.callsign} is airborne; "hold short" applies to ground traffic.`, "we're airborne");
   const refs = cmd.holdShort?.length ? cmd.holdShort : [cmd.crossRunwayId ?? cmd.runwayId ?? cmd.runwayEnd!];
-  const rws = refs.map((r) => findRunway(airport, r));
-  if (rws.some((r) => !r)) return unable(env, `Unknown runway in hold-short instruction (${refs.join(', ')}).`, "we can't find that runway");
+  const rws: Runway[] = [];
+  const twyStops: string[] = [];
+  const knownTaxiways = new Set(graph.edges.map((e) => e.taxiway.toUpperCase()));
+  for (const r of refs) {
+    const rw = findRunway(airport, r);
+    if (rw) { rws.push(rw); continue; }
+    // Hold short of a taxiway: stop at the intersection where the route reaches it.
+    const twy = r.toUpperCase().replace(/^TWY\s*/, '');
+    if (!knownTaxiways.has(twy)) return unable(env, `Unknown runway or taxiway in hold-short instruction (${r}).`, "we can't find that runway or taxiway");
+    if (!ac.route || ac.route.progressIndex >= ac.route.nodeIds.length) return unable(env, `${ac.callsign} has no taxi route; a hold short of taxiway ${twy} needs one.`, `we're not taxiing`);
+    const stop = taxiwayStopNode(graph, ac.route.nodeIds, Math.max(0, ac.route.progressIndex - 1), twy, ac.pos);
+    if (!stop) return unable(env, `The route of ${ac.callsign} does not reach taxiway ${twy}.`, `our route doesn't cross ${spokenTaxiway(twy)}`);
+    twyStops.push(stop);
+  }
   return {
     plan: {
       patch: { holdShort: refs },
       commit: () => {
-        const graph = airport.taxiwayGraph;
         for (const rw of rws) {
-          const i = ac.runwayAuthorizations.indexOf(rw!.id);
+          const i = ac.runwayAuthorizations.indexOf(rw.id);
           if (i >= 0) ac.runwayAuthorizations.splice(i, 1);
           if (ac.route) {
             for (let k = ac.route.progressIndex; k < ac.route.nodeIds.length; k++) {
               const n = graph.nodes[ac.route.nodeIds[k]];
-              if (n.kind === 'holding_position' && n.runwayId === rw!.id && !ac.route.stopAtNodeIds.includes(n.id)) ac.route.stopAtNodeIds.push(n.id);
+              if (n.kind === 'holding_position' && n.runwayId === rw.id && !ac.route.stopAtNodeIds.includes(n.id)) ac.route.stopAtNodeIds.push(n.id);
             }
           }
         }
+        for (const id of twyStops) if (ac.route && !ac.route.stopAtNodeIds.includes(id)) ac.route.stopAtNodeIds.push(id);
       },
     },
   };

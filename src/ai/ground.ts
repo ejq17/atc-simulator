@@ -15,6 +15,7 @@ import type { Agent, AgentView, Plan } from './core';
 import { createClearanceAgent } from './clnc';
 import type { ClearanceStore } from './clnc';
 import { busyHoldIds, etaToThresholdSec, holdNodeAt, interactingRunways, opposingTraffic, pendingIntermediateStops, planDeparture, planParking, remainingRouteM } from './world';
+import { holdTooShort } from '../sim/holdSelection';
 import * as say from './phrase';
 
 const HANDOFF_WITHIN_M = 400;
@@ -80,6 +81,24 @@ export function createGroundAgent(store: ClearanceStore): Agent {
           summary: `${ac.callsign} taxi to runway ${dep.runwayEnd}${dep.holdShort.length ? `, hold short ${dep.holdShort.join(' ')}` : ''}`,
         });
         continue;
+      }
+
+      // 1b. Departure standing at an intersection hold with too little runway for its type (Tower sent it back): taxi to full length.
+      if (ac.isDeparture && ac.phase === 'HOLDING_SHORT' && ac.groundSpeedKt < 1 && v.settled(ac) >= 4) {
+        const g = findRunwayEnd(airport, ac.assignedRunwayEnd);
+        const hold = holdNodeAt(airport, ac);
+        if (g && hold && hold.runwayId === g.runway.id && holdTooShort(g, hold, ac)) {
+          const dep = planDeparture(airport, ac, state.activeRunways.departing, busyHoldIds(state, ac.id));
+          if (dep && dep.holdId !== hold.id && !opposingTraffic(state, dep.nodeIds, ac.id)) {
+            plans.push({
+              key: `${ac.id}:taxi-full:${hold.id}`, aircraftId: ac.id, callsign: ac.callsign, priority: 50,
+              cmds: [mkCmd('TAXI', ac, { destination: `RWY${dep.runwayEnd}`, runwayEnd: dep.runwayEnd, route: dep.via, holdShort: dep.holdShort })],
+              phrase: say.taxiToRunway(ac, dep.runwayEnd, dep.via, dep.holdShort),
+              summary: `${ac.callsign} taxi to runway ${dep.runwayEnd} full length`,
+            });
+          }
+          continue;
+        }
       }
 
       // 2. Holding short of a runway on the taxi route: cross when the runway is not in use.

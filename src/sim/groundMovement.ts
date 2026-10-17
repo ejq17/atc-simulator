@@ -9,7 +9,8 @@
  */
 import type { Aircraft, TaxiNode, TaxiwayGraph, Vec2 } from './types';
 import { dist, headingDiff, headingToVec, ktToMps, mpsToKt, normHeading, vCross, vDot, vSub, vecToHeading } from './geo';
-import { activeClearance, advancePhase, emitEvent, getRuntime, perfOf, setPhase } from './context';
+import { activeClearance, advancePhase, emitEvent, getRuntime, perfOf, pilotSay, setPhase } from './context';
+import { spokenTaxiway } from '../radio/spoken';
 import type { AircraftRuntime, SimContext } from './context';
 import { findRunwayEnd } from './runways';
 import { runwayCrossingsAlong } from './pathfinding';
@@ -105,6 +106,18 @@ function onRouteComplete(ctx: SimContext, ac: Aircraft, node: TaxiNode): void {
 function onHoldReached(ctx: SimContext, ac: Aircraft, rt: AircraftRuntime, node: TaxiNode): void {
   rt.stoppedAtNodeId = node.id;
   if (ac.phase === 'TAXIING' && node.kind === 'holding_position') setPhase(ctx, ac, 'HOLDING_SHORT', node.id);
+  if (node.kind !== 'holding_position' && ac.route) {
+    // Hold short of a taxiway: report it (the taxiway held short of is the one the route is about to join, not the one it arrived on).
+    const graph = ctx.state.airport.taxiwayGraph;
+    const prevId = ac.route.nodeIds[ac.route.progressIndex - 2];
+    const arrived = graph.edges.find((e) => (e.from === prevId && e.to === node.id) || (e.from === node.id && e.to === prevId))?.taxiway;
+    const twy = node.taxiways.find((t) => t !== arrived) ?? node.taxiways[0];
+    if (twy && !rt.calls.has(`holdTwy:${node.id}`)) {
+      rt.calls.add(`holdTwy:${node.id}`);
+      emitEvent(ctx, { kind: 'INFO', aircraftId: ac.id, callsign: ac.callsign, text: `${ac.callsign} holding short of taxiway ${twy}`, severity: 'info', speaker: 'SYSTEM' });
+      pilotSay(ctx, ac, `${ac.spokenCallsign}, holding short of ${spokenTaxiway(twy)}.`);
+    }
+  }
 }
 
 export function updateGroundMovement(ctx: SimContext, dt: number): void {

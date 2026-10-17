@@ -56,6 +56,11 @@ export const PHRASES: readonly { words: readonly string[]; to: PhraseTarget }[] 
   { words: ['take', 'off'], to: { text: 'takeoff' } },
   { words: ['run', 'way'], to: { text: 'runway' } },
   { words: ['push', 'back'], to: { text: 'pushback' } },
+  // Whisper tiny.en renderings heard in real sessions
+  { words: ['tax', 'e'], to: { text: 'taxi' } },
+  { words: ['park', 'yee'], to: { text: 'parking' } },
+  { words: ['park', 'ee'], to: { text: 'parking' } },
+  { words: ['be', 'a'], to: { text: 'via' } },
   // STT renderings of approach names
   { words: ['i', 'l', 's'], to: { text: 'ils' } },
   { words: ['eye', 'el', 'es'], to: { text: 'ils' } },
@@ -75,7 +80,16 @@ export const ALIASES = rec<readonly string[]>({
   tousand: ['thousand'], decimal: ['point'], dot: ['point'], knot: ['knots'], kts: ['knots'],
   kt: ['knots'], lineup: ['line', 'up'], takeoffs: ['takeoff'], ramps: ['ramp'],
   centre: ['center'], localiser: ['localizer'], localizor: ['localizer'], localizers: ['localizer'], hedding: ['heading'], goaround: ['go', 'around'],
+  // Whisper tiny.en renderings heard in real sessions
+  tackty: ['taxi'], taxie: ['taxi'], taxity: ['taxi'], taxituary: ['taxi', 'to', 'runway'], vietnam: ['via', 'november'],
+  taxitu: ['taxi', 'to'], tax: ['taxi'], access: ['taxi'], mic: ['mike'], alima: ['via', 'lima'], holdshore: ['hold', 'short'],
 });
+
+/** Words Whisper writes for the "November" of an N-number ("Number 678 mike victor", "Remember, 685 golf delta"). */
+export const N_PREFIX_WORDS: ReadonlySet<string> = new Set(['number', 'remember', 'novembre', 'nowember']);
+
+/** Words Whisper writes for "tower" right after "contact" ("contact our", "contact hour"). Only honoured in that position. */
+export const TOWER_MISHEARD: ReadonlySet<string> = new Set(['our', 'hour', 'power', 'towers', 'tar', 'towel']);
 
 /** Alphanumeric fragments that must not be split letter-by-letter ("250kts", "fl180"). */
 export const KEEP_WORDS: ReadonlySet<string> = new Set([
