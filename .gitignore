@@ -29,3 +29,6 @@ data/sources/raw/
 test-results/
 playwright-report/
 .cache/
+
+# agent worktrees
+.claude/worktrees/
