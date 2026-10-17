@@ -6,7 +6,8 @@ import type { Scenario } from '../sim/types';
 import { findRunwayEnd } from '../sim/runways';
 import { game } from './game';
 import { MIN_SPAWN_SPACING_SEC, rampFactor } from './traffic';
-import { callsignTail, NM } from './world';
+import { holdingPositionsForRunway } from '../airport';
+import { callsignTail, canDepartFrom, fullLengthHold, NM, runwayLongEnoughFor } from './world';
 
 const airport = loadKacy();
 
@@ -131,10 +132,21 @@ describe('traffic generator', () => {
     }
   });
 
-  it('never sends an A320 departure to short runway 4/22 and honours aircraftTypes', () => {
+  it('A320 capability comes from the performance data: 4/22 only from full length, 13/31 from any hold; aircraftTypes is honoured', () => {
+    // Capability: takeoffDistanceFt (5,000 ft for the A320) against the declared runway length minus the entry distance.
+    expect(runwayLongEnoughFor(airport, 'A320', '22')).toBe(true);
+    expect(runwayLongEnoughFor(airport, 'A320', '4')).toBe(true);
+    for (const e of ['4', '22', '13', '31']) expect(runwayLongEnoughFor(airport, 'C172', e)).toBe(true);
+    const holds = (rid: string, end: string) => holdingPositionsForRunway(airport, rid).filter((h) => !h.protectsRunwayEnd || h.protectsRunwayEnd === end);
+    expect(holds('4/22', '22').filter((h) => canDepartFrom(airport, 'A320', '22', h)).map((h) => h.id)).toEqual([fullLengthHold(airport, '22').id]);
+    expect(holds('4/22', '22').length).toBeGreaterThan(1); // the intersection holds exist and are refused for the A320
+    expect(holds('4/22', '22').every((h) => canDepartFrom(airport, 'C172', '22', h))).toBe(true);
+    expect(holds('13/31', '13').every((h) => canDepartFrom(airport, 'A320', '13', h))).toBe(true);
+
     const r = simulate(scenarioWith({ seed: 10, runways: '22', gaFraction: 0.2, arrivalsPerHour: 10, departuresPerHour: 40, maxAircraft: 30 }), 1800);
     const jetDeps = r.recs.filter((x) => x.spec.isDeparture && x.spec.type === 'A320');
-    expect(jetDeps).toEqual([]);
+    expect(jetDeps.length).toBeGreaterThan(0); // allowed now; the runway entry (full length only) is the player's choice and the engine enforces it
+    for (const d of jetDeps) expect(airport.parking.find((p) => p.id === (d.spec.start as { parkingId: string }).parkingId)!.category).toBe('airline');
     expect(r.recs.some((x) => !x.spec.isDeparture && x.spec.type === 'A320')).toBe(true);
     const ga = simulate(scenarioWith({ seed: 10, types: ['C172'], maxAircraft: 30, arrivalsPerHour: 30, departuresPerHour: 30 }), 1200);
     expect(ga.recs.every((x) => x.spec.type === 'C172')).toBe(true);
@@ -159,7 +171,7 @@ describe('traffic generator', () => {
       late += r.recs.filter((x) => x.time >= 1050).length;
     }
     expect(late).toBeGreaterThan(early);
-  });
+  }, 30_000); // six 25-minute engine runs: 4-5 s on a loaded machine
 
   it('returns a null generator when traffic is disabled', () => {
     const quiet: Scenario = { ...sc, traffic: { ...sc.traffic!, enabled: false } };

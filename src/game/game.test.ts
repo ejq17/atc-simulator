@@ -50,15 +50,20 @@ describe('buildFreePlay', () => {
     expect(game.buildFreePlay(airport, { weather: 'no-such-preset' }).weather).toEqual(getPresetWeather('clear'));
   });
 
-  it('recommends runways from the wind (A320-capable ends only) unless told otherwise', () => {
+  it('recommends runways from the wind (ends the types can depart from) unless told otherwise', () => {
     const nw: Weather = { ...getPresetWeather('clear'), windDirDeg: 290, windSpeedKt: 15 };
     expect(game.buildFreePlay(airport, { weather: nw }).activeRunways).toEqual({ departing: ['31'], landing: ['31'] });
     const se: Weather = { ...getPresetWeather('clear'), windDirDeg: 110, windSpeedKt: 15 };
     expect(game.buildFreePlay(airport, { weather: se }).activeRunways).toEqual({ departing: ['13'], landing: ['13'] });
-    // A south-west wind favours runway 22 but A320s cannot depart it: with jets in play, 13/31 is chosen.
+    // A south-west wind favours runway 22. An A320 (5,000 ft takeoff distance) can depart 22 (6,145 ft) from full length, so the wind decides for jets too.
     const sw: Weather = { ...getPresetWeather('clear'), windDirDeg: 200, windSpeedKt: 18 };
-    expect(game.buildFreePlay(airport, { weather: sw }).activeRunways.landing[0]).toMatch(/^(13|31)$/);
+    expect(game.buildFreePlay(airport, { weather: sw }).activeRunways).toEqual({ departing: ['22'], landing: ['22'] });
     expect(game.buildFreePlay(airport, { weather: sw, aircraftTypes: ['C172'] }).activeRunways.landing).toEqual(['22']);
+    // Operator preference for the longer 13/31 pair when the headwinds tie (within 1 kt) or the wind is calm - not a capability limit.
+    const calm: Weather = { ...getPresetWeather('clear'), windDirDeg: 0, windSpeedKt: 2 };
+    expect(game.buildFreePlay(airport, { weather: calm }).activeRunways).toEqual({ departing: ['13'], landing: ['13'] });
+    const tie: Weather = { ...getPresetWeather('clear'), windDirDeg: 165, windSpeedKt: 10 }; // true 165 = magnetic 175: equal headwind on 13 (128) and 22 (218)
+    expect(game.buildFreePlay(airport, { weather: tie }).activeRunways).toEqual({ departing: ['13'], landing: ['13'] });
     const fixed = game.buildFreePlay(airport, { weather: nw, activeRunways: { departing: ['22'], landing: ['13'] } });
     expect(fixed.activeRunways).toEqual({ departing: ['22'], landing: ['13'] });
   });

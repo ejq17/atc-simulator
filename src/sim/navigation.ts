@@ -123,7 +123,7 @@ export function currentFixId(ac: Pick<Aircraft, 'nav'>): string | undefined {
 export function advanceNav(airport: Airport, ac: Aircraft, perf: AircraftPerformance): string[] {
   const nav = ac.nav;
   const done: string[] = [];
-  if (!nav || nav.mode === 'vectors') return done;
+  if (!nav || nav.mode === 'vectors' || nav.mode === 'missed' || nav.mode === 'holding') return done; // missed / holding are flown by their own guidance
   for (let guard = 0; guard < 4 && nav.index < nav.fixes.length; guard++) {
     const id = nav.fixes[nav.index];
     const p = fixPosition(airport, id);

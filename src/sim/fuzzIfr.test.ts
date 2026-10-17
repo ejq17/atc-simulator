@@ -7,9 +7,9 @@ import { mulberry32 } from './rng';
 
 const KINDS: ClearanceKind[] = [
   'IFR_CLEARANCE', 'APPROACH', 'APPROACH', 'DIRECT_FIX', 'RESUME_OWN_NAVIGATION', 'RADAR_CONTACT', 'TAKEOFF', 'LAND', 'HEADING', 'ALTITUDE', 'SPEED',
-  'CONTACT_FREQUENCY', 'CONTACT_FREQUENCY', 'GO_AROUND', 'CONTINUE_APPROACH', 'TAXI', 'LINE_UP_AND_WAIT', 'ENTER_PATTERN',
+  'CONTACT_FREQUENCY', 'CONTACT_FREQUENCY', 'HOLD_AT_FIX', 'HOLD_AT_FIX', 'MISSED_APPROACH', 'GO_AROUND', 'CONTINUE_APPROACH', 'TAXI', 'LINE_UP_AND_WAIT', 'ENTER_PATTERN',
 ];
-const FIXES = ['TVO', 'FX13A', 'FX13B', 'FX13M', 'FX22A', 'TARR', 'TSE', 'Testville', 'NOWHERE'];
+const FIXES = ['TVO', 'FX13A', 'FX13B', 'FX13M', 'FX22A', 'TARR', 'TSE', 'FXS', 'Testville', 'NOWHERE'];
 const TYPES: ApproachType[] = ['ILS', 'LOC', 'RNAV', 'VOR', 'VISUAL'];
 
 describe('fuzz: random IFR instruction streams never crash or corrupt state', () => {
@@ -41,6 +41,7 @@ describe('fuzz: random IFR instruction streams never crash or corrupt state', ()
             approachType: rng() < 0.85 ? pick(TYPES) : undefined,
             fix: rng() < 0.8 ? pick(FIXES) : undefined,
             ifr: rng() < 0.6 ? { squawk: rng() < 0.5 ? pick(['4215', '7700', '1234', '12']) : undefined, initialAltitudeFt: rng() < 0.4 ? Math.floor(rng() * 6000) : undefined, destination: rng() < 0.2 ? 'KBOS' : undefined } : undefined,
+            hold: rng() < 0.9 ? { fix: pick(FIXES), turns: pick(['left', 'right'] as const), asPublished: rng() < 0.5, inboundCourseDeg: rng() < 0.5 ? Math.floor(rng() * 360) : undefined, legMinutes: rng() < 0.3 ? 1 : undefined, legNm: rng() < 0.2 ? 3 : undefined } : undefined,
             destination: rng() < 0.4 ? pick(['RWY13', 'RWY22', 'GA1']) : undefined,
             headingDeg: Math.floor(rng() * 380),
             altitudeFt: Math.floor(rng() * 14000),

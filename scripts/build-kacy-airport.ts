@@ -975,6 +975,10 @@ function fixesOf(entries: { fix: string; role: string }[]): string[] {
   }
   return out;
 }
+const textField = <K extends 'missedApproachText' | 'holdingText' | 'minimaText'>(key: K, v: unknown): Partial<Record<K, string>> => {
+  const t = typeof v === 'string' ? v.trim() : '';
+  return t && t !== '-' ? ({ [key]: t } as Record<K, string>) : {};
+};
 const procedures: InstrumentProcedure[] = [];
 for (const a of procSrc.instrument_approaches as J[]) {
   procedures.push({
@@ -984,6 +988,10 @@ for (const a of procSrc.instrument_approaches as J[]) {
     runwayEnd: endId(a.runway),
     chartPdfUrl: a.pdf.url,
     fixes: fixesOf(a.fixes_and_roles),
+    // plate transcriptions copied verbatim from kacy-procedures.json ('-' in the source means "none printed" and is omitted)
+    ...textField('missedApproachText', a.missed_approach),
+    ...textField('holdingText', a.holding),
+    ...textField('minimaText', a.minima_summary),
     provenance: dtppProv(a.pdf.url, `${a.printed_amendment_on_plate as string}; HTTP ${a.pdf.http_status as number} ${a.pdf.content_type as string}; ${a.data_provenance as string}`),
   });
 }

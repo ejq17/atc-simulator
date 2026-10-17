@@ -110,6 +110,8 @@ const GA_PREFIX: Record<string, string> = { C172: 'Cessna', C182: 'Cessna', C152
 
 /** Airline flight number in group form: 451 -> "four fifty one", 1234 -> "twelve thirty four", 100 -> "one hundred". */
 export function flightNumberSpoken(num: string): string {
+  // 7110.65 2-4-20: a flight number with a leading zero is spoken digit by digit ("Delta Zero One Zero")
+  if (num.length > 1 && num.startsWith('0')) return digitsSpoken(num);
   const n = Number(num);
   if (num.length <= 2) return n < 10 && num.length === 1 ? ONES[n] : num.startsWith('0') ? digitsSpoken(num) : numberWords(n);
   const tail = num.slice(-2);

@@ -19,7 +19,15 @@ Honest status as of 2026-10-16. "Done" means it runs and is covered by tests.
 - UI: Clearance Delivery / Approach / Departure / combined position sets, per-aircraft frequency routing of transmissions, flight strips by frequency, procedure fixes and final approach course on the radar, squawk/nav mode in data blocks, 60 nm range.
 - Voice: on-device Whisper provider (no cloud, audio never leaves the machine) and an automated fake-microphone browser test that speaks a real clearance into the push-to-talk pipeline and verifies the aircraft departs (see `e2e/voice.spec.ts`). Observed transcript: "Cessna 723 Echo Juliet runway 1 3 cleared for takeoff", ~1.3 s from key release to transcript.
 
-**Simulation engine** — `src/sim`, `src/radio` (200 tests)
+**Realism verification round (2026-10-17)** — `docs/REALISM-VERIFICATION.md`, `docs/PHRASEOLOGY-AUDIT.md`
+- Aircraft performance re-sourced: C172 (Textron spec sheet, 172S POH, EASA TCDS) and A320 (Airbus A320 Aircraft Characteristics, EUROCONTROL) with a source per value in `src/sim/performance.ts` and `data/sources/aircraft-performance.json`. The A320 takeoff distance was corrected from 6,500 to ~5,000 ft, which fixed a real behavioural error (the engine refused valid A320 departures from runway 4/22).
+- Runway holding-position distance (250 ft) confirmed against FAA AC 150/5300-13B Appendix G for all four KACY ends.
+- Radar separation: 3 nm (7110.65 5-5-4, verified) plus 5 nm for a light aircraft behind a medium/large on the same final (simplified from the wake tables). Airborne proximity (1.5 nm / 500 ft) is labelled a near-miss alert, not a separation minimum.
+- Published missed approaches flown from the plate text of all 13 KACY approaches (e.g. ILS 13: climb to 600, climbing left turn to 2000 on ACY R-090 to SMITS and hold); holding patterns (standard right turns, 1-minute legs, published holds at SMITS/RODDI/KOVEC/TUBER/CARYL/STEVV; direct entry only); HOLD and MISSED APPROACH commands; decision altitude/MDA from the plate minima with "runway not in sight" missed approaches in weather below minima.
+- Phraseology: 109 phrases audited against FAA JO 7110.65, the AIM and the Pilot/Controller Glossary; 20+ corrections applied (Clearance Delivery name, "taxi" in taxi readbacks, "airport" and "departure frequency" in IFR clearances, destination in the ready-to-taxi call, "leaving ... climbing to" check-ins, miles as digits, ATIS hold-short readback line, lesson texts). Decisions on ambiguous items are recorded in the audit.
+- Voice: Whisper decoding moved to a Web Worker (longest main-thread task during decode: 961 ms -> 0 ms; frame gap 950 ms -> 17 ms); production bundle 29 MB -> 3.8 MB.
+
+**Simulation engine** — `src/sim`, `src/radio` (260 tests)
 - Fixed-step deterministic loop, seeded PRNG, event log, subscribers.
 - Taxi pathfinding with ordered `via`, hold-short stops, explicit runway crossing clearances, spacing, parking.
 - Takeoff roll, climb, bank-limited turns, wind, 3° approach, flare, rollout, exit selection by type, automatic go-around without landing clearance, pattern basics.
@@ -38,11 +46,11 @@ Honest status as of 2026-10-16. "Done" means it runs and is covered by tests.
 
 **UI** — `src/ui`, `e2e/` (see `src/ui/README.md`): setup (mode / scenario / weather / runways / **controller positions** with per-position explanations, the positions each scenario needs and an **IFR flows** option), simulator (surface + radar canvases with interpolation, aircraft list and **Strips** tab, aircraft details, radio panel with PTT, typed input and one live RX/TX chip per active frequency, comms log, alerts, charts/navaids/ATIS/weather/settings drawers, training banner), debrief. IFR support: eight position sets (CLNC, GND, TWR, TWR+GND, APP+DEP, DEP, APP+TWR, All) with each call applied on the addressed aircraft's frequency and a clear "Not on frequency" rejection; `fixes` passed to the parser; flight rules, squawk, route, navigation mode, IFR clearance, approach clearance / established state and request badges (REQ IFR CLNC, REQ APPROACH, CHECK-IN, REQ TAXI, ...) in the panels; radar with 60 NM range, procedure fixes and final course of the active landing runways, dashed selected-aircraft route, All fixes, squawk and V/R/A letters in data blocks; empty readbacks (radar contact) are never spoken. Screenshots in `docs/screenshots/` (`sim`, `radar`, `approach`, `strips`, `setup-ifr`, ...).
 
-Totals: 1347 vitest tests in 67 files, 19 Playwright tests (14 chromium flows + 5 fake-microphone voice flows), type-check clean. Verified by the orchestrator on 2026-10-17.
+Totals: 1450 vitest tests in 70 files, 19 Playwright tests (14 chromium flows + 5 fake-microphone voice flows), type-check clean, production build 3.8 MB. Verified by the orchestrator on 2026-10-17 after the realism round.
 
 ## Known issues
 - The microphone path is proven with Chromium's fake audio device and the on-device Whisper provider (five automated tests). A physical headset, the Chrome Web Speech service, and the Deepgram path (no key available) were not exercised; Web Speech is unavailable in headless Chromium and the app degrades gracefully there.
-- Whisper decoding runs on the main thread (WASM), so the page can stutter for about a second after releasing push-to-talk; a Web Worker would fix that. The first use downloads ~40 MB of model files from huggingface.co. `vite build` copies a 27 MB ONNX runtime `.wasm` into `dist/assets` that is not used at runtime.
+- Whisper's first use downloads ~40 MB of model files from huggingface.co and the ONNX runtime from a CDN; decoding adds ~1.5 s after key release.
 - A session without a Ground position strands landed aircraft at the runway exit (pilots told to contact an unworked frequency wait there); choose a position set that includes Ground, or Tower + Ground.
 - Browser TTS cannot be routed through WebAudio, so the radio filter applies only to clicks/static, not the pilot voice.
 - Career step 1 completes as soon as the takeoff clearance is accepted.
@@ -51,7 +59,7 @@ Totals: 1347 vitest tests in 67 files, 19 Playwright tests (14 chromium flows + 
 - Lint: 3 non-blocking warnings.
 
 ## Not yet implemented (goal.md phases 5–6 and beyond)
-- IFR simplifications: no STARs (arrivals appear over the published IAF/IF such as CARYL, STEVV, KOPCE, JEDOB), no holding patterns, no per-fix altitude restrictions or published minimums, final approach course equals runway heading, missed-approach altitude fixed at 2000 ft, in-trail separation uses a single 3 nm figure.
+- IFR simplifications: KACY has no published STARs (verified: none in the d-TPP), so arrivals appear over the published IAF/IF (CARYL, STEVV, KOPCE, JEDOB); holding uses direct entries only; no per-fix altitude restrictions; final approach course equals runway heading (RNAV 22 / VOR 4 are a few degrees off); same-runway separation is binary (occupied/not) rather than the 3,000/4,500/6,000 ft categories of 3-9-6/3-10-3; wake categories simplified to light/medium/heavy.
 - Additional aircraft types (regional jets, helicopters, ANG F-16s), emergencies beyond a scripted pan-pan call, holding patterns, takeoff cancellation, LAHSO operations, wake-turbulence timing.
 - Radio congestion/blocked transmissions beyond the controller stepping on a pilot; pilot clarification requests.
 - Session replay from recorded events; 3D tower view; desktop (Tauri) packaging; additional airports (architecture allows it: everything airport-specific comes from the `Airport` object).

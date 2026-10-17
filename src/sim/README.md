@@ -20,6 +20,9 @@ here knows about KACY. Tests run against the synthetic `__fixtures__/testAirport
 | `traffic.ts` | Spawning (incl. `at_fix` arrivals and IFR departures), automatic pilot calls, frequency-change application, despawn, `TrafficGenerator` interface |
 | `navigation.ts` | Lateral navigation over fixes: fix lookup (`Airport.navaids`), `distanceToFixNm`, `bearingToFixMag`, fly-by sequencing (`advanceNav`, `turnLeadM`) |
 | `approach.ts` | Instrument / visual approach analysis: procedure classification, `assessApproach` (route join, intercept geometry, weather, range) |
+| `missedApproach.ts` | Interpreter and guidance for the published missed approach text; published-hold lookup |
+| `holding.ts` | Holding patterns (direct entry), `holdingText` parser |
+| `minima.ts` | Approach minima from `minimaText`, runway-in-sight test for the decision altitude |
 | `ifr.ts` | IFR clearance defaults (DP name from `airport.procedures`, squawk assignment) |
 | `scoring.ts` | `ScoreCard` maintenance and the score formula |
 | `geo.ts`, `rng.ts`, `performance.ts`, `runways.ts` | Math, mulberry32 PRNG, C172/A320 tables, runway geometry |
@@ -100,8 +103,12 @@ pilot readback (`onPilotTransmission` fires; callers must NOT speak the returned
     current edition before shipping; only the first three were specified by the product owner.
 * **Dynamic detection** each tick: `RUNWAY_INCURSION` (taxiing/holding aircraft on a runway polygon without
   authorisation), `RUNWAY_CONFLICT` (2+ aircraft on a surface with high-speed traffic), `GROUND_PROXIMITY`
-  (< 30 m, parked aircraft excluded), `AIRBORNE_PROXIMITY` (< 1.5 nm and < 500 ft). Alerts are keyed so each
+  (< 30 m, parked aircraft excluded), `AIRBORNE_PROXIMITY` (< 1.5 nm and < 500 ft: a **near-miss alert threshold**,
+  not the separation minimum - the terminal radar minimum is 3 nm, JO 7110.65 5-5-4). Alerts are keyed so each
   episode emits one event.
+* **Same-runway separation is binary** (runway occupied / a departure rolling / an arrival inside 2 nm): the distance-based
+  rule of 7110.65 3-9-6 / 3-10-3 (3,000 / 4,500 / 6,000 ft between a departing or landing aircraft and the preceding one,
+  by SRS category I = C172, III = A320) is **not implemented** and is a known limitation.
 * Ground spacing: stop at `1.5 * max(length) + 20 m` behind an aircraft ahead on the same path.
 
 ## Pilot behaviour and readback errors
@@ -181,12 +188,12 @@ shape (`TVO` VOR, `FX13A/B`, `FX22A-C`, ...); `kacyIfr.test.ts` runs the same fl
 `route[1]`, `nav = { fixes: route, index: 1, mode: 'route' }`, phase INBOUND (-> APPROACH inside 25 nm of the runway end),
 on `initialFrequencyId` (APP), IFR with `flightPlan` from the spec (default: IFR, route = spec route, cruise = spawn
 altitude), a squawk from the seeded stream, `target.altitudeFt = altitudeFt` (held until cleared otherwise).
-First call (instead of the standard "inbound" call): *"Atlantic City Approach, Spirit four fifty one, five thousand,
+First call (instead of the standard "inbound" call): *"Atlantic City Approach, Spirit four fifty one, level five thousand,
 information alpha."*, pending request `APPROACH`.
 
 ### IFR departures (Clearance Delivery -> Ground -> Tower -> Departure)
 
-1. A parked departure whose `flightPlan.flightRules === 'IFR'` calls its spawn frequency (CLNC): *"Atlantic City Clearance,
+1. A parked departure whose `flightPlan.flightRules === 'IFR'` calls its spawn frequency (CLNC): *"Atlantic City Clearance Delivery,
    Spirit four fifty one, IFR to Philadelphia, with information alpha, ready to copy."* Pending `IFR_CLEARANCE`. VFR
    departures (and IFR specs without a flight plan) behave as before.
 2. `IFR_CLEARANCE` (see `ifr.ts`): refused unless the aircraft is PARKED/READY, has an IFR flight plan, has a pending
@@ -196,12 +203,12 @@ information alpha."*, pending request `APPROACH`.
    cruise, departure frequency = DEP else APP, squawk = seeded unused code. Stored on `flightPlan.ifrClearance` (`readBack:
    true`), `ac.squawk` set.
 3. 15 s later (`IFR_TAXI_REQUEST_DELAY_SEC`) the pilot tunes Ground by itself and calls *"... Ground, Spirit four fifty one, at
-   Gate one, ready to taxi, IFR departure."* (pending `TAXI`).
+   Gate one, ready to taxi, IFR to Philadelphia."* (pending `TAXI`).
 4. `TAKEOFF` without an IFR clearance: training -> refused ("no IFR clearance on file"); otherwise accepted, an INFO event, and
    a communication error (`COMMAND_ACCEPTED` with `data.commError`, no "correct clearance" credit).
 5. After takeoff: runway heading, climb to `ifrClearance.initialAltitudeFt`. Tower: `CONTACT_FREQUENCY` `frequencyId: 'DEP'`
    (resolves; the id the controller named is kept when APP and DEP share a frequency, so the pilot says "Departure"). Check-in:
-   *"Atlantic City Departure, Spirit four fifty one, one thousand two hundred climbing two thousand."* (pending `OTHER`).
+   *"Atlantic City Departure, Spirit four fifty one, leaving one thousand two hundred, climbing to two thousand."* (pending `OTHER`).
 6. `RADAR_CONTACT` is informational: `radarIdentified = true`, INFO event, **no pilot transmission** (the outcome's `readback` is
    `''`), clears the pending request. Then `ALTITUDE`, `HEADING`, `DIRECT_FIX`, `RESUME_OWN_NAVIGATION` as usual.
 7. Leaving the area: a DEPARTURE with an IFR flight plan is removed when it is more than 15 nm from the ARP **and** (above
@@ -227,8 +234,11 @@ information alpha."*, pending request `APPROACH`.
   distance to the threshold when it is already on (or within the on-course tolerance of) the course, otherwise at the projected
   join point (intercept point, or the first on-course fix it will fly). The leader is advanced by `groundspeed x
   (distance still to fly to the join point / follower groundspeed)`, floor 0. Too close -> `UNSAFE_CLEARANCE` (training refuses,
-  other modes flag and score). The reference text says only "radar separation minima" (FAA JO 7110.65): no paragraph is cited
-  because none is verified in `docs/FAA-REFERENCES.md`; 3 nm is a simplification.
+  other modes flag and score). 3 nm is the terminal radar minimum of JO 7110.65 5-5-4 MINIMA (single-sensor ASR/FUSION; 5 nm
+  applies in STARS multi-sensor mode or beyond 40 mi, ignored). **Wake:** when the follower's `wakeCategory` is `light` (C172) and
+  the leader's is not (A320) the minimum is **5 nm**, and the reason text says "wake turbulence separation (simplified from the
+  7110.65 5-5-4 wake tables)". The category mapping is simplified to `AircraftPerformance.wakeCategory`; the tables' 6 mi on
+  approach, heavy / B757 categories and the 2.5 nm reduction are not modelled.
 
 Procedure geometry (all relative to the runway end; no airport knowledge): *on-course* fixes (1-40 nm out, `|cross| <= 0.2 d +
 0.3 nm`) form the straight-in segment (farthest = IF/IAF, the one closest but >= 3 nm out = FAF); fixes listed *before* the
@@ -247,16 +257,67 @@ Vertical: the assigned altitude is held. Once established inbound on the straigh
 outside the IF) the aircraft intercepts the 3 degree path **from below** (level until the path arrives) or descends onto it from
 above at up to 1.3x the descent rate; no per-fix altitude restrictions. FINAL (the existing glidepath / decision-point logic)
 starts when established inside **8 nm** (`APPROACH_FINAL_NM`; 7 nm jets / 4 nm light for aircraft without an approach
-clearance), the assigned speed is dropped to approach speed. On Approach the pilot reports *"established ILS runway one three."*
+clearance), the assigned speed is dropped to approach speed. On Approach the pilot reports *"established on the ILS runway one three."*
 (pending `FREQUENCY_CHANGE`); the controller hands off with `CONTACT_FREQUENCY TWR`; the pilot checks in with Tower *"Atlantic
 City Tower, Spirit four fifty one, seven mile final runway one three, full stop."* (pending `LANDING`); `LAND` as before
 (an approach-cleared aircraft keeps its route when LAND is issued; one that is not drops its route and flies to the runway).
 
-Missed approach (automatic go-around, e.g. no landing clearance): the approach clearance and route are cancelled; IFR aircraft
-climb to 2000 ft (never lower than 1500 ft above the field; never descending to it) on runway heading and call *"... runway
-heading, level two thousand, request vectors for another approach."* (published missed approach altitudes are not in the
-dataset). Tower hands back with `CONTACT_FREQUENCY APP`; the check-in is *"... Approach, ..., missed approach, two thousand."*
-(pending `APPROACH`). Approach vectors / `DIRECT_FIX` (-> APPROACH) / `APPROACH` again.
+### Published missed approach (`missedApproach.ts`)
+
+On any go-around of an IFR aircraft (no landing clearance, unstable, ATC `GO_AROUND`/`MISSED_APPROACH`, decision altitude) the
+engine interprets `missedApproachText` of the cleared procedure (else an IAP of the runway end) with a small deterministic
+grammar (the six verbatim KACY forms and all 13 transcribed texts are tested):
+
+```
+[Climb to <alt> then] climbing (left|right) turn to <alt> <legs> and hold.     Climb to <alt> <legs> and hold.
+leg := (via|on) heading <deg> deg | (via|on) track <deg> deg to <FIX> | direct <FIX>
+     | (via|on) <NAVAID> [VORTAC|VOR] R-<radial> to <FIX> [INT][/<NAVAID> <n> DME | /<n> DME]
+```
+
+Model (nav mode `'missed'`, phase GO_AROUND): climb straight ahead on the runway heading to the first altitude (400 ft above the
+field if none), then turn in the stated direction (the short way round if the stated direction would loop more than 200 degrees)
+and fly the legs: a heading until the next radial can be intercepted (lead = `turnLeadM`); a radial = intercept it from the named
+navaid and track it outbound to the fix (cross-track gain, 45 degree cap); `direct` / `track .. to` = fly to the fix with
+fly-by sequencing; the aircraft climbs to the final altitude (never descending to it) at climb speed, and at the last fix enters
+the hold (`holding.ts`, nav mode `'holding'`, phase HOLDING). Headings / tracks / radials are magnetic.
+Text that is missing, not in the grammar, or names an unknown fix: the plain go-around (runway heading, fixed altitude) and a
+warning INFO event ("the published missed approach ... could not be interpreted"). VFR aircraft without an approach clearance
+always use the plain go-around.
+
+Pilot calls: *"..., going around runway one three, no landing clearance, flying the published missed approach."* (at the
+decision altitude: *"..., going missed approach, runway not in sight, flying the published missed approach."*); on the same
+frequency, once level: *"..., flying the published missed approach, level two thousand, request frequency change."*; after the
+Tower hands it back (`CONTACT_FREQUENCY APP`): *"Atlantic City Approach, Spirit four fifty one, missed approach, climbing two
+thousand, direct SMITS, request further clearance."* (or "holding at SMITS, two thousand" once in the hold).
+
+### Holding (`holding.ts`)
+
+Standard racetrack, **direct entry only** (teardrop / parallel entries are simplified to a direct entry: fly to the fix, turn
+180 degrees in the pattern direction onto the outbound heading, fly the leg, turn back, track the inbound course). Right turns
+unless stated. Legs: the stated minutes or nm, else 1 minute at or below 14,000 ft and 1.5 minutes above; outbound timing starts
+within 5 degrees of the outbound heading. Hold speed 170 kt (jets) / 90 kt (light): a jet's racetrack is ~2.2 nm wide and the
+whole pattern stays within ~4.5 nm of the fix for 1-minute legs (the 180 degree turns at a standard-rate turn of the type add
+about a nautical mile beyond the leg). The aircraft stays until `DIRECT_FIX` / `APPROACH` / `HEADING` / `RESUME_OWN_NAVIGATION`
+(an arrival returns to phase APPROACH).
+
+Inbound course, in order: the instruction; the plate `holdingText` when it states one ("270 deg inbound"); for the hold at the end of
+a published missed approach, the reciprocal of the radial it ends on (SMITS on ACY R-090 -> 270), the radial that any procedure
+defines the fix on, or the stated track; otherwise the course from the previous route fix (or from the aircraft) to the fix. Every
+case that is not stated by the instruction or the holding text records an `assumption` in the INFO event. Leg length / turns come
+from `holdingText` ("CARYL: one-minute hold", "RODDI 5 NM hold") when the instruction says "as published" or does not state them.
+
+`HOLD_AT_FIX` is valid for airborne aircraft in INBOUND / APPROACH / DEPARTURE / GO_AROUND / HOLDING (not on final), fix known.
+`MISSED_APPROACH` is valid in FINAL / APPROACH and executes the published missed approach.
+
+### Decision altitude (`minima.ts`)
+
+`rt.approach` of an instrument approach carries minima resolved from `minimaText`: ILS -> `S-ILS` DA; LOC -> `S-LOC` MDA; RNAV -> LPV
+DA, else LNAV MDA, else RNP / LNAV-VNAV DA; VOR -> the straight-in `S-<rwy>` line MDA; the first (lowest category) values; HAT
+from "HAT n" or the bracketed height; visibility from the bracketed "(500-7/8)" pair, "MDA 480-1" or RVR/5280. Unreadable text:
+200 ft HAT / 1/2 sm for ILS, 450 ft HAT / 1 sm otherwise, announced in an INFO event. When the aircraft reaches the DA/MDA on
+FINAL (or LANDING) the runway is "in sight" only if visibility >= the minimum and the ceiling (lowest BKN/OVC/VV) >= HAT; if not
+it executes the published missed approach even when cleared to land. The MDA is not levelled off at (the 3 degree path is followed
+to the decision point) and the weather is the scenario's single METAR-like observation. Visual approaches have no DA.
 
 ### What the parser must provide
 
@@ -265,8 +326,20 @@ dataset). Tower hands back with `CONTACT_FREQUENCY APP`; the check-in is *"... A
 | `IFR_CLEARANCE` | `ifr` (all optional): `destination`, `departureProcedure`, `initialAltitudeFt`, `expectAltitudeFt`, `departureFrequencyMhz`, `squawk` |
 | `APPROACH` | `approachType`, `runwayEnd` (or `runwayId`) |
 | `DIRECT_FIX` | `fix` (identifier or navaid name) |
-| `RESUME_OWN_NAVIGATION`, `RADAR_CONTACT` | none |
+| `HOLD_AT_FIX` | `hold`: `fix`, `turns`, `asPublished`, optional `inboundCourseDeg` (magnetic, to the fix), `legMinutes`, `legNm`, `efcZulu` |
+| `RESUME_OWN_NAVIGATION`, `RADAR_CONTACT`, `MISSED_APPROACH` | none |
 | `CONTACT_FREQUENCY` | `frequencyId` `CLNC`/`GND`/`TWR`/`APP`/`DEP` (or `frequencyMhz`) |
+
+## Phraseology audit (docs/PHRASEOLOGY-AUDIT.md)
+
+Applied in `src/radio`: R-F1 ("Clearance Delivery"), R-B1 (taxi readback "Runway one three, taxi via ..."), R-B2 / R-B2b / R-B2c (IFR
+clearance: "Cleared to Philadelphia airport", "expect one zero thousand, one zero minutes after departure", "departure
+frequency ..."), R-B3 (ready to taxi: "IFR to Philadelphia"), R-B5 ("leaving 1,200, climbing to 2,000" / "level 5,000" instead of
+"passing"), R-B6 (mileages as digits: "one zero miles"), R-B7 ("established on the ILS runway one three"), R-S3 (leading-zero flight
+numbers digit by digit), R-I1 (IFR clearance problems: "Unable, we filed to Philadelphia"; an unusable altitude / squawk /
+frequency is a "Say again the squawk code", not "Unable"). **Not applied:** R-B4 ("with information X" is the common US form
+and pilots and controllers use it; "information X received" would be more literal AIM 4-1-13) and R-S1 (the ATIS channel
+125.725 is printed on the chart as such, so it is spoken in full; the controller rule of two decimals is not applied to readbacks).
 
 ## Airport data contract
 
@@ -278,6 +351,7 @@ surface carry `onRunwayId`; parking nodes of kind `parking`; GND/TWR frequencies
 
 ## Known limitations
 
+* Performance tables carry `source:` comments per changed value (data/sources/aircraft-performance.json, docs/REALISM-VERIFICATION.md); A320 roll ~35 s / ~1.3 km to rotation, takeoff distance 5,000 ft (refused from an intersection of KACY 4/22 with less remaining).
 * Simplified physics: first-order heading/vertical dynamics, constant accelerations, no density altitude,
   steady wind (gusts ignored), no wake turbulence, no braking-action effects.
 * Takeoff abort and rejected landings on the runway are not modelled; an aircraft told to line up cannot be
@@ -287,6 +361,6 @@ surface carry `onRunwayId`; parking nodes of kind `parking`; GND/TWR frequencies
 * After a go-around the aircraft flies runway heading at a fixed altitude until instructed.
 * IFR: no holding patterns, procedure turns, DME arcs, STARs, speed/altitude restrictions per fix or minimums; the final approach
   course is always the runway heading; one transponder code per aircraft, no radar coverage model (everything is "radar
-  contact" once identified); departure clearance has no void time; the missed approach is "2000 ft on runway heading".
+  contact" once identified); departure clearance has no void time; the missed approach is "2000 ft on runway heading" only when the plate text is unavailable or not interpretable.
 * Free-play traffic generation still spawns arrivals on the extended centreline, not at fixes (scenarios use `at_fix`).
 * `radioState` `RECEIVING` is not used (readbacks are instantaneous); no frequency congestion yet.

@@ -80,7 +80,7 @@ describe('prepareForTts', () => {
   it('spells acronyms letter by letter', () => {
     expect(prepareForTts('Cleared ILS approach')).toBe('Cleared I L S approach');
     expect(prepareForTts('VFR to the north')).toBe('V F R to the north');
-    expect(prepareForTts('Information ATIS Alpha')).toBe('Information A T I S Alpha');
+    expect(prepareForTts('Information ATIS Alpha')).toBe('Information ATIS Alpha'); // ATIS is spoken as a word
   });
 
   it('turns runway numbers into words, using niner', () => {

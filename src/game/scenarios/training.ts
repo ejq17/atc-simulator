@@ -1,6 +1,6 @@
 /**
  * Training scenarios: calm weather, no readback errors, unsafe clearances refused (engine `mode: 'training'`), and a
- * `training.steps` walk-through. Every `reference` was verified on the FAA site (see ../references.ts); nothing is quoted.
+ * `training.steps` walk-through. Every `reference` was verified on the FAA site (see ../references.ts); explanations are paraphrased and only the short phraseology patterns the order prescribes are repeated (audited in docs/PHRASEOLOGY-AUDIT.md).
  */
 import { refText, refTexts, KACY_READBACK_NOTE } from '../references';
 import type { TrainingStepSpec } from '../types';
@@ -69,14 +69,14 @@ export const TRAINING_SCENARIOS: ScenarioDef[] = [
             id: 'takeoff', callsign: 'N723EJ', expectCommand: 'TAKEOFF', reference: refText('3-9-10'),
             prompt: 'The runway is clear. Clear N723EJ for takeoff.',
             example: 'Cessna seven two three echo juliet, runway one three, cleared for takeoff.',
-            explanation: 'A takeoff clearance states the runway number first, then "cleared for takeoff". It is the only thing that authorises the takeoff roll, and the pilot must read it back with the runway and the callsign.',
-            mistakes: ['Saying only "cleared for takeoff" without the runway number.', 'Using "take off" or "go ahead" - those are not takeoff clearances.', 'Issuing it while another aircraft or vehicle is on the runway.'],
+            explanation: 'A takeoff clearance states the runway number first, then "cleared for takeoff". It is the only thing that authorises the takeoff roll, and the pilot should read it back with the runway and the callsign (7110.65 2-4-3 asks controllers to make sure runway and hold-short items are read back).',
+            mistakes: ['Saying only "cleared for takeoff" without the runway number.', 'Using "take off" or "go ahead" - those are not takeoff clearances (4-3-1: avoid the word "takeoff" except to clear or cancel a takeoff).', 'Issuing it while another aircraft or vehicle is on the runway.'],
           },
           {
-            id: 'handoff', callsign: 'N723EJ', expectCommand: 'CONTACT_FREQUENCY',
+            id: 'handoff', callsign: 'N723EJ', expectCommand: 'CONTACT_FREQUENCY', reference: refText('2-1-17'),
             prompt: 'N723EJ is airborne and leaving your airspace. Tell it to contact Departure on 124.6.',
             example: 'Cessna seven two three echo juliet, contact departure one two four point six.',
-            explanation: 'After you transfer an aircraft it leaves your frequency and no longer hears you. Give the facility and frequency, with the callsign, and let the pilot read it back. (No 7110.65 paragraph is cited here: handoff phraseology was not verified for this lesson.)',
+            explanation: 'After you transfer an aircraft it leaves your frequency and no longer hears you. Give the facility and frequency, with the callsign, and let the pilot read it back. 7110.65 2-1-17 gives the form "Contact (facility and function), (frequency)": "contact departure one two four point six". The location name is omitted when the tower and the TRACON share a name, as they do at Atlantic City.',
             mistakes: ['Transferring the aircraft before it is clear of conflicts with your other traffic.', 'Forgetting the frequency.'],
           },
         ] satisfies TrainingStepSpec[],
@@ -99,9 +99,9 @@ export const TRAINING_SCENARIOS: ScenarioDef[] = [
           steps: [
             {
               id: 'taxi', callsign: 'N482KB', expectCommand: 'TAXI', reference: refTexts('3-7-2', '3-7-1'),
-              prompt: 'N482KB asks to taxi. Give a route to runway 13 (delta, alpha) and tell it to hold short of the runway.',
-              example: 'Cessna four eight two kilo bravo, taxi to runway one three via delta, alpha, hold short runway one three.',
-              explanation: 'A taxi instruction must include the specific route to follow. When it is for a runway, make sure the pilot has the correct runway assignment (the readback with the runway number confirms it) and say where the aircraft must hold. Use "taxi" - never "cleared to taxi": the word "cleared" is kept for runway and approach clearances.',
+              prompt: 'N482KB asks to taxi. State the runway first, then the route to it (delta, alpha), and tell it to hold short of the runway.',
+              example: 'Cessna four eight two kilo bravo, runway one three, taxi via delta, alpha, hold short of runway one three.',
+              explanation: 'When you authorise taxi to a takeoff runway, state the departure runway first and then the specific route: "Runway (number), taxi via (route), hold short of (runway)". The route is mandatory, and the pilot\'s readback with the runway number confirms the runway assignment (3-7-2). Use "taxi" - never "cleared to taxi": the word "cleared" is kept for runway and approach clearances (3-7-1).',
               mistakes: ['"Cleared to taxi" instead of "taxi".', 'A destination with no route ("taxi to runway one three").', '"Taxi as requested" or "proceed as requested" - not approved wording.', 'Not checking the readback of the hold-short instruction.'],
             },
             {
@@ -188,9 +188,9 @@ export const TRAINING_SCENARIOS: ScenarioDef[] = [
           steps: [
             {
               id: 'taxi', callsign: 'N60DX', expectCommand: 'TAXI', reference: refTexts('3-7-2', '2-4-3'),
-              prompt: 'N60DX asks to taxi. Give it a route to runway 22 via alpha, and tell it to hold short of runway 13.',
-              example: 'Cessna six zero delta x-ray, taxi to runway two two via alpha, hold short of runway one three.',
-              explanation: 'When you want an aircraft to stop short of a runway, issue the route up to the hold-short point (or the whole route and then the hold-short instruction). You must also make sure the pilot reads back the hold-short instruction - at KACY the airport diagram itself requires readback of all runway holding instructions.',
+              prompt: 'N60DX asks to taxi. State runway 22 first, give it a route via alpha, and tell it to hold short of runway 13.',
+              example: 'Cessna six zero delta x-ray, runway two two, taxi via alpha, hold short of runway one three.',
+              explanation: 'When the aircraft is to stop short of a runway, issue the route up to that runway hold-short point (3-7-2); for any other hold-short point you may give the route up to it, or the whole route and then the hold-short instruction. A crossing is a separate clearance for each runway. You must also make sure the pilot reads back the hold-short instruction - at KACY the airport diagram itself requires readback of all runway holding instructions, and 7110.65 2-4-3 and 3-7-2 require the controller to obtain it ("read back hold instructions" if it is missing).',
               mistakes: ['No hold-short instruction when you want the aircraft to stop short of the runway.', 'Accepting a readback that leaves out the hold-short, the runway or the callsign (pilots must use their callsign in a readback; the simulated pilots put it last).'],
             },
             {
@@ -203,7 +203,7 @@ export const TRAINING_SCENARIOS: ScenarioDef[] = [
               id: 'cross', callsign: 'N60DX', expectCommand: 'CROSS_RUNWAY', reference: refTexts('3-7-2', '3-1-3'),
               prompt: 'Check runway 13/31 is empty, then tell N60DX to cross runway 13 at alpha.',
               example: 'Cessna six zero delta x-ray, cross runway one three at alpha.',
-              explanation: 'The crossing instruction names the runway and where to cross. The ground controller must coordinate with the local controller before authorising a crossing of an active runway; here you are both, so look at the runway first.',
+              explanation: 'The crossing instruction names the runway and where to cross ("Cross (runway) at (taxiway)"). The ground controller must coordinate with the local controller before authorising a crossing of an active runway; here you are both, so look at the runway first.',
               mistakes: ['"Taxi across" or "proceed across" - say "cross runway ... at ...".', 'Crossing in front of an arrival that is on short final.', 'Issuing the crossing without the runway number.'],
             },
             {
@@ -236,10 +236,10 @@ export const TRAINING_SCENARIOS: ScenarioDef[] = [
             mistakes: ['Clearing the faster aircraft first and leaving the slower one inside it.'],
           },
           {
-            id: 'space', callsign: 'NKS451', expectCommand: 'SPEED', reference: refText('3-8-1'),
+            id: 'space', callsign: 'NKS451', expectCommand: 'SPEED', reference: refTexts('5-7-2', '3-8-1'),
             prompt: 'NKS451 is faster and will close on the Cessna. Reduce its speed to 140 knots to build spacing.',
             example: 'Spirit four fifty one, reduce speed to one four zero.',
-            explanation: 'Sequence and spacing are established by having aircraft adjust their flight (speed, path, or pattern) as necessary - here, a speed reduction for the faster aircraft.',
+            explanation: 'Sequence and spacing are established by having aircraft adjust their flight (speed, path, or pattern) as necessary - here, a speed reduction for the faster aircraft. Speed phraseology is "Reduce speed to" and the separate digits of the speed (5-7-2); the word "knots" may be left out.',
             mistakes: ['Waiting until the Airbus is nearly on top of the Cessna.', 'Issuing a speed outside what the aircraft can fly.'],
           },
           {
@@ -274,7 +274,7 @@ export const TRAINING_SCENARIOS: ScenarioDef[] = [
             id: 'enter', callsign: 'N59TB', expectCommand: 'ENTER_PATTERN', reference: refText('3-8-1'),
             prompt: 'N59TB is inbound for landing. Tell it to enter a left downwind for runway 13.',
             example: 'Cessna five nine tango bravo, enter left downwind runway one three.',
-            explanation: 'Pattern instructions are how the tower builds the arrival sequence: entry leg, runway, and later "extend downwind", "make short approach" or a number in the landing order.',
+            explanation: 'Pattern instructions are how the tower builds the arrival sequence: entry leg, runway, and later "extend downwind", "make short approach" or a number in the landing order (3-8-1). The AIM (4-3-2) shows the same entry form for a downwind with a runway number.',
             mistakes: ['Leaving out the runway.', 'Giving a pattern entry on the wrong side for the traffic flow.'],
           },
           {
@@ -310,14 +310,14 @@ export const TRAINING_SCENARIOS: ScenarioDef[] = [
             id: 'line-up', callsign: 'N723EJ', expectCommand: 'LINE_UP_AND_WAIT', reference: refText('3-9-4'),
             prompt: 'Line up N723EJ on runway 13 (Spirit 451 is 5 nm out and you intend to depart the Cessna first).',
             example: 'Cessna seven two three echo juliet, runway one three, line up and wait.',
-            explanation: 'Line up and wait is for an imminent departure. Once an aircraft is in position, the same runway cannot also be given to a landing aircraft (without the safety logic used at some facilities), so you must make the departure happen or send the arrival around.',
+            explanation: 'Line up and wait is for an imminent departure, and the aircraft in position is told about landing traffic within about 6 miles (for example "traffic, a Boeing 737, six mile final"). Once an aircraft is in position, the same runway cannot also be given to a landing aircraft (without the safety logic used at some facilities), so you must make the departure happen or send the arrival around.',
             mistakes: [MISTAKE_CONDITIONAL],
           },
           {
-            id: 'go-around', callsign: 'NKS451', expectCommand: 'GO_AROUND', check: 'go_around:NKS451', reference: refTexts('3-9-4', '3-10-5'),
+            id: 'go-around', callsign: 'NKS451', expectCommand: 'GO_AROUND', check: 'go_around:NKS451', reference: refTexts('3-8-1', '3-9-4', '3-10-5'),
             prompt: 'Spirit 451 is on final and the Cessna is still in position. Do not clear it to land - tell it to go around.',
             example: 'Spirit four fifty one, go around.',
-            explanation: 'A landing clearance cannot be issued while another aircraft is holding in position on the runway. When the Cessna cannot depart in time, the arrival is sent around. (If you wait too long the Airbus goes around by itself at 0.5 nm without a clearance - that also completes the step.)',
+            explanation: '"Go around" (with further instructions if needed) is the 3-8-1 phraseology. A landing clearance cannot be issued while another aircraft is holding in position on the runway. When the Cessna cannot depart in time, the arrival is sent around. (If you wait too long the Airbus goes around by itself at 0.5 nm without a clearance - that also completes the step.)',
             mistakes: ['Clearing the Airbus to land with the Cessna in position (the simulator refuses it in training mode).', 'Leaving the Cessna in position for minutes while you decide.'],
           },
           {
@@ -343,20 +343,20 @@ export const TRAINING_SCENARIOS: ScenarioDef[] = [
       training: {
         steps: [
           {
-            id: 'wait-call', callsign: 'NKS451', check: 'ifr_request:NKS451', reference: refText('4-3-2'),
+            id: 'wait-call', callsign: 'NKS451', check: 'ifr_request:NKS451', reference: refText('4-3-3'),
             prompt: 'Wait for NKS451 to call Clearance Delivery. Do not read the clearance until the pilot has asked for it.',
-            explanation: 'An IFR clearance is issued on request: the pilot calls with the aircraft identification, the destination and the ATIS letter, and then writes the clearance down ("ready to copy"). Reading it before the call gets a "we have not called for our clearance" answer.',
+            explanation: 'An IFR clearance is issued on request: the pilot calls with the facility name, the aircraft identification, the destination and the ATIS letter ("information Bravo received"), and then writes the clearance down ("ready to copy"). Reading it before the call gets a "we have not called for our clearance" answer.',
             mistakes: ['Issuing the clearance before the pilot has called.'],
           },
           {
-            id: 'clearance', callsign: 'NKS451', expectCommand: 'IFR_CLEARANCE', reference: refTexts('4-2-1', '4-3-2'),
-            prompt: 'NKS451 is ready to copy. Issue the IFR clearance: cleared to Philadelphia, the Atlantic City Three departure with radar vectors, maintain two thousand, expect 10,000 ten minutes after departure, departure frequency 124.6, and a squawk code of your choice.',
-            example: 'Spirit four fifty one, cleared to Philadelphia airport via the Atlantic City Three departure, radar vectors, maintain two thousand, expect one zero thousand one zero minutes after departure, departure frequency one two four point six, squawk four two one five.',
+            id: 'clearance', callsign: 'NKS451', expectCommand: 'IFR_CLEARANCE', reference: refTexts('4-2-1', '4-3-2', '3-9-3'),
+            prompt: 'NKS451 is ready to copy. Issue the IFR clearance: cleared to Philadelphia airport, the Atlantic City Three departure with radar vectors, maintain two thousand, expect 10,000 ten minutes after departure, departure frequency 124.6, and a squawk code of your choice.',
+            example: 'Spirit four fifty one, cleared to Philadelphia airport, Atlantic City Three departure, radar vectors, maintain two thousand, expect one zero thousand, one zero minutes after departure, departure frequency one two four point six, squawk four two one five.',
             explanation:
               'Give the items in this order. (1) The aircraft identification, so the right pilot answers. (2) The clearance limit: "cleared to Philadelphia airport" - when the limit is an airport, the word "airport" follows the name. ' +
-              '(3) The departure procedure or vectors: "via the Atlantic City Three departure, radar vectors" - at KACY the departure procedure is published and Departure will vector the aircraft. ' +
-              '(4) The route, here covered by radar vectors (otherwise the filed route or "as filed"). (5) The altitude data in the order flown: "maintain two thousand" is the initial altitude, "expect one zero thousand one zero minutes after departure" is the cruise altitude the pilot should plan for. ' +
-              '(6) The departure frequency, 124.6 (Approach and Departure share it at KACY), and (7) the transponder code: four digits, each 0 to 7, never 0000, 1200, 7500, 7600 or 7700, and not a code another aircraft already uses. The pilot reads the whole clearance back; the aircraft then switches to Ground by itself and asks for taxi.',
+              '(3) The departure procedure or vectors: "Atlantic City Three departure, radar vectors" - the 4-3-2 form is "(name and number) departure", with no "via"; at KACY the published procedure gives only the runway heading and Departure vectors the aircraft to the filed route (the chart says maintain 2000, expect the filed altitude ten minutes after departure). ' +
+              '(4) The route, here covered by radar vectors (otherwise the filed route or "as filed"). (5) The altitude data in the order flown: "maintain two thousand" is the initial altitude, "expect one zero thousand, one zero minutes after departure" is the cruise altitude the pilot should plan for (digits are spoken one at a time: "one zero minutes"). ' +
+              '(6) The departure frequency, 124.6 (Approach and Departure share it at KACY; the chart also shows 134.25 for the north sector), as "departure frequency ...", and (7) the transponder code ("squawk ..."; 3-9-3 puts frequency and code together): four digits, each 0 to 7, never 0000, 1200, 7500, 7600 or 7700, and not a code another aircraft already uses. The pilot reads the whole clearance back; the aircraft then switches to Ground by itself and asks for taxi.',
             mistakes: [
               'Leaving out "cleared to <destination>" - the destination is the clearance limit.',
               'A squawk code with an 8 or a 9, or a reserved or duplicate code.',
@@ -404,31 +404,31 @@ export const TRAINING_SCENARIOS: ScenarioDef[] = [
               prompt: `Vector NKS451 to intercept the runway 13 final approach course: turn ${g.turn} to a heading that meets the course at no more than 30 degrees. About ${Math.round(g.angleDeg)} degrees (heading ${String(g.headingMag).padStart(3, '0')}) works here: the aircraft is ${Math.abs(g.crossNm).toFixed(1)} nm off the course, so it intercepts about ${(Math.abs(g.crossNm) / Math.sin((g.angleDeg * Math.PI) / 180)).toFixed(0)} nm later.`,
               example: `Spirit four fifty one, turn ${g.turn} heading ${hdg}.`,
               explanation:
-                `The heading must meet the final approach course at no more than 30 degrees (7110.65 allows 30 when the intercept is 2 miles or more outside the approach gate, 20 closer in), and the intercept has to be outside the final approach fix. ` +
-                `In the simulator that means: intercept angle 30 degrees or less, intercept point outside the FAF (${faf}), and the course no more than 10 nm ahead of the aircraft when you clear it. ` +
+                `The heading must meet the final approach course at no more than 30 degrees (7110.65 allows 30 when the intercept is 2 miles or more outside the approach gate, 20 closer in), and 5-9-1 wants the intercept at least 2 miles outside the approach gate. 5-9-4 also has you give the aircraft's position relative to a fix on the final approach course (distance and fix name) before the vector. ` +
+                `The simulator has no approach gate, so it simplifies this: intercept angle 30 degrees or less, intercept point outside the FAF (${faf}), and the course no more than 10 nm ahead of the aircraft when you clear it. ` +
                 `Here the course is on your ${g.turn === 'left' ? 'left' : 'right'}, so turn ${g.turn}. A bigger angle ("turn left heading zero zero zero") would be refused as too steep.`,
               mistakes: ['An intercept angle above 30 degrees.', 'A heading that does not converge on the course (turning away from it).', 'Waiting until the aircraft is inside the FAF: the approach clearance is then refused.'],
             },
             {
               id: 'clear', callsign: 'NKS451', expectCommand: 'APPROACH', reference: refTexts('5-9-4', '4-8-1'),
-              prompt: 'Clear NKS451 for the ILS runway 13 approach with an altitude to maintain until it is established: "maintain two thousand until established, cleared ILS runway one three approach".',
-              example: 'Spirit four fifty one, maintain two thousand until established, cleared ILS runway one three approach.',
+              prompt: 'Clear NKS451 for the ILS runway 13 approach with an altitude to maintain until it is established: "maintain two thousand until established on the localizer, cleared ILS runway one three approach".',
+              example: 'Spirit four fifty one, maintain two thousand until established on the localizer, cleared ILS runway one three approach.',
               explanation:
-                'Before the aircraft reaches the approach gate the controller gives its position, the vector to the course and the approach clearance. The altitude is held "until established" on the localizer (a segment of the published approach) so the aircraft stays above terrain and below the glidepath until it can follow it. ' +
-                'The clearance names the approach as published (ILS runway 13), and the pilot reads it back with the runway and callsign. The simulator checks the geometry: inside the FAF or an intercept steeper than 30 degrees is refused in training.',
+                'Before the aircraft reaches the approach gate the controller gives its position, the vector to the course and the approach clearance. The altitude is held "until established on the localizer" (a segment of the published approach; the 5-9-4 arrival examples use exactly this wording) so the aircraft stays above terrain and below the glidepath until it can follow it. ' +
+                'The clearance names the approach as published, "Cleared ILS runway 13 approach" (4-8-1), and the pilot reads it back with the runway and callsign. The simulator checks the geometry: inside the FAF or an intercept steeper than 30 degrees is refused in training.',
               mistakes: ['"Cleared approach" without naming the ILS and the runway.', 'Forgetting the altitude to maintain until established.', 'Clearing the approach after the aircraft is already inside the FAF.'],
             },
             {
               id: 'wait-established', callsign: 'NKS451', check: 'established:NKS451', reference: refText('5-9-2'),
               prompt: 'Wait. NKS451 turns onto the localizer, intercepts the glidepath from below and reports established on the ILS runway 13.',
-              explanation: 'After the interception, watch the track: if the aircraft is not converging, ask its position and intentions. The pilot reports "established" when it is on the course inside the final approach segment, and stays on your frequency until you hand it off.',
+              explanation: 'After the interception, watch the track: if the aircraft is not converging, ask its position and intentions (5-9-2). The simulated pilot reports "established" when it is on the course, and stays on your frequency until you hand it off.',
               mistakes: ['Handing the aircraft to Tower before it has reported established (it is not yet on the final).'],
             },
             {
-              id: 'handoff', callsign: 'NKS451', expectCommand: 'CONTACT_FREQUENCY',
+              id: 'handoff', callsign: 'NKS451', expectCommand: 'CONTACT_FREQUENCY', reference: refTexts('5-9-4', '2-1-17'),
               prompt: 'NKS451 is established. Hand it to Tower on 120.3.',
               example: 'Spirit four fifty one, contact tower one two zero point three.',
-              explanation: 'Once the aircraft is established on the final and no longer needs vectors, Approach transfers it to Tower; the pilot checks in with its distance from the runway and Tower issues the landing clearance. (No 7110.65 paragraph is cited here: the handoff wording was not verified for this lesson.)',
+              explanation: 'Once the aircraft is established on the final and no longer needs vectors, Approach transfers it to Tower; the pilot checks in with its distance from the runway and Tower issues the landing clearance. 5-9-4 requires the frequency change before the final approach fix, and its example names the tower and gives the frequency; 2-1-17 gives the form "Contact (facility and function), (frequency)", with the location name omitted when tower and TRACON share it.',
               mistakes: ['Keeping the aircraft on Approach until the last mile.', 'Forgetting the frequency.'],
             },
           ] satisfies TrainingStepSpec[],

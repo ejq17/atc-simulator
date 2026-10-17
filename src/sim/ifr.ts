@@ -14,6 +14,7 @@ import type { Aircraft, Airport, IfrClearanceDetails, ParsedCommand, SimulationS
 import type { SimContext } from './context';
 import { rngInt } from './rng';
 import { frequencyForPosition } from '../radio/frequencies';
+import { spokenAirportName } from '../radio/spoken';
 
 export const DEFAULT_INITIAL_ALTITUDE_FT = 2000;
 export const RESERVED_SQUAWKS: ReadonlySet<string> = new Set(['0000', '1200', '7500', '7600', '7700']);
@@ -51,7 +52,8 @@ export function departureProcedureName(airport: Airport): string | undefined {
 const stripK = (icao: string) => icao.trim().toUpperCase().replace(/^K(?=[A-Z0-9]{3}$)/, '');
 export const sameAirportId = (a: string, b: string): boolean => stripK(a) === stripK(b);
 
-export type IfrBuild = { ok: true; ifr: IfrClearanceDetails } | { ok: false; reason: string; pilot: string };
+/** `sayAgain`: the pilot asks for the element again ("Say again the squawk code") instead of saying "Unable". */
+export type IfrBuild = { ok: true; ifr: IfrClearanceDetails } | { ok: false; reason: string; pilot: string; sayAgain?: boolean };
 
 export function buildIfrClearance(ctx: SimContext, ac: Aircraft, given: ParsedCommand['ifr']): IfrBuild {
   const { airport } = ctx.state;
@@ -59,24 +61,24 @@ export function buildIfrClearance(ctx: SimContext, ac: Aircraft, given: ParsedCo
   const p = given ?? {};
 
   if (p.destination && !sameAirportId(p.destination, fp.destination)) {
-    return { ok: false, reason: `${ac.callsign} filed to ${fp.destination}; the clearance limit ${p.destination} does not match the flight plan.`, pilot: `we filed to ${fp.destination.replace(/^K/, '')}` };
+    return { ok: false, reason: `${ac.callsign} filed to ${fp.destination}; the clearance limit ${p.destination} does not match the flight plan.`, pilot: `we filed to ${spokenAirportName(fp.destination)}` };
   }
   const dpName = departureProcedureName(airport);
   if (p.departureProcedure && dpName && !dpName.toUpperCase().includes(p.departureProcedure.toUpperCase().replace(/\s+DEPARTURE\s*$/, '').trim())) {
     return { ok: false, reason: `Unknown departure procedure "${p.departureProcedure}" (this airport has ${dpName}).`, pilot: `we don't have that departure procedure` };
   }
   if (p.initialAltitudeFt !== undefined && !(p.initialAltitudeFt >= airport.elevationFt + 500 && p.initialAltitudeFt <= 18000)) {
-    return { ok: false, reason: `Initial altitude ${p.initialAltitudeFt} ft is not usable.`, pilot: 'say again the initial altitude' };
+    return { ok: false, reason: `Initial altitude ${p.initialAltitudeFt} ft is not usable.`, pilot: 'say again the initial altitude', sayAgain: true };
   }
   let squawk = p.squawk;
   if (squawk !== undefined) {
-    if (!isAssignableSquawk(squawk)) return { ok: false, reason: `Squawk ${squawk} is not an assignable transponder code.`, pilot: 'say again the squawk code' };
-    if (squawksInUse(ctx.state, ac.id).has(squawk)) return { ok: false, reason: `Squawk ${squawk} is already assigned to another aircraft.`, pilot: 'say again the squawk code' };
+    if (!isAssignableSquawk(squawk)) return { ok: false, reason: `Squawk ${squawk} is not an assignable transponder code.`, pilot: 'say again the squawk code', sayAgain: true };
+    if (squawksInUse(ctx.state, ac.id).has(squawk)) return { ok: false, reason: `Squawk ${squawk} is already assigned to another aircraft.`, pilot: 'say again the squawk code', sayAgain: true };
   } else {
     squawk = assignSquawk(ctx, ac.id);
   }
   const depFreq = p.departureFrequencyMhz ?? frequencyForPosition(airport, 'DEP')?.mhz ?? frequencyForPosition(airport, 'APP')?.mhz ?? frequencyForPosition(airport, 'TWR')?.mhz;
-  if (depFreq === undefined) return { ok: false, reason: `${airport.icao} has no departure frequency to assign.`, pilot: 'say again the departure frequency' };
+  if (depFreq === undefined) return { ok: false, reason: `${airport.icao} has no departure frequency to assign.`, pilot: 'say again the departure frequency', sayAgain: true };
 
   const dp = dpName;
   const ifr: IfrClearanceDetails = {

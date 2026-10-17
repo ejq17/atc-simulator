@@ -10,11 +10,15 @@ const DIGIT_WORDS: Record<string, string> = {
 
 const SUFFIX_WORDS: Record<string, string> = { L: 'left', R: 'right', C: 'center' };
 
-/** Acronyms spoken letter by letter. */
+/**
+ * Acronyms spoken letter by letter. Pronounced-as-word acronyms (ATIS, METAR, TAF,
+ * NOTAM, ASOS, AWOS, RNAV, TCAS, PAPI, VASI, SID) are deliberately NOT listed: the FAA
+ * Pilot/Controller Glossary and common usage say them as words (see docs/PHRASEOLOGY-AUDIT.md).
+ */
 const LETTERED = [
-  'ILS', 'VFR', 'IFR', 'ATIS', 'METAR', 'TAF', 'RNAV', 'VOR', 'DME', 'ATC',
-  'TCAS', 'ASOS', 'AWOS', 'NOTAM', 'VMC', 'IMC', 'GPS', 'RVR', 'SID', 'FAA',
-  'ACY', 'KACY', 'MSL', 'AGL', 'NDB', 'ADS-B', 'PAPI', 'VASI',
+  'ILS', 'VFR', 'IFR', 'VOR', 'DME', 'ATC',
+  'VMC', 'IMC', 'GPS', 'RVR', 'FAA',
+  'ACY', 'KACY', 'MSL', 'AGL', 'NDB', 'ADS-B',
 ];
 const LETTERED_RE = new RegExp(`\\b(${LETTERED.map((a) => a.replace('-', '\\-')).join('|')})\\b`, 'g');
 

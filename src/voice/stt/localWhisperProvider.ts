@@ -26,6 +26,8 @@ import { startPcmCapture, TARGET_SAMPLE_RATE, warmUpAudio } from './pcmCapture.t
 import type { PcmCapture, WarmAudio } from './pcmCapture.ts';
 import type { SpeechRecognitionProvider, SttStartOptions } from './types.ts';
 import { SttError } from './types.ts';
+import { errorText, importError, isEnglishOnly, mapPipelineError } from './whisperProtocol.ts';
+import type { WhisperWorkerEvent, WhisperWorkerRequest } from './whisperProtocol.ts';
 
 export const LOCAL_WHISPER_ID = 'whisper-local' as const;
 export const LOCAL_WHISPER_LABEL = 'Local Whisper (on-device, no cloud)';
@@ -34,6 +36,7 @@ export const DEFAULT_WHISPER_MODEL = 'onnx-community/whisper-tiny.en';
 /** Shown through onPartial while the model decodes. Not part of the transcript. */
 export const WHISPER_PLACEHOLDER = 'Transcribing…';
 
+const READY_MESSAGE = 'Local speech model ready (runs on this device).';
 const MIN_SAMPLES = Math.round(TARGET_SAMPLE_RATE * 0.25);
 const MAX_SECONDS = 60;
 /** Mean absolute amplitude below which a capture is treated as silence (about -66 dBFS). */
@@ -52,10 +55,146 @@ export interface WhisperProgress {
 
 type ProgressInfo = { status?: string; file?: string; loaded?: number; total?: number; progress?: number; name?: string };
 type AsrCall = (audio: Float32Array, options?: Record<string, unknown>) => Promise<{ text?: string } | Array<{ text?: string }>>;
+/** transformers.js `pipeline()` signature, reduced to what we use. */
 type PipelineFactory = (task: string, model: string, options?: Record<string, unknown>) => Promise<AsrCall>;
 export interface TransformersModule {
   pipeline: PipelineFactory;
   env?: Record<string, unknown>;
+}
+
+/** The slice of the Worker API the provider uses (so tests can fake it). */
+export interface WorkerLike {
+  postMessage(message: WhisperWorkerRequest, transfer?: Transferable[]): void;
+  onmessage: ((e: MessageEvent<WhisperWorkerEvent>) => void) | null;
+  onerror: ((e: ErrorEvent) => any) | null;
+  onmessageerror: ((e: MessageEvent) => any) | null;
+  terminate(): void;
+}
+
+const defaultCreateWorker = (): WorkerLike => new Worker(new URL('./whisperWorker.ts', import.meta.url), { type: 'module' });
+
+/** Raised when the worker itself cannot run (script failed to load, crashed), as opposed to a model/network error. */
+class WorkerUnavailableError extends Error {}
+
+interface AsrBackend {
+  readonly kind: 'worker' | 'main';
+  alive(): boolean;
+  load(req: { model: string; device: string; dtype: string }, onProgress: (info: ProgressInfo) => void): Promise<void>;
+  transcribe(audio: Float32Array, call: Record<string, unknown>): Promise<string>;
+}
+
+function mainBackend(loadTransformers: () => Promise<TransformersModule>): AsrBackend {
+  let asr: AsrCall | null = null;
+  return {
+    kind: 'main',
+    alive: () => true,
+    async load(req, onProgress) {
+      let tf: TransformersModule;
+      try {
+        tf = await loadTransformers();
+      } catch (cause) {
+        throw importError(cause);
+      }
+      if (tf.env) {
+        tf.env.allowLocalModels = false; // never probe the dev server for /models/... (it answers index.html)
+        tf.env.useBrowserCache = true; // persist model files in the Cache API
+      }
+      try {
+        asr = await tf.pipeline('automatic-speech-recognition', req.model, { device: req.device, dtype: req.dtype, progress_callback: onProgress });
+      } catch (cause) {
+        throw mapPipelineError(cause, req.model);
+      }
+    },
+    async transcribe(audio, call) {
+      if (!asr) throw new Error('The speech model has not been loaded.');
+      const out = await asr(audio, call);
+      const first = Array.isArray(out) ? out[0] : out;
+      return typeof first?.text === 'string' ? first.text : '';
+    },
+  };
+}
+
+function workerBackend(createWorker: () => WorkerLike): AsrBackend {
+  let worker: WorkerLike;
+  try {
+    worker = createWorker();
+  } catch (cause) {
+    throw new WorkerUnavailableError(errorText(cause));
+  }
+  let dead = false;
+  let loaded = false;
+  let nextId = 1;
+  let onProgress: (info: ProgressInfo) => void = () => undefined;
+  let loadSettle: { resolve(): void; reject(e: unknown): void } | null = null;
+  const pending = new Map<number, { resolve(t: string): void; reject(e: unknown): void }>();
+  let model = '';
+
+  const die = (cause: unknown) => {
+    if (dead) return;
+    dead = true;
+    worker.terminate();
+    const err = loaded ? new SttError('unknown', `The local speech worker stopped unexpectedly. (${errorText(cause)})`, { cause }) : new WorkerUnavailableError(errorText(cause));
+    loadSettle?.reject(err);
+    loadSettle = null;
+    pending.forEach((p) => p.reject(err));
+    pending.clear();
+  };
+  worker.onerror = (e) => die(e?.message || 'worker error');
+  worker.onmessageerror = () => die('worker message error');
+  worker.onmessage = (e) => {
+    const m = e.data;
+    switch (m.type) {
+      case 'progress':
+        onProgress(m.info as ProgressInfo);
+        break;
+      case 'ready':
+        loaded = true;
+        loadSettle?.resolve();
+        loadSettle = null;
+        break;
+      case 'result':
+        pending.get(m.id)?.resolve(m.text);
+        pending.delete(m.id);
+        break;
+      case 'error':
+        if (m.id !== undefined) {
+          pending.get(m.id)?.reject(new SttError('unknown', `Local speech recognition failed: ${m.message}`));
+          pending.delete(m.id);
+        } else if (m.stage === 'import') {
+          loadSettle?.reject(importError(new Error(m.message)));
+          loadSettle = null;
+        } else {
+          loadSettle?.reject(mapPipelineError(new Error(m.message), model));
+          loadSettle = null;
+        }
+        break;
+    }
+  };
+
+  return {
+    kind: 'worker',
+    alive: () => !dead,
+    load(req, progress) {
+      model = req.model;
+      onProgress = progress;
+      return new Promise<void>((resolve, reject) => {
+        loadSettle = { resolve, reject };
+        worker.postMessage({ type: 'load', ...req });
+      }).catch((err: unknown) => {
+        if (!(err instanceof WorkerUnavailableError)) worker.terminate(); // model error: a fresh worker retries cleanly
+        dead = true;
+        throw err;
+      });
+    },
+    transcribe(audio, call) {
+      if (dead) return Promise.reject(new SttError('unknown', 'The local speech worker is not running.'));
+      const id = nextId++;
+      return new Promise<string>((resolve, reject) => {
+        pending.set(id, { resolve, reject });
+        worker.postMessage({ type: 'transcribe', id, audio, call }, [audio.buffer]); // transfer: no copy, no main-thread work
+      });
+    },
+  };
 }
 
 export interface LocalWhisperOptions {
@@ -64,8 +203,16 @@ export interface LocalWhisperOptions {
   device?: 'wasm' | 'webgpu';
   /** Defaults to 'q8' (smallest download). */
   dtype?: string;
-  /** Test seam; defaults to `import('@huggingface/transformers')` (code-split, loaded only when used). */
+  /**
+   * Main-thread engine seam; defaults to `import('@huggingface/transformers')` (code-split, loaded only when used).
+   * Supplying it (tests) selects the main-thread engine unless `createWorker` is also given.
+   */
   loadTransformers?: () => Promise<TransformersModule>;
+  /**
+   * Worker factory. Default: a module Web Worker running whisperWorker.ts when `Worker` exists. `null` forces the
+   * main-thread engine. Anything that makes the worker fail to start also falls back to the main thread.
+   */
+  createWorker?: (() => WorkerLike) | null;
   getUserMedia?: (c: MediaStreamConstraints) => Promise<MediaStream>;
   startCapture?: (stream: MediaStream, onChunk: (pcm: ArrayBuffer) => void, warm?: WarmAudio) => Promise<PcmCapture>;
   /** Test seam for the idle audio graph (see warmUpAudio). */
@@ -83,11 +230,11 @@ export interface LocalWhisperProvider extends SpeechRecognitionProvider {
   /** Subscribe to model download/initialisation progress. Replays the current state immediately. */
   onProgress(listener: (p: WhisperProgress) => void): () => void;
   getProgress(): WhisperProgress;
+  /** Where decoding runs: 'worker' (default), 'main' (fallback), or 'none' until the model has been prepared. */
+  getEngine(): 'worker' | 'main' | 'none';
   prepare(): Promise<void>;
   dispose(): Promise<void>;
 }
-
-const isEnglishOnly = (model: string) => model.endsWith('.en');
 
 function int16ToFloat32(chunks: Int16Array[], total: number): Float32Array {
   const out = new Float32Array(total);
@@ -105,8 +252,8 @@ function meanAbs(a: Float32Array): number {
   return s / a.length;
 }
 
-/** Pipelines are expensive (tens of MB in memory): share one per model+device across provider instances. */
-const pipelineCache = new Map<string, Promise<AsrCall>>();
+/** Loaded engines are expensive (tens of MB): share one per model+device across provider instances. */
+const backendCache = new Map<string, Promise<AsrBackend>>();
 
 export function createLocalWhisperProvider(options: LocalWhisperOptions = {}): LocalWhisperProvider {
   const model = options.model ?? DEFAULT_WHISPER_MODEL;
@@ -114,8 +261,6 @@ export function createLocalWhisperProvider(options: LocalWhisperOptions = {}): L
   const dtype = options.dtype ?? 'q8';
   const now = options.now ?? (() => Date.now());
   const finalTimeoutMs = options.finalTimeoutMs ?? 180_000;
-  const loadTransformers =
-    options.loadTransformers ?? (() => import('@huggingface/transformers') as unknown as Promise<TransformersModule>);
   const getMedia = () =>
     options.getUserMedia ??
     (typeof navigator !== 'undefined' && navigator.mediaDevices?.getUserMedia
@@ -156,11 +301,21 @@ export function createLocalWhisperProvider(options: LocalWhisperOptions = {}): L
     });
   }
 
-  function ensurePipeline(): Promise<AsrCall> {
-    const cached = pipelineCache.get(cacheKey);
+  const useWorker = options.createWorker !== null && (options.createWorker !== undefined || (options.loadTransformers === undefined && typeof Worker !== 'undefined'));
+  let engineKind: 'worker' | 'main' | 'none' = 'none';
+
+  function ensureBackend(): Promise<AsrBackend> {
+    const cached = backendCache.get(cacheKey);
     if (cached) {
-      if (progress.phase !== 'ready') cached.then(() => emit({ phase: 'ready', percent: 100, message: 'Local speech model ready (runs on this device).' }), () => undefined);
-      return cached;
+      return cached.then((b) => {
+        if (b.alive()) {
+          engineKind = b.kind;
+          if (progress.phase !== 'ready') emit({ phase: 'ready', percent: 100, message: READY_MESSAGE });
+          return b;
+        }
+        backendCache.delete(cacheKey); // the worker died after loading: rebuild
+        return ensureBackend();
+      });
     }
     if (typeof WebAssembly === 'undefined') {
       const err = new SttError('unsupported', 'This browser has no WebAssembly support, which the local Whisper model needs.');
@@ -169,42 +324,33 @@ export function createLocalWhisperProvider(options: LocalWhisperOptions = {}): L
     }
     files.clear();
     emit({ phase: 'downloading', percent: 0, message: 'Preparing local speech model…' });
+    const req = { model, device, dtype };
     const p = (async () => {
-      let tf: TransformersModule;
-      try {
-        tf = await loadTransformers();
-      } catch (cause) {
-        throw new SttError('network', 'Could not load the local speech engine code. Check your connection and reload the page.', { cause });
+      let backend: AsrBackend | null = null;
+      if (useWorker) {
+        try {
+          backend = workerBackend(options.createWorker ?? defaultCreateWorker);
+          await backend.load(req, onFileProgress);
+        } catch (err) {
+          if (!(err instanceof WorkerUnavailableError)) throw err;
+          console.info('[whisper-local] Web Workers are unavailable here; decoding on the main thread, so the page may pause briefly.');
+          emit({ phase: 'downloading', percent: 0, message: 'Web Workers unavailable: decoding on the main thread (the page may pause briefly).' });
+          backend = null;
+        }
       }
-      if (tf.env) {
-        tf.env.allowLocalModels = false; // never probe the dev server for /models/... (it answers index.html)
-        tf.env.useBrowserCache = true; // persist model files in the Cache API
+      if (!backend) {
+        backend = mainBackend(options.loadTransformers ?? (() => import('@huggingface/transformers') as unknown as Promise<TransformersModule>));
+        await backend.load(req, onFileProgress);
       }
-      try {
-        const asr = await tf.pipeline('automatic-speech-recognition', model, {
-          device,
-          dtype,
-          progress_callback: onFileProgress,
-        });
-        emit({ phase: 'loading', percent: 99, message: 'Starting local speech model…' });
-        return asr;
-      } catch (cause) {
-        const text = cause instanceof Error ? cause.message : String(cause);
-        const offline = /failed to fetch|fetch failed|networkerror|network|load failed|could not locate|\b(?:401|403|404|5\d\d)\b|cors|huggingface/i.test(text);
-        throw new SttError(
-          offline ? 'network' : 'unsupported',
-          offline
-            ? `Could not download the local speech model (${model}) from huggingface.co. Check your internet connection and try “Download / prepare local model” again. (${text})`
-            : `The local speech model could not start in this browser (WebAssembly/WebGPU problem). (${text})`,
-          { cause },
-        );
-      }
+      emit({ phase: 'loading', percent: 99, message: 'Starting local speech model…' });
+      engineKind = backend.kind;
+      return backend;
     })();
-    pipelineCache.set(cacheKey, p);
+    backendCache.set(cacheKey, p);
     p.then(
-      () => emit({ phase: 'ready', percent: 100, message: 'Local speech model ready (runs on this device).' }),
+      () => emit({ phase: 'ready', percent: 100, message: READY_MESSAGE }),
       (err: unknown) => {
-        pipelineCache.delete(cacheKey); // allow a retry
+        backendCache.delete(cacheKey); // allow a retry
         const e = err instanceof Error ? err : new Error(String(err));
         emit({ phase: 'error', percent: 0, message: e.message, error: e });
       },
@@ -243,6 +389,7 @@ export function createLocalWhisperProvider(options: LocalWhisperOptions = {}): L
     },
 
     getProgress: () => progress,
+    getEngine: () => engineKind,
     onProgress(listener) {
       listeners.add(listener);
       listener(progress);
@@ -251,7 +398,7 @@ export function createLocalWhisperProvider(options: LocalWhisperOptions = {}): L
 
     async warmUp() {
       void getWarm(); // also prepare the idle audio graph (the click is a user gesture, so it can start running)
-      await ensurePipeline();
+      await ensureBackend();
     },
 
     async prepare() {
@@ -305,7 +452,7 @@ export function createLocalWhisperProvider(options: LocalWhisperOptions = {}): L
       c.startedAt = now();
       current = c;
       // Overlap model download/initialisation with the user speaking. Errors surface at stop().
-      void ensurePipeline().catch(() => undefined);
+      void ensureBackend().catch(() => undefined);
     },
 
     async stop() {
@@ -324,9 +471,9 @@ export function createLocalWhisperProvider(options: LocalWhisperOptions = {}): L
         return;
       }
       c.opts.onPartial(WHISPER_PLACEHOLDER);
-      let asr: AsrCall;
+      let backend: AsrBackend;
       try {
-        asr = await ensurePipeline();
+        backend = await ensureBackend();
       } catch (err) {
         c.opts.onError(err instanceof Error ? err : new Error(String(err)));
         return;
@@ -338,11 +485,9 @@ export function createLocalWhisperProvider(options: LocalWhisperOptions = {}): L
           call.language = 'en';
           call.task = 'transcribe';
         }
-        const out = await asr(audio, call);
-        const first = Array.isArray(out) ? out[0] : out;
-        text = typeof first?.text === 'string' ? first.text : '';
+        text = await backend.transcribe(audio, call);
       } catch (cause) {
-        c.opts.onError(new SttError('unknown', `Local speech recognition failed: ${cause instanceof Error ? cause.message : String(cause)}`, { cause }));
+        c.opts.onError(cause instanceof SttError ? cause : new SttError('unknown', `Local speech recognition failed: ${errorText(cause)}`, { cause }));
         return;
       }
       const cleaned = postProcessTranscript(text);

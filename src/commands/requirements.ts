@@ -21,6 +21,7 @@ export function missingRequired(d: Draft): string[] {
       ...(f.approachType ? [] : ['missing approach type']),
       ...(f.runwayEnd ? [] : ['missing runway']),
     ];
+    case 'HOLD_AT_FIX': return f.hold?.fix ? [] : ['missing holding fix'];
     case 'DIRECT_FIX': return f.fix ? [] : ['missing fix'];
     case 'IFR_CLEARANCE': return f.ifr?.destination ? [] : ['missing destination airport'];
     default: return [];

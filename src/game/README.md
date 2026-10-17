@@ -67,8 +67,7 @@ parked A320 with `flightPlan` (destination KPHL/KEWR/KBOS..., cruise 10,000-23,0
 taxi (an aircraft told to contact an unstaffed Ground frequency stays on the exit and blocks the next arrival), which is why step 8 lists GND.
 
 Design rules every scenario follows (and `scenarios.test.ts` enforces): ids resolve against `loadKacy()`; only C172 and A320;
-no helicopters (USCG) or fighters (ANG); an A320 never sits on a hold it cannot depart from (the engine needs 6,500 ft:
-the full-length 13/31 holds and Charlie, never Alpha/4-22); airborne spawns are on the extended centreline at the runway end's TRUE heading
+no helicopters (USCG) or fighters (ANG); an A320 never sits on a hold it cannot depart from (the engine needs the type's `takeoffDistanceFt`, 5,000 ft for the A320, against the declared runway length minus the entry distance: every 13/31 hold qualifies, on 4/22 only the full-length ends; scenarios keep jets on 13/31 by operator preference); airborne spawns are on the extended centreline at the runway end's TRUE heading
 or on real bearings from KPHL (309), KMIV (257), KWWD (209); no two airborne spawns closer than 3 nm; 120 s in a real
 engine produce no CONFLICT / INCURSION / SEPARATION events.
 
@@ -78,7 +77,7 @@ to the 13 threshold, and taxiway Alpha crosses 13/31 on the way to runway 22 (bo
 ## Free play
 
 `buildFreePlay(airport, options)` honours every `FreePlayOptions` field: `seed`, `weather` (preset id | `'random'` (seeded) | `'live'` |
-a `Weather`), `activeRunways` (else `recommendRunways`, limited to A320-capable ends when jets are in play, preferred order 13, 31, 22, 4),
+a `Weather`), `activeRunways` (else `recommendRunways`, limited to ends the A320 can depart from, judged by `takeoffDistanceFt` vs `Runway.lengthFt` (all four ends at KACY); ties and calm wind go to the longer pair by operator preference, order 13, 31, 22, 4 - not a capability limit),
 `aircraftCount` (initial parked departures + inbound arrivals, distinct parking, arrivals >= 3 nm apart, jets placed nearer than Cessnas),
 `arrivalsPerHour`/`departuresPerHour`/`gaFraction`/`maxAircraft`, `difficulty` (default rates, max aircraft and the traffic ramp),
 `aircraftTypes`, `startingScenario` (`quiet`, `busy_departures`, `busy_arrivals`, `mixed`), `ifrFlows`.
@@ -97,7 +96,7 @@ independent exponential clocks for arrivals and departures at the hourly rates t
 never above `maxAircraft`. Arrivals: 10-12 nm from the threshold of an active landing runway, half on the centreline and half on a base-leg offset of 20-50 degrees,
 2,500-3,000 ft, 100 kt (C172) / 170 kt (A320), >= 3 nm from any other airborne aircraft (5 nm for a faster aircraft behind a slower one on the same final), initial frequency
 `TWR` (or `APP` if the scenario has APP but not TWR). Departures: free parking (GA ramp/FBO for C172, gates for A320), initial frequency `GND`,
-request `TAXI`; A320 departures are replaced by C172 (or skipped) when the active departure runway is 4/22. Callsigns: N-numbers in three formats and Spirit (80 %) / American flight numbers,
+request `TAXI`; A320 departures are replaced by C172 (or skipped) only when no active departure runway is long enough for the type (never at KACY now: an A320 can use 4/22 from full length; the generator only chooses the gate, the runway entry is the player's and the engine refuses < 5,000 ft remaining). Callsigns: N-numbers in three formats and Spirit (80 %) / American flight numbers,
 unique for the whole session and never ending in the same three characters as an active aircraft.
 
 ### IFR flows (`ifr.ts`, applied by the generator and the free-play builder)

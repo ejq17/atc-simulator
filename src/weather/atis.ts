@@ -9,6 +9,12 @@
  * The broadcast is ALWAYS flagged `simulated: true` and carries
  * `simulatedLabel` ("SIMULATED - not the real KACY ATIS") for the UI to show.
  * Cloud heights are AGL, so `elevationFt` is only echoed back as metadata.
+ *
+ * Content and order follow FAA JO 7110.65 2-9-3 (Content) and AIM 4-1-13: facility name, phonetic letter, time of the
+ * weather (UTC), wind, visibility / obstructions, sky condition, temperature, dew point, altimeter, instrument or
+ * visual approach in use (which names the landing runway), departure runway only when it differs from the landing
+ * runway, NOTAMs, the hold-short readback statement, then "Advise on initial contact you have information X".
+ * Numbers follow 2-4-17 (separate digits; "niner"). See docs/PHRASEOLOGY-AUDIT.md.
  */
 import type { Atis, Weather } from '../sim/types';
 import { ceilingCategory, ceilingFt, visibilityCategory, windMagnetic } from './metar';
@@ -48,6 +54,11 @@ export interface GenerateAtisInput {
    */
   approachesInUse?: string[];
   notams?: string[];
+  /**
+   * Add "Read back all runway hold short instructions." (7110.65 2-9-3; the KACY airport diagram requires readback of
+   * all runway holding instructions). Default true.
+   */
+  holdShortReadback?: boolean;
   elevationFt: number;
   /** Simulation clock seconds at issue (stored as `issuedAtSec`). Default 0. */
   issuedAtSec?: number;
@@ -314,17 +325,28 @@ function runwayList(ids: string[], speak: boolean): string {
   return `${word} ${names.join(' and ')}`;
 }
 
-function runwaySegment(active: ActiveRunways, speak: boolean): string {
+/** True when one of the approach phrases already names runway `rwy` ("ILS runway 13 approach"). */
+function approachNamesRunway(approaches: readonly string[], rwy: string): boolean {
+  const re = new RegExp(`\\brunway\\s+${rwy}\\b`, 'i');
+  return approaches.some((a) => re.test(a));
+}
+
+/**
+ * 7110.65 2-9-3: the approach in use names the landing runway ("specify landing runway/s unless the runway is that to
+ * which the instrument approach is made") and the departure runway is "given only if different from landing runway/s".
+ * Returns '' when nothing needs to be added after the approach statement.
+ */
+function runwaySegment(active: ActiveRunways, speak: boolean, approaches: readonly string[]): string {
   const land = uniq(active.landing);
   const dep = uniq(active.departing);
   if (land.length === 0 && dep.length === 0) return 'Runway information not available.';
-  if (land.length && dep.length && land.length === dep.length && land.every((r) => dep.includes(r))) {
-    return `Landing and departing ${runwayList(land, speak)}.`;
-  }
+  const same = land.length > 0 && land.length === dep.length && land.every((r) => dep.includes(r));
+  const unnamed = land.filter((r) => !approachNamesRunway(approaches, r));
+  if (same && unnamed.length === land.length) return `Landing and departing ${runwayList(land, speak)}.`;
   const parts: string[] = [];
-  if (land.length) parts.push(`Landing ${runwayList(land, speak)}`);
-  if (dep.length) parts.push(`${parts.length ? 'departing' : 'Departing'} ${runwayList(dep, speak)}`);
-  return `${parts.join(', ')}.`;
+  if (unnamed.length) parts.push(`Landing ${runwayList(unnamed, speak)}`);
+  if (dep.length && !same) parts.push(`${parts.length ? 'departing' : 'Departing'} ${runwayList(dep, speak)}`);
+  return parts.length ? `${parts.join(', ')}.` : '';
 }
 
 function capitalize(s: string): string { return s.charAt(0).toUpperCase() + s.slice(1); }
@@ -355,11 +377,16 @@ export function generateAtis(input: GenerateAtisInput): SimulatedAtis {
     disp.push(`${capitalize(joined)} in use.`);
     spok.push(`${capitalize(speakFreeText(joined))} in use.`);
   }
-  disp.push(runwaySegment(activeRunways, false));
-  spok.push(runwaySegment(activeRunways, true));
+  const rwyDisp = runwaySegment(activeRunways, false, approaches);
+  const rwySpok = runwaySegment(activeRunways, true, approaches);
+  if (rwyDisp) { disp.push(rwyDisp); spok.push(rwySpok); }
   if (notams.length) {
     disp.push(`NOTAMs: ${notams.join('. ')}.`);
     spok.push(`Notices to air missions: ${notams.map(speakFreeText).join('. ')}.`);
+  }
+  if (input.holdShortReadback ?? true) {
+    disp.push('Read back all runway hold short instructions.');
+    spok.push('Read back all runway hold short instructions.');
   }
   disp.push(`Advise on initial contact you have information ${phonetic}.`);
   spok.push(`Advise on initial contact you have information ${phonetic}.`);

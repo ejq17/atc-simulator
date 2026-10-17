@@ -7,7 +7,7 @@ pilot text-to-speech with radio clicks. Browser APIs only; the one npm dependenc
 ```
 src/voice/
   stt/        types (provider interface, VoiceStatus), webSpeechProvider, deepgramProvider,
-              localWhisperProvider (on-device Whisper), aviationPostProcess, pcmCapture (mic -> 16 kHz PCM),
+              localWhisperProvider (on-device Whisper), whisperWorker + whisperProtocol (decoding thread), aviationPostProcess, pcmCapture (mic -> 16 kHz PCM),
               aviationVocab, providerNotes (STT_PROVIDER_NOTES)
   ptt.ts      createPushToTalk (hold/toggle, runtime key change, bindButton)
   voiceController.ts   PTT + provider orchestration, status events
@@ -98,6 +98,15 @@ key** (it could not be exercised here).
 `device: 'webgpu'` is available through the provider options but is not the default because it is not deterministic in
 headless browsers).
 
+* **Threading.** The transformers.js pipeline runs in a module Web Worker (`stt/whisperWorker.ts`, protocol in `stt/whisperProtocol.ts`):
+  model start-up and decoding never block the UI thread. The page transfers (not copies) the Float32 PCM buffer and receives
+  `progress` / `ready` / `result` / `error` messages; the provider's public interface is unchanged. If `Worker` is missing or the worker
+  script cannot start, the provider falls back to decoding on the main thread and logs one notice
+  (`provider.getEngine()` reports `'worker'` or `'main'`). Measured with a Long Tasks observer and a requestAnimationFrame gap probe in
+  `e2e/voice.spec.ts` (Apple-silicon laptop, headless Chromium, 5 s call): main-thread decode = one 930-960 ms long task and a ~920-950 ms
+  frame gap; worker = no long tasks and a 17 ms worst frame gap. Key release to transcript went from about 1.2 s to about 1.5 s
+  (message passing plus the worker's own WASM threads); the UI stays live meanwhile.
+  `dispose()` releases the idle audio graph but keeps the worker (and its loaded model) for the next session.
 * **Flow.** PTT down: `getUserMedia` + `pcmCapture` fill a 16 kHz mono buffer (nothing is partial-streamed). PTT up:
   `onPartial('Transcribing…')`, `pipeline('automatic-speech-recognition', model)` over the buffer, the text is cleaned by
   `aviationPostProcess.ts`, then `onPartial(text)` and `onFinal(text, { durationMs })` (no confidence: Whisper reports none).
@@ -152,8 +161,23 @@ transcribes, the real parser and engine act, and the aircraft departs. Details t
 * Browser voices differ by OS/browser; with few voices pilots are told apart by rate/pitch only. Voice lists load asynchronously in Chrome.
 * Web Speech: Chrome ends recognition on pauses, so the provider restarts it while the key is held; accuracy on callsigns and numbers is lower than Deepgram. Firefox has no Web Speech recognition; Safari support is partial.
 * Browsers require a user gesture before audio plays and HTTPS (or localhost) for the microphone.
-* Local Whisper: tiny.en is less accurate than Deepgram on callsigns and runs on the main thread (WASM), so the page can stutter
-  for about a second while decoding; a Web Worker would fix that. The model and ONNX runtime need the network once, and the production
-  build copies a 27 MB ONNX `.wasm` into `dist/assets` that is not used at runtime (the runtime is fetched from jsdelivr).
+* Local Whisper: tiny.en is less accurate than Deepgram on callsigns. The model and ONNX runtime need the network once.
+  **Build size:** by default `vite build` emits onnxruntime-web's 27 MB `ort-wasm-simd-threaded.asyncify.wasm` into `dist/assets` even though
+  it is never loaded (transformers.js points the runtime at jsdelivr before use). There is no documented switch for this; `optimizeDeps.exclude`
+  and `assetsInclude` do not affect it. A verified fix (dist 29 MB -> 3.8 MB, e2e still green against that build) is a small Vite plugin that
+  turns the bundled fallback URL into `undefined`; it must be registered for both the app and the worker build. It lives outside `src/voice`, so
+  it is not applied; add this to `vite.config.ts` if the size matters:
+
+  ```ts
+  const noBundledOrtWasm = () => ({
+    name: 'no-bundled-ort-wasm', enforce: 'pre' as const, apply: 'build' as const,
+    transform(code: string, id: string) {
+      if (!id.includes('/onnxruntime-web/')) return null;
+      const re = /new URL\(\s*["']ort-wasm-simd-threaded[\w.]*\.wasm["']\s*,\s*import\.meta\.url\s*\)\.href/g;
+      return re.test(code) ? { code: code.replace(re, 'undefined'), map: null } : null;
+    },
+  });
+  // defineConfig({ plugins: [..., noBundledOrtWasm()], worker: { plugins: () => [noBundledOrtWasm()] } })
+  ```
 * The Deepgram temp-token subprotocol and the nova-3/nova-2 fallback were verified against documentation and fake sockets, not a live account.
 * Real aviation frequencies are never used: all radio is simulated inside the app.

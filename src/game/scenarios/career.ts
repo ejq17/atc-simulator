@@ -3,9 +3,9 @@
  * (holding positions from `runwayEntryNodes`, parking ids from the airport, airborne spawns on the TRUE-heading
  * extended centreline or on real bearings toward neighbouring airfields).
  *
- * Conventions: wind favours 13/31; the A320 only ever departs from the 13/31 full-length / Charlie holds (the engine
- * refuses a 6,500 ft roll on 6,145 ft runway 4/22); no helicopters (Coast Guard) and no fighters (ANG) are spawned
- * because the simulator does not model them yet.
+ * Conventions: wind favours 13/31; the A320 departs from 13/31 holds (it needs 5,000 ft: every 13/31 hold has that, on 4/22
+ * only the full-length ends do; scenarios keep jets on the longer 13/31 pair by operator preference); no helicopters (Coast Guard)
+ * and no fighters (ANG) are spawned because the simulator does not model them yet.
  */
 import { getPresetWeather } from '../../weather/presets';
 import { planDepartureTaxi, routeWords } from '../world';
@@ -100,7 +100,7 @@ const step4 = def(
     description:
       'Two Cessnas are holding short of runway 13: N412KB at the full-length entry (Bravo) and N88PL at Charlie. A Spirit A320 will ask to taxi from the terminal in about a minute. ' +
       'Decide the order, use line up and wait only when a takeoff clearance cannot be issued yet, and never clear a departure until the aircraft ahead is airborne and past the end of the runway or has turned clear.' +
-      ' The A320 needs about 6,500 ft of runway: send it to the full-length hold on Bravo (or Charlie), not the Alpha intersection - the simulator will refuse the takeoff.',
+      ' The A320 needs about 5,000 ft of runway: any runway 13 hold has that, but a departure from an intersection of 4/22 with less than 5,000 ft left is refused.',
     weather: WX_RWY13(), activeRunways: { departing: ['13'], landing: ['13'] }, controllerPositions: TOWER_AND_GROUND,
     spawns: [
       holdingShort(airport, 'N412KB', 'C172', '13', 0),
@@ -191,7 +191,7 @@ const step7 = def(
       'One runway, five movements. Spirit 712 is on a 9 nm final, a Cessna is holding short for departure, Cessna N35DM is coming in from Millville, a Spirit departure will call from the gate, ' +
       'and American 1201 arrives from the Philadelphia direction later. Get the departures out in the gaps between arrivals, give landing aircraft clearances in order and send each to Ground.' +
       ' Spirit 329 is IFR to Philadelphia (cruise 10,000): it calls Clearance Delivery (127.85) first. Read the clearance, then it asks Ground for taxi by itself; after takeoff hand it to Departure (124.6), answer its check-in with "radar contact" and climb it or send it direct (for example direct Coyle) to finish the handling.' +
-      ' The A320 needs about 6,500 ft of runway: send it to the full-length hold on Bravo (or Charlie), not the Alpha intersection - the simulator will refuse the takeoff.',
+      ' The A320 needs about 5,000 ft of runway: any runway 13 hold has that, but a departure from an intersection of 4/22 with less than 5,000 ft left is refused.',
     weather: WX_RWY13(), activeRunways: { departing: ['13'], landing: ['13'] }, controllerPositions: IFR_DEPARTURE_POSITIONS,
     spawns: [
       arrivalOnFinal(airport, 'NKS712', 'A320', '13', 9, 0),
@@ -259,7 +259,7 @@ const step9 = def(
       'Cessna N48KT is 6 nm out at 90 knots with Spirit 817 (A320) 12 nm out at 180 knots behind it: the Airbus closes about 70-100 knots faster. Slow the Spirit, or land the Cessna first and keep it from reaching the runway until it is clear. ' +
       'Two departures (N61RT, then Spirit 540 from the gate) need gaps; the Airbus needs far more runway and time than the Cessna. ' +
       'Spirit 540 is IFR to Newark (cruise 14,000): read its clearance on Clearance Delivery (127.85) when it calls, then it asks Ground for taxi; after takeoff hand it to Departure (124.6), say radar contact and climb it or send it direct.' +
-      ' The A320 needs about 6,500 ft of runway: send it to the full-length hold on Bravo (or Charlie), not the Alpha intersection - the simulator will refuse the takeoff.',
+      ' The A320 needs about 5,000 ft of runway: any runway 13 hold has that, but a departure from an intersection of 4/22 with less than 5,000 ft left is refused.',
     weather: WX_RWY13(), activeRunways: { departing: ['13'], landing: ['13'] }, controllerPositions: IFR_DEPARTURE_POSITIONS,
     spawns: [
       arrivalOnFinal(airport, 'N48KT', 'C172', '13', 6, 0, { speedKt: 90 }),
@@ -302,7 +302,7 @@ const step10 = def(
       description:
         'Operations start on runway 13 with a light southeast wind. At 10 minutes the wind shifts to 300 at 14 (see the weather schedule): runway 31 becomes the runway in use. ' +
         'Finish the runway 13 traffic, switch the active runways to 31 (landing and departing), and handle American 1004 (arrival on 31) and Cessna N90LE (departure from 31). Update the ATIS when the configuration changes.' +
-        ' The A320 needs about 6,500 ft of runway: send it to the full-length hold on Bravo (the full-length hold at either end), not the Alpha intersection - the simulator will refuse the takeoff.',
+        ' The A320 needs about 5,000 ft of runway: any 13/31 hold has that, but a departure from an intersection of 4/22 with less than 5,000 ft left is refused.',
       weather: vfrWeather(130, 10), activeRunways: { departing: ['13'], landing: ['13'] }, controllerPositions: TOWER_AND_GROUND,
       spawns: [
         arrivalOnFinal(airport, 'NKS501', 'A320', '13', 9, 0),

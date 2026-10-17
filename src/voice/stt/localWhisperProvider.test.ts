@@ -1,7 +1,8 @@
 // @vitest-environment jsdom
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createLocalWhisperProvider, LOCAL_WHISPER_ID, WHISPER_PLACEHOLDER } from './localWhisperProvider.ts';
-import type { TransformersModule } from './localWhisperProvider.ts';
+import type { TransformersModule, WorkerLike } from './localWhisperProvider.ts';
+import type { WhisperWorkerEvent, WhisperWorkerRequest } from './whisperProtocol.ts';
 import { createVoiceController } from '../voiceController.ts';
 import { STT_PROVIDER_NOTES } from './providerNotes.ts';
 import { SttError, sttErrorCode } from './types.ts';
@@ -281,5 +282,142 @@ describe('local whisper inside the voice controller', () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+});
+
+/** Scriptable stand-in for the Whisper Web Worker. */
+class FakeWorker implements WorkerLike {
+  static all: FakeWorker[] = [];
+  onmessage: ((e: MessageEvent<WhisperWorkerEvent>) => void) | null = null;
+  onerror: ((e: ErrorEvent) => void) | null = null;
+  onmessageerror: ((e: MessageEvent) => void) | null = null;
+  sent: Array<{ msg: WhisperWorkerRequest; transfer?: Transferable[] }> = [];
+  terminated = false;
+  /** What to do when the page asks for a model load / a transcription. */
+  onLoad: (w: FakeWorker) => void = (w) => {
+    w.emit({ type: 'progress', info: { status: 'progress', file: 'a.onnx', loaded: 5_000_000, total: 10_000_000 } });
+    w.emit({ type: 'progress', info: { status: 'done', file: 'a.onnx' } });
+    w.emit({ type: 'ready' });
+  };
+  onTranscribe: (w: FakeWorker, id: number) => void = (w, id) => w.emit({ type: 'result', id, text: ' Sessna 723 Echo Juliet Hold position' });
+  constructor() { FakeWorker.all.push(this); }
+  emit(data: WhisperWorkerEvent) { this.onmessage?.({ data } as MessageEvent<WhisperWorkerEvent>); }
+  postMessage(msg: WhisperWorkerRequest, transfer?: Transferable[]) {
+    this.sent.push({ msg, transfer });
+    queueMicrotask(() => (msg.type === 'load' ? this.onLoad(this) : this.onTranscribe(this, msg.id)));
+  }
+  terminate() { this.terminated = true; }
+}
+
+function workerHarness(configure?: (w: FakeWorker) => void, extra: Partial<Parameters<typeof createLocalWhisperProvider>[0]> = {}) {
+  FakeWorker.all = [];
+  const main = harness();
+  const provider = createLocalWhisperProvider({
+    model: model(),
+    createWorker: () => { const w = new FakeWorker(); configure?.(w); return w; },
+    loadTransformers: main.loadTransformers, // only used if the worker cannot start
+    getUserMedia: main.getUserMedia, startCapture: main.startCapture,
+    ...extra,
+  });
+  return { provider, main, calls: main.calls, handlers: main.handlers };
+}
+
+describe('local whisper in a Web Worker', () => {
+  it('decodes in the worker: transfers the PCM buffer, relays progress, never touches the main-thread pipeline', async () => {
+    const h = workerHarness();
+    const seen: number[] = [];
+    h.provider.onProgress((p) => p.phase === 'downloading' && seen.push(p.percent));
+    await h.provider.start(h.handlers);
+    await h.provider.stop();
+
+    const w = FakeWorker.all[0];
+    expect(FakeWorker.all).toHaveLength(1);
+    expect(w.sent[0].msg).toMatchObject({ type: 'load', device: 'wasm', dtype: 'q8' });
+    const tx = w.sent.find((m) => m.msg.type === 'transcribe')!;
+    const req = tx.msg as Extract<WhisperWorkerRequest, { type: 'transcribe' }>;
+    expect(req.audio).toBeInstanceOf(Float32Array);
+    expect(req.audio.length).toBe(16000);
+    expect(tx.transfer).toEqual([req.audio.buffer]); // transferred, not copied
+    expect(req.call).toMatchObject({ return_timestamps: false });
+    expect(req.call).not.toHaveProperty('language'); // English-only model
+
+    expect(h.calls.partial[0]).toBe(WHISPER_PLACEHOLDER);
+    expect(h.calls.final.map(([t]) => t)).toEqual(['Cessna 723 Echo Juliet Hold position']);
+    expect(h.calls.final[0][1].confidence).toBeUndefined();
+    expect(h.provider.getEngine()).toBe('worker');
+    expect(h.main.loadTransformers).not.toHaveBeenCalled();
+    expect(seen).toContain(50);
+    expect(h.provider.getProgress().phase).toBe('ready');
+  });
+
+  it('keeps one worker and one load across presses', async () => {
+    const h = workerHarness();
+    await h.provider.start(h.handlers);
+    await h.provider.stop();
+    await h.provider.start(h.handlers);
+    await h.provider.stop();
+    expect(FakeWorker.all).toHaveLength(1);
+    expect(FakeWorker.all[0].sent.filter((m) => m.msg.type === 'load')).toHaveLength(1);
+    expect(h.calls.final).toHaveLength(2);
+  });
+
+  it('a model download failure inside the worker is a network error (no silent fallback) and a retry gets a fresh worker', async () => {
+    let first = true;
+    const h = workerHarness((w) => {
+      if (first) { first = false; w.onLoad = (x) => x.emit({ type: 'error', stage: 'pipeline', message: 'Failed to fetch huggingface.co/x' }); }
+    });
+    await expect(h.provider.warmUp()).rejects.toMatchObject({ code: 'network' });
+    expect(FakeWorker.all[0].terminated).toBe(true);
+    expect(h.main.loadTransformers).not.toHaveBeenCalled();
+    await h.provider.warmUp();
+    expect(FakeWorker.all).toHaveLength(2);
+    expect(h.provider.getProgress().phase).toBe('ready');
+  });
+
+  it('falls back to the main thread, with one notice, when the worker script cannot start', async () => {
+    const info = vi.spyOn(console, 'info').mockImplementation(() => undefined);
+    const h = workerHarness((w) => { w.onLoad = () => w.onerror?.({ message: 'Failed to load module script' } as ErrorEvent); });
+    await h.provider.start(h.handlers);
+    await h.provider.stop();
+    expect(h.provider.getEngine()).toBe('main');
+    expect(h.main.pipeline).toHaveBeenCalledOnce();
+    expect(h.calls.final.map(([t]) => t)).toEqual(['Cessna 723 Echo Juliet Hold position']);
+    expect(info).toHaveBeenCalledTimes(1);
+    expect(String(info.mock.calls[0][0])).toMatch(/main thread/);
+  });
+
+  it('falls back to the main thread when constructing the worker throws', async () => {
+    vi.spyOn(console, 'info').mockImplementation(() => undefined);
+    const main = harness();
+    const provider = createLocalWhisperProvider({
+      model: model(), createWorker: () => { throw new Error('Worker is not defined'); }, loadTransformers: main.loadTransformers,
+    });
+    await provider.warmUp();
+    expect(provider.getEngine()).toBe('main');
+  });
+
+  it('createWorker: null forces the main-thread engine', async () => {
+    const main = harness();
+    const provider = createLocalWhisperProvider({ model: model(), createWorker: null, loadTransformers: main.loadTransformers });
+    await provider.warmUp();
+    expect(provider.getEngine()).toBe('main');
+  });
+
+  it('a transcription error from the worker is reported through onError', async () => {
+    const h = workerHarness((w) => { w.onTranscribe = (x, id) => x.emit({ type: 'error', id, stage: 'transcribe', message: 'out of memory' }); });
+    await h.provider.start(h.handlers);
+    await expect(h.provider.stop()).resolves.toBeUndefined();
+    expect(h.calls.errors[0].message).toMatch(/out of memory/);
+    expect(h.calls.errors[0].message.match(/Local speech recognition failed/g)).toHaveLength(1);
+  });
+
+  it('a worker that crashes after loading is replaced on the next press', async () => {
+    const h = workerHarness();
+    await h.provider.warmUp();
+    FakeWorker.all[0].onerror?.({ message: 'boom' } as ErrorEvent);
+    await h.provider.start(h.handlers);
+    await h.provider.stop();
+    expect(FakeWorker.all).toHaveLength(2);
+    expect(h.calls.final).toHaveLength(1);
   });
 });

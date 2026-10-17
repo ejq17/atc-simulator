@@ -46,11 +46,15 @@ Sample (live KACY METAR fetched 2026-10-17, runway 31):
 ```
 text:       Atlantic City Airport information Bravo, 0100 Zulu. Wind 300 at 17, gusts 23. Visibility 10.
             Sky condition few clouds at 1800, ceiling 3800 broken, overcast 4900. Temperature 21, dew point 17.
-            Altimeter 29.83. Visual approach runway 31 in use. Landing and departing runway 31.
-            NOTAMs: Taxiway B closed. Advise on initial contact you have information Bravo.
+            Altimeter 29.83. Visual approach runway 31 in use. NOTAMs: Taxiway B closed.
+            Read back all runway hold short instructions. Advise on initial contact you have information Bravo.
 spokenText: ... Wind three zero zero at one seven, gusts two three. Visibility one zero. ... Altimeter two niner
             eight three. ... Notices to air missions: Taxiway B closed. ...
 ```
+
+Content and order follow 7110.65 2-9-3 and AIM 4-1-13 (see `docs/PHRASEOLOGY-AUDIT.md`): the approach in use names the landing
+runway, a departure runway is added only when it differs ("Departing runway 4."), and the hold-short readback statement is
+included unless `holdShortReadback: false`.
 
 The result extends `Atis` (`letter`, `text`, `issuedAtSec`, `activeRunways`, `simulated: true`) with
 `spokenText`, `phonetic`, `timeZulu`, `simulatedLabel` (**"SIMULATED – not the real KACY ATIS"**, UI must show it),

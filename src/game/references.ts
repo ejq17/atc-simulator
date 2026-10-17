@@ -8,6 +8,9 @@
  *
  * IFR additions (4-2-1, 4-3-2, 4-8-1, 5-9-1, 5-9-2, 5-9-4) were confirmed the same way on 2026-10-16 (chapter 4 sections 2, 3 and 8, chapter 5
  * section 9, fetched with a browser User-Agent; headings read from the page, edition JO 7110.65BB).
+ *
+ * Phraseology audit additions (2-1-17, 2-4-17, 2-4-19, 2-9-3, 3-9-3, 4-3-3, 5-7-2) were confirmed on 2026-10-17 from the pages
+ * saved under data/sources/raw/phraseology/ (see docs/PHRASEOLOGY-AUDIT.md).
  */
 export interface FaaReference {
   /** Paragraph number, e.g. "3-9-10". */
@@ -25,12 +28,17 @@ function ref(para: string, title: string, page: string): FaaReference {
 }
 
 export const REFERENCES = {
+  '2-1-17': ref('2-1-17', 'Radio Communications', 'chap2_section_1'),
   '2-4-3': ref('2-4-3', 'Pilot Acknowledgment/Read Back', 'chap2_section_4'),
+  '2-4-17': ref('2-4-17', 'Numbers Usage', 'chap2_section_4'),
+  '2-4-19': ref('2-4-19', 'Facility Identification', 'chap2_section_4'),
   '2-4-20': ref('2-4-20', 'Aircraft Identification', 'chap2_section_4'),
+  '2-9-3': ref('2-9-3', 'Content', 'chap2_section_9'),
   '3-1-3': ref('3-1-3', 'Use of Active Runways', 'chap3_section_1'),
   '3-1-12': ref('3-1-12', 'Visually Scanning Runways', 'chap3_section_1'),
   '4-2-1': ref('4-2-1', 'Clearance Items', 'chap4_section_2'),
   '4-3-2': ref('4-3-2', 'Departure Clearances', 'chap4_section_3'),
+  '4-3-3': ref('4-3-3', 'Abbreviated Departure Clearance', 'chap4_section_3'),
   '4-8-1': ref('4-8-1', 'Approach Clearance', 'chap4_section_8'),
   '5-9-1': ref('5-9-1', 'Vectors to Final Approach Course', 'chap5_section_9'),
   '5-9-2': ref('5-9-2', 'Final Approach Course Interception', 'chap5_section_9'),
@@ -38,6 +46,8 @@ export const REFERENCES = {
   '3-7-1': ref('3-7-1', 'Ground Traffic Movement', 'chap3_section_7'),
   '3-7-2': ref('3-7-2', 'Taxi and Ground Movement Operations', 'chap3_section_7'),
   '3-8-1': ref('3-8-1', 'Sequence/Spacing Application', 'chap3_section_8'),
+  '5-7-2': ref('5-7-2', 'Methods', 'chap5_section_7'),
+  '3-9-3': ref('3-9-3', 'Departure Control Instructions', 'chap3_section_9'),
   '3-9-4': ref('3-9-4', 'Line Up and Wait (LUAW)', 'chap3_section_9'),
   '3-9-6': ref('3-9-6', 'Same Runway Separation', 'chap3_section_9'),
   '3-9-8': ref('3-9-8', 'Intersecting Runway/Intersecting Flight Path Operations', 'chap3_section_9'),

@@ -226,20 +226,26 @@ export function routeWords(taxiways: string[]): string {
   return taxiways.filter((t) => t).map((t) => NATO[t] ?? t).join(', ');
 }
 
-/** Can this aircraft type take off from `hold` toward `endId`? Mirrors the engine's runway-length check. */
+/**
+ * Can this aircraft type take off from `hold` toward `endId`? Compares the type's `takeoffDistanceFt` (engine performance data, source-verified)
+ * with the declared runway length (`Runway.lengthFt`, used as the TORA) minus the distance from the threshold to where the aircraft enters
+ * the runway. No type is hard-coded as "13/31 only": an A320 (5,000 ft) can use 4/22 (6,145 ft) from full length but not from an intersection
+ * with less than 5,000 ft remaining, exactly as the engine's `runwayLengthCheck` decides.
+ */
 export function canDepartFrom(airport: Airport, type: string, endId: string, hold: TaxiNode): boolean {
   const perf = getPerformance(type);
   const e = endOf(airport, endId);
-  const other = airport.runways.find((r) => r.ends.some((x) => x.id === endId))!.ends.find((x) => x.id !== endId)!;
+  const runway = airport.runways.find((r) => r.ends.some((x) => x.id === endId))!;
+  const other = runway.ends.find((x) => x.id !== endId)!;
   const total = Math.hypot(other.threshold.x - e.threshold.x, other.threshold.y - e.threshold.y);
   const dir = { x: (other.threshold.x - e.threshold.x) / total, y: (other.threshold.y - e.threshold.y) / total };
   const entryId = (hold as TaxiNode & { entryNodeId?: string }).entryNodeId;
   const entry = (entryId && airport.taxiwayGraph.nodes[entryId]) || hold;
-  const along = Math.max(0, (entry.pos.x - e.threshold.x) * dir.x + (entry.pos.y - e.threshold.y) * dir.y);
-  return (total - along) / 0.3048 >= perf.takeoffDistanceFt;
+  const alongFt = Math.max(0, (entry.pos.x - e.threshold.x) * dir.x + (entry.pos.y - e.threshold.y) * dir.y) / 0.3048;
+  return runway.lengthFt - alongFt >= perf.takeoffDistanceFt;
 }
 
-/** Can the type take off from the *full length* of this runway end at all? (A320 cannot use 4/22.) */
+/** Can the type take off from the *full length* of this runway end? (KACY: an A320 can on every end, 4/22 only from the end of the pavement.) */
 export function runwayLongEnoughFor(airport: Airport, type: string, endId: string): boolean {
   return canDepartFrom(airport, type, endId, fullLengthHold(airport, endId));
 }

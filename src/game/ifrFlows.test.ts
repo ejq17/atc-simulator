@@ -376,9 +376,9 @@ describe('IFR objective checks', () => {
 
   it('ifr_request / ifr_clearance / established', () => {
     const s = fakeState([
-      ev(5, 'TRANSMISSION', 'NKS1', { request: 'IFR_CLEARANCE' }, { speaker: 'PILOT', text: 'Atlantic City Clearance, Spirit one, IFR to Philadelphia, ready to copy.' }),
+      ev(5, 'TRANSMISSION', 'NKS1', { request: 'IFR_CLEARANCE' }, { speaker: 'PILOT', text: 'Atlantic City Clearance Delivery, Spirit one, IFR to Philadelphia, ready to copy.' }),
       ev(9, 'COMMAND_ACCEPTED', 'NKS1', { kind: 'IFR_CLEARANCE' }),
-      ev(50, 'TRANSMISSION', 'NKS2', { request: 'FREQUENCY_CHANGE' }, { speaker: 'PILOT', text: 'Atlantic City Approach, Spirit two, established ILS runway one three.' }),
+      ev(50, 'TRANSMISSION', 'NKS2', { request: 'FREQUENCY_CHANGE' }, { speaker: 'PILOT', text: 'Atlantic City Approach, Spirit two, established on the ILS runway one three.' }),
       ev(60, 'TRANSMISSION', 'NKS3', { request: 'FREQUENCY_CHANGE' }, { speaker: 'PILOT', text: 'Atlantic City Tower, Spirit three, clear of runway one three.' }),
     ]);
     expect(evaluateCheck(s, 'ifr_request:NKS1')).toBe(true);

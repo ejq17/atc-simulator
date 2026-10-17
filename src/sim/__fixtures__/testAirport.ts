@@ -104,12 +104,25 @@ function fixtureNav(r13: RunwayEnd, r31: RunwayEnd, r4: RunwayEnd, r22: RunwayEn
   // VOR 31
   add('FX31A', onFinal(r31, 10.13, 1.01));
   add('FX31B', onFinal(r31, 4.16, 0.4));
+  // VORTAC near the field and the missed approach holding fix on its R-090 at 11 DME (like ACY / SMITS)
+  add('FVR', { x: 72, y: -188 }, 'VORTAC', 'FIXTURE');
+  add('FXS', { x: 72 + Math.sin(deg2rad(78)) * 11 * 1852, y: -188 + Math.cos(deg2rad(78)) * 11 * 1852 });
   // en-route VOR southeast
   add('TSE', { x: 12000, y: -42000 }, 'VOR', 'TEST SEA');
-  const iap = (id: string, name: string, runwayEnd: string, fixes: string[]): InstrumentProcedure => ({ id, name, type: 'IAP', runwayEnd, chartPdfUrl: '', fixes, provenance: prov });
+  const iap = (id: string, name: string, runwayEnd: string, fixes: string[], text: Partial<InstrumentProcedure> = {}): InstrumentProcedure => ({
+    id, name, type: 'IAP', runwayEnd, chartPdfUrl: '', fixes, provenance: prov, ...text,
+  });
   const procedures: InstrumentProcedure[] = [
-    iap('FIX-ILS-OR-LOC-RWY-13', 'ILS OR LOC RWY 13', '13', ['TVO', 'FX13A', 'FX13B', 'FX13M']),
-    iap('FIX-RNAV-GPS-RWY-22', 'RNAV (GPS) RWY 22', '22', ['FX22F', 'FX22A', 'FX22B', 'FX22C', 'FX22M']),
+    iap('FIX-ILS-OR-LOC-RWY-13', 'ILS OR LOC RWY 13', '13', ['TVO', 'FX13A', 'FX13B', 'FX13M'], {
+      missedApproachText: 'Climb to 600 then climbing left turn to 2000 on FVR R-090 to FXS/FVR 11 DME and hold.',
+      holdingText: 'FX13A: one-minute hold 4500/2000',
+      minimaText: 'S-ILS 13 DA 275 RVR 1800 HAT 200 (200-1/2); S-LOC 13 520/45 HAT 445 (500-7/8)',
+    }),
+    iap('FIX-RNAV-GPS-RWY-22', 'RNAV (GPS) RWY 22', '22', ['FX22F', 'FX22A', 'FX22B', 'FX22C', 'FX22M'], {
+      missedApproachText: 'Climb to 600 then climbing right turn to 2000 direct FX22M and hold.',
+      holdingText: 'FX22M 6 NM hold',
+      minimaText: 'LPV DA 364-1 HAT 296 (300-1); LNAV MDA 520-1 / 520-1 3/8 HAT 452',
+    }),
     iap('FIX-RNAV-GPS-RWY-04', 'RNAV (GPS) RWY 04', '4', ['FX04F', 'FX04A', 'FX04B', 'FX04C']),
     iap('FIX-VOR-RWY-31', 'VOR RWY 31', '31', ['FX31A', 'FX31B']),
     { id: 'FIX-ATLANTIC-CITY-THREE', name: 'ATLANTIC CITY THREE DEPARTURE', type: 'DP', chartPdfUrl: '', provenance: prov },

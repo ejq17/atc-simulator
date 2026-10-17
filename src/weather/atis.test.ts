@@ -116,7 +116,8 @@ describe('generateAtis - clear day', () => {
     expect(atis.text).toBe(
       'Atlantic City Airport information Alpha, 1651 Zulu. ' +
       'Wind 210 at 10. Visibility 10. Sky clear. Temperature 24, dew point 14. Altimeter 30.05. ' +
-      'Visual approach runway 22 in use. Landing and departing runway 22. ' +
+      'Visual approach runway 22 in use. ' +
+      'Read back all runway hold short instructions. ' +
       'Advise on initial contact you have information Alpha.',
     );
   });
@@ -126,7 +127,8 @@ describe('generateAtis - clear day', () => {
       'Atlantic City Airport information Alpha, one six five one Zulu. ' +
       'Wind two one zero at one zero. Visibility one zero. Sky clear. Temperature two four, dew point one four. ' +
       'Altimeter three zero zero five. ' +
-      'Visual approach runway two two in use. Landing and departing runway two two. ' +
+      'Visual approach runway two two in use. ' +
+      'Read back all runway hold short instructions. ' +
       'Advise on initial contact you have information Alpha.',
     );
     expect(atis.spokenText).not.toMatch(/\d/);
@@ -200,19 +202,38 @@ describe('generateAtis - details', () => {
     }));
     expect(a.text).toContain('ILS runway 13 approach and RNAV GPS runway 4 approach in use.');
     expect(a.spokenText).toContain('I L S runway one three approach and R NAV G P S runway four approach in use.');
-    expect(a.text).toContain('Landing runway 13, departing runway 4.');
-    expect(a.spokenText).toContain('Landing runway one three, departing runway four.');
+    // 7110.65 2-9-3: the approach names the landing runway; the departure runway is given only when it differs.
+    expect(a.text).toContain('in use. Departing runway 4. ');
+    expect(a.spokenText).toContain('in use. Departing runway four. ');
+    expect(a.text).not.toContain('Landing runway');
   });
 
-  it('multiple runways in use', () => {
+  it('does not repeat runways that the approach in use already names (7110.65 2-9-3)', () => {
     const a = generateAtis(base(getPresetWeather('clear'), { activeRunways: { landing: ['22', '31'], departing: ['22', '31'] } }));
-    expect(a.text).toContain('Landing and departing runways 22 and 31.');
+    expect(a.text).toContain('Visual approach runway 22 and visual approach runway 31 in use. Read back');
+    expect(a.text).not.toMatch(/Landing and departing|Departing runway/);
+    const dep = generateAtis(base(getPresetWeather('clear'), { activeRunways: { landing: ['22'], departing: ['31'] } }));
+    expect(dep.text).toContain('Visual approach runway 22 in use. Departing runway 31. ');
+    expect(dep.spokenText).toContain('Departing runway three one. ');
+  });
+
+  it('names the landing runway when the approach text does not', () => {
+    const a = generateAtis(base(getPresetWeather('clear'), { approachesInUse: ['visual approaches'] }));
+    expect(a.text).toContain('Visual approaches in use. Landing and departing runway 22. ');
+    const b = generateAtis(base(getPresetWeather('clear'), { approachesInUse: ['visual approaches'], activeRunways: { landing: ['22'], departing: ['31'] } }));
+    expect(b.spokenText).toContain('Landing runway two two, departing runway three one. ');
+  });
+
+  it('asks for hold short readbacks before the closing statement unless turned off', () => {
+    const a = generateAtis(base(getPresetWeather('clear')));
+    expect(a.text.endsWith('Read back all runway hold short instructions. Advise on initial contact you have information Alpha.')).toBe(true);
+    expect(generateAtis(base(getPresetWeather('clear'), { holdShortReadback: false })).text).not.toContain('Read back');
   });
 
   it('NOTAMs are included, spoken as notices to air missions with digits spelled', () => {
     const a = generateAtis(base(getPresetWeather('clear'), { notams: ['Taxiway B closed between A and C.', 'Runway 4/22 lights out of service'] }));
     expect(a.text).toContain('NOTAMs: Taxiway B closed between A and C. Runway 4/22 lights out of service.');
-    expect(a.spokenText).toContain('Notices to air missions: Taxiway B closed between A and C. Runway four slash two two lights out of service.');
+    expect(a.spokenText).toContain('Notices to air missions: Taxiway B closed between A and C. Runway four slash two two lights out of service. Read back all runway hold short instructions.');
     expect(a.spokenText).not.toMatch(/\d/);
     expect(a.notams).toHaveLength(2);
   });

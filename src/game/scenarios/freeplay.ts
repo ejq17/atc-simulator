@@ -45,7 +45,10 @@ const DIFF_PROFILE: Record<Diff, { rate: number; max: number }> = {
   hard: { rate: 1.5, max: 16 },
 };
 
-/** Preferred runway order when the wind does not decide (13/31 is the primary pair, and is the only one an A320 can depart). */
+/**
+ * Preferred runway order when the wind does not decide (calm wind, or headwinds within the tolerance of each other). 13/31 comes first because it is the
+ * longer pair (10,001 ft against 6,145 ft): an operator preference, not a limitation - an A320 can depart 4/22 from full length.
+ */
 const PREFERRED_ORDER = ['13', '31', '22', '4'];
 
 export function resolveWeather(w: FreePlayOptions['weather'], seed: number): Weather | 'live' {
@@ -57,7 +60,7 @@ export function resolveWeather(w: FreePlayOptions['weather'], seed: number): Wea
   return getPresetWeather('clear');
 }
 
-/** Runway config for the weather. `jets` restricts the choice to ends an A320 can depart from. */
+/** Runway config for the weather. `jets` restricts the choice to ends an A320 can depart from (engine performance data vs the declared runway length). */
 export function recommendConfig(airport: Airport, weather: Weather | 'live', jets: boolean): { departing: string[]; landing: string[] } {
   const ends = airport.runways.flatMap((r) => r.ends.map((e) => ({ id: e.id, magneticHeadingDeg: e.magneticHeadingDeg })));
   const usable = jets ? ends.filter((e) => runwayLongEnoughFor(airport, 'A320', e.id)) : ends;

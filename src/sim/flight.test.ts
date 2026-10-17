@@ -75,28 +75,30 @@ describe('takeoff', () => {
     expect(along).toBeLessThan(g.lengthM);
   });
 
-  it('the A320 needs far more runway: rolls ~1.8-2.2 km and lifts at 140 kt; rejected from short runway 22', () => {
-    const e = makeEngine({ scenario: { spawns: [HOLDING('NKS451', 'H13', '13', 'A320'), HOLDING('NKS452', 'H22', '22', 'A320')] } });
+  it('the A320 needs far more runway: rolls ~1.1-1.5 km and lifts at 140 kt; refused from an intersection of runway 22 with < 5,000 ft left, accepted from the full length', () => {
+    // C_h422N is the intersection of taxiway C with 4/22: 4,668 ft remain from there for a departure on 22; H22 is the full length.
+    const e = makeEngine({ scenario: { spawns: [HOLDING('NKS452', 'C_h422N', '22', 'A320'), HOLDING('NKS453', 'H22', '22', 'A320')] } });
     run(e, 3);
     const bad = e.applyCommand(cmd('TAKEOFF', 'NKS452', { runwayEnd: '22' }));
     expect(bad.status).toBe('rejected');
-    if (bad.status === 'rejected') expect(bad.reason).toMatch(/runway.*remain|too short/i);
-    const ac = find(e, 'NKS451');
-    expect(e.applyCommand(cmd('TAKEOFF', 'NKS451', { runwayEnd: '13' })).status).toBe('accepted');
-    const g = findRunwayEnd(airport, '13')!;
+    if (bad.status === 'rejected') expect(bad.reason).toMatch(/Only \d+ ft of runway 22 remain.*needs about 5000 ft/);
+    const full = e.applyCommand(cmd('TAKEOFF', 'NKS453', { runwayEnd: '22' }));
+    expect(full.status).toBe('accepted');
+    const ac = find(e, 'NKS453');
+    const g22 = findRunwayEnd(airport, '22')!;
     let startAlong = 0;
     let lift = 0;
     expect(
       runUntil(e, () => {
-        if (ac.phase === 'TAKEOFF_ROLL' && startAlong === 0) startAlong = alongCross(g, ac.pos).along;
-        if (!ac.onGround && lift === 0) lift = alongCross(g, ac.pos).along;
+        if (ac.phase === 'TAKEOFF_ROLL' && startAlong === 0) startAlong = alongCross(g22, ac.pos).along;
+        if (!ac.onGround && lift === 0) lift = alongCross(g22, ac.pos).along;
         return !ac.onGround;
       }, 200),
     ).toBe(true);
     expect(ac.airspeedKt).toBeGreaterThanOrEqual(140);
     const rollM = lift - startAlong;
-    expect(rollM).toBeGreaterThan(1500);
-    expect(rollM).toBeLessThan(2400);
+    expect(rollM).toBeGreaterThan(1100);
+    expect(rollM).toBeLessThan(1500);
     run(e, 120);
     expect(ac.altitudeFt).toBeGreaterThan(2500);
     expect(ac.airspeedKt).toBeLessThanOrEqual(getPerformance('A320').maxSpeedKt);

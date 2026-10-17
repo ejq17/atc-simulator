@@ -7,7 +7,7 @@ import { loadKacy } from '../airport';
 import type { SimulationEngine } from './api';
 import { createEngine } from './engine';
 import type { Scenario, ScenarioAircraftSpawn } from './types';
-import { cmd, makeScenario, pilotTexts, run, runUntil, say, ALL_POSITIONS } from './__fixtures__/testHelpers';
+import { cmd, HOLDING, makeScenario, pilotTexts, run, runUntil, say, ALL_POSITIONS } from './__fixtures__/testHelpers';
 import { alongCross, findRunwayEnd } from './runways';
 import { mToNm } from './geo';
 import { matchingProcedures, analyzeProcedure } from './approach';
@@ -99,10 +99,10 @@ describe('KACY arrivals flown fix to fix', () => {
   it('ILS 13 from CARYL via MAYBN, LAND from Tower, touchdown on 13', () => {
     const e = engineFor([arrival('NKS451', 'CARYL', ['CARYL', 'MAYBN'], '13', 3000)], { activeRunways: { departing: ['13'], landing: ['13'] } });
     expect(runUntil(e, () => pilotTexts(e).length > 0, 10)).toBe(true);
-    expect(pilotTexts(e)[0]).toBe('Atlantic City Approach, Spirit four fifty one, three thousand, information alpha.');
+    expect(pilotTexts(e)[0]).toBe('Atlantic City Approach, Spirit four fifty one, level three thousand, information alpha.');
     const ac = flyApproach(e, 'NKS451', 'ILS', '13');
     expect(ac.assignedRunwayEnd).toBe('13');
-    expect(pilotTexts(e)).toContain('Atlantic City Approach, Spirit four fifty one, established ILS runway one three.');
+    expect(pilotTexts(e)).toContain('Atlantic City Approach, Spirit four fifty one, established on the ILS runway one three.');
     expect(pilotTexts(e)).toContain('Cleared ILS runway one three approach, Spirit four fifty one');
   });
 
@@ -136,13 +136,13 @@ describe('KACY IFR departure to KPHL via the ATLANTIC CITY THREE', () => {
     const e = engineFor([spec], { activeRunways: { departing: ['13'], landing: ['13'] } });
     const ac = Object.values(e.getState().aircraft)[0];
     expect(runUntil(e, () => ac.pendingRequest?.kind === 'IFR_CLEARANCE', 30)).toBe(true);
-    expect(pilotTexts(e)[0]).toBe('Atlantic City Clearance, Spirit four fifty one, IFR to Philadelphia, with information alpha, ready to copy.');
+    expect(pilotTexts(e)[0]).toBe('Atlantic City Clearance Delivery, Spirit four fifty one, IFR to Philadelphia, with information alpha, ready to copy.');
 
     const clr = say(e, cmd('IFR_CLEARANCE', 'NKS451', { ifr: {} }), 'CLNC');
     expect(clr.status).toBe('accepted');
     if (clr.status === 'accepted') {
       expect(clr.clearance.ifr).toMatchObject({ destination: 'KPHL', departureProcedure: 'ATLANTIC CITY THREE', initialAltitudeFt: 2000, expectAltitudeFt: 10000, departureFrequencyMhz: 124.6 });
-      expect(clr.readback).toMatch(/^Cleared to Philadelphia, Atlantic City Three departure, radar vectors, maintain two thousand, expect one zero thousand ten minutes after departure, departure one two four point six, squawk [a-z ]+, Spirit four fifty one$/);
+      expect(clr.readback).toMatch(/^Cleared to Philadelphia airport, Atlantic City Three departure, radar vectors, maintain two thousand, expect one zero thousand, one zero minutes after departure, departure frequency one two four point six, squawk [a-z ]+, Spirit four fifty one$/);
     }
     expect(runUntil(e, () => ac.pendingRequest?.kind === 'TAXI', 40)).toBe(true);
     expect(ac.frequencyId).toBe('GND');
@@ -169,5 +169,24 @@ describe('KACY IFR departure to KPHL via the ATLANTIC CITY THREE', () => {
     const s = e.getState();
     expect(s.score.aircraftHandled).toBe(1);
     expect(s.score.unsafeInstructions + s.score.runwayIncursions + s.score.separationViolations).toBe(0);
+  });
+});
+
+describe('A320 takeoff distance on KACY 4/22 (6,145 ft)', () => {
+  const tryTakeoff = (node: string, end: string) => {
+    const e = createEngine({ airport: kacy, readbackErrorRate: 0, scenario: makeScenario({ activeRunways: { departing: [end], landing: [end] }, spawns: [HOLDING('NKS451', node, end, 'A320')] }) });
+    run(e, 4);
+    return e.applyCommand(cmd('TAKEOFF', 'NKS451', { runwayEnd: end }));
+  };
+
+  it('accepted from the full length of 22 and 4; refused from an intersection with < 5,000 ft remaining', () => {
+    expect(tryTakeoff('HP4-22-A-2', '22').status).toBe('accepted');
+    expect(tryTakeoff('HP4-22-A-1', '4').status).toBe('accepted');
+    const short = tryTakeoff('HP4-22-B-1', '22');
+    expect(short.status).toBe('rejected');
+    if (short.status === 'rejected') expect(short.reason).toMatch(/Only 3\d{3} ft of runway 22 remain.*needs about 5000 ft/);
+    const short4 = tryTakeoff('HP4-22-D-1', '4');
+    expect(short4.status).toBe('rejected');
+    if (short4.status === 'rejected') expect(short4.reason).toMatch(/Only 4\d{3} ft of runway 4 remain/);
   });
 });

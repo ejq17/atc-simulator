@@ -302,7 +302,7 @@ describe('flying approaches to touchdown', () => {
     run(e, 60);
     expect(ac.phase).toBe('ROLLOUT');
     const texts = pilotTexts(e);
-    expect(texts).toContain('Atlantic City Approach, Spirit four fifty one, established ILS runway one three.');
+    expect(texts).toContain('Atlantic City Approach, Spirit four fifty one, established on the ILS runway one three.');
     expect(texts.some((t) => /^Atlantic City Tower, Spirit four fifty one, \w+ mile final runway one three, full stop\.$/.test(t))).toBe(true);
     expect(e.getState().events.some((x) => x.kind === 'GO_AROUND')).toBe(false);
     expect(e.getState().events.some((x) => /touched down runway 13/.test(x.text))).toBe(true);
@@ -328,8 +328,10 @@ describe('flying approaches to touchdown', () => {
     handoffAndLand(e, 'NKS451', '13');
   });
 
-  it('missed approach: 2000 ft, runway heading, asks for vectors; Tower hands back to Approach; direct + second approach lands', () => {
-    const e = makeEngine({ scenario: ifrScenario([AT_FIX('NKS451', 'TARR', ROUTE, '13', {}, 3000)], { mode: 'training' }) });
+  it('missed approach without published text (fallback): 2000 ft, runway heading, asks for vectors; Tower hands back to Approach; direct + second approach lands', () => {
+    const plain = createTestAirport();
+    for (const p of plain.procedures) delete p.missedApproachText; // no published missed approach in the data: the plain go-around
+    const e = makeEngine({ scenario: ifrScenario([AT_FIX('NKS451', 'TARR', ROUTE, '13', {}, 3000)], { mode: 'training' }), opts: { airport: plain } });
     const ac = find(e, 'NKS451');
     run(e, 5);
     say(e, appr('NKS451', 'ILS', '13'), 'APP');
@@ -406,7 +408,8 @@ describe('APPROACH clearance and separation (radar separation minima, 3 nm in tr
       expect(r.reason).toMatch(/Unsafe clearance not issued/);
       expect(r.reason).toMatch(/AAL100/);
       expect(r.reason).toMatch(/radar separation minima/);
-      expect(r.reason).not.toMatch(/\d-\d-\d/); // no paragraph number is cited
+      expect(r.reason).toMatch(/radar separation minimum 3 nm/);
+      expect(r.reason).toMatch(/7110\.65 5-5-4/); // paragraph verified in docs/REALISM-VERIFICATION.md
     }
     run(e, 1);
     expect(e.getState().score.unsafeInstructions).toBe(1);
@@ -443,6 +446,27 @@ describe('APPROACH clearance and separation (radar separation minima, 3 nm in tr
     expect(say(f, appr('NKS451', 'ILS', '13'), 'APP').status).toBe('accepted');
     run(f, 1);
     expect(f.getState().score.unsafeInstructions).toBe(1);
+  });
+
+  it('wake: a light aircraft behind an A320 needs 5 nm, an A320 behind an A320 only 3 nm', () => {
+    const mk = (followerType: string) => {
+      // leader A320 on 6.7 nm final (FINAL), follower over the IF (10.66 nm): 3.96 nm apart
+      const e = makeEngine({ scenario: ifrScenario([ARRIVING('AAL100', '13', 6.7, 'A320', 'APP'), { ...AT_FIX('NKS451', 'FX13A', ['FX13A', 'FX13B'], '13', {}, 3000), type: followerType }], { mode: 'training' }) });
+      return say(e, appr('NKS451', 'ILS', '13'), 'APP');
+    };
+    expect(mk('A320').status).toBe('accepted'); // 3.96 nm >= 3 nm
+    const light = mk('C172');
+    expect(light.status).toBe('rejected');
+    if (light.status === 'rejected') {
+      expect(light.unsafe).toBe(true);
+      expect(light.reason).toMatch(/wake turbulence separation \(simplified from the 7110\.65 5-5-4 wake tables\) needs 5 nm for NKS451 \(C172\) behind AAL100 \(A320\)/);
+    }
+  });
+
+  it('wake: a light aircraft AHEAD of an A320 only needs the 3 nm radar minimum from the A320 clearance', () => {
+    const e = makeEngine({ scenario: ifrScenario([{ ...ARRIVING('N5LEAD', '13', 6.7, 'C172', 'APP') }, AT_FIX('NKS451', 'FX13A', ['FX13A', 'FX13B'], '13', {}, 3000)], { mode: 'training' }) });
+    // A320 follower behind a C172 leader at 3.96 nm: the radar minimum applies
+    expect(say(e, appr('NKS451', 'ILS', '13'), 'APP').status).toBe('accepted');
   });
 
   it('vectored follower joining at 8 nm with the leader on 3 nm final is fine', () => {

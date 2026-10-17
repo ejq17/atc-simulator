@@ -64,6 +64,8 @@ const r = parseTransmission('Spirit four fifty one, runway one three, cleared fo
 | radar contact [N miles <dir> of the field / from <fix>] | `RADAR_CONTACT` (position text consumed and ignored) |
 | cleared to <airport> [via <DP / route>], maintain N, expect N [N minutes after departure], departure [frequency] X, squawk NNNN; "cleared [to X] as filed" | `IFR_CLEARANCE` (`ifr`, see below) |
 | `maintain N until established [on the localizer]`, `until <fix>` | the normal `ALTITUDE`, plus `destination: 'UNTIL_ESTABLISHED'` or `'UNTIL_<FIX>'` (+ `fix`) |
+| hold [at] <fix> [as published], hold <dir> of <fix> on the N radial \| localizer, right\|left turns, N minute \| N mile legs, expect further clearance [at] HHMM; "cleared to <fix>, hold ..." | `HOLD_AT_FIX` (`hold`, see below) |
+| execute [the] [published] missed approach, fly the published missed approach, go missed, "go around, fly the published missed approach" | `MISSED_APPROACH` (the go-around prefix is absorbed, no separate `GO_AROUND`) |
 | standalone squawk, ident, other "cleared ... approach" (NDB, TACAN), ambiguous `maintain 180` | `UNKNOWN` with an explanatory issue |
 | anything else / empty | one `UNKNOWN` with `no recognised instruction` / `empty transmission` |
 
@@ -86,6 +88,24 @@ the rest). Fields in `ParsedCommand.ifr`:
 | `squawk` | four digits 0-7 as a string (`"4215"`); wrong length or digits 8/9 give an issue and no `squawk` |
 
 Only `destination` is required for confidence. A standalone `squawk` (outside a clearance) is still `UNKNOWN`.
+
+### Holding (`HOLD_AT_FIX`)
+
+`ParsedCommand.hold` (`Partial<HoldingInstruction>`), elements in any order; only `hold.fix` is required for confidence
+(resolved with `ctx.fixes` exactly like `DIRECT_FIX`, unknown -> raw token + `unknown fix X`). Bare "hold",
+"hold position" and "hold short of ..." are not claimed by this rule; it fires on `hold at|as published|<compass>|<known fix>`
+and on `cleared|proceed [to|direct] <fix> [and|then] hold`.
+
+* `asPublished`: always set (`true` for "as published", else `false`).
+* `turns`: `left`/`right`; defaults to `'right'` when not stated. The issue `standard right turns assumed` is added only when
+  turns were not stated and the hold is not as published.
+* `inboundCourseDeg`: from "on the N radial", converted to the INBOUND course to the fix: `(radial + 180) mod 360`, 0 -> 360
+  (`hold east of SMITS on the 090 radial` -> 270). "On the localizer" leaves it undefined.
+* The compass word (north ... northwest; "southwest" is also the airline token) is only a consistency check: more than 45 degrees
+  from the radial gives the issue `inconsistent hold: ...` (and a conflict penalty).
+* `legMinutes` / `legNm`: "one minute legs", "five mile legs".
+* `efcZulu`: "expect further clearance [at] one two four five" -> `"1245"` (3 digits are zero-padded, an optional `zulu` is
+  dropped, invalid times give an issue).
 
 ### Fixes (`ParseContext.fixes`)
 

@@ -83,7 +83,7 @@ describe('arrival spawned at a fix', () => {
     const e = makeEngine({ scenario: spawnAt() });
     const ac = find(e, 'NKS451');
     expect(runUntil(e, () => ac.pendingRequest?.kind === 'APPROACH', 10)).toBe(true);
-    expect(pilotTexts(e)).toEqual(['Atlantic City Approach, Spirit four fifty one, five thousand, information alpha.']);
+    expect(pilotTexts(e)).toEqual(['Atlantic City Approach, Spirit four fifty one, level five thousand, information alpha.']);
     expect(ac.pendingRequest?.text).toMatch(/checking in/);
     // no standard "inbound for landing" call on top of the check-in
     run(e, 30);

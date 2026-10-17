@@ -32,7 +32,7 @@ export function listenersOn(aircraft: Iterable<Aircraft>, mhz: number): Aircraft
   return out;
 }
 
-const POSITION_WORD: Record<string, string> = { CLNC: 'Clearance', GND: 'Ground', TWR: 'Tower', APP: 'Approach', DEP: 'Departure', ATIS: 'ATIS' };
+const POSITION_WORD: Record<string, string> = { CLNC: 'Clearance Delivery', GND: 'Ground', TWR: 'Tower', APP: 'Approach', DEP: 'Departure', ATIS: 'ATIS' };
 
 /** Short facility word for a position: "Ground", "Tower"... */
 export function positionWord(position: string): string {

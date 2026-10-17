@@ -5,6 +5,7 @@ import type { Toks } from './match';
 import {
   ruleCross, ruleHoldPosition, ruleHoldShort, ruleLineUp, ruleTaxi, ruleTaxiIntoPosition,
 } from './rules-ground';
+import { ruleHoldAtFix, ruleMissedApproach } from './rules-hold';
 import { makeAltitudeRule, ruleHeading, rulePattern, ruleSpeed } from './rules-flight';
 import {
   ruleApproach, ruleDirectFix, ruleIfrClearance, rulePosition, ruleRadarContact, ruleResumeNav,
@@ -23,6 +24,8 @@ import { ruleContinue, ruleGoAround, ruleLand, rulePushback, ruleTakeoff } from 
  *  - land/takeoff before the approach / IFR clearance rules (all start with "cleared"),
  *    approach before IFR clearance ("cleared to the ILS ..."), both before the unsupported
  *    "cleared ... approach" catch-all (NDB, TACAN ...)
+ *  - hold-at-fix before hold-short / hold-position (it only claims "hold at|as published|<compass>|<known fix>"
+ *    and "cleared to FIX, hold"); missed approach before go-around ("go around, fly the published missed approach")
  *  - radar contact / resume nav / direct before heading ("proceed")
  *  - the positional "N miles from X" filler sits after the runway / route refs
  * Fix-aware rules (direct, until, position text) need `ctx.fixes`, so the list is built per parse.
@@ -30,8 +33,8 @@ import { ruleContinue, ruleGoAround, ruleLand, rulePushback, ruleTakeoff } from 
 export function buildRules(ctx: Pick<ParseContext, 'fixes'> = {}): readonly Rule[] {
   const fixes = makeFixMatcher(ctx.fixes);
   return [
-    ruleWind, ruleSayAgain, ruleTaxiIntoPosition, ruleLineUp, ruleTakeoff, ruleLand, ruleGoAround,
-    rulePushback, ruleRadarContact(fixes), ruleResumeNav, ruleApproach, ruleDirectFix(fixes),
+    ruleWind, ruleSayAgain, ruleTaxiIntoPosition, ruleLineUp, ruleTakeoff, ruleLand, ruleHoldAtFix(fixes),
+    ruleMissedApproach, ruleGoAround, rulePushback, ruleRadarContact(fixes), ruleResumeNav, ruleApproach, ruleDirectFix(fixes),
     ruleIfrClearance, ruleContact, ruleHoldShort, ruleHoldPosition, ruleCross, ruleTaxi,
     ruleHeading, ruleSpeed, makeAltitudeRule(fixes), rulePattern, ruleContinue, ruleUnsupported,
     ruleRunwayRef, ruleRoute, rulePosition(fixes), ruleFiller,

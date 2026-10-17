@@ -463,8 +463,11 @@ export function updatePilotRequests(ctx: SimContext): void {
     if (!ac.onGround && ac.phase === 'GO_AROUND' && !rt.calls.has('gaEst') && ac.target.altitudeFt !== undefined && Math.abs(ac.altitudeFt - ac.target.altitudeFt) < 20) {
       rt.calls.add('gaEst');
       const ifr = ac.flightPlan?.flightRules === 'IFR';
-      pilotSay(ctx, ac, goAroundEstablishedCall(ac, env, ac.target.altitudeFt, { vectors: ifr }), { request: 'LANDING' });
-      ac.pendingRequest = { kind: 'LANDING', text: ifr ? 'request vectors for another approach' : 'request another approach', sinceSec: now };
+      const published = !!rt.missed;
+      pilotSay(ctx, ac, goAroundEstablishedCall(ac, env, ac.target.altitudeFt, { vectors: ifr, published }), { request: published ? 'FREQUENCY_CHANGE' : 'LANDING' });
+      ac.pendingRequest = published
+        ? { kind: 'FREQUENCY_CHANGE', text: 'flying the published missed approach, request frequency change', sinceSec: now }
+        : { kind: 'LANDING', text: ifr ? 'request vectors for another approach' : 'request another approach', sinceSec: now };
       continue;
     }
 
@@ -500,9 +503,11 @@ export function updatePilotRequests(ctx: SimContext): void {
       }
       if (!ac.onGround && !ac.isDeparture && ac.assignedRunwayEnd) {
         const g = findRunwayEnd(airport, ac.assignedRunwayEnd);
-        if (g && (pos === 'APP' || pos === 'DEP') && (ac.phase === 'GO_AROUND' || rt.calls.has('gaEst'))) {
-          pilotSay(ctx, ac, missedApproachCheckInCall(ac, env), { checkIn: true });
-          ac.pendingRequest = { kind: 'APPROACH', text: 'missed approach, requesting vectors', sinceSec: now };
+        if (g && (pos === 'APP' || pos === 'DEP') && (ac.phase === 'GO_AROUND' || rt.calls.has('gaEst') || rt.missedFlown)) {
+          const nextFix = rt.hold ? rt.hold.fix : rt.missed ? ac.nav?.fixes[ac.nav.index] : undefined;
+          const published = nextFix ? { climbToFt: ac.target.altitudeFt ?? Math.round(ac.altitudeFt), fix: nextFix, holding: !!rt.hold } : undefined;
+          pilotSay(ctx, ac, missedApproachCheckInCall(ac, env, { published }), { checkIn: true });
+          ac.pendingRequest = { kind: 'APPROACH', text: published ? 'missed approach, requesting further clearance' : 'missed approach, requesting vectors', sinceSec: now };
           continue;
         }
         if (g && pos === 'TWR' && ac.flightPlan) {

@@ -217,3 +217,50 @@ describe('result shape for new commands', () => {
     expect(r.issues.join(' ')).toContain('ambiguous fix');
   });
 });
+
+run({
+  'hold at fix': [
+    { say: `${S}, hold at SMITS as published`, cmds: [{ kind: 'HOLD_AT_FIX', ...NKS, hold: { fix: 'SMITS', asPublished: true, turns: 'right' } }], clean: true, conf: [0.95, 1] },
+    { say: `${S}, hold as published at SMITS`, cmds: [{ kind: 'HOLD_AT_FIX', hold: { fix: 'SMITS', asPublished: true } }], clean: true },
+    { say: `${S}, hold east of SMITS on the zero nine zero radial, right turns, one minute legs, expect further clearance one two four five`,
+      cmds: [{ kind: 'HOLD_AT_FIX', hold: { fix: 'SMITS', asPublished: false, turns: 'right', inboundCourseDeg: 270, legMinutes: 1, efcZulu: '1245' } }], clean: true, conf: [0.9, 1] },
+    { say: `${S}, hold northwest of CARYL on the localizer, left turns, five mile legs`,
+      cmds: [{ kind: 'HOLD_AT_FIX', hold: { fix: 'CARYL', turns: 'left', legNm: 5, asPublished: false } }], clean: true },
+    { say: `${S}, hold at RODDI as published, expect further clearance at one three zero zero`,
+      cmds: [{ kind: 'HOLD_AT_FIX', hold: { fix: 'RODDI', asPublished: true, efcZulu: '1300' } }], issue: 'unknown fix RODDI' },
+    { say: `${S}, cleared to SMITS, hold as published`, cmds: [{ kind: 'HOLD_AT_FIX', hold: { fix: 'SMITS', asPublished: true } }], clean: true },
+    { say: `${S}, hold at carol as published`, cmds: [{ kind: 'HOLD_AT_FIX', hold: { fix: 'CARYL' } }], clean: true },
+    { say: `${S}, hold at Cedar Lake as published`, cmds: [{ kind: 'HOLD_AT_FIX', hold: { fix: 'VCN', asPublished: true } }], clean: true },
+    { say: `${S}, hold southwest of Sea Isle on the 225 radial, left turns, two minute legs`,
+      cmds: [{ kind: 'HOLD_AT_FIX', hold: { fix: 'SIE', inboundCourseDeg: 45, turns: 'left', legMinutes: 2 } }], clean: true },
+    { say: `${S}, hold west of SMITS on the 270 radial`, cmds: [{ kind: 'HOLD_AT_FIX', hold: { inboundCourseDeg: 90 } }], issue: 'standard right turns assumed' },
+    { say: `${S}, hold south of SMITS on the one eight zero radial, right turns`, cmds: [{ kind: 'HOLD_AT_FIX', hold: { inboundCourseDeg: 360 } }], clean: true },
+    { say: `${S}, hold north of SMITS on the 360 radial, right turns`, cmds: [{ kind: 'HOLD_AT_FIX', hold: { inboundCourseDeg: 180 } }], clean: true },
+    { say: `${S}, hold at SMITS`, cmds: [{ kind: 'HOLD_AT_FIX', hold: { fix: 'SMITS', asPublished: false, turns: 'right' } }], issue: 'standard right turns assumed' },
+    { say: `${S}, hold at SMITS as published`, cmds: [{ kind: 'HOLD_AT_FIX' }], conf: [0.9, 1] },
+    { say: `${S}, hold east of SMITS on the 270 radial, right turns`, cmds: [{ kind: 'HOLD_AT_FIX', hold: { inboundCourseDeg: 90 } }], issue: 'inconsistent hold', conf: [0, 0.8] },
+    { say: `${S}, hold as published`, cmds: [{ kind: 'HOLD_AT_FIX', hold: { asPublished: true } }], issue: 'missing holding fix', conf: [0, 0.6] },
+    { say: `${S}, hold at zebra as published`, cmds: [{ kind: 'HOLD_AT_FIX', hold: { fix: 'ZEBRA' } }], issue: 'unknown fix ZEBRA', conf: [0.5, 0.9] },
+    { say: `${S}, hold at SMITS as published, expect further clearance nine four five`, cmds: [{ kind: 'HOLD_AT_FIX', hold: { efcZulu: '0945' } }], clean: true },
+    { say: `${S}, hold at SMITS as published, expect further clearance two five zero zero`, cmds: [{ kind: 'HOLD_AT_FIX', hold: { fix: 'SMITS' } }], issue: 'invalid expect-further-clearance time' },
+    { say: `${S}, hold at SMITS, right turns, one minute legs`, ctx: CTX, cmds: [{ kind: 'HOLD_AT_FIX', hold: { fix: 'SMITS', turns: 'right', legMinutes: 1 } }], clean: true },
+    { say: `${S}, hold at SMITS as published, then maintain 3000`, cmds: [{ kind: 'HOLD_AT_FIX' }, { kind: 'ALTITUDE', altitudeFt: 3000 }], clean: true },
+    { say: `${S}, proceed direct SMITS`, cmds: [{ kind: 'DIRECT_FIX', fix: 'SMITS' }], clean: true },
+    { say: `${S}, hold short of runway 13`, cmds: [{ kind: 'HOLD_SHORT', runwayEnd: '13' }], clean: true },
+    { say: `${S}, hold position`, cmds: [{ kind: 'HOLD_POSITION' }], clean: true },
+  ],
+
+  'missed approach': [
+    { say: `${S}, execute missed approach`, cmds: [{ kind: 'MISSED_APPROACH', ...NKS }], clean: true, conf: [0.95, 1] },
+    { say: `${S}, execute the missed approach`, cmds: [{ kind: 'MISSED_APPROACH' }], clean: true },
+    { say: `${S}, go around, fly the published missed approach`, cmds: [{ kind: 'MISSED_APPROACH' }], clean: true },
+    { say: `${S}, execute the published missed approach, climb and maintain two thousand`, cmds: [{ kind: 'MISSED_APPROACH' }, { kind: 'ALTITUDE', altitudeFt: 2000 }], clean: true },
+    { say: `${S}, go missed`, cmds: [{ kind: 'MISSED_APPROACH' }], clean: true },
+    { say: `${S}, go missed approach`, cmds: [{ kind: 'MISSED_APPROACH' }], clean: true },
+    { say: `${S}, fly the published missed approach`, cmds: [{ kind: 'MISSED_APPROACH' }], clean: true },
+    { say: `${S}, go around, execute the missed approach`, cmds: [{ kind: 'MISSED_APPROACH' }], clean: true },
+    { say: `${S}, go around`, cmds: [{ kind: 'GO_AROUND' }], clean: true },
+    { say: `${S}, go around, fly runway heading, climb and maintain two thousand`, cmds: [{ kind: 'GO_AROUND' }, { kind: 'HEADING' }, { kind: 'ALTITUDE' }], clean: true },
+    { say: `${S}, execute missed approach, contact departure one eighteen point one`, cmds: [{ kind: 'MISSED_APPROACH' }, { kind: 'CONTACT_FREQUENCY', frequencyId: 'DEP' }], clean: true },
+  ],
+});

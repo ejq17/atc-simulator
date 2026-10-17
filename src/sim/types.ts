@@ -133,6 +133,10 @@ export interface InstrumentProcedure {
   runwayEnd?: string;
   chartPdfUrl: string;     // official FAA d-TPP URL
   fixes?: string[];        // named fixes in order (IAF..MAP) where verified
+  /** Transcribed from the plate (human transcription; see data/sources/README.md). */
+  missedApproachText?: string;
+  holdingText?: string;
+  minimaText?: string;
   provenance: DataProvenance;
 }
 
@@ -215,7 +219,21 @@ export type ClearanceKind =
   | 'APPROACH'             // "cleared ILS/RNAV/VOR/visual runway <end> approach"
   | 'DIRECT_FIX'           // "proceed direct <fix>"
   | 'RESUME_OWN_NAVIGATION'// "resume own navigation" after vectors
-  | 'RADAR_CONTACT';       // "radar contact" (informational; marks the aircraft as identified)
+  | 'RADAR_CONTACT'        // "radar contact" (informational; marks the aircraft as identified)
+  | 'HOLD_AT_FIX'          // "hold at SMITS as published" / "hold east of SMITS on the 090 radial, right turns, one minute legs"
+  | 'MISSED_APPROACH';     // "execute missed approach" / "go around, fly the published missed approach"
+
+export interface HoldingInstruction {
+  fix: string;
+  /** Inbound course to the fix, magnetic degrees. */
+  inboundCourseDeg?: number;
+  turns: 'left' | 'right';
+  legMinutes?: number;
+  legNm?: number;
+  asPublished: boolean;
+  /** Expect-further-clearance time, "HHMM" Zulu, when given. */
+  efcZulu?: string;
+}
 
 export type ApproachType = 'ILS' | 'LOC' | 'RNAV' | 'VOR' | 'VISUAL';
 
@@ -264,6 +282,7 @@ export interface Clearance {
   approachType?: ApproachType;
   fix?: string;                    // DIRECT_FIX target
   ifr?: IfrClearanceDetails;       // IFR_CLEARANCE
+  hold?: HoldingInstruction;       // HOLD_AT_FIX
   /** Set when the engine finished executing the clearance. */
   completedAtSec?: number;
 }
@@ -313,7 +332,7 @@ export interface Aircraft {
   /** IFR flight plan and lateral navigation state (airborne routing over named fixes). */
   flightPlan?: FlightPlan;
   /** Active lateral navigation: flying toward `fixes[index]`; undefined while on vectors/heading. */
-  nav?: { fixes: string[]; index: number; mode: 'route' | 'direct' | 'approach' | 'vectors' };
+  nav?: { fixes: string[]; index: number; mode: 'route' | 'direct' | 'approach' | 'vectors' | 'holding' | 'missed' };
   /** Transponder code and radar identification state. */
   squawk?: string;
   radarIdentified?: boolean;
@@ -357,6 +376,7 @@ export interface ParsedCommand {
   approachType?: ApproachType;
   fix?: string;
   ifr?: Partial<IfrClearanceDetails>;
+  hold?: Partial<HoldingInstruction>;
   /** 0..1, calibrated from grammar match quality and entity resolution. */
   confidence: number;
   rawText: string;

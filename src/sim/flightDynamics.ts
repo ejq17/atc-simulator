@@ -17,6 +17,9 @@ import type { RunwayEndGeom } from './runways';
 import { neighborIds, shortestDistances } from './pathfinding';
 import { goingAroundCall } from '../radio/readback';
 import { advanceNav, fixPosition } from './navigation';
+import { holdGuidance } from './holding';
+import { missedGuidance, startPublishedMissed } from './missedApproach';
+import { resolveMinima, runwayInSight } from './minima';
 import { APPROACH_FINAL_NM, isOnCourse } from './approach';
 
 export const GLIDEPATH_DEG = 3;
@@ -27,7 +30,7 @@ const ROLL_ACCEL_DEG_PER_SEC2 = 6;
 const VS_ACCEL_FPM_PER_SEC = 600;
 const APPROACH_RANGE_NM = 25;
 /** Phases in which `ac.nav` (lateral navigation over fixes) is flown. */
-const NAV_PHASES: readonly FlightPhase[] = ['INBOUND', 'APPROACH', 'INITIAL_CLIMB', 'DEPARTURE', 'GO_AROUND'];
+const NAV_PHASES: readonly FlightPhase[] = ['INBOUND', 'APPROACH', 'INITIAL_CLIMB', 'DEPARTURE', 'GO_AROUND', 'HOLDING'];
 /** IFR missed approach / go-around level-off: 2000 ft, but never lower than 1500 ft above the field. */
 export const IFR_MISSED_APPROACH_FT = 2000;
 
@@ -249,11 +252,17 @@ export function initiateGoAround(ctx: SimContext, ac: Aircraft, o: { reason: str
   rt.calls.delete('gaEst');
   rt.navMode = 'HEADING';
   rt.pattern = undefined;
-  // A missed approach cancels the approach clearance and any route: runway heading, climb, ask for vectors.
+  // A missed approach cancels the approach clearance and any route. IFR aircraft fly the published missed approach when its
+  // text can be interpreted; otherwise: runway heading, climb to a fixed altitude, ask for vectors.
+  const approachBefore = rt.approach;
   rt.approach = undefined;
+  rt.missed = undefined;
+  rt.hold = undefined;
   ac.nav = undefined;
   completeClearances(ctx, ac, ['APPROACH']);
   ac.target = { headingDeg: g ? g.headingDeg : ac.headingDeg, altitudeFt: goAroundAltitudeFt(ac, elev), speedKt: undefined };
+  const published = startPublishedMissed(ctx, ac, rt, g, approachBefore);
+  rt.missedFlown = true;
   ac.pendingRequest = undefined;
   emitEvent(ctx, {
     kind: 'GO_AROUND', aircraftId: ac.id, callsign: ac.callsign, severity: 'warning', speaker: 'SYSTEM',
@@ -261,7 +270,7 @@ export function initiateGoAround(ctx: SimContext, ac: Aircraft, o: { reason: str
     data: { reason: o.reason, runwayEnd: g?.end.id },
   });
   if (o.announce) {
-    pilotSay(ctx, ac, goingAroundCall(ac, { airport: ctx.state.airport }, g?.end.id ?? '', o.reason), { goAround: true });
+    pilotSay(ctx, ac, goingAroundCall(ac, { airport: ctx.state.airport }, g?.end.id ?? '', o.reason, { published }), { goAround: true });
     ac.pendingRequest = { kind: 'OTHER', text: `going around: ${o.reason}`, sinceSec: ctx.state.clock.timeSec };
   }
 }
@@ -379,6 +388,25 @@ function approachGuidance(ctx: SimContext, ac: Aircraft, rt: AircraftRuntime, g:
   maybeEstablishFinal(ctx, ac, rt, g, perf);
 
   if (ac.phase === 'FINAL' || ac.phase === 'LANDING') {
+    // Decision altitude / MDA of an instrument approach: without the runway in sight the missed approach is flown, even if cleared to land.
+    if (rt.approach && rt.approach.type !== 'VISUAL' && !rt.approach.daChecked) {
+      const ap = rt.approach;
+      if (!ap.minima) {
+        const proc = ctx.state.airport.procedures.find((p) => p.id === ap.procedureId);
+        ap.minima = resolveMinima(proc, ap.type, g.elevationFt);
+        if (ap.minima.assumed) {
+          emitEvent(ctx, { kind: 'INFO', aircraftId: ac.id, callsign: ac.callsign, severity: 'warning', speaker: 'SYSTEM', text: `${ac.callsign}: ${ap.minima.assumed}`, data: { minima: 'fallback' } });
+        }
+      }
+      if (ac.altitudeFt <= ap.minima.altFt) {
+        ap.daChecked = true;
+        const sight = runwayInSight(ctx.state.weather, ap.minima);
+        if (!sight.inSight) {
+          initiateGoAround(ctx, ac, { reason: 'runway not in sight', announce: true });
+          return { desiredHeading: g.headingDeg, altTargetFt: ac.target.altitudeFt, speedKt: perf.climbSpeedKt };
+        }
+      }
+    }
     // Decision point: landing clearance + runway free, else go around.
     if (ac.phase === 'FINAL' && !rt.decisionDone && d <= DECISION_POINT_M) {
       rt.decisionDone = true;
@@ -506,6 +534,18 @@ function endOfRoute(ctx: SimContext, ac: Aircraft, rt: AircraftRuntime, g: Runwa
 /** Lateral guidance toward `nav.fixes[nav.index]`; undefined once the route is exhausted. */
 function routeGuidance(ctx: SimContext, ac: Aircraft, rt: AircraftRuntime, g: RunwayEndGeom | undefined, perf: AircraftPerformance, wind: Vec2, aglFt: number): Guidance | undefined {
   const airport = ctx.state.airport;
+  const mode = ac.nav!.mode;
+  if (mode === 'missed' || mode === 'holding') {
+    // Published missed approach / holding pattern: own guidance, wind-corrected here.
+    const gd = mode === 'missed' && rt.missed ? missedGuidance(ctx, ac, rt, perf) : rt.hold ? holdGuidance(ctx, ac, rt, perf) : undefined;
+    if (!gd) {
+      ac.nav = undefined; // inconsistent state (e.g. hold cleared): fall back to holding the heading
+      ac.target.headingDeg = ac.headingDeg;
+      rt.navMode = 'HEADING';
+      return undefined;
+    }
+    return { desiredHeading: headingForTrack(gd.track, ac.airspeedKt, wind), altTargetFt: ac.target.altitudeFt, speedKt: gd.speedKt, forceDir: gd.forceDir };
+  }
   for (const id of advanceNav(airport, ac, perf)) rt.passedFixes.add(id.toUpperCase());
   const nav = ac.nav!;
   if (g && !ac.isDeparture && ac.phase === 'INBOUND' && dist(ac.pos, g.end.threshold) < nmToM(APPROACH_RANGE_NM)) setPhase(ctx, ac, 'APPROACH');

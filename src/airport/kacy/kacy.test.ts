@@ -207,6 +207,20 @@ describe('procedures', () => {
     expect(iaps.find((p) => p.name === 'ILS OR LOC/DME RWY 31')?.runwayEnd).toBe('31');
     expect(iaps.find((p) => p.name === 'RNAV (GPS) RWY 04')?.fixes).toContain('FASEN');
   });
+
+  it('IAPs carry the plate transcriptions (missed approach, holding, minima) from the source', () => {
+    const iap = (name: string) => ap.procedures.find((p) => p.name === name)!;
+    expect(iap('ILS Z OR LOC Z RWY 13').missedApproachText).toMatch(/SMITS/);
+    expect(iap('RNAV (GPS) Y RWY 31').missedApproachText).toMatch(/KOVEC/);
+    for (const a of procSrc.instrument_approaches) {
+      const p = iap(a.chart_name);
+      expect(p.missedApproachText, a.chart_name).toBe(a.missed_approach);
+      expect(p.minimaText, a.chart_name).toBe(a.minima_summary);
+      expect(p.holdingText, a.chart_name).toBe(a.holding === '-' ? undefined : a.holding);
+      expect(p.provenance.notes).toMatch(/transcription/);
+    }
+    expect(iap('ILS Z OR LOC Z RWY 13').holdingText).toMatch(/CARYL/);
+  });
 });
 
 describe('taxiway graph', () => {

@@ -21,8 +21,14 @@ ADS-B, or live traffic.
 | Live weather (METAR/TAF) | Aviation Weather Center API via the local backend | live |
 | Procedural references in training/debrief | FAA JO 7110.65 paragraph numbers and titles verified against the FAA web edition (`docs/FAA-REFERENCES.md`) | 2026-10-16 |
 
+Behavioural realism is verified too: aircraft performance values carry a source each
+(Textron/Cessna, Airbus, EASA, EUROCONTROL), the 250 ft holding-position distance matches
+FAA AC 150/5300-13B, separation rules cite FAA JO 7110.65, published missed approaches and
+holds are flown from the plate text, and 109 radio phrases were audited against the FAA
+(`docs/REALISM-VERIFICATION.md`, `docs/PHRASEOLOGY-AUDIT.md`).
+
 Everything approximate or simplified is documented: runway holding positions are derived
-(250 ft from the centreline; the FAA data has no hold-line coordinates), most parking
+(250 ft from the centreline per the FAA design standard; the FAA data has no hold-line coordinates), most parking
 spots other than the ten OSM gate stands are synthetic positions inside the real aprons,
 aircraft performance is a simplified model (C172 and A320 only), and 32 short OSM apron
 lanes could not be matched to a charted identifier. See `data/sources/README.md` and
@@ -85,7 +91,8 @@ Taxi (with via routes and hold-short), hold position, hold short, cross runway, 
 and wait, cleared for takeoff, cleared to land (incl. option / touch-and-go / low
 approach), go around, continue approach, contact/monitor frequency, headings, altitudes,
 speeds, pattern entries, IFR clearances (Clearance Delivery), approach clearances
-(ILS/LOC/RNAV/VOR/visual), direct-to-fix, resume own navigation, radar contact.
+(ILS/LOC/RNAV/VOR/visual), direct-to-fix, resume own navigation, radar contact, holding
+instructions (as published or with radial/turns/legs/EFC), execute missed approach.
 430+ parser test transmissions in `src/commands`. Positions: Clearance Delivery,
 Ground, Tower, Approach/Departure, or any combination.
 

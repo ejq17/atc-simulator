@@ -15,16 +15,23 @@ import { assessApproach } from './approach';
 import { computeRunwayActivity } from './runwayOccupancy';
 import type { RunwayActivity } from './runwayOccupancy';
 import { TAXI_PHASES } from './stateMachines';
-import { emitEvent } from './context';
+import { emitEvent, perfOf } from './context';
 import type { SimContext } from './context';
 
 export const REF_SAME_RUNWAY = 'FAA JO 7110.65 3-9-6 (same runway separation)';
 export const REF_LANDING = 'FAA JO 7110.65 3-10-5 (landing clearance) and 3-10-3 (same runway separation)';
 export const REF_TAXI = 'FAA JO 7110.65 3-7-2 (taxi and ground movement, runway crossings)';
 export const REF_INTERSECTING = 'FAA JO 7110.65 3-9-8 (intersecting runway separation)';
-/** Paragraph deliberately not cited: only the topic (radar separation minima) is referenced; the 3 nm figure is a simplification. */
-export const REF_RADAR_SEPARATION = 'FAA JO 7110.65, radar separation minima (simplified here to 3 nm in-trail on the same final)';
+/** 7110.65 5-5-4 MINIMA (paragraph number and title verified, docs/REALISM-VERIFICATION.md): 3 nm is the terminal radar minimum. */
+export const REF_RADAR_SEPARATION = 'FAA JO 7110.65 5-5-4 (radar separation minima, simplified here to 3 nm in-trail on the same final)';
+export const REF_WAKE_SEPARATION = 'FAA JO 7110.65 5-5-4 wake turbulence separation (simplified from the 7110.65 5-5-4 wake tables)';
 export const APPROACH_IN_TRAIL_NM = 3;
+/**
+ * A light aircraft (wakeCategory 'light', e.g. C172) following a medium / heavy aircraft (e.g. A320) on the same final gets 5 nm.
+ * Simplified from the 7110.65 5-5-4 wake tables (5 mi directly behind, 6 mi on approach for a small aircraft behind a large jet):
+ * the category mapping is by `AircraftPerformance.wakeCategory` only (light behind anything heavier); every other pair uses 3 nm.
+ */
+export const APPROACH_IN_TRAIL_LIGHT_BEHIND_HEAVIER_NM = 5;
 
 export interface SafetyIssue {
   kind: ConflictAlert['kind'];
@@ -99,11 +106,17 @@ function assessApproachSeparation(state: SimulationState, ac: Aircraft, cmd: Par
     const theirsNow = -along;
     const theirsAtJoin = Math.max(0, theirsNow - ktToMps(o.groundSpeedKt) * tJoinSec);
     const gapNm = mToNm(Math.abs(mine - theirsAtJoin));
-    if (gapNm < APPROACH_IN_TRAIL_NM) {
+    // Wake: the follower is the one farther out on the course; a light aircraft behind a medium / heavy one needs more.
+    const followerIsMine = mine >= theirsAtJoin;
+    const follower = followerIsMine ? ac : o;
+    const leader = followerIsMine ? o : ac;
+    const wake = perfOf(follower).wakeCategory === 'light' && perfOf(leader).wakeCategory !== 'light';
+    const minNm = wake ? APPROACH_IN_TRAIL_LIGHT_BEHIND_HEAVIER_NM : APPROACH_IN_TRAIL_NM;
+    if (gapNm < minNm) {
       issues.push({
         kind: 'AIRBORNE_PROXIMITY',
-        text: `Approach clearance for ${ac.callsign} to runway ${g.end.id} puts it ${gapNm.toFixed(1)} nm in trail of ${o.callsign}, established on the same final (${mToNm(theirsNow).toFixed(1)} nm out now)`,
-        reference: REF_RADAR_SEPARATION,
+        text: `Approach clearance for ${ac.callsign} to runway ${g.end.id} puts it ${gapNm.toFixed(1)} nm ${followerIsMine ? 'in trail of' : 'ahead of'} ${o.callsign}, established on the same final (${mToNm(theirsNow).toFixed(1)} nm out now); ${wake ? `wake turbulence separation (simplified from the 7110.65 5-5-4 wake tables) needs ${minNm} nm for ${follower.callsign} (${follower.type}) behind ${leader.callsign} (${leader.type})` : `radar separation minimum ${minNm} nm`}`,
+        reference: wake ? REF_WAKE_SEPARATION : REF_RADAR_SEPARATION,
         aircraftIds: [ac.id, o.id],
         runwayId: g.runway.id,
       });
@@ -246,6 +259,7 @@ function parkedLike(state: SimulationState, ac: Aircraft): boolean {
   if (ac.phase === 'PARKED' || ac.phase === 'ARRIVED') return true;
   return ac.groundSpeedKt < 0.1 && state.airport.parking.some((p) => dist(p.pos, ac.pos) < 8);
 }
+/** Near-miss ALERT thresholds (not the separation minimum: the radar minimum is 3 nm, see REF_RADAR_SEPARATION). */
 export const AIRBORNE_PROXIMITY_NM = 1.5;
 export const AIRBORNE_PROXIMITY_FT = 500;
 
@@ -308,7 +322,7 @@ export function detectConflicts(ctx: SimContext): void {
             key: `AIR:${[a.id, b.id].sort().join('+')}`,
             alert: {
               kind: 'AIRBORNE_PROXIMITY', aircraftIds: [a.id, b.id],
-              text: `${a.callsign} and ${b.callsign}: ${mToNm(d).toFixed(1)} nm, ${Math.round(dv)} ft`,
+              text: `Near-miss alert: ${a.callsign} and ${b.callsign}: ${mToNm(d).toFixed(1)} nm, ${Math.round(dv)} ft`,
               severity: d < nmToM(0.5) && dv < 200 ? 'critical' : 'warning',
             },
           });

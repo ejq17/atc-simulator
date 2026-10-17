@@ -28,6 +28,8 @@ import { frequencyById, frequencyByMhz, frequencyForPosition, hearsFrequency, fo
 import { buildReadback, buildSayAgain, buildUnable } from '../radio/readback';
 import { SPEED_LIMIT_BELOW_10K_KT } from './performance';
 import { findNavFix, indexOfFix } from './navigation';
+import { startHold } from './holding';
+import { publishedHoldFor } from './missedApproach';
 import { assessApproach } from './approach';
 import { buildIfrClearance } from './ifr';
 
@@ -278,6 +280,9 @@ function missingEntities(cmd: ParsedCommand, g?: RunwayEndGeom): string[] {
     case 'DIRECT_FIX':
       if (!cmd.fix) m.push('fix');
       break;
+    case 'HOLD_AT_FIX':
+      if (!cmd.hold?.fix) m.push('fix to hold at');
+      break;
     case 'CROSS_RUNWAY':
       if (!cmd.crossRunwayId && !cmd.runwayId && !cmd.runwayEnd) m.push('runway to cross');
       break;
@@ -306,7 +311,7 @@ function commandKey(ac: Aircraft, c: ParsedCommand): string {
   return [
     ac.id, c.kind, c.runwayEnd ?? '', c.runwayId ?? '', (c.route ?? []).join('>'), (c.holdShort ?? []).join(','), c.crossRunwayId ?? '',
     c.destination ?? '', c.headingDeg ?? '', c.turnDirection ?? '', c.altitudeFt ?? '', c.speedKt ?? '', c.frequencyMhz ?? '', c.frequencyId ?? '', c.patternLeg ?? '',
-    c.approachType ?? '', c.fix ?? '', c.ifr ? JSON.stringify(c.ifr) : '',
+    c.approachType ?? '', c.fix ?? '', c.ifr ? JSON.stringify(c.ifr) : '', c.hold ? JSON.stringify(c.hold) : '',
   ].join('|');
 }
 
@@ -346,6 +351,7 @@ function describeClearance(c: Clearance): string {
   if (c.frequencyMhz !== undefined) bits.push(`${c.frequencyMhz}`);
   if (c.approachType) bits.push(`${c.approachType} approach`);
   if (c.fix) bits.push(`direct ${c.fix}`);
+  if (c.hold) bits.push(`hold at ${c.hold.fix}${c.hold.asPublished ? ' as published' : ''}`);
   if (c.ifr) bits.push(`to ${c.ifr.destination}${c.ifr.departureProcedure ? ` via ${c.ifr.departureProcedure}` : ''} sq ${c.ifr.squawk}`);
   return bits.join(' ');
 }
@@ -775,6 +781,9 @@ function leaveFinalIfNeeded(env: Env): void {
 /** A heading assignment suspends the route (kept for DIRECT_FIX / RESUME_OWN_NAVIGATION) and cancels an approach clearance. */
 function enterVectors(env: Env): void {
   const { ac, rt, ctx } = env;
+  rt.missed = undefined;
+  rt.hold = undefined;
+  if (ac.phase === 'HOLDING' && !ac.isDeparture) setPhase(ctx, ac, 'APPROACH', 'vectored out of the hold');
   if (rt.approach) {
     rt.approach = undefined;
     completeClearances(ctx, ac, ['APPROACH']);
@@ -888,6 +897,8 @@ function planPattern(env: Env): PlanResult {
         ac.target.altitudeFt = undefined;
         ac.nav = undefined;
         rt.approach = undefined;
+        rt.missed = undefined;
+        rt.hold = undefined;
         if (leg === 'straight_in') {
           rt.pattern = undefined;
           if (ac.phase === 'GO_AROUND') setPhase(ctx, ac, 'APPROACH');
@@ -924,7 +935,11 @@ function planIfrClearance(env: Env): PlanResult {
   if (fp.ifrClearance) return unable(env, `${ac.callsign} already has its IFR clearance.`, 'we already have our clearance', false);
   if (ac.pendingRequest?.kind !== 'IFR_CLEARANCE') return unable(env, `${ac.callsign} has not requested an IFR clearance.`, "we haven't called for our clearance");
   const built = buildIfrClearance(ctx, ac, cmd.ifr);
-  if (!built.ok) return unable(env, built.reason, built.pilot);
+  if (!built.ok) {
+    // An element that cannot be used: the pilot asks for it again ("Say again the squawk code"), other problems are "Unable".
+    if (built.sayAgain) return { reject: { reason: built.reason, pilot: `${built.pilot.charAt(0).toUpperCase()}${built.pilot.slice(1)}, ${ac.spokenCallsign}`, commError: true } };
+    return unable(env, built.reason, built.pilot);
+  }
   const ifr = built.ifr;
   return {
     plan: {
@@ -958,11 +973,13 @@ function planRadarContact(env: Env): PlanResult {
   };
 }
 
-const ROUTE_PHASES = ['INBOUND', 'APPROACH', 'INITIAL_CLIMB', 'DEPARTURE', 'GO_AROUND'];
+const ROUTE_PHASES = ['INBOUND', 'APPROACH', 'INITIAL_CLIMB', 'DEPARTURE', 'GO_AROUND', 'HOLDING'];
 
 /** After a missed approach, a route instruction re-sequences the aircraft for another approach. */
 function rejoinFromGoAround(env: Env, note: string): void {
-  if (env.ac.phase === 'GO_AROUND') setPhase(env.ctx, env.ac, 'APPROACH', note);
+  env.rt.missed = undefined;
+  env.rt.hold = undefined;
+  if (env.ac.phase === 'GO_AROUND' || (env.ac.phase === 'HOLDING' && !env.ac.isDeparture)) setPhase(env.ctx, env.ac, 'APPROACH', note);
 }
 
 function planDirectFix(env: Env): PlanResult {
@@ -1062,6 +1079,10 @@ function planApproach(env: Env): PlanResult {
       flag,
       commit: () => {
         completeClearances(ctx, ac, ['APPROACH']);
+        rt.missed = undefined;
+        rt.hold = undefined;
+        rt.missedFlown = false;
+        if (ac.phase === 'HOLDING' && !ac.isDeparture) setPhase(ctx, ac, 'APPROACH', `cleared ${type} approach`);
         rt.approach = {
           type, runwayEnd: g.end.id, procedureId: plan.procedureId, onCourse: plan.onCourse, ifDM: plan.ifDM,
           pendingCapture: !established && plan.mode === 'intercept', clearedAtSec: env.now,
@@ -1093,7 +1114,65 @@ function planApproach(env: Env): PlanResult {
   };
 }
 
+const HOLD_PHASES = ['INBOUND', 'APPROACH', 'DEPARTURE', 'GO_AROUND', 'HOLDING'];
+
+/** "Hold at <fix> [as published | inbound course / radial, turns, legs, EFC]": direct-entry holding pattern (see holding.ts). */
+function planHoldAtFix(env: Env): PlanResult {
+  const { ac, rt, cmd, airport, ctx } = env;
+  const h = cmd.hold!;
+  if (ac.onGround) return unable(env, `${ac.callsign} is on the ground.`, "we're on the ground");
+  if (!HOLD_PHASES.includes(ac.phase)) return unable(env, `${ac.callsign} (${ac.phase}) cannot enter a hold now.`, ac.phase === 'FINAL' || ac.phase === 'LANDING' ? "we're established on the approach" : 'we cannot hold now');
+  const navFix = findNavFix(airport, h.fix);
+  if (!navFix) return unable(env, `Unknown fix "${h.fix}" at ${airport.icao}.`, "we don't have that fix");
+  const pub = publishedHoldFor(airport, navFix.id, rt.approach?.procedureId ?? rt.missed?.procedureId);
+  const known = ac.nav?.fixes ?? ac.flightPlan?.route ?? [];
+  const prevFixId = (() => {
+    const k = indexOfFix(airport, known, navFix.id);
+    return k > 0 ? known[k - 1] : undefined;
+  })();
+  let inboundMag: number;
+  let source = 'as issued';
+  let assumption: string | undefined;
+  if (h.inboundCourseDeg !== undefined) inboundMag = h.inboundCourseDeg;
+  else if (pub?.hold.inboundCourseMag !== undefined) {
+    inboundMag = pub.hold.inboundCourseMag;
+    source = `published (${pub.inboundSource ?? pub.source})`;
+  } else {
+    const prev = prevFixId ? findNavFix(airport, prevFixId) : undefined;
+    const from = prev?.pos ?? ac.pos;
+    const brg = Math.atan2(navFix.pos.x - from.x, navFix.pos.y - from.y) * (180 / Math.PI);
+    inboundMag = (Math.round(brg - airport.magneticVariationDeg) + 720) % 360;
+    source = pub ? `published (${pub.source})` : 'no published hold';
+    assumption = `inbound course ${String(inboundMag || 360).padStart(3, '0')} = the course ${prev ? `from ${prev.id}` : 'from the aircraft'} to ${navFix.id} (inbound course not stated or transcribed)`;
+  }
+  const turns = h.asPublished ? (pub?.hold.turns ?? h.turns ?? 'right') : (h.turns ?? pub?.hold.turns ?? 'right');
+  const legNm = h.legNm ?? (h.legMinutes === undefined ? pub?.hold.legNm : undefined);
+  const legMinutes = h.legMinutes ?? (legNm === undefined ? pub?.hold.legMinutes : undefined);
+  return {
+    plan: {
+      patch: { hold: { fix: navFix.id, inboundCourseDeg: h.inboundCourseDeg, turns: h.turns ?? 'right', legMinutes: h.legMinutes, legNm: h.legNm, asPublished: !!h.asPublished, efcZulu: h.efcZulu } },
+      commit: () => {
+        if (rt.approach) completeClearances(ctx, ac, ['APPROACH']);
+        startHold(ctx, ac, rt, {
+          fix: navFix.id, inboundTrueDeg: magneticToTrue(inboundMag, airport.magneticVariationDeg), turns, legMinutes, legNm, efcZulu: h.efcZulu, source, assumption,
+        });
+        if (ac.isDeparture && rt.handedOff) rt.depInstructed = true;
+      },
+    },
+  };
+}
+
+/** "Execute the missed approach": go around and fly the published missed approach (FINAL / APPROACH). */
+function planMissedApproach(env: Env): PlanResult {
+  const { ac, ctx } = env;
+  if (ac.onGround) return unable(env, `${ac.callsign} is on the ground.`, "we're on the ground");
+  if (ac.phase !== 'FINAL' && ac.phase !== 'APPROACH') return unable(env, `${ac.callsign} (${ac.phase}) is not on an approach.`, "we're not on an approach");
+  return { plan: { patch: {}, commit: () => initiateGoAround(ctx, ac, { reason: 'ATC instruction', announce: false }) } };
+}
+
 const PLANNERS: Partial<Record<ClearanceKind, (env: Env) => PlanResult>> = {
+  HOLD_AT_FIX: planHoldAtFix,
+  MISSED_APPROACH: planMissedApproach,
   IFR_CLEARANCE: planIfrClearance,
   APPROACH: planApproach,
   DIRECT_FIX: planDirectFix,

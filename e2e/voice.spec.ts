@@ -37,6 +37,43 @@ async function seedSettings(page: Page, providerId?: string) {
   }, providerId);
 }
 
+/**
+ * Main-thread responsiveness probe: records Long Tasks (>50 ms) and the gaps between animation frames, so a test can
+ * report how long Whisper blocks the UI. Results are read with `probe(page, fromMs)`.
+ */
+async function installPerfProbe(page: Page) {
+  await page.addInitScript(() => {
+    const perf = { long: [] as Array<[number, number]>, gaps: [] as Array<[number, number]>, last: 0 };
+    (window as unknown as { __perf: typeof perf }).__perf = perf;
+    try {
+      new PerformanceObserver((list) => {
+        for (const e of list.getEntries()) perf.long.push([e.startTime, e.duration]);
+      }).observe({ type: 'longtask', buffered: true });
+    } catch { /* Long Tasks API unavailable */ }
+    const tick = (t: number) => {
+      if (perf.last) perf.gaps.push([t, t - perf.last]);
+      perf.last = t;
+      requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+  });
+}
+
+interface MainThreadStats { longestTaskMs: number; longTasks: number; maxFrameGapMs: number }
+const nowInPage = (page: Page) => page.evaluate(() => performance.now());
+async function probe(page: Page, fromMs: number): Promise<MainThreadStats> {
+  return page.evaluate((from) => {
+    const p = (window as unknown as { __perf: { long: Array<[number, number]>; gaps: Array<[number, number]> } }).__perf;
+    const long = p.long.filter(([t]) => t >= from);
+    const gaps = p.gaps.filter(([t]) => t >= from);
+    return {
+      longestTaskMs: Math.round(Math.max(0, ...long.map(([, d]) => d))),
+      longTasks: long.length,
+      maxFrameGapMs: Math.round(Math.max(0, ...gaps.map(([, g]) => g))),
+    };
+  }, fromMs);
+}
+
 async function open(clip: ClipName, providerId?: string) {
   vb = await launchVoiceBrowser(clip);
   const errors: string[] = [];
@@ -46,21 +83,29 @@ async function open(clip: ClipName, providerId?: string) {
     vb.page.on('framenavigated', (f) => console.log('[nav]', f.url()));
   }
   await seedSettings(vb.page, providerId);
+  await installPerfProbe(vb.page);
   return { page: vb.page, errors };
 }
 
 /** Hold the PTT key while the fake mic plays the clip, then release; returns wall ms from release to the final text. */
+let decodeStats: { hold: MainThreadStats; decode: MainThreadStats } | null = null;
 async function speak(page: Page, clip: ClipName, expectInPartial: RegExp) {
   await page.locator('body').click({ position: { x: 2, y: 2 } }); // make sure no input has focus
   await page.keyboard.down('Space');
+  const downAt = await nowInPage(page);
   await expect(page.getByTestId('mic-badge')).toHaveText('TRANSMITTING');
   await page.waitForTimeout(CLIPS[clip].seconds * 1000 + 1000); // %noloop: silence after the clip, so over-holding is safe
   await page.keyboard.up('Space');
   const releasedAt = Date.now();
+  const upAt = await nowInPage(page);
   await expect(page.getByTestId('mic-badge')).toHaveText('TRANSCRIBING');
   await expect(page.getByTestId('partial')).toHaveText(/\S/);
   await expect(page.getByTestId('partial')).toHaveText(expectInPartial, { timeout: 120_000 });
   const transcribeMs = Date.now() - releasedAt;
+  const holdStats = await probe(page, downAt);
+  const decode = await probe(page, upAt);
+  decodeStats = { hold: holdStats, decode };
+  console.log(`[voice] main thread, key down..transcript: ${JSON.stringify(holdStats)}; key up..transcript (decode): ${JSON.stringify(decode)}`);
   const heard = (await page.getByTestId('partial').textContent())?.trim() ?? '';
   test.info().annotations.push({ type: 'transcript', description: `${clip}: "${heard}" (${transcribeMs} ms after key release)` });
   console.log(`[voice] ${clip}: heard "${heard}" -- ${transcribeMs} ms from key release to transcript`);
@@ -97,6 +142,10 @@ test('hold SPACE while the fake mic says the takeoff clearance: transcript, read
   await expect(page.getByTestId('mic-badge')).toHaveText('READY');
 
   const { heard } = await speak(page, 'takeoff', /cleared for takeoff/i);
+  // Decoding runs in a Web Worker: the UI thread must stay responsive while Whisper works (running it on the main
+  // thread measured a ~930 ms long task / frame gap here).
+  expect(decodeStats!.decode.longestTaskMs).toBeLessThan(250);
+  expect(decodeStats!.decode.maxFrameGapMs).toBeLessThan(250);
   expect(heard).toMatch(/723/);
 
   const log = page.getByTestId('comms-log');

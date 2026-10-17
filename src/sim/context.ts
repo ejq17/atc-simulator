@@ -8,6 +8,9 @@ import type { EngineOptions } from './api';
 import type { Rng } from './rng';
 import { getPerformance } from './performance';
 import { assertTransition, transitionPath } from './stateMachines';
+import type { MissedState } from './missedApproach';
+import type { HoldState } from './holding';
+import type { Minima } from './minima';
 
 export const EVENT_CAP = 2000;
 
@@ -31,6 +34,10 @@ export interface ApproachRuntime {
   /** Vector-intercept clearance: keep the assigned heading until the course is captured. */
   pendingCapture: boolean;
   clearedAtSec: number;
+  /** Resolved minima (computed lazily at the first decision altitude check). */
+  minima?: Minima;
+  /** The decision altitude was already evaluated on this approach. */
+  daChecked?: boolean;
 }
 
 export interface AircraftRuntime {
@@ -73,6 +80,12 @@ export interface AircraftRuntime {
   arrivedAtSec?: number;
   /** Active approach clearance (IFR approaches and visual approaches). */
   approach?: ApproachRuntime;
+  /** Published missed approach in progress (nav mode 'missed'). */
+  missed?: MissedState;
+  /** Holding pattern in progress (nav mode 'holding'). */
+  hold?: HoldState;
+  /** A missed approach / go-around was flown and the aircraft has not yet been cleared for another approach. */
+  missedFlown?: boolean;
   /** Nav mode to return to on RESUME_OWN_NAVIGATION after vectors. */
   navBeforeVectors?: 'route' | 'direct';
   /** IFR departure: when to tune Ground and ask for taxi after the clearance was read back. */

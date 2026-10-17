@@ -22,7 +22,7 @@ describe('IFR clearance request (Clearance Delivery)', () => {
     const { e, ac } = clearedDeparture();
     expect(ac.phase).toBe('PARKED');
     expect(ac.frequencyId).toBe('CLNC');
-    expect(pilotTexts(e)).toEqual(['Atlantic City Clearance, Spirit four fifty one, IFR to Philadelphia, with information alpha, ready to copy.']);
+    expect(pilotTexts(e)).toEqual(['Atlantic City Clearance Delivery, Spirit four fifty one, IFR to Philadelphia, with information alpha, ready to copy.']);
     expect(ac.pendingRequest).toMatchObject({ kind: 'IFR_CLEARANCE' });
     // it does not ask for taxi until it has its clearance
     run(e, 60);
@@ -33,7 +33,7 @@ describe('IFR clearance request (Clearance Delivery)', () => {
   it('VFR departures are unchanged: no clearance request, they ask for taxi', () => {
     const e = makeEngine({ scenario: { spawns: [GA_PARKED('N723EJ', 'GA1', 'GND')] } });
     expect(runUntil(e, () => find(e, 'N723EJ').pendingRequest?.kind === 'TAXI', 30)).toBe(true);
-    expect(pilotTexts(e)[0]).toMatch(/ready to taxi, VFR departure/);
+    expect(pilotTexts(e)[0]).toMatch(/ready to taxi, VFR to [A-Za-z' ]+\.$/);
   });
 
   it('a spec flight plan marked VFR does not need a clearance either', () => {
@@ -56,7 +56,7 @@ describe('IFR_CLEARANCE', () => {
     });
     expect(isAssignableSquawk(ifr.squawk)).toBe(true);
     expect(r.readback).toBe(
-      `Cleared to Philadelphia, Atlantic City Three departure, radar vectors, maintain two thousand, expect one zero thousand ten minutes after departure, departure one two four point six, squawk ${ifr.squawk.split('').map((d) => ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven'][Number(d)]).join(' ')}, Spirit four fifty one`,
+      `Cleared to Philadelphia airport, Atlantic City Three departure, radar vectors, maintain two thousand, expect one zero thousand, one zero minutes after departure, departure frequency one two four point six, squawk ${ifr.squawk.split('').map((d) => ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven'][Number(d)]).join(' ')}, Spirit four fifty one`,
     );
     expect(ac.squawk).toBe(ifr.squawk);
     expect(ac.flightPlan?.ifrClearance).toMatchObject({ ...ifr, readBack: true });
@@ -70,7 +70,7 @@ describe('IFR_CLEARANCE', () => {
     expect(r.status).toBe('accepted');
     if (r.status === 'accepted') {
       expect(r.readback).toContain('maintain three thousand');
-      expect(r.readback).toContain('expect one two thousand ten minutes after departure');
+      expect(r.readback).toContain('expect one two thousand, one zero minutes after departure');
       expect(r.readback).toContain('squawk four two one five');
     }
     expect(ac.squawk).toBe('4215');
@@ -83,16 +83,22 @@ describe('IFR_CLEARANCE', () => {
     runUntil(e, () => ac.pendingRequest?.kind === 'IFR_CLEARANCE', 30);
     const r = say(e, cmd('IFR_CLEARANCE', 'NKS451', { ifr: { destination: 'BOS' } }), 'CLNC');
     expect(r.status).toBe('accepted');
-    if (r.status === 'accepted') expect(r.readback).toMatch(/^Cleared to Boston, .*expect flight level two three zero ten minutes after departure/);
+    if (r.status === 'accepted') expect(r.readback).toMatch(/^Cleared to Boston airport, .*expect flight level two three zero, one zero minutes after departure/);
   });
 
   it('refuses a clearance limit that is not the filed destination, bad or duplicate squawks, and unusable altitudes', () => {
     const { e } = clearedDeparture();
     const wrongDest = say(e, cmd('IFR_CLEARANCE', 'NKS451', { ifr: { destination: 'KBOS' } }), 'CLNC');
     expect(wrongDest.status).toBe('rejected');
-    if (wrongDest.status === 'rejected') expect(wrongDest.reason).toMatch(/does not match the flight plan/);
+    if (wrongDest.status === 'rejected') {
+      expect(wrongDest.reason).toMatch(/does not match the flight plan/);
+      expect(wrongDest.pilotResponse).toBe('Unable, we filed to Philadelphia, Spirit four fifty one');
+    }
     for (const bad of ['7700', '7500', '7600', '1200', '0000', '4289', '12']) {
-      expect(say(e, cmd('IFR_CLEARANCE', 'NKS451', { ifr: { squawk: bad } }), 'CLNC').status, bad).toBe('rejected');
+      const r = say(e, cmd('IFR_CLEARANCE', 'NKS451', { ifr: { squawk: bad } }), 'CLNC');
+      expect(r.status, bad).toBe('rejected');
+      // an unusable element is a request to say it again, not "Unable" (PCG: SAY AGAIN)
+      if (r.status === 'rejected') expect(r.pilotResponse).toBe('Say again the squawk code, Spirit four fifty one');
     }
     expect(say(e, cmd('IFR_CLEARANCE', 'NKS451', { ifr: { initialAltitudeFt: 50 } }), 'CLNC').status).toBe('rejected');
     expect(say(e, cmd('IFR_CLEARANCE', 'NKS451', { ifr: { departureProcedure: 'BRIDGEPORT FOUR' } }), 'CLNC').status).toBe('rejected');
@@ -150,7 +156,7 @@ describe('IFR_CLEARANCE', () => {
     expect(ac.frequencyId).toBe('GND');
     expect(ac.frequencyMhz).toBe(121.9);
     expect(ac.phase).toBe('READY');
-    expect(pilotTexts(e).pop()).toBe('Atlantic City Ground, Spirit four fifty one, at Gate one, ready to taxi, IFR departure.');
+    expect(pilotTexts(e).pop()).toBe('Atlantic City Ground, Spirit four fifty one, at Gate one, ready to taxi, IFR to Philadelphia.');
     // Ground can now taxi it
     expect(say(e, cmd('TAXI', 'NKS451', { destination: 'RWY13' }), 'GND').status).toBe('accepted');
   });
@@ -224,7 +230,7 @@ describe('IFR departure routing', () => {
     expect(ac.frequencyMhz).toBe(124.6);
     expect(runUntil(e, () => ac.pendingRequest?.kind === 'OTHER', 10)).toBe(true);
     const text = pilotTexts(e).pop()!;
-    expect(text).toMatch(/^Atlantic City Departure, Spirit four fifty one, (\w+ )+(thousand|hundred)( \w+)*( climbing two thousand)?\.$/);
+    expect(text).toMatch(/^Atlantic City Departure, Spirit four fifty one, (leaving (\w+ )+(thousand|hundred)( \w+)*, climbing to two thousand|level two thousand)\.$/);
     // an Approach-position controller on the same frequency hears it too
     expect(say(e, cmd('RADAR_CONTACT', 'NKS451'), 'APP').status).toBe('accepted');
   });
@@ -238,7 +244,7 @@ describe('IFR departure routing', () => {
     expect(runUntil(e, () => ac.altitudeFt >= 1200 && !ac.onGround, 400)).toBe(true);
     say(e, cmd('CONTACT_FREQUENCY', 'NKS451', { frequencyId: 'DEP' }), 'TWR');
     expect(runUntil(e, () => ac.pendingRequest?.kind === 'OTHER', 20)).toBe(true);
-    expect(pilotTexts(e).pop()).toMatch(/^Atlantic City Departure, Spirit four fifty one, one thousand \w+ hundred climbing two thousand\.$/);
+    expect(pilotTexts(e).pop()).toMatch(/^Atlantic City Departure, Spirit four fifty one, leaving one thousand \w+ hundred, climbing to two thousand\.$/);
   });
 
   it('RADAR_CONTACT is informational: sets radarIdentified, no readback, no pilot transmission', () => {
