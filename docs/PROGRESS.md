@@ -61,6 +61,17 @@ Honest status as of 2026-10-16. "Done" means it runs and is covered by tests.
 
 Totals: 1612 vitest tests in 82 files, 24 Playwright tests (14 chromium flows, 5 fake-microphone Whisper flows, 2 Web Speech flows in real Chrome, 3 Deepgram protocol flows) plus the opt-in real-microphone project, type-check clean, production build 3.8 MB. Verified by the orchestrator on 2026-10-17 after the final realism round.
 
+
+## Needs the user (cannot be done autonomously)
+
+1. **Real speech through real hardware.** Open the laptop lid (or use a working headset) so macOS enables a microphone, grant Microphone permission to the app that launches the test (System Settings > Privacy & Security > Microphone: the terminal/VS Code process and Google Chrome), then run:
+   ```bash
+   npm run build && npx vite preview --port 5173 &   # stable server
+   REAL_MIC=1 npx playwright test --project=chrome-real-mic
+   ```
+   The spec plays a spoken clearance through the speakers into the real microphone and asserts the readback and departure. On the build machine every input delivered digital silence (lid closed; native capture via AVAudioEngine also returned zero samples), so the spec reports that diagnosis.
+2. **Deepgram recognition accuracy.** Put `DEEPGRAM_API_KEY=...` in `.env`, start `npm run server`, select the Deepgram provider in Settings and speak. The client protocol (token grant, subprotocol upgrade, 16 kHz audio, interim/final results) is proven against a mock; only Deepgram's own accuracy is unmeasured.
+
 ## Known issues
 - The microphone path is proven in automation for all three providers (fake audio device). Not exercised: a physical headset with a human voice, and Deepgram's own recognition accuracy (the client protocol is proven against a mock; a real key is needed for accuracy). Google's Web Speech service needs 1–3 s to open its stream, so speakers should pause a beat after keying; the app cannot buffer for it.
 - Whisper's first use downloads ~40 MB of model files from huggingface.co and the ONNX runtime from a CDN; decoding adds ~1.5 s after key release.
