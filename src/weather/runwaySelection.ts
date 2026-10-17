@@ -56,7 +56,7 @@ export interface RecommendOptions {
   variationDeg?: number;
   /** Headwind differences up to this are treated as ties. Default 1 kt. */
   toleranceKt?: number;
-  /** Wind at/below this speed (or variable) uses the preferred order only. Default 3 kt. */
+  /** Wind below this speed (or variable) is treated as calm and uses the preferred order only. Default 5 kt (FAA JO 7110.65 3-5-1: calm wind is less than 5 knots). */
   calmBelowKt?: number;
   /** Use gust speed instead of steady speed. Default false. */
   useGusts?: boolean;
@@ -76,13 +76,13 @@ export function recommendRunways(
     preferredOrder = [],
     variationDeg = KACY_MAGNETIC_VARIATION_DEG,
     toleranceKt = 1,
-    calmBelowKt = 3,
+    calmBelowKt = 5,
     useGusts = false,
   } = options;
 
   const speed = useGusts && weather.windGustKt ? weather.windGustKt : weather.windSpeedKt;
   const magDir = windMagnetic(weather, variationDeg);
-  const calm = magDir === 'VRB' || magDir === 0 || speed <= calmBelowKt;
+  const calm = magDir === 'VRB' || magDir === 0 || speed < calmBelowKt;
 
   const prefRank = (id: string) => {
     const i = preferredOrder.indexOf(id);

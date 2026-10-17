@@ -87,8 +87,27 @@ export interface Session {
   dispose(): void;
 }
 
+/**
+ * Approaches in use, derived from the airport's published procedures for each landing runway:
+ * ILS where one exists (KACY: 13 and 31 only), else RNAV (GPS), else VOR; visual approaches in VFR.
+ * Never names an approach the airport does not publish (docs/BEHAVIOUR-ACCURACY.md W4).
+ */
+export function approachesInUseFor(state: SimulationState): string[] {
+  const out: string[] = [];
+  for (const rwy of state.activeRunways.landing) {
+    if (state.weather.flightCategory === 'VFR') { out.push(`visual approach runway ${rwy}`); continue; }
+    const iaps = state.airport.procedures.filter((p) => p.type === 'IAP' && p.runwayEnd === rwy && !/^(HI-|COPTER)/i.test(p.name));
+    const pick = iaps.find((p) => /^ILS/i.test(p.name)) ?? iaps.find((p) => /^RNAV \(GPS\)/i.test(p.name)) ?? iaps.find((p) => /^VOR/i.test(p.name));
+    if (!pick) continue;
+    const kind = /^ILS/i.test(pick.name) ? 'ILS' : /^RNAV/i.test(pick.name) ? 'RNAV (GPS)' : 'VOR';
+    out.push(`${kind} runway ${rwy} approach`);
+  }
+  return out;
+}
+
 export function makeAtis(state: SimulationState, letter: string, startUtcMs: number): SimulatedAtis {
   return generateAtis({
+    approachesInUse: approachesInUseFor(state),
     airportName: AIRPORT_CALL_NAME,
     icao: state.airport.icao,
     weather: state.weather,

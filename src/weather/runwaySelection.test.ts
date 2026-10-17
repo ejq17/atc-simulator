@@ -98,8 +98,8 @@ describe('recommendRunways', () => {
     expect(r.ranking.map((x) => x.id).slice(0, 2)).toEqual(['13', '4']);
   });
 
-  it('light wind (<=3 kt) and VRB use preferred order', () => {
-    expect(recommendRunways(wind(200, 3), KACY_ENDS, { preferredOrder: ['31'] }).primary).toBe('31');
+  it('calm wind (<5 kt, 7110.65 3-5-1) and VRB use preferred order', () => {
+    expect(recommendRunways(wind(200, 4), KACY_ENDS, { preferredOrder: ['31'] }).primary).toBe('31');
     expect(recommendRunways(wind('VRB', 8), KACY_ENDS, { preferredOrder: ['4'] }).primary).toBe('4');
   });
 

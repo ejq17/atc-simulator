@@ -14,6 +14,7 @@ not quote text. This software is not ATC training.
 | 3-9-3 | DEPARTURE CONTROL INSTRUCTIONS | "Departure frequency ..., squawk ..." |
 | 4-3-3 | ABBREVIATED DEPARTURE CLEARANCE | Destination on first call, "cleared to ... airport, ... departure, then as filed" |
 | 5-7-2 | METHODS | Speed adjustment phraseology |
+| 3-5-1 | SELECTION (runway in use) | Wind runway at 5 kt or more; calm-wind runway below 5 kt |
 | 3-7-1 | GROUND TRAFFIC MOVEMENT | Ground control basics |
 | 3-7-2 | TAXI AND GROUND MOVEMENT OPERATIONS | Taxi clearances, explicit runway crossing clearances, hold-short readback |
 | 3-7-4 | RUNWAY PROXIMITY | Hold positions |
@@ -41,6 +42,7 @@ Page URLs (the FAA site returns 403 to non-browser user agents; fetch with a nor
 - https://www.faa.gov/air_traffic/publications/atpubs/atc_html/chap2_section_1.html
 - https://www.faa.gov/air_traffic/publications/atpubs/atc_html/chap2_section_4.html
 - https://www.faa.gov/air_traffic/publications/atpubs/atc_html/chap2_section_9.html
+- https://www.faa.gov/air_traffic/publications/atpubs/atc_html/chap3_section_5.html
 - https://www.faa.gov/air_traffic/publications/atpubs/atc_html/chap3_section_7.html
 - https://www.faa.gov/air_traffic/publications/atpubs/atc_html/chap3_section_9.html
 - https://www.faa.gov/air_traffic/publications/atpubs/atc_html/chap3_section_10.html

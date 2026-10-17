@@ -111,6 +111,8 @@ export interface RadioFrequency {
   name: string;            // "Atlantic City Tower"
   mhz: number;
   position: ControllerPositionId | 'ATIS' | 'OTHER';
+  /** Sectorization from NASR (e.g. KACY approach/departure south 130-309, north 310-129), magnetic bearings from the airport. */
+  sectorBearings?: { fromDeg: number; toDeg: number };
   provenance: DataProvenance;
 }
 
@@ -137,6 +139,16 @@ export interface InstrumentProcedure {
   missedApproachText?: string;
   holdingText?: string;
   minimaText?: string;
+  /** Published holding patterns read from the plate depiction (human transcription). */
+  holdingPatterns?: {
+    fix: string;
+    inboundCourseDeg: number;        // magnetic
+    turns: 'left' | 'right';
+    legNm?: number;
+    legMinutes?: number;
+    role: 'missed_approach' | 'hold_in_lieu' | 'arrival';
+    maxSpeedKt?: number;
+  }[];
   provenance: DataProvenance;
 }
 
