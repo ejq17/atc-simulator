@@ -22,6 +22,7 @@ import type { RunwayEndGeom } from './runways';
 import { findTaxiRoute, nearestNode, neighborIds, runwayCrossingsAlong } from './pathfinding';
 import { computeStopNodes } from './groundMovement';
 import { initiateGoAround } from './flightDynamics';
+import { freeParkingCandidates, parkingOccupant, resolveParkingQuery } from './parkingResolver';
 import { assessClearanceSafety, recordUnsafeClearance } from './conflicts';
 import { frequencyById, frequencyByMhz, frequencyForPosition, hearsFrequency, formatMhz } from '../radio/frequencies';
 import { buildReadback, buildSayAgain, buildUnable } from '../radio/readback';
@@ -396,30 +397,42 @@ function planTaxi(env: Env): PlanResult {
   let targets: string[] = [];
   let runwayEnd: string | undefined;
   const destRaw = cmd.destination ?? (cmd.runwayEnd ? `RWY${cmd.runwayEnd}` : undefined);
-  if (!destRaw) {
-    if (cmd.kind !== 'TAXI_TO_PARKING') return unable(env, 'No taxi destination given.', 'say destination', false);
-    targets = airport.parking.map((p) => p.nodeId);
-  } else {
-    const up = destRaw.trim().toUpperCase();
-    const parking = airport.parking.find((p) => p.id.toUpperCase() === up || p.name.toUpperCase() === up);
-    if (parking) targets = [parking.nodeId];
-    else {
-      const endRaw = parseRunwayDestination(destRaw);
-      const g = findRunwayEnd(airport, endRaw);
-      if (!g) return unable(env, `Unknown taxi destination "${destRaw}".`, "we can't find that destination");
-      runwayEnd = g.end.id;
-      const holds = Object.values(graph.nodes).filter((n) => n.kind === 'holding_position' && n.runwayId === g.runway.id);
-      const explicit = holds.filter((h) => h.protectsRunwayEnd && normalizeRunwayEndId(h.protectsRunwayEnd) === normalizeRunwayEndId(g.end.id));
-      const implicit = holds.filter((h) => !h.protectsRunwayEnd);
-      let cands = explicit.length ? explicit : implicit;
-      const lastVia = cmd.route?.[cmd.route.length - 1]?.toUpperCase();
-      if (lastVia) {
-        const m = [...explicit, ...implicit].filter((h) => h.taxiways.some((t) => t.toUpperCase() === lastVia));
-        if (m.length) cands = m;
-      }
-      if (!cands.length) return unable(env, `No holding position serves runway ${g.end.id}.`, `we can't find a holding position for runway ${g.end.id}`);
-      targets = cands.map((h) => h.id);
+  const isRunwayWord = !!destRaw && /^\s*(RWY|RUNWAY)/i.test(destRaw);
+  const pq = !isRunwayWord && (destRaw || cmd.kind === 'TAXI_TO_PARKING') ? resolveParkingQuery(airport, destRaw) : ({ kind: 'unknown' } as const);
+  if (!destRaw && cmd.kind !== 'TAXI_TO_PARKING') return unable(env, 'No taxi destination given.', 'say destination', false);
+  if (pq.kind === 'spot') {
+    const occ = parkingOccupant(ctx.state, pq.parking, ac.id);
+    if (occ) return unable(env, `Parking ${pq.parking.id} is occupied by ${occ.callsign}.`, 'that parking spot is occupied');
+    targets = [pq.parking.nodeId];
+  } else if (pq.kind === 'category' || pq.kind === 'default') {
+    const cat = pq.kind === 'category' ? pq.category : undefined;
+    const cands = freeParkingCandidates(ctx.state, ac, cat, rt.homeParkingCategory);
+    if (!cands.length) {
+      return unable(env, `No unoccupied ${cat ? `${cat} ` : ''}parking position is available.`, 'there is no parking available');
     }
+    targets = cands.map((c) => c.nodeId);
+  } else {
+    const endRaw = parseRunwayDestination(destRaw ?? '');
+    const g = findRunwayEnd(airport, endRaw);
+    if (!g) {
+      return unable(
+        env,
+        `Unknown taxi destination "${destRaw}": not a runway, a parking id/name, or a parking area (gate, ramp, FBO, cargo, military).`,
+        "we can't find that destination",
+      );
+    }
+    runwayEnd = g.end.id;
+    const holds = Object.values(graph.nodes).filter((n) => n.kind === 'holding_position' && n.runwayId === g.runway.id);
+    const explicit = holds.filter((h) => h.protectsRunwayEnd && normalizeRunwayEndId(h.protectsRunwayEnd) === normalizeRunwayEndId(g.end.id));
+    const implicit = holds.filter((h) => !h.protectsRunwayEnd);
+    let cands = explicit.length ? explicit : implicit;
+    const lastVia = cmd.route?.[cmd.route.length - 1]?.toUpperCase();
+    if (lastVia) {
+      const m = [...explicit, ...implicit].filter((h) => h.taxiways.some((t) => t.toUpperCase() === lastVia));
+      if (m.length) cands = m;
+    }
+    if (!cands.length) return unable(env, `No holding position serves runway ${g.end.id}.`, `we can't find a holding position for runway ${g.end.id}`);
+    targets = cands.map((h) => h.id);
   }
   if (runwayEnd && ac.isDeparture === false) return unable(env, 'Arriving aircraft cannot be taxied to a departure runway.', 'we are an arrival');
 
@@ -438,7 +451,7 @@ function planTaxi(env: Env): PlanResult {
 
   return {
     plan: {
-      patch: { route: cmd.route, holdShort: cmd.holdShort, destination: cmd.destination ?? (runwayEnd ? `RWY${runwayEnd}` : dest?.id), runwayEnd },
+      patch: { route: cmd.route, holdShort: cmd.holdShort, destination: dest?.id ?? (runwayEnd ? `RWY${runwayEnd}` : cmd.destination), runwayEnd },
       commit: () => {
         const stops = new Set(computeStopNodes(graph, route.nodeIds, ac.runwayAuthorizations));
         for (const rid of cmd.holdShort ?? []) {

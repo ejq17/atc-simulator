@@ -89,7 +89,7 @@ describe('clearance readbacks (callsign last)', () => {
     expect(t({ kind: 'ALTITUDE', altitudeFt: 1000 }, spirit)).toBe('Descend and maintain one thousand, Spirit four fifty one');
     expect(t({ kind: 'SPEED', speedKt: 180 }, spirit)).toBe('Speed one eight zero, Spirit four fifty one');
     expect(t({ kind: 'CONTACT_FREQUENCY', frequencyMhz: 120.3, frequencyId: 'TWR' }, cess)).toBe('Tower one two zero point three, Cessna seven two three echo juliet');
-    expect(t({ kind: 'TAXI', destination: 'GA2', route: ['A', 'B'] })).toBe('Taxi to general aviation Ramp two via alpha, bravo, Cessna seven two three echo juliet');
+    expect(t({ kind: 'TAXI', destination: 'GA2', route: ['A', 'B'] })).toBe('Taxi to the ramp via alpha, bravo, Cessna seven two three echo juliet');
     expect(t({ kind: 'ENTER_PATTERN', runwayEnd: '13', patternLeg: 'left_downwind' })).toBe('Left downwind runway one three, Cessna seven two three echo juliet');
     expect(buildUnable(cess, 'we are airborne')).toBe('Unable, we are airborne, Cessna seven two three echo juliet');
   });

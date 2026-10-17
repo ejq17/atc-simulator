@@ -92,6 +92,9 @@ export function createTestAirport(): Airport {
   node('GA1', 'parking', -540, 470, ['RAMP'], { name: 'GA Ramp 1' });
   node('GA2', 'parking', -480, 490, ['RAMP'], { name: 'GA Ramp 2' });
   node('GA3', 'parking', -420, 470, ['RAMP'], { name: 'GA Ramp 3' });
+  node('GATE-1', 'parking', -620, 380, ['RAMP'], { name: 'Gate 1' });
+  node('GATE-2', 'parking', -620, 320, ['RAMP'], { name: 'Gate 2' });
+  node('FBO-1', 'parking', -340, 470, ['RAMP'], { name: 'FBO Ramp 1' });
   node('AP', 'apron', -480, 400, ['RAMP', 'B']);
 
   // Taxiway A (s = -200)
@@ -136,6 +139,9 @@ export function createTestAirport(): Airport {
   link('GA1', 'AP', 'RAMP');
   link('GA2', 'AP', 'RAMP');
   link('GA3', 'AP', 'RAMP');
+  link('GATE-1', 'AP', 'RAMP');
+  link('GATE-2', 'AP', 'RAMP');
+  link('FBO-1', 'AP', 'RAMP');
   link('AP', 'A_J', 'B');
   // A
   link('A_S', 'AC', 'A');
@@ -203,6 +209,9 @@ export function createTestAirport(): Airport {
       { id: 'GA1', name: 'GA Ramp 1', nodeId: 'GA1', pos: nodes.GA1.pos, category: 'ga', headingDeg: 200 },
       { id: 'GA2', name: 'GA Ramp 2', nodeId: 'GA2', pos: nodes.GA2.pos, category: 'ga', headingDeg: 200 },
       { id: 'GA3', name: 'GA Ramp 3', nodeId: 'GA3', pos: nodes.GA3.pos, category: 'ga', headingDeg: 200 },
+      { id: 'GATE-1', name: 'Gate 1', nodeId: 'GATE-1', pos: nodes['GATE-1'].pos, category: 'airline', headingDeg: 200 },
+      { id: 'GATE-2', name: 'Gate 2', nodeId: 'GATE-2', pos: nodes['GATE-2'].pos, category: 'airline', headingDeg: 200 },
+      { id: 'FBO-1', name: 'FBO Ramp 1', nodeId: 'FBO-1', pos: nodes['FBO-1'].pos, category: 'fbo', headingDeg: 200 },
     ],
     // FIXTURE-ONLY PLACEHOLDER frequencies. Not real KACY values.
     frequencies: [

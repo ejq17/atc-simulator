@@ -182,6 +182,7 @@ export function spawnFromSpec(ctx: SimContext, spec: SpawnSpec): Aircraft {
     ac.headingDeg = p.headingDeg ?? (nb ? bearingDeg(p.pos, nb.pos) : 0);
     ac.trackDeg = ac.headingDeg;
     ac.phase = 'PARKED';
+    rt.homeParkingCategory = p.category;
     rt.firstCallAtSec = now + 3 + rng() * 5;
   } else if (s.kind === 'holding_short') {
     const node = graph.nodes[s.nodeId];

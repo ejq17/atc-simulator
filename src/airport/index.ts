@@ -16,6 +16,8 @@ export {
   runwayExitNodes,
   edgesBetween,
   edgesOfNode,
+  findParking,
+  isRunwayEdge,
   normalizeRunwayEnd,
   normalizeRunwayId,
 } from './graphUtils';

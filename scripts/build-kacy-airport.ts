@@ -714,6 +714,59 @@ const runwaysOfNode = new Map<number, string[]>();
 for (const [rid, set] of pl.runwayNodes) for (const n of set) runwaysOfNode.set(n, [...(runwaysOfNode.get(n) ?? []), rid]);
 const thrNodeIds = new Set([...thresholdNodeOf.values()].flat());
 
+// --- taxi edges that lie on a runway surface carry onRunwayId (engine contract; `taxiway` keeps the human identifier)
+const runwayMarked: { edge: FEdge; why: string }[] = [];
+const markOnRunway = (e: FEdge, rid: string, why: string): void => {
+  if (e.runwayId && e.runwayId !== rid) {
+    hard(`taxi edge ${e.taxiway || '(unnamed)'} ${e.a}-${e.b} would lie on two runways (${e.runwayId} and ${rid}); split the edge`);
+    return;
+  }
+  if (!e.runwayId) runwayMarked.push({ edge: e, why });
+  e.runwayId = rid;
+};
+{
+  const taxiAdj = new Map<number, { other: number; e: FEdge }[]>();
+  for (const e of fedges) {
+    if (e.kind !== 'taxiway' && e.kind !== 'unnamed') continue;
+    for (const [x, y] of [[e.a, e.b], [e.b, e.a]]) taxiAdj.set(x, [...(taxiAdj.get(x) ?? []), { other: y, e }]);
+  }
+  // (1) every edge between a hold line and its runway entry node: the crossing starts at the hold line
+  for (const h of holds) {
+    const prev = new Map<number, { from: number; e: FEdge }>([[h.node, { from: -1, e: undefined as unknown as FEdge }]]);
+    const queue = [h.node];
+    while (queue.length && !prev.has(h.entryNode)) {
+      const x = queue.shift()!;
+      for (const { other, e } of taxiAdj.get(x) ?? []) {
+        if (prev.has(other)) continue;
+        prev.set(other, { from: x, e });
+        queue.push(other);
+      }
+    }
+    if (!prev.has(h.entryNode)) {
+      hard(`hold ${h.node} has no taxi path to its runway entry node ${h.entryNode}`);
+      continue;
+    }
+    for (let x = h.entryNode; x !== h.node; ) {
+      const step = prev.get(x)!;
+      markOnRunway(step.e, h.runwayId, 'hold-to-entry path');
+      x = step.from;
+    }
+  }
+  // (2) any taxi edge with a runway-kind endpoint, or whose midpoint is inside a runway polygon
+  for (const e of fedges) {
+    if (e.kind !== 'taxiway' && e.kind !== 'unnamed') continue;
+    const mid = lerp(pl.pos[e.a], pl.pos[e.b], 0.5);
+    const inside = runways.find((r) => pointInPolygon(mid, r.polygon as P[]));
+    if (inside) markOnRunway(e, inside.id, 'midpoint inside runway polygon');
+    for (const n of [e.a, e.b]) {
+      if (!pl.pinned.has(n)) continue;
+      const rids = runwaysOfNode.get(n) ?? [];
+      if (rids.length === 1) markOnRunway(e, rids[0], 'runway-kind endpoint');
+      else if (rids.length > 1 && !e.runwayId) hard(`taxi edge touches multi-runway node ${n} without lying on a runway`);
+    }
+  }
+}
+
 // deterministic ids: sort by position
 const sortedNodes = [...usedNodes].sort((p, q) => pl.pos[p].x - pl.pos[q].x || pl.pos[p].y - pl.pos[q].y);
 const nodeIdOf = new Map<number, string>();
@@ -837,6 +890,8 @@ const apronPolys: Vec2[][] = apronRecs.map((a) => a.ring.map(pr));
 // Frequencies (all values read from kacy-frequencies.json)
 // ---------------------------------------------------------------------------------------------
 const titleCase = (s: string): string => s.toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase());
+/** Spoken airport name for the radio layer: "ATLANTIC CITY INTL" -> "Atlantic City International" (raw NASR name kept in provenance notes as nasrName). */
+const spokenName = (nasrName: string): string => titleCase(nasrName.replace(/\bINTL\b/, 'INTERNATIONAL'));
 const fsum: J = freqSrc.summary_by_function;
 const callName = titleCase(freqSrc.facility.radio_call as string); // "Atlantic City"
 const freqProv = (note: string): DataProvenance => nasrProv(note, { source: 'FAA NASR 28-day subscription (FRQ.csv, cycle 2026-10-01); cross-checked with d-TPP airport diagram 00669AD cycle 2610' });
@@ -979,7 +1034,7 @@ const unresolved = decisions.filter((d) => d.method === 'unresolved' || d.method
 const airport: KacyAirport = {
   icao: facility.airport.icao,
   faaId: facility.airport.faa_id,
-  name: facility.airport.name,
+  name: spokenName(facility.airport.name),
   arp,
   elevationFt: facility.airport.field_elevation_ft,
   magneticVariationDeg: magVar,
@@ -1004,7 +1059,7 @@ const airport: KacyAirport = {
   towerHours: facility.tower.tower_hours,
   airspaceClass: facility.airspace.class_c ? 'C' : undefined,
   provenance: [
-    nasrProv(`kacy-facility.json: ARP, elevation, magnetic variation ${facility.airport.magnetic_variation.deg as number} ${facility.airport.magnetic_variation.hemisphere as string} (epoch ${facility.airport.magnetic_variation.epoch_year as string}, stale), runways, remarks, tower hours, Class C flag.`),
+    nasrProv(`nasrName: ${facility.airport.name as string}. kacy-facility.json: ARP, elevation, magnetic variation ${facility.airport.magnetic_variation.deg as number} ${facility.airport.magnetic_variation.hemisphere as string} (epoch ${facility.airport.magnetic_variation.epoch_year as string}, stale), runways, remarks, tower hours, Class C flag.`),
     freqProv('kacy-frequencies.json'),
     navProv('kacy-navaids.json (ACY VORTAC, VORs, ILS components, 36 fixes)'),
     dtppProv('https://www.faa.gov/air_traffic/flight_info/aeronav/digital_products/dtpp/', 'kacy-procedures.json: 13 IAPs, airport diagram, ATLANTIC CITY THREE DP, hot spot, LAHSO'),
@@ -1077,6 +1132,37 @@ for (const e of edges) {
   dupKeys.add(k);
 }
 check('no duplicate edges', dups === 0, `${dups} duplicate node pairs`);
+// runway-crossing edges carry onRunwayId
+{
+  const tadj = new Map<string, { other: string; e: KacyTaxiEdge }[]>();
+  for (const e of edges) {
+    if (e.kind !== 'taxiway' && e.kind !== 'unnamed') continue;
+    for (const [x, y] of [[e.from, e.to], [e.to, e.from]]) tadj.set(x, [...(tadj.get(x) ?? []), { other: y, e }]);
+  }
+  const badHold: string[] = [];
+  for (const h of Object.values(nodes).filter((n) => n.kind === 'holding_position')) {
+    const prev = new Map<string, { from: string; e: KacyTaxiEdge | null }>([[h.id, { from: '', e: null }]]);
+    const q = [h.id];
+    const entryId = h.entryNodeId!;
+    while (q.length && !prev.has(entryId)) {
+      const x = q.shift()!;
+      for (const { other, e } of tadj.get(x) ?? []) {
+        if (prev.has(other)) continue;
+        prev.set(other, { from: x, e });
+        q.push(other);
+      }
+    }
+    let ok = prev.has(entryId);
+    for (let x = entryId; ok && x !== h.id; x = prev.get(x)!.from) ok = prev.get(x)!.e!.onRunwayId === h.runwayId;
+    if (!ok) badHold.push(h.id);
+  }
+  check('every holding position -> entry-node path has onRunwayId === the hold runway', badHold.length === 0, badHold.join(', '));
+  const unmarked = edges.filter((e) => (e.kind === 'taxiway' || e.kind === 'unnamed') && !e.onRunwayId && runways.some((r) => pointInPolygon({ x: (nodes[e.from].pos.x + nodes[e.to].pos.x) / 2, y: (nodes[e.from].pos.y + nodes[e.to].pos.y) / 2 }, r.polygon as P[])));
+  check('no taxi edge with its midpoint inside a runway polygon lacks onRunwayId', unmarked.length === 0, unmarked.map((e) => e.id).join(', '));
+  const rwKindEnd = edges.filter((e) => (e.kind === 'taxiway' || e.kind === 'unnamed') && !e.onRunwayId && (nodes[e.from].kind === 'runway' || nodes[e.to].kind === 'runway'));
+  check('no taxi edge touching a runway-kind node lacks onRunwayId', rwKindEnd.length === 0, rwKindEnd.map((e) => e.id).join(', '));
+  check('taxi edges marked onRunwayId (information)', true, `${edges.filter((e) => e.kind !== 'runway' && e.onRunwayId).length} taxi edges carry onRunwayId (hold-to-runway crossing paths); taxiway identifier kept`);
+}
 const selfLoops = edges.filter((e) => e.from === e.to);
 check('no self-loop edges', selfLoops.length === 0, `${selfLoops.length}`);
 

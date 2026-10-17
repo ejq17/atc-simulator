@@ -130,6 +130,15 @@ score = clamp(0, 100, 100 - 25*incursions - 15*unsafe - 10*separation - 5*missed
 * `averageWaitSec` = mean age of a pilot request when answered; `totalDelaySec` = sum of waits above 60 s.
 * `scenarioCompleted` when `durationSec` elapsed or all scripted traffic has been handled.
 
+## Parking destinations
+
+`parkingResolver.ts` resolves a `TAXI`/`TAXI_TO_PARKING` destination by exact id, id without punctuation
+("GATE1" -> "GATE-1"), name, then category keyword (GATE/TERMINAL=airline; RAMP/GA/GENERAL AVIATION=ga; FBO;
+CARGO/FAA=cargo; ANG/MILITARY=military). A category, "PARKING" or no destination picks the nearest (by taxi
+route) UNOCCUPIED spot: the requested category, else the spawn category, else the aircraft's natural one
+(airline callsign / large type -> airline, N-number -> ga). Spots occupied by, or already assigned to, another
+aircraft are skipped. The chosen id is stored in `Clearance.destination`; the readback says "gate three" or "the ramp".
+
 ## Airport data contract
 
 `checkAirportForSim(airport)` (see `airportCheck.ts`) reports what is missing. In short: runway polygons;

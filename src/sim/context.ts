@@ -49,6 +49,8 @@ export interface AircraftRuntime {
   decisionDone: boolean;
   /** A CONTACT_FREQUENCY handoff was completed. */
   handedOff: boolean;
+  /** Category of the parking position the aircraft spawned on (preferred when returning to parking). */
+  homeParkingCategory?: 'ga' | 'airline' | 'cargo' | 'military' | 'fbo' | 'other';
   /** Since when the aircraft has been standing still (for 'ready' calls). */
   stillSince?: number;
   /** Time at which the pilot checks in on a newly selected frequency. */

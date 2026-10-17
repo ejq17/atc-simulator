@@ -8,7 +8,7 @@
  *
  * Runway identifiers are normalised: "04" == "4", "RWY13/31" == "13-31" == "13/31".
  */
-import type { Airport, TaxiEdge, TaxiNode, TaxiNodeKind, TaxiwayGraph, Vec2 } from '../sim/types';
+import type { Airport, ParkingPosition, TaxiEdge, TaxiNode, TaxiNodeKind, TaxiwayGraph, Vec2 } from '../sim/types';
 import type { KacyTaxiNode } from './types';
 
 export type GraphSource = TaxiwayGraph | Airport;
@@ -82,6 +82,11 @@ export function normalizeRunwayId(id: string): string {
     .split(/[/-]/)
     .map((p) => normalizeRunwayEnd(p.trim()))
     .join('/');
+}
+
+/** True for edges that run along the runway centreline (kind 'runway' / taxiway "RWY..."); taxiway edges that merely cross a runway keep their identifier. */
+export function isRunwayEdge(e: TaxiEdge): boolean {
+  return (e as { kind?: string }).kind === 'runway' || e.taxiway.startsWith('RWY');
 }
 
 const dist = (a: Vec2, b: Vec2): number => Math.hypot(a.x - b.x, a.y - b.y);
@@ -192,7 +197,7 @@ export function runwayExitNodes(source: GraphSource, runwayEnd: string): RunwayE
     const rids = ((n as KacyTaxiNode).runwayIds ?? (n.runwayId ? [n.runwayId] : [])).map(normalizeRunwayId);
     if (!rids.includes(g.runwayId)) continue;
     for (const e of idx.adjacency.get(n.id) ?? []) {
-      if (e.onRunwayId) continue; // runway edge
+      if (isRunwayEdge(e)) continue; // travelling along the runway itself, not an exit
       const nbId = e.from === n.id ? e.to : e.from;
       let nb = graph.nodes[nbId];
       // look ~25 m down the exit path (first edges can be very short)
@@ -200,7 +205,7 @@ export function runwayExitNodes(source: GraphSource, runwayEnd: string): RunwayE
       let prevId = n.id;
       let cur = e;
       while (walked < 25) {
-        const nextEdge = (idx.adjacency.get(nb.id) ?? []).find((x) => x !== cur && !x.onRunwayId && (x.from !== prevId && x.to !== prevId) && nb.kind !== 'intersection');
+        const nextEdge = (idx.adjacency.get(nb.id) ?? []).find((x) => x !== cur && !isRunwayEdge(x) && (x.from !== prevId && x.to !== prevId) && nb.kind !== 'intersection');
         if (!nextEdge) break;
         prevId = nb.id;
         nb = graph.nodes[nextEdge.from === nb.id ? nextEdge.to : nextEdge.from];
@@ -224,4 +229,70 @@ export function runwayExitNodes(source: GraphSource, runwayEnd: string): RunwayE
     }
   }
   return out.sort((a, b) => a.distanceFromThresholdM - b.distanceFromThresholdM || (a.node.id < b.node.id ? -1 : 1));
+}
+
+// ---------------------------------------------------------------------------
+// Parking lookup
+// ---------------------------------------------------------------------------
+
+const CATEGORY_KEYWORDS: Record<string, ParkingPosition['category']> = {
+  GATE: 'airline', GATES: 'airline', TERMINAL: 'airline', AIRLINE: 'airline',
+  RAMP: 'ga', PARKING: 'ga', GA: 'ga', GARAMP: 'ga', GENERALAVIATION: 'ga', TIEDOWN: 'ga',
+  FBO: 'fbo',
+  CARGO: 'cargo', FAA: 'cargo',
+  ANG: 'military', MILITARY: 'military',
+};
+
+const squash = (s: string): string => s.toUpperCase().replace(/[^A-Z0-9]+/g, '');
+
+/** needle occurs in hay, and a trailing digit in needle is not followed by another digit ("GATE1" must not match "GATE10"). */
+function containsToken(hay: string, needle: string): boolean {
+  if (!needle) return false;
+  const trailingDigit = /\d$/.test(needle);
+  let i = hay.indexOf(needle);
+  while (i >= 0) {
+    const next = hay[i + needle.length];
+    if (!trailingDigit || next === undefined || !/\d/.test(next)) return true;
+    i = hay.indexOf(needle, i + 1);
+  }
+  return false;
+}
+
+const naturalKey = (p: ParkingPosition): [string, number] => {
+  const m = /^(.*?)(\d+)$/.exec(p.id);
+  return [m ? m[1] : p.id, m ? parseInt(m[2], 10) : 0];
+};
+
+/**
+ * Resolve a user / parser string to parking positions, best match first. Case-insensitive.
+ * Order of preference: exact id ("GATE-1"), id with separators removed ("gate 1", "GATE1"),
+ * exact name ("Gate 1", "GA Ramp 3"), category keyword ("gate"/"terminal" -> airline,
+ * "ramp"/"parking"/"ga"/"general aviation" -> ga, "fbo", "cargo"/"faa", "ang"/"military"),
+ * then names containing the query. Returns [] when nothing matches.
+ */
+export function findParking(airport: Pick<Airport, 'parking'>, query: string): ParkingPosition[] {
+  const q = query.trim().toUpperCase();
+  const qs = squash(query);
+  if (!qs) return [];
+  const scored = new Map<string, { p: ParkingPosition; score: number }>();
+  const bump = (p: ParkingPosition, score: number): void => {
+    const cur = scored.get(p.id);
+    if (!cur || cur.score < score) scored.set(p.id, { p, score });
+  };
+  const cat = CATEGORY_KEYWORDS[qs];
+  for (const p of airport.parking) {
+    if (p.id.toUpperCase() === q) bump(p, 100);
+    else if (squash(p.id) === qs) bump(p, 90);
+    else if (p.name.toUpperCase() === q || squash(p.name) === qs) bump(p, 80);
+    else if (cat && p.category === cat) bump(p, 60);
+    else if (!cat && (containsToken(squash(p.name), qs) || containsToken(squash(p.id), qs))) bump(p, 40);
+  }
+  return [...scored.values()]
+    .sort((a, b) => {
+      if (b.score !== a.score) return b.score - a.score;
+      const [ka, na] = naturalKey(a.p);
+      const [kb, nb] = naturalKey(b.p);
+      return ka < kb ? -1 : ka > kb ? 1 : na - nb;
+    })
+    .map((x) => x.p);
 }

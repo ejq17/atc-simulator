@@ -44,6 +44,15 @@ export function runwayFromDestination(dest: string | undefined): string | undefi
   return undefined;
 }
 
+/** "gate three" for an airline gate (digits of its id), "the ramp" for GA/FBO/other spots. */
+export function spokenParking(p: ParkingPosition): string {
+  if (p.category === 'airline') {
+    const digits = /(\d+)/.exec(p.id)?.[1] ?? /(\d+)/.exec(p.name)?.[1];
+    return digits ? `gate ${digitsSpoken(String(Number(digits)))}` : 'the gate';
+  }
+  return 'the ramp';
+}
+
 function viaPhrase(route?: string[]): string {
   if (!route || !route.length) return '';
   return ` via ${route.map(spokenTaxiway).join(', ')}`;
@@ -122,7 +131,7 @@ export function buildReadback(aircraft: Aircraft, c: Clearance, env: ReadbackEnv
         else if (c.destination) {
           const up = c.destination.toUpperCase();
           const park = env.airport.parking.find((p) => p.id.toUpperCase() === up || p.name.toUpperCase() === up);
-          head = `Taxi to ${spokenText(park?.name ?? c.destination)}`;
+          head = `Taxi to ${park ? spokenParking(park) : spokenText(c.destination)}`;
         }
         else head = c.kind === 'TAXI_TO_PARKING' ? 'Taxi to parking' : 'Taxi';
         return `${head}${viaPhrase(c.route)}${holdShortPhrase(c.holdShort)}`;
