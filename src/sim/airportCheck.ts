@@ -42,5 +42,13 @@ export function checkAirportForSim(airport: Airport): AirportCheck {
   for (const pos of ['GND', 'TWR'] as const) {
     if (!airport.frequencies.some((f) => f.position === pos)) warnings.push(`No ${pos} frequency`);
   }
+  // IFR operations (optional): Clearance Delivery, Approach / Departure, and procedures that refer to known fixes.
+  if (!airport.frequencies.some((f) => f.position === 'CLNC')) warnings.push('No CLNC frequency: IFR departures cannot request a clearance from Clearance Delivery');
+  if (!airport.frequencies.some((f) => f.position === 'DEP' || f.position === 'APP')) warnings.push('No DEP/APP frequency: IFR departure and approach handoffs have no frequency');
+  const known = new Set(airport.navaids.map((n) => n.id.toUpperCase()));
+  for (const p of airport.procedures) {
+    const unknown = (p.fixes ?? []).filter((f) => !known.has(f.toUpperCase()));
+    if (unknown.length) warnings.push(`Procedure ${p.id}: fixes not in Airport.navaids (${unknown.join(', ')}) are ignored by approach routing`);
+  }
   return { errors, warnings };
 }

@@ -9,7 +9,7 @@ export interface NormalizeOptions {
   extraAirlines?: Readonly<Record<string, string>>;
 }
 
-interface Item { w: string; rawStart: number; rawEnd: number; pre?: TokenKind }
+interface Item { w: string; rawStart: number; rawEnd: number; pre?: TokenKind; /** raw word ended with , . ; : ! ? -> a spoken number cannot continue past it */ brk?: boolean }
 
 const ICAO_LOWER: ReadonlySet<string> = new Set([...AIRLINES.values()].map((c) => c.toLowerCase()));
 
@@ -26,8 +26,11 @@ export function normalize(raw: string, opts: NormalizeOptions = {}): NormalizedT
     KEEP_WORDS.has(w) || ICAO_LOWER.has(w) || airlines.has(w) || NATO.has(w) || GA_PREFIXES.has(w) || ALIASES.has(w);
 
   const rawWords = raw.trim().split(/\s+/).filter(Boolean);
-  let items: Item[] = rawWords.flatMap((rw, idx) =>
-    cleanWord(rw, known).filter((w) => !DISFLUENCIES.has(w)).map((w) => ({ w, rawStart: idx, rawEnd: idx + 1 })));
+  let items: Item[] = rawWords.flatMap((rw, idx) => {
+    const pieces = cleanWord(rw, known).filter((w) => !DISFLUENCIES.has(w));
+    const brk = /[,;:!?]$|[a-z]\.$/i.test(rw);
+    return pieces.map((w, k): Item => ({ w, rawStart: idx, rawEnd: idx + 1, ...(brk && k === pieces.length - 1 ? { brk } : {}) }));
+  });
   items = applyPhrases(items);
   items = applyAliases(items);
   const lead = new Set<string>([...airlines.keys(), ...GA_PREFIXES.keys(), 'november', 'delta']);
@@ -67,7 +70,7 @@ function applyPhrases(items: Item[]): Item[] {
     const hit = PHRASES.find((ph) => ph.words.every((w, k) => items[i + k] !== undefined && !items[i + k].pre && items[i + k].w === w));
     if (!hit) { out.push(items[i]); continue; }
     const last = items[i + hit.words.length - 1];
-    out.push({ w: hit.to.text, pre: hit.to.kind ?? 'word', rawStart: items[i].rawStart, rawEnd: last.rawEnd });
+    out.push({ w: hit.to.text, pre: hit.to.kind ?? 'word', rawStart: items[i].rawStart, rawEnd: last.rawEnd, ...(last.brk ? { brk: true } : {}) });
     i += hit.words.length - 1;
   }
   return out;
@@ -117,7 +120,9 @@ function numberPass(items: Item[], lead: ReadonlySet<string>): Item[] {
     if (!it.pre && (numeric(i) || startsDecimal)) {
       let j = i;
       const words: string[] = [];
-      while (numeric(j)) { words.push(toDigitWord(items[j].w)); j++; }
+      while (numeric(j)) { words.push(toDigitWord(items[j].w)); j++; if (items[j - 1].brk) break; }
+      const cut = words.length > 1 && /^minutes?$/.test(wordAt(j) ?? '') ? minuteCut(words, items[i - 1]?.w === 'fl') : 0;
+      if (cut > 0) { words.length = cut; j = i + cut; }
       let text = words.length ? evaluateNumberWords(words) : '';
       if (wordAt(j) === 'point' && fracDigit(j + 1)) {
         let frac = '';
@@ -133,6 +138,18 @@ function numberPass(items: Item[], lead: ReadonlySet<string>): Item[] {
     i++;
   }
   return out;
+}
+
+/**
+ * "expect one zero thousand one zero minutes after departure": the number run before
+ * "minutes" is an altitude followed by a minute count. Returns how many words belong
+ * to the first number (0 = leave the run alone).
+ */
+function minuteCut(words: readonly string[], afterFlightLevel: boolean): number {
+  const t = words.lastIndexOf('thousand');
+  if (t >= 0 && t < words.length - 1 && !words.slice(t + 1).includes('hundred')) return t + 1;
+  if (afterFlightLevel && words.length > 3 && words.slice(0, 3).every((w) => numberWordClass(w) === 'digit')) return 3;
+  return 0;
 }
 
 function resolveTokens(items: Item[], airlines: ReadonlyMap<string, string>): Token[] {

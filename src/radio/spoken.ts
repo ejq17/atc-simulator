@@ -135,6 +135,24 @@ export function spokenCallsign(callsign: string, type?: string): string {
   return digitsSpoken(cs);
 }
 
+const AIRPORT_CITIES: Record<string, string> = {
+  KPHL: 'Philadelphia', KJFK: 'Kennedy', KLGA: 'LaGuardia', KEWR: 'Newark', KBOS: 'Boston', KDCA: 'Reagan National', KIAD: 'Dulles',
+  KBWI: 'Baltimore', KORD: 'Chicago O\'Hare', KATL: 'Atlanta', KCLT: 'Charlotte', KMIA: 'Miami', KMCO: 'Orlando', KFLL: 'Fort Lauderdale',
+  KPIT: 'Pittsburgh', KDTW: 'Detroit', KRDU: 'Raleigh Durham', KTPA: 'Tampa', KILG: 'Wilmington', KTTN: 'Trenton', KMIV: 'Millville',
+  KWWD: 'Wildwood', KVAY: 'Mount Holly', KACY: 'Atlantic City', KPNE: 'Northeast Philadelphia', KABE: 'Allentown',
+};
+
+/** Spoken name of an airport for clearances: "KPHL" -> "Philadelphia"; unknown ids are spelled in phonetics. */
+export function spokenAirportName(icao: string): string {
+  const up = icao.trim().toUpperCase();
+  return AIRPORT_CITIES[up] ?? AIRPORT_CITIES[`K${up}`] ?? digitsSpoken(up);
+}
+
+/** "CEDAR LAKE" -> "Cedar Lake" (navaid names in clearances). */
+export function titleCase(s: string): string {
+  return s.toLowerCase().replace(/\b([a-z])/g, (m) => m.toUpperCase());
+}
+
 export function capitalize(s: string): string {
   return s.length ? s[0].toUpperCase() + s.slice(1) : s;
 }

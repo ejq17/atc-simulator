@@ -15,6 +15,7 @@ function spawnPos(a: Airport, s: ScenarioAircraftSpawn): Vec2 {
   const st = s.start;
   if (st.kind === 'parked') return a.parking.find((p) => p.id === st.parkingId)!.pos;
   if (st.kind === 'holding_short') return a.taxiwayGraph.nodes[st.nodeId].pos;
+  if (st.kind === 'at_fix') return a.navaids.find((n) => n.id === st.fix)!.pos;
   if (st.distanceNm !== undefined && st.runwayEnd) {
     const g = findRunwayEnd(a, st.runwayEnd)!;
     return { x: g.end.threshold.x - g.dir.x * st.distanceNm * NM, y: g.end.threshold.y - g.dir.y * st.distanceNm * NM };

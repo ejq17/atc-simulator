@@ -5,9 +5,9 @@
  * Units: positions in metres, speeds converted to m/s for integration, altitudes in feet.
  * `ac.target.headingDeg` is a TRUE heading (the executor converts controller magnetic headings).
  */
-import type { Aircraft, AircraftPerformance, Vec2, Weather } from './types';
+import type { Aircraft, AircraftPerformance, FlightPhase, Vec2, Weather } from './types';
 import {
-  clamp, deg2rad, dist, headingDiff, headingToVec, ktToMps, mpsToKt, mToFt, nmToM, normHeading, rad2deg,
+  clamp, deg2rad, dist, headingDiff, headingToVec, ktToMps, mpsToKt, mToFt, mToNm, nmToM, normHeading, rad2deg,
   vAdd, vDot, vScale, vSub, vecToHeading, bearingDeg,
 } from './geo';
 import { activeClearance, completeClearances, emitEvent, getRuntime, perfOf, pilotSay, setPhase } from './context';
@@ -16,6 +16,8 @@ import { alongCross, findRunwayEnd } from './runways';
 import type { RunwayEndGeom } from './runways';
 import { neighborIds, shortestDistances } from './pathfinding';
 import { goingAroundCall } from '../radio/readback';
+import { advanceNav, fixPosition } from './navigation';
+import { APPROACH_FINAL_NM, isOnCourse } from './approach';
 
 export const GLIDEPATH_DEG = 3;
 export const TCH_FT = 50;
@@ -24,6 +26,10 @@ export const DECISION_POINT_M = nmToM(0.5);
 const ROLL_ACCEL_DEG_PER_SEC2 = 6;
 const VS_ACCEL_FPM_PER_SEC = 600;
 const APPROACH_RANGE_NM = 25;
+/** Phases in which `ac.nav` (lateral navigation over fixes) is flown. */
+const NAV_PHASES: readonly FlightPhase[] = ['INBOUND', 'APPROACH', 'INITIAL_CLIMB', 'DEPARTURE', 'GO_AROUND'];
+/** IFR missed approach / go-around level-off: 2000 ft, but never lower than 1500 ft above the field. */
+export const IFR_MISSED_APPROACH_FT = 2000;
 
 /** Air mass motion vector (m/s) the wind imparts; VRB is treated as calm. */
 export function windVector(w: Weather): Vec2 {
@@ -49,6 +55,11 @@ function departureAltitudeFt(ac: Aircraft, elevFt: number): number {
 
 function goAroundAltitudeFt(ac: Aircraft, elevFt: number): number {
   const perf = perfOf(ac);
+  if (ac.flightPlan?.flightRules === 'IFR') {
+    // Missed approach: climb to 2000 ft (published missed approach altitudes are not in the dataset); never descend to it.
+    const floor = Math.max(IFR_MISSED_APPROACH_FT, Math.ceil((elevFt + 1500) / 100) * 100);
+    return Math.max(floor, Math.floor(ac.altitudeFt / 100) * 100);
+  }
   return Math.round((elevFt + (perf.category === 'light' ? 1500 : 3000)) / 100) * 100;
 }
 
@@ -86,7 +97,7 @@ function stepTakeoffRoll(ctx: SimContext, ac: Aircraft, dt: number): void {
     ac.onGround = false;
     ac.altitudeFt = g.elevationFt;
     ac.target.headingDeg = ac.target.headingDeg ?? g.headingDeg;
-    ac.target.altitudeFt = ac.target.altitudeFt ?? departureAltitudeFt(ac, g.elevationFt);
+    ac.target.altitudeFt = ac.target.altitudeFt ?? ac.flightPlan?.ifrClearance?.initialAltitudeFt ?? departureAltitudeFt(ac, g.elevationFt);
     rt.navMode = 'HEADING';
     rt.takeoffCleared = false;
     rt.lineUp = undefined;
@@ -152,6 +163,8 @@ function touchdown(ctx: SimContext, ac: Aircraft, rt: AircraftRuntime, g: Runway
   ac.headingDeg = g.headingDeg;
   ac.trackDeg = g.headingDeg;
   ac.target = {};
+  ac.nav = undefined;
+  rt.approach = undefined;
   rt.navMode = 'AUTO';
   rt.turnRateDegPerSec = 0;
   setPhase(ctx, ac, 'ROLLOUT', 'touchdown');
@@ -236,6 +249,10 @@ export function initiateGoAround(ctx: SimContext, ac: Aircraft, o: { reason: str
   rt.calls.delete('gaEst');
   rt.navMode = 'HEADING';
   rt.pattern = undefined;
+  // A missed approach cancels the approach clearance and any route: runway heading, climb, ask for vectors.
+  rt.approach = undefined;
+  ac.nav = undefined;
+  completeClearances(ctx, ac, ['APPROACH']);
   ac.target = { headingDeg: g ? g.headingDeg : ac.headingDeg, altitudeFt: goAroundAltitudeFt(ac, elev), speedKt: undefined };
   ac.pendingRequest = undefined;
   emitEvent(ctx, {
@@ -325,20 +342,41 @@ function otherOnRunway(ctx: SimContext, ac: Aircraft, g: RunwayEndGeom): Aircraf
   return Object.values(ctx.state.aircraft).find((o) => o !== ac && o.occupyingRunways.includes(g.runway.id));
 }
 
+/** Distance (m) before the threshold at which FINAL (3 degree path logic) starts; cleared approaches join farther out. */
+function finalStartM(rt: AircraftRuntime, perf: AircraftPerformance): number {
+  return nmToM(rt.approach ? Math.max(APPROACH_FINAL_NM, finalStartNm(perf)) : finalStartNm(perf));
+}
+
+/** APPROACH / PATTERN -> FINAL when established on the extended centreline inside the final start distance. */
+function maybeEstablishFinal(ctx: SimContext, ac: Aircraft, rt: AircraftRuntime, g: RunwayEndGeom, perf: AircraftPerformance): boolean {
+  if (ac.phase === 'INBOUND' && rt.approach) setPhase(ctx, ac, 'APPROACH');
+  if (ac.phase !== 'APPROACH' && ac.phase !== 'PATTERN') return false;
+  const d = -alongCross(g, ac.pos).along;
+  if (!(inCaptureZone(g, ac, perf) && d <= finalStartM(rt, perf) + 300)) return false;
+  setPhase(ctx, ac, 'FINAL', `established runway ${g.end.id}`);
+  rt.pattern = undefined;
+  rt.decisionDone = false;
+  ac.target.altitudeFt = undefined;
+  if (rt.approach) {
+    // Established on a cleared approach: leave the route, slow to approach speed, fly the course.
+    ac.nav = undefined;
+    ac.target.headingDeg = undefined;
+    rt.navMode = 'AUTO';
+    rt.turnDirection = undefined;
+    if (ac.target.speedKt !== undefined && ac.target.speedKt > perf.climbSpeedKt) ac.target.speedKt = undefined;
+  }
+  return true;
+}
+
 function approachGuidance(ctx: SimContext, ac: Aircraft, rt: AircraftRuntime, g: RunwayEndGeom, perf: AircraftPerformance, wind: Vec2, aglFt: number): Guidance {
   const { along, cross } = alongCross(g, ac.pos);
   const d = -along;
-  const startM = nmToM(finalStartNm(perf));
+  const startM = finalStartM(rt, perf);
   const distThr = dist(ac.pos, g.end.threshold);
   const base = ac.target.speedKt ?? defaultSpeedKt(ac, perf, aglFt);
 
   if (ac.phase === 'INBOUND' && distThr < nmToM(APPROACH_RANGE_NM)) setPhase(ctx, ac, 'APPROACH');
-  if ((ac.phase === 'APPROACH' || ac.phase === 'PATTERN') && inCaptureZone(g, ac, perf) && d <= startM + 300) {
-    setPhase(ctx, ac, 'FINAL', `established runway ${g.end.id}`);
-    rt.pattern = undefined;
-    rt.decisionDone = false;
-    ac.target.altitudeFt = undefined;
-  }
+  maybeEstablishFinal(ctx, ac, rt, g, perf);
 
   if (ac.phase === 'FINAL' || ac.phase === 'LANDING') {
     // Decision point: landing clearance + runway free, else go around.
@@ -361,6 +399,8 @@ function approachGuidance(ctx: SimContext, ac: Aircraft, rt: AircraftRuntime, g:
     const err = glide - ac.altitudeFt;
     let vs = Math.min(0, vsGp + clamp(err * 5, -400, 400));
     vs = Math.max(vs, -perf.descentRateFpm * 1.3);
+    // Cleared approach: intercept the glidepath from below (hold level until it arrives).
+    if (rt.approach && err > 50 && d > nmToM(2)) vs = 0;
     if (aglFt < 30) vs = -(100 + (Math.abs(vsGp) - 100) * clamp(aglFt / 30, 0, 1));
     const rampSpeed = ac.target.speedKt ?? perf.approachSpeedKt;
     const speedKt = perf.touchdownSpeedKt + (rampSpeed - perf.touchdownSpeedKt) * clamp(aglFt / 150, 0, 1);
@@ -411,6 +451,88 @@ function patternHeading(g: RunwayEndGeom, ac: Aircraft, rt: AircraftRuntime, win
   return headingForTrack(baseHdg, ac.airspeedKt, wind);
 }
 
+/** Glidepath state at `dM` metres before the threshold: ideal vertical speed and altitude error (ft, + = aircraft below the path). */
+function glideState(ac: Aircraft, perf: AircraftPerformance, g: RunwayEndGeom, dM: number): { vs: number; err: number } {
+  const gsMps = Math.max(ktToMps(ac.groundSpeedKt), ktToMps(perf.minSpeedKt * 0.8));
+  const vsGp = -mToFt(gsMps * TAN_GP) * 60;
+  const err = glideAltitudeFt(g.elevationFt, dM) - ac.altitudeFt;
+  const vs = Math.max(Math.min(0, vsGp + clamp(err * 5, -400, 400)), -perf.descentRateFpm * 1.3);
+  return { vs, err };
+}
+
+/** On-course fixes (farthest first) that are still ahead of the aircraft along the final approach course. */
+function fixesAhead(ctx: SimContext, g: RunwayEndGeom, onCourse: string[], pos: Vec2): string[] {
+  const dAc = -alongCross(g, pos).along;
+  return onCourse.filter((id) => {
+    const p = fixPosition(ctx.state.airport, id);
+    return !!p && -alongCross(g, p).along < dAc - 200;
+  });
+}
+
+/** Vector-intercept approach clearance: when the course is reached, stop flying the heading and capture it. */
+function capturePendingApproach(ctx: SimContext, ac: Aircraft, rt: AircraftRuntime, g: RunwayEndGeom, perf: AircraftPerformance): void {
+  const ap = rt.approach;
+  if (!ap || !ap.pendingCapture || !inCaptureZone(g, ac, perf)) return;
+  ap.pendingCapture = false;
+  rt.navMode = 'AUTO';
+  rt.turnDirection = undefined;
+  ac.target.headingDeg = undefined;
+  const ahead = fixesAhead(ctx, g, ap.onCourse, ac.pos);
+  ac.nav = ahead.length ? { fixes: ahead, index: 0, mode: 'approach' } : undefined;
+  emitEvent(ctx, {
+    kind: 'INFO', aircraftId: ac.id, callsign: ac.callsign, severity: 'info', speaker: 'SYSTEM',
+    text: `${ac.callsign} established on the ${ap.type} course runway ${ap.runwayEnd}`, data: { approach: ap.type, runwayEnd: ap.runwayEnd },
+  });
+}
+
+/** The route is flown out: approach -> runway guidance takes over; otherwise hold the last heading. */
+function endOfRoute(ctx: SimContext, ac: Aircraft, rt: AircraftRuntime, g: RunwayEndGeom | undefined): void {
+  const mode = ac.nav?.mode;
+  ac.nav = undefined;
+  if (mode === 'approach' && rt.approach && g) {
+    rt.navMode = 'AUTO';
+    ac.target.headingDeg = undefined;
+  } else {
+    ac.target.headingDeg = ac.headingDeg;
+    rt.navMode = 'HEADING';
+    rt.turnDirection = undefined;
+    emitEvent(ctx, {
+      kind: 'INFO', aircraftId: ac.id, callsign: ac.callsign, severity: 'info', speaker: 'SYSTEM',
+      text: `${ac.callsign} reached the end of its route, maintaining heading ${Math.round(ac.headingDeg)}`, data: { routeComplete: true },
+    });
+  }
+}
+
+/** Lateral guidance toward `nav.fixes[nav.index]`; undefined once the route is exhausted. */
+function routeGuidance(ctx: SimContext, ac: Aircraft, rt: AircraftRuntime, g: RunwayEndGeom | undefined, perf: AircraftPerformance, wind: Vec2, aglFt: number): Guidance | undefined {
+  const airport = ctx.state.airport;
+  for (const id of advanceNav(airport, ac, perf)) rt.passedFixes.add(id.toUpperCase());
+  const nav = ac.nav!;
+  if (g && !ac.isDeparture && ac.phase === 'INBOUND' && dist(ac.pos, g.end.threshold) < nmToM(APPROACH_RANGE_NM)) setPhase(ctx, ac, 'APPROACH');
+  if (nav.index >= nav.fixes.length) {
+    endOfRoute(ctx, ac, rt, g);
+    return undefined;
+  }
+  const fixId = nav.fixes[nav.index];
+  const p = fixPosition(airport, fixId)!;
+  let desired = headingForTrack(bearingDeg(ac.pos, p), ac.airspeedKt, wind);
+  let vsFpm: number | undefined;
+  if (nav.mode === 'approach' && rt.approach && g && rt.approach.onCourse.some((f) => f.toUpperCase() === fixId.toUpperCase())) {
+    // Straight-in segment: track the course once close to it, and descend on the 3 degree path once the path is reached.
+    const { along, cross } = alongCross(g, ac.pos);
+    const d = -along;
+    if (inCaptureZone(g, ac, perf)) desired = centrelineHeading(g, ac, perf, wind);
+    // Established inbound on the straight-in segment (on the course within the classification tolerance and no farther
+    // out than the IF + 1 nm): hold the assigned altitude until the 3 degree path is reached, then follow it.
+    const ifM = rt.approach.ifDM ?? nmToM(12);
+    if (d <= ifM + nmToM(1) && isOnCourse(mToNm(d), mToNm(cross))) {
+      const gs = glideState(ac, perf, g, d);
+      vsFpm = gs.err > 50 ? 0 : gs.vs;
+    }
+  }
+  return { desiredHeading: desired, altTargetFt: ac.target.altitudeFt, vsFpm, speedKt: ac.target.speedKt ?? defaultSpeedKt(ac, perf, aglFt) };
+}
+
 function stepAirborne(ctx: SimContext, ac: Aircraft, dt: number): void {
   const perf = perfOf(ac);
   const rt = getRuntime(ctx, ac);
@@ -420,8 +542,15 @@ function stepAirborne(ctx: SimContext, ac: Aircraft, dt: number): void {
   const wind = windVector(ctx.state.weather);
 
   const navPhase = ac.phase === 'INBOUND' || ac.phase === 'APPROACH' || ac.phase === 'FINAL' || ac.phase === 'LANDING' || ac.phase === 'PATTERN';
-  let guid: Guidance;
-  if (g && navPhase && (rt.navMode === 'AUTO' || ac.phase === 'FINAL' || ac.phase === 'LANDING')) {
+  if (g && rt.approach && (ac.phase === 'INBOUND' || ac.phase === 'APPROACH')) {
+    capturePendingApproach(ctx, ac, rt, g, perf);
+    if (!rt.approach.pendingCapture) maybeEstablishFinal(ctx, ac, rt, g, perf);
+  }
+  let guid: Guidance | undefined;
+  if (ac.nav && ac.nav.mode !== 'vectors' && NAV_PHASES.includes(ac.phase)) guid = routeGuidance(ctx, ac, rt, g, perf, wind, agl);
+  if (guid) {
+    /* flying the route */
+  } else if (g && navPhase && (rt.navMode === 'AUTO' || ac.phase === 'FINAL' || ac.phase === 'LANDING')) {
     guid = approachGuidance(ctx, ac, rt, g, perf, wind, agl);
   } else {
     const speed = ac.target.speedKt ?? defaultSpeedKt(ac, perf, agl);

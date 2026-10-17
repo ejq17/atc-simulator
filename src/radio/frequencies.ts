@@ -48,9 +48,14 @@ export function airportCallName(airport: Airport): string {
     .trim();
 }
 
-/** Full call name for the facility an aircraft is tuned to: "Atlantic City Ground". */
-export function facilityCallName(airport: Airport, mhz: number): string {
-  const f = frequencyByMhz(airport, mhz);
+/**
+ * Full call name for the facility an aircraft is tuned to: "Atlantic City Ground".
+ * Several positions can share one frequency (KACY: Approach and Departure are both 124.6), so the frequency id the
+ * aircraft was told to contact wins when it matches the tuned frequency.
+ */
+export function facilityCallName(airport: Airport, mhz: number, frequencyId?: string): string {
+  const byId = frequencyId ? frequencyById(airport, frequencyId) : undefined;
+  const f = byId && sameFrequency(byId.mhz, mhz) ? byId : frequencyByMhz(airport, mhz);
   if (f && f.position !== 'OTHER') return `${airportCallName(airport)} ${positionWord(f.position)}`;
   return airportCallName(airport);
 }

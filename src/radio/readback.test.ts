@@ -3,11 +3,12 @@ import type { Aircraft, Clearance } from '../sim/types';
 import { createTestAirport } from '../sim/__fixtures__/testAirport';
 import { mulberry32 } from '../sim/rng';
 import {
-  buildReadback, buildUnable, checkInCall, clearOfRunwayCall, finalCall, goingAroundCall, holdingShortCall, inboundCall,
-  readyToTaxiCall, requestFrequencyChangeCall,
+  approachCheckInCall, arrivalTowerCheckInCall, buildReadback, buildUnable, checkInCall, clearOfRunwayCall, departureCheckInCall, establishedCall, finalCall,
+  goAroundEstablishedCall, goingAroundCall, holdingShortCall, ifrClearanceRequestCall, inboundCall, missedApproachCheckInCall, readyToTaxiCall,
+  requestFrequencyChangeCall,
 } from './readback';
 import {
-  digitsSpoken, spokenAltitude, spokenCallsign, spokenFrequency, spokenHeading, spokenRunway, spokenSpeed, spokenTaxiway, spokenText,
+  digitsSpoken, spokenAirportName, spokenAltitude, spokenCallsign, spokenFrequency, spokenHeading, spokenRunway, spokenSpeed, spokenTaxiway, spokenText, titleCase,
 } from './spoken';
 import { facilityCallName, hearsFrequency, listenersOn } from './frequencies';
 
@@ -171,5 +172,90 @@ describe('frequencies', () => {
     expect(facilityCallName(airport, 121.9)).toBe('Atlantic City Ground');
     expect(facilityCallName(airport, 124.6)).toBe('Atlantic City Approach');
     expect(facilityCallName(airport, 130.0)).toBe('Atlantic City');
+  });
+});
+
+describe('IFR readbacks and calls', () => {
+  const nks = ac({ callsign: 'NKS451', spokenCallsign: 'Spirit four fifty one', type: 'A320', flightRules: 'IFR', frequencyMhz: 127.85, frequencyId: 'CLNC' });
+  const ifr = {
+    destination: 'KPHL', routeText: 'ATLANTIC CITY THREE departure, radar vectors, then as filed', departureProcedure: 'ATLANTIC CITY THREE',
+    initialAltitudeFt: 2000, expectAltitudeFt: 10000, departureFrequencyMhz: 124.6, squawk: '4215',
+  };
+
+  it('IFR clearance: destination, DP, radar vectors, maintain, expect, departure frequency, squawk, callsign last', () => {
+    expect(buildReadback(nks, clr({ kind: 'IFR_CLEARANCE', ifr }), env).text).toBe(
+      'Cleared to Philadelphia, Atlantic City Three departure, radar vectors, maintain two thousand, expect one zero thousand ten minutes after departure, departure one two four point six, squawk four two one five, Spirit four fifty one',
+    );
+  });
+
+  it('IFR clearance without a DP says "as filed"; flight-level cruise; unknown destinations are spelled out', () => {
+    const t = buildReadback(nks, clr({ kind: 'IFR_CLEARANCE', ifr: { ...ifr, departureProcedure: undefined, expectAltitudeFt: 24000, destination: 'KXYZ' } }), env).text;
+    expect(t).toBe(
+      'Cleared to kilo x-ray yankee zulu, as filed, maintain two thousand, expect flight level two four zero ten minutes after departure, departure one two four point six, squawk four two one five, Spirit four fifty one',
+    );
+    expect(buildReadback(nks, clr({ kind: 'IFR_CLEARANCE', ifr: { ...ifr, expectAltitudeFt: undefined } }), env).text).not.toMatch(/expect/);
+  });
+
+  it('approach clearances by type', () => {
+    const b = (approachType: Clearance['approachType'], runwayEnd = '13') => buildReadback(nks, clr({ kind: 'APPROACH', approachType, runwayEnd }), env).text;
+    expect(b('ILS')).toBe('Cleared ILS runway one three approach, Spirit four fifty one');
+    expect(b('LOC')).toBe('Cleared localizer runway one three approach, Spirit four fifty one');
+    expect(b('RNAV', '22')).toBe('Cleared RNAV runway two two approach, Spirit four fifty one');
+    expect(b('VOR', '4')).toBe('Cleared VOR runway four approach, Spirit four fifty one');
+    expect(b('VISUAL')).toBe('Cleared visual approach runway one three, Spirit four fifty one');
+  });
+
+  it('approach clearance readbacks can carry a seeded runway error', () => {
+    const r = buildReadback(nks, clr({ kind: 'APPROACH', approachType: 'ILS', runwayEnd: '13' }), { airport, rng: mulberry32(3), errorRate: 1 });
+    expect(r.error?.kind).toBe('runway');
+    expect(r.error?.correct).toBe('runway 13');
+  });
+
+  it('direct fix: navaid name when present, otherwise the identifier; resume own navigation; radar contact has no readback', () => {
+    expect(buildReadback(nks, clr({ kind: 'DIRECT_FIX', fix: 'TVO' }), env).text).toBe('Direct Testville, Spirit four fifty one');
+    expect(buildReadback(nks, clr({ kind: 'DIRECT_FIX', fix: 'FX13A' }), env).text).toBe('Direct FX13A, Spirit four fifty one');
+    expect(buildReadback(nks, clr({ kind: 'DIRECT_FIX', fix: 'UNKNWN' }), env).text).toBe('Direct UNKNWN, Spirit four fifty one');
+    expect(buildReadback(nks, clr({ kind: 'RESUME_OWN_NAVIGATION' }), env).text).toBe('Resuming own navigation, Spirit four fifty one');
+    expect(buildReadback(nks, clr({ kind: 'RADAR_CONTACT' }), env).text).toBe('');
+  });
+
+  it('contact frequency by position id resolves CLNC / DEP / APP, keeping the named position when positions share a frequency', () => {
+    expect(buildReadback(nks, clr({ kind: 'CONTACT_FREQUENCY', frequencyId: 'DEP', frequencyMhz: 124.6 }), env).text).toBe('Departure one two four point six, Spirit four fifty one');
+    expect(buildReadback(nks, clr({ kind: 'CONTACT_FREQUENCY', frequencyId: 'APP', frequencyMhz: 124.6 }), env).text).toBe('Approach one two four point six, Spirit four fifty one');
+    expect(buildReadback(nks, clr({ kind: 'CONTACT_FREQUENCY', frequencyId: 'CLNC' }), env).text).toBe('Clearance one two seven point eight five, Spirit four fifty one');
+  });
+
+  it('the facility is named from the frequency id the aircraft was told to contact (APP and DEP share 124.6)', () => {
+    expect(facilityCallName(airport, 124.6)).toBe('Atlantic City Approach');
+    expect(facilityCallName(airport, 124.6, 'DEP')).toBe('Atlantic City Departure');
+    expect(facilityCallName(airport, 124.6, 'APP')).toBe('Atlantic City Approach');
+    expect(facilityCallName(airport, 121.9, 'DEP')).toBe('Atlantic City Ground'); // stale id for another frequency is ignored
+    expect(facilityCallName(airport, 127.85)).toBe('Atlantic City Clearance');
+  });
+
+  it('pilot calls', () => {
+    expect(ifrClearanceRequestCall(nks, env, { destination: 'KPHL', atisLetter: 'B' })).toBe(
+      'Atlantic City Clearance, Spirit four fifty one, IFR to Philadelphia, with information bravo, ready to copy.',
+    );
+    const app = { ...nks, frequencyMhz: 124.6, frequencyId: 'APP', onGround: false, isDeparture: false, altitudeFt: 5000 };
+    expect(approachCheckInCall(app, env, { altitudeFt: 5000, atisLetter: 'B' })).toBe('Atlantic City Approach, Spirit four fifty one, five thousand, information bravo.');
+    expect(approachCheckInCall(app, env, { altitudeFt: 4960 })).toBe('Atlantic City Approach, Spirit four fifty one, five thousand.');
+    const dep = { ...nks, frequencyMhz: 124.6, frequencyId: 'DEP', onGround: false, altitudeFt: 1230 };
+    expect(departureCheckInCall(dep, env, { targetAltitudeFt: 2000 })).toBe('Atlantic City Departure, Spirit four fifty one, one thousand two hundred climbing two thousand.');
+    expect(departureCheckInCall({ ...dep, altitudeFt: 2000 }, env, { targetAltitudeFt: 2000 })).toBe('Atlantic City Departure, Spirit four fifty one, two thousand.');
+    expect(establishedCall(app, env, { type: 'ILS', runwayEnd: '13' })).toBe('Atlantic City Approach, Spirit four fifty one, established ILS runway one three.');
+    expect(establishedCall(app, env, { type: 'LOC', runwayEnd: '31' })).toBe('Atlantic City Approach, Spirit four fifty one, established localizer runway three one.');
+    const twr = { ...app, frequencyMhz: 120.3, frequencyId: 'TWR' };
+    expect(arrivalTowerCheckInCall(twr, env, { distanceNm: 4.6, runwayEnd: '13' })).toBe('Atlantic City Tower, Spirit four fifty one, five mile final runway one three, full stop.');
+    expect(missedApproachCheckInCall({ ...app, altitudeFt: 2000 }, env)).toBe('Atlantic City Approach, Spirit four fifty one, missed approach, two thousand.');
+    expect(goAroundEstablishedCall(twr, env, 2000, { vectors: true })).toBe('Atlantic City Tower, Spirit four fifty one, runway heading, level two thousand, request vectors for another approach.');
+    expect(goAroundEstablishedCall(twr, env, 2000)).toMatch(/request another approach\.$/);
+  });
+
+  it('spoken airport names and title case', () => {
+    expect(spokenAirportName('KPHL')).toBe('Philadelphia');
+    expect(spokenAirportName('BOS')).toBe('Boston');
+    expect(spokenAirportName('KQQQ')).toBe('kilo quebec quebec quebec');
+    expect(titleCase('CEDAR LAKE')).toBe('Cedar Lake');
   });
 });

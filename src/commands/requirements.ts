@@ -17,6 +17,12 @@ export function missingRequired(d: Draft): string[] {
     case 'ALTITUDE': return f.altitudeFt !== undefined ? [] : ['missing altitude'];
     case 'SPEED': return f.speedKt !== undefined || f.destination ? [] : ['missing speed'];
     case 'ENTER_PATTERN': return f.patternLeg || f.destination ? [] : ['missing pattern leg'];
+    case 'APPROACH': return [
+      ...(f.approachType ? [] : ['missing approach type']),
+      ...(f.runwayEnd ? [] : ['missing runway']),
+    ];
+    case 'DIRECT_FIX': return f.fix ? [] : ['missing fix'];
+    case 'IFR_CLEARANCE': return f.ifr?.destination ? [] : ['missing destination airport'];
     default: return [];
   }
 }

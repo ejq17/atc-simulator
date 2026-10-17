@@ -37,7 +37,7 @@ export function sanitizeVoiceSettings(raw: unknown): VoiceSettings {
   const d = DEFAULT_VOICE_SETTINGS;
   const r = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>;
   const provider: SttProviderId =
-    r.providerId === 'webspeech' || r.providerId === 'deepgram' || r.providerId === 'none' ? r.providerId : d.providerId;
+    r.providerId === 'webspeech' || r.providerId === 'deepgram' || r.providerId === 'whisper-local' || r.providerId === 'none' ? r.providerId : d.providerId;
   return {
     providerId: provider,
     pttKey: typeof r.pttKey === 'string' && r.pttKey.length > 0 && r.pttKey.length <= 32 ? r.pttKey : d.pttKey,
@@ -113,6 +113,8 @@ export const VOICE_PRIVACY_NOTES = {
       'Browser speech recognition: Chrome sends your microphone audio to Google servers for recognition (Edge sends it to Microsoft). The simulator itself never sees or keeps that audio. Use Deepgram or typed commands if that is not acceptable to you.',
     deepgram:
       'Deepgram: audio streams from your browser straight to Deepgram (api.deepgram.com) over an encrypted connection while you hold the key. Deepgram processes it under your own account and its terms; the simulator server only hands out short-lived tokens and never receives the audio.',
+    'whisper-local':
+      'Local Whisper: the speech model runs inside this browser tab on your computer. Your voice is never uploaded or sent anywhere, not even to the simulator server. The only downloads are the model files (about 40 MB, once, from huggingface.co) and the WebAssembly runtime (from cdn.jsdelivr.net); no audio is part of either request. After that it works offline.',
     none: 'Off: the microphone is never opened. Type your transmissions.',
   },
   transcripts:

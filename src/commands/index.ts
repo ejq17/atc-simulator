@@ -3,6 +3,7 @@ import type { ParseContext } from './context';
 import { parse } from './parse';
 
 export type { ParseContext } from './context';
+export type { FixInfo } from './fixes';
 export type { AircraftRef, CallsignResolution } from './callsign';
 export { resolveCallsign, CALLSIGN_ACCEPT } from './callsign';
 export { commandConfidence } from './confidence';

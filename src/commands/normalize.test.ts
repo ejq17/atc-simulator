@@ -3,6 +3,15 @@ import { normalize } from './normalize';
 import { rawSlice } from './tokens';
 
 const cases: [string, string][] = [
+  ['I L S', 'ils'],
+  ['i.l.s.', 'ils'],
+  ['eye el es', 'ils'],
+  ['R-NAV', 'rnav'],
+  ['are nav', 'rnav'],
+  ['spirit four fifty one, four miles', 'NKS 451 4 miles'],
+  ['expect one zero thousand one zero minutes', 'expect 10000 10 minutes'],
+  ['expect flight level two three zero ten minutes', 'expect fl 230 10 minutes'],
+  ['maintain two thousand five hundred', 'maintain 2500'],
   ['one three', '13'],
   ['two thousand five hundred', '2500'],
   ['tree', '3'],

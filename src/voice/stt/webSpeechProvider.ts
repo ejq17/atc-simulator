@@ -69,11 +69,30 @@ export function describeWebSpeechError(code: string): SttError {
 
 const MAX_RESTARTS = 8;
 const STOP_SETTLE_TIMEOUT_MS = 3000;
+/**
+ * Some browsers expose SpeechRecognition but never fire `start` or `error` (headless Chromium, embedded webviews, no
+ * speech service). Without a deadline start() hangs and the UI stays on "Transmitting" forever. Not applied while the
+ * microphone permission prompt is open, because the user may legitimately take a while to answer it.
+ */
+const START_TIMEOUT_MS = 6000;
+
+async function micPermissionPending(): Promise<boolean> {
+  try {
+    const perms = typeof navigator !== 'undefined' ? navigator.permissions : undefined;
+    if (!perms?.query) return false;
+    const status = await perms.query({ name: 'microphone' as PermissionName });
+    return status.state === 'prompt';
+  } catch {
+    return false;
+  }
+}
 
 export interface WebSpeechProviderOptions {
   /** Injectable for tests. */
   ctor?: RecCtor;
   now?: () => number;
+  /** Override the start() deadline in tests. */
+  startTimeoutMs?: number;
 }
 
 export function createWebSpeechProvider(options: WebSpeechProviderOptions = {}): SpeechRecognitionProvider {
@@ -203,12 +222,27 @@ export function createWebSpeechProvider(options: WebSpeechProviderOptions = {}):
       session = s;
       rec = r;
       wire(r, s);
+      const startTimeoutMs = options.startTimeoutMs ?? ((await micPermissionPending()) ? 0 : START_TIMEOUT_MS);
       await new Promise<void>((resolve, reject) => {
-        r.onstart = () => resolve();
+        let timer: ReturnType<typeof setTimeout> | undefined;
+        if (startTimeoutMs > 0) {
+          timer = setTimeout(() => {
+            s.done = true;
+            session = null;
+            rec = null;
+            try { r.abort(); } catch { /* ignore */ }
+            reject(new SttError('unsupported', 'Browser speech recognition did not start (no speech service is available in this browser). Pick another provider in Settings, or type your transmission.'));
+          }, startTimeoutMs);
+        }
+        r.onstart = () => {
+          clearTimeout(timer);
+          resolve();
+        };
         const prevError = r.onerror;
         r.onerror = (e) => {
           // Errors before the session started reject start() directly.
           if (e.error !== 'no-speech' && e.error !== 'aborted') {
+            clearTimeout(timer);
             s.done = true;
             session = null;
             rec = null;
@@ -220,6 +254,7 @@ export function createWebSpeechProvider(options: WebSpeechProviderOptions = {}):
         try {
           r.start();
         } catch (err) {
+          clearTimeout(timer);
           s.done = true;
           session = null;
           rec = null;

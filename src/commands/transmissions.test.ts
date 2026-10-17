@@ -255,7 +255,7 @@ run({
     { say: 'Spirit four fife one line up and weight runway one three', cmds: [{ kind: 'LINE_UP_AND_WAIT', ...NKS, runwayEnd: '13' }], clean: true },
     { say: `${S} takeoff runway 13`, cmds: [{ kind: 'UNKNOWN', callsign: 'NKS451' }], issue: 'no recognised instruction', conf: [0, 0.2] },
     { say: `${S} go ahead and land runway 13`, cmds: [{ kind: 'UNKNOWN' }], conf: [0, 0.2] },
-    { say: `${S} cleared ILS runway 13 approach`, cmds: [{ kind: 'UNKNOWN' }], issue: 'unsupported instruction', conf: [0, 0.2] },
+    { say: `${S} cleared NDB runway 13 approach`, cmds: [{ kind: 'UNKNOWN' }], issue: 'unsupported instruction', conf: [0, 0.2] },
     { say: `${S} squawk one two zero zero`, cmds: [{ kind: 'UNKNOWN' }], issue: 'unsupported instruction: squawk', conf: [0, 0.2] },
     { say: `${S} um taxi uh to runway 13 via alpha`, cmds: [{ kind: 'TAXI', route: ['A'], destination: 'RWY13' }], clean: true },
     { say: `${S} taxi quickly to runway 13 via alpha`, cmds: [{ kind: 'TAXI', route: ['A'], destination: 'RWY13' }], issue: 'unrecognised words', conf: [0.5, 0.95] },

@@ -40,3 +40,18 @@ export interface Case {
   conf?: [number, number];
   ctx?: ParseContext;
 }
+
+/** Fixes / navaids around KACY used by the IFR tests. */
+export const FIXES: NonNullable<ParseContext['fixes']> = [
+  { id: 'CARYL', spoken: 'carol' },
+  { id: 'MAYBN', spoken: 'maybin' },
+  { id: 'STEVV', spoken: 'stev' },
+  { id: 'PRSTY', spoken: 'pristy' },
+  { id: 'SMITS' },
+  { id: 'SIE', name: 'Sea Isle' },
+  { id: 'VCN', name: 'Cedar Lake' },
+  { id: 'CYN', name: 'Coyle' },
+  { id: 'ACY', name: 'Atlantic City VOR' },
+];
+
+export const FIX_CTX: ParseContext = { ...CTX, fixes: FIXES };

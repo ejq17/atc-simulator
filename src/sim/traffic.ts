@@ -2,19 +2,22 @@
  * Spawning, automatic pilot-initiated calls, aircraft lifecycle and the pluggable
  * `TrafficGenerator` interface (continuous traffic scheduling can be expanded by src/game).
  */
-import type { Aircraft, Scenario, SimulationState, Vec2 } from './types';
+import type { Aircraft, FlightPlan, Scenario, SimulationState, Vec2 } from './types';
 import {
-  bearingDeg, dist, headingDiff, mToNm, nmToM, vScale, vSub,
+  bearingDeg, dist, headingDiff, headingToVec, mToNm, nmToM, vDot, vScale, vSub,
 } from './geo';
 import { glideAltitudeFt, finalStartNm } from './flightDynamics';
 import { findRunwayEnd, alongCross } from './runways';
 import { emitEvent, getRuntime, newRuntime, perfOf, pilotSay, setPhase } from './context';
 import type { SimContext } from './context';
 import { mulberry32, rngInt, rngPick } from './rng';
-import { frequencyById, frequencyByMhz } from '../radio/frequencies';
+import { frequencyById, frequencyByMhz, frequencyForPosition, sameFrequency } from '../radio/frequencies';
+import { findNavFix, fixPosition } from './navigation';
+import { assignSquawk } from './ifr';
 import { spokenCallsign as buildSpokenCallsign } from '../radio/spoken';
 import {
-  checkInCall, clearOfRunwayCall, finalCall, goAroundEstablishedCall, holdingShortCall, holdingShortCrossingCall, inboundCall, readyToTaxiCall, stoppedOnRunwayCall,
+  approachCheckInCall, arrivalTowerCheckInCall, checkInCall, clearOfRunwayCall, departureCheckInCall, establishedCall, finalCall, goAroundEstablishedCall,
+  holdingShortCall, holdingShortCrossingCall, ifrClearanceRequestCall, inboundCall, missedApproachCheckInCall, readyToTaxiCall, stoppedOnRunwayCall,
 } from '../radio/readback';
 import type { ReadbackEnv } from '../radio/readback';
 
@@ -173,6 +176,12 @@ export function spawnFromSpec(ctx: SimContext, spec: SpawnSpec): Aircraft {
   };
   const rt = newRuntime(now + 2 + rng() * 4);
   ctx.runtime.set(id, rt);
+  if (spec.flightPlan) {
+    const fp: FlightPlan = { ...spec.flightPlan, route: [...spec.flightPlan.route] };
+    ac.flightPlan = fp;
+    ac.origin = fp.origin;
+    ac.destination = fp.destination;
+  }
   const s = spec.start;
   if (s.kind === 'parked') {
     const p = airport.parking.find((x) => x.id === s.parkingId);
@@ -197,6 +206,34 @@ export function spawnFromSpec(ctx: SimContext, spec: SpawnSpec): Aircraft {
     ac.route = { nodeIds: [node.id], taxiways: node.taxiways.slice(0, 1), stopAtNodeIds: [node.id], progressIndex: 1 };
     rt.stoppedAtNodeId = node.id;
     rt.firstCallAtSec = now + 2 + rng() * 3;
+  } else if (s.kind === 'at_fix') {
+    // Arrival entering the area over a named fix, flying its route to the airport.
+    const fixNav = findNavFix(airport, s.fix);
+    if (!fixNav) throw new Error(`Unknown fix ${s.fix}`);
+    const first = s.route[0] ? findNavFix(airport, s.route[0])?.id : undefined;
+    const route = s.route.length ? (first === fixNav.id ? [...s.route] : [fixNav.id, ...s.route]) : [fixNav.id];
+    const g = findRunwayEnd(airport, s.runwayEnd ?? state.activeRunways.landing[0]);
+    const nextPos = route[1] ? fixPosition(airport, route[1]) : undefined;
+    ac.onGround = false;
+    ac.pos = { x: fixNav.pos.x, y: fixNav.pos.y };
+    ac.headingDeg = nextPos ? bearingDeg(ac.pos, nextPos) : g ? bearingDeg(ac.pos, g.end.threshold) : 0;
+    ac.altitudeFt = s.altitudeFt;
+    ac.airspeedKt = s.speedKt;
+    ac.groundSpeedKt = s.speedKt;
+    ac.phase = 'INBOUND';
+    ac.assignedRunwayEnd = g?.end.id;
+    ac.target = { altitudeFt: s.altitudeFt };
+    ac.nav = { fixes: route, index: nextPos ? 1 : route.length, mode: 'route' };
+    for (let i = 0; i < ac.nav.index; i++) rt.passedFixes.add(route[i].toUpperCase()); // the spawn fix is already reached
+    if (!ac.flightPlan) {
+      ac.flightPlan = { flightRules: 'IFR', origin: ac.origin, destination: airport.icao, cruiseAltitudeFt: s.altitudeFt, route: [...route] };
+    }
+    ac.squawk = ac.flightPlan.squawk ?? assignSquawk(ctx);
+    ac.radarIdentified = false;
+    ac.trackDeg = ac.headingDeg;
+    rt.approachCheckIn = true;
+    rt.calls.add('inbound'); // the approach check-in replaces the standard inbound call
+    rt.firstCallAtSec = now + 1 + rng() * 3;
   } else {
     const landingEnd = s.runwayEnd ?? state.activeRunways.landing[0];
     const g = findRunwayEnd(airport, landingEnd);
@@ -235,7 +272,7 @@ export function spawnFromSpec(ctx: SimContext, spec: SpawnSpec): Aircraft {
   state.aircraft[id] = ac;
   emitEvent(ctx, {
     kind: 'SPAWN', aircraftId: id, callsign, severity: 'info', speaker: 'SYSTEM',
-    text: `${callsign} (${spec.type}) spawned ${s.kind === 'parked' ? `at ${s.parkingId}` : s.kind === 'holding_short' ? `holding short at ${s.nodeId}` : 'airborne'}`,
+    text: `${callsign} (${spec.type}) spawned ${s.kind === 'parked' ? `at ${s.parkingId}` : s.kind === 'holding_short' ? `holding short at ${s.nodeId}` : s.kind === 'at_fix' ? `inbound over ${s.fix}` : 'airborne'}`,
     data: { phase: ac.phase },
   });
   return ac;
@@ -326,6 +363,29 @@ export function updatePilotRequests(ctx: SimContext): void {
       for (const k of [...rt.calls]) if (k.startsWith('hold:') || k.startsWith('holdX:')) rt.calls.delete(k);
     }
 
+    // 0. IFR departure: Clearance Delivery first; ~15 s after the clearance it tunes Ground and asks for taxi (step 1).
+    if (ac.phase === 'PARKED' && ac.isDeparture && ac.flightPlan?.flightRules === 'IFR') {
+      const fp = ac.flightPlan;
+      if (!fp.ifrClearance) {
+        if (!rt.calls.has('ifrClearance') && now >= rt.firstCallAtSec) {
+          rt.calls.add('ifrClearance');
+          pilotSay(ctx, ac, ifrClearanceRequestCall(ac, env, { destination: fp.destination, atisLetter: state.atis.letter }), { request: 'IFR_CLEARANCE' });
+          ac.pendingRequest = { kind: 'IFR_CLEARANCE', text: `IFR to ${fp.destination}, ready to copy`, sinceSec: now };
+        }
+        continue;
+      }
+      if (rt.taxiRequestAtSec === undefined || now < rt.taxiRequestAtSec) continue;
+      const gnd = frequencyForPosition(airport, 'GND');
+      if (gnd && !sameFrequency(ac.frequencyMhz, gnd.mhz)) {
+        ac.frequencyMhz = gnd.mhz;
+        ac.frequencyId = gnd.id;
+        emitEvent(ctx, {
+          kind: 'HANDOFF', aircraftId: ac.id, callsign: ac.callsign, severity: 'info', speaker: 'SYSTEM', frequencyMhz: gnd.mhz,
+          text: `${ac.callsign} changed to ${gnd.mhz.toFixed(3)} (${gnd.id})`, data: { frequencyId: gnd.id },
+        });
+      }
+    }
+
     // 1. Parked departure asks for taxi.
     if (ac.phase === 'PARKED' && ac.isDeparture && !rt.calls.has('readyToTaxi') && now >= rt.firstCallAtSec) {
       rt.calls.add('readyToTaxi');
@@ -361,6 +421,14 @@ export function updatePilotRequests(ctx: SimContext): void {
       }
     }
 
+    // 3b. Arrival that entered at a fix: check in with Approach.
+    if (!ac.onGround && !ac.isDeparture && rt.approachCheckIn && now >= rt.firstCallAtSec) {
+      rt.approachCheckIn = false;
+      pilotSay(ctx, ac, approachCheckInCall(ac, env, { altitudeFt: ac.altitudeFt, atisLetter: state.atis.letter }), { request: 'APPROACH' });
+      ac.pendingRequest = { kind: 'APPROACH', text: 'checking in inbound', sinceSec: now };
+      continue;
+    }
+
     // 4. Arrivals: inbound call, then a call on final if not yet cleared.
     if (!ac.onGround && !ac.isDeparture && ac.assignedRunwayEnd) {
       const g = findRunwayEnd(airport, ac.assignedRunwayEnd);
@@ -369,6 +437,14 @@ export function updatePilotRequests(ctx: SimContext): void {
         const distNm = mToNm(dist(ac.pos, { x: 0, y: 0 }));
         pilotSay(ctx, ac, inboundCall(ac, env, { distanceNm: distNm, bearingFromAirportDeg: bearingDeg({ x: 0, y: 0 }, ac.pos), atisLetter: state.atis.letter }), { request: 'LANDING' });
         ac.pendingRequest = { kind: 'LANDING', text: 'inbound for landing', sinceSec: now };
+        continue;
+      }
+      const onApproachFreq = ['APP', 'DEP'].includes(frequencyByMhz(airport, ac.frequencyMhz)?.position ?? '');
+      if (g && ac.phase === 'FINAL' && !rt.landingEnd && !rt.calls.has('final') && rt.calls.has('inbound') && rt.approach && onApproachFreq) {
+        // Established on a cleared approach but still with Approach: report and wait for the tower handoff.
+        rt.calls.add('final');
+        pilotSay(ctx, ac, establishedCall(ac, env, { type: rt.approach.type, runwayEnd: g.end.id }), { request: 'FREQUENCY_CHANGE' });
+        ac.pendingRequest = { kind: 'FREQUENCY_CHANGE', text: `established on the approach to runway ${g.end.id}`, sinceSec: now };
         continue;
       }
       if (g && ac.phase === 'FINAL' && !rt.landingEnd && !rt.calls.has('final') && rt.calls.has('inbound')) {
@@ -386,8 +462,9 @@ export function updatePilotRequests(ctx: SimContext): void {
     // 4b. Established after a go-around: ask what to do next.
     if (!ac.onGround && ac.phase === 'GO_AROUND' && !rt.calls.has('gaEst') && ac.target.altitudeFt !== undefined && Math.abs(ac.altitudeFt - ac.target.altitudeFt) < 20) {
       rt.calls.add('gaEst');
-      pilotSay(ctx, ac, goAroundEstablishedCall(ac, env, ac.target.altitudeFt), { request: 'LANDING' });
-      ac.pendingRequest = { kind: 'LANDING', text: 'request another approach', sinceSec: now };
+      const ifr = ac.flightPlan?.flightRules === 'IFR';
+      pilotSay(ctx, ac, goAroundEstablishedCall(ac, env, ac.target.altitudeFt, { vectors: ifr }), { request: 'LANDING' });
+      ac.pendingRequest = { kind: 'LANDING', text: ifr ? 'request vectors for another approach' : 'request another approach', sinceSec: now };
       continue;
     }
 
@@ -416,6 +493,26 @@ export function updatePilotRequests(ctx: SimContext): void {
     if (rt.checkInAtSec !== undefined && now >= rt.checkInAtSec) {
       rt.checkInAtSec = undefined;
       const pos = frequencyByMhz(airport, ac.frequencyMhz)?.position;
+      if (!ac.onGround && ac.isDeparture && ac.flightPlan?.flightRules === 'IFR' && (pos === 'DEP' || pos === 'APP')) {
+        pilotSay(ctx, ac, departureCheckInCall(ac, env, { targetAltitudeFt: ac.target.altitudeFt }), { checkIn: true });
+        ac.pendingRequest = { kind: 'OTHER', text: 'checked in on departure', sinceSec: now };
+        continue;
+      }
+      if (!ac.onGround && !ac.isDeparture && ac.assignedRunwayEnd) {
+        const g = findRunwayEnd(airport, ac.assignedRunwayEnd);
+        if (g && (pos === 'APP' || pos === 'DEP') && (ac.phase === 'GO_AROUND' || rt.calls.has('gaEst'))) {
+          pilotSay(ctx, ac, missedApproachCheckInCall(ac, env), { checkIn: true });
+          ac.pendingRequest = { kind: 'APPROACH', text: 'missed approach, requesting vectors', sinceSec: now };
+          continue;
+        }
+        if (g && pos === 'TWR' && ac.flightPlan) {
+          rt.calls.add('inbound');
+          rt.calls.add('final');
+          pilotSay(ctx, ac, arrivalTowerCheckInCall(ac, env, { distanceNm: mToNm(-alongCross(g, ac.pos).along), runwayEnd: g.end.id }), { checkIn: true, request: 'LANDING' });
+          ac.pendingRequest = { kind: 'LANDING', text: 'inbound, requesting landing clearance', sinceSec: now };
+          continue;
+        }
+      }
       const wantsTaxi = ac.onGround && ac.phase === 'RUNWAY_EXIT' && pos === 'GND';
       const taxiway = ac.onGround && ac.route ? graph.nodes[ac.route.nodeIds[ac.route.nodeIds.length - 1]]?.taxiways[0] : undefined;
       pilotSay(ctx, ac, checkInCall(ac, env, { taxiway, wantsTaxiToParking: wantsTaxi }), { checkIn: true });
@@ -432,6 +529,13 @@ export function updatePilotRequests(ctx: SimContext): void {
 export const ARRIVED_DESPAWN_SEC = 20;
 export const DEPARTURE_EXIT_NM = 15;
 export const LOST_AIRCRAFT_NM = 40;
+export const IFR_EXIT_ALTITUDE_FT = 6000;
+
+/** On its route (route / direct navigation, not vectors) and moving away from the airport reference point. */
+function outboundOnRoute(ac: Aircraft): boolean {
+  if (!ac.nav || ac.nav.mode === 'vectors') return false;
+  return vDot(headingToVec(ac.trackDeg), ac.pos) > 0;
+}
 
 export function updateLifecycle(ctx: SimContext): void {
   const now = ctx.state.clock.timeSec;
@@ -444,7 +548,16 @@ export function updateLifecycle(ctx: SimContext): void {
     }
     if (!ac.onGround) {
       const dNm = mToNm(dist(ac.pos, { x: 0, y: 0 }));
-      if (ac.phase === 'DEPARTURE' && dNm > DEPARTURE_EXIT_NM) {
+      if (ac.phase === 'DEPARTURE' && dNm > DEPARTURE_EXIT_NM && ac.flightPlan?.flightRules === 'IFR') {
+        // IFR departure: leaves once clear of the area and above 6000 ft or established outbound on its route.
+        // Handled only if Departure also issued an altitude / direct / resume instruction after the handoff.
+        if (ac.altitudeFt >= IFR_EXIT_ALTITUDE_FT || outboundOnRoute(ac)) {
+          const handled = rt.handedOff && rt.depInstructed;
+          removeAircraft(ctx, ac.id, handled, handled ? 'departed the area (handed off)' : rt.handedOff ? 'departed the area (no instruction after handoff)' : 'left the area without a handoff');
+          continue;
+        }
+      }
+      if (ac.phase === 'DEPARTURE' && dNm > DEPARTURE_EXIT_NM && ac.flightPlan?.flightRules !== 'IFR') {
         removeAircraft(ctx, ac.id, rt.handedOff, rt.handedOff ? 'departed the area (handed off)' : 'left the area without a handoff');
       } else if (dNm > LOST_AIRCRAFT_NM) {
         removeAircraft(ctx, ac.id, false, 'left the simulation area');

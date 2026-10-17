@@ -10,7 +10,8 @@
  */
 import type { Aircraft, ConflictAlert, ParsedCommand, SimulationState } from './types';
 import { dist, mToNm, nmToM, pointInPolygon } from './geo';
-import { crossingRunways, findRunway, findRunwayEnd, isOnFinal } from './runways';
+import { alongCross, crossingRunways, findRunway, findRunwayEnd, isOnFinal } from './runways';
+import { assessApproach } from './approach';
 import { computeRunwayActivity } from './runwayOccupancy';
 import type { RunwayActivity } from './runwayOccupancy';
 import { TAXI_PHASES } from './stateMachines';
@@ -21,6 +22,9 @@ export const REF_SAME_RUNWAY = 'FAA JO 7110.65 3-9-6 (same runway separation)';
 export const REF_LANDING = 'FAA JO 7110.65 3-10-5 (landing clearance) and 3-10-3 (same runway separation)';
 export const REF_TAXI = 'FAA JO 7110.65 3-7-2 (taxi and ground movement, runway crossings)';
 export const REF_INTERSECTING = 'FAA JO 7110.65 3-9-8 (intersecting runway separation)';
+/** Paragraph deliberately not cited: only the topic (radar separation minima) is referenced; the 3 nm figure is a simplification. */
+export const REF_RADAR_SEPARATION = 'FAA JO 7110.65, radar separation minima (simplified here to 3 nm in-trail on the same final)';
+export const APPROACH_IN_TRAIL_NM = 3;
 
 export interface SafetyIssue {
   kind: ConflictAlert['kind'];
@@ -74,6 +78,33 @@ function activeOnRunway(state: SimulationState, act: RunwayActivity, exclude: st
   return [...ids];
 }
 
+/** An approach clearance must not put the aircraft on a final course within 3 nm (in trail) of another aircraft established on it. */
+function assessApproachSeparation(state: SimulationState, ac: Aircraft, cmd: ParsedCommand): SafetyAssessment {
+  const issues: SafetyIssue[] = [];
+  const g = findRunwayEnd(state.airport, cmd.runwayEnd ?? ac.assignedRunwayEnd);
+  if (!g || !cmd.approachType || ac.onGround) return { safe: true, issues };
+  const a = assessApproach(state, ac, cmd.approachType, g);
+  if (a.kind !== 'ok') return { safe: true, issues };
+  const mine = a.plan.joinDM;
+  for (const o of Object.values(state.aircraft)) {
+    if (o.id === ac.id || o.onGround || o.assignedRunwayEnd !== g.end.id) continue;
+    const established = o.phase === 'FINAL' || o.phase === 'LANDING' || (o.nav?.mode === 'approach' && isOnFinal(g, o.pos, o.headingDeg, 30));
+    if (!established) continue;
+    const theirs = -alongCross(g, o.pos).along;
+    const gapNm = mToNm(Math.abs(mine - theirs));
+    if (gapNm < APPROACH_IN_TRAIL_NM) {
+      issues.push({
+        kind: 'AIRBORNE_PROXIMITY',
+        text: `Approach clearance for ${ac.callsign} to runway ${g.end.id} puts it ${gapNm.toFixed(1)} nm from ${o.callsign}, established on the same final`,
+        reference: REF_RADAR_SEPARATION,
+        aircraftIds: [ac.id, o.id],
+        runwayId: g.runway.id,
+      });
+    }
+  }
+  return { safe: issues.length === 0, issues };
+}
+
 /**
  * Would issuing `cmd` create an unsafe situation given the current state?
  * Pure: reads the state only. Used by the executor before any state change.
@@ -83,6 +114,7 @@ export function assessClearanceSafety(state: SimulationState, cmd: ParsedCommand
   const ac = cmd.callsign ? Object.values(state.aircraft).find((a) => a.callsign.toUpperCase() === cmd.callsign!.toUpperCase()) : undefined;
   if (!ac) return { safe: true, issues };
   const { airport } = state;
+  if (cmd.kind === 'APPROACH') return assessApproachSeparation(state, ac, cmd);
   const activity = computeRunwayActivity(state);
 
   let runwayId: string | undefined;

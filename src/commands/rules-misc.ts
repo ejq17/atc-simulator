@@ -61,7 +61,7 @@ export const ruleWind: Rule = (t, i) => {
   return fillerHit(j);
 };
 
-const UNSUPPORTED = new Set(['squawk', 'ident', 'direct']);
+const UNSUPPORTED = new Set(['squawk', 'ident']);
 
 /** Instructions that exist in ATC but are not simulated: flagged, never guessed. */
 export const ruleUnsupported: Rule = (t, i) => {

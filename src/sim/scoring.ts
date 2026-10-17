@@ -21,6 +21,8 @@
  *   READBACK_ERROR event with data.missed          -> missedReadbackErrors
  *   COMMAND_REJECTED / CLARIFICATION with data.commError -> communicationErrors
  *   COMMAND_ACCEPTED with data.scored              -> correctClearances (+ request wait statistics)
+ *   COMMAND_ACCEPTED with data.commError           -> communicationErrors (accepted but improper: takeoff without an IFR
+ *                                                     clearance, approach clearance with an improper intercept)
  *   DESPAWN with data.handled                      -> aircraftHandled
  *
  * Wait statistics: every accepted clearance that answers a pilot request records the request age;
@@ -94,6 +96,7 @@ export function applyEventToScore(ctx: SimContext, ev: SimEvent): void {
       break;
     case 'COMMAND_ACCEPTED':
       if (d.scored) s.correctClearances++;
+      if (d.commError) s.communicationErrors++; // accepted but improper (e.g. takeoff without an IFR clearance, bad intercept angle)
       if (typeof d.waitSec === 'number') {
         const ws = ctx.waitStats;
         ws.count++;

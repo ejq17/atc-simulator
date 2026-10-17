@@ -56,6 +56,17 @@ export const PHRASES: readonly { words: readonly string[]; to: PhraseTarget }[] 
   { words: ['take', 'off'], to: { text: 'takeoff' } },
   { words: ['run', 'way'], to: { text: 'runway' } },
   { words: ['push', 'back'], to: { text: 'pushback' } },
+  // STT renderings of approach names
+  { words: ['i', 'l', 's'], to: { text: 'ils' } },
+  { words: ['eye', 'el', 'es'], to: { text: 'ils' } },
+  { words: ['eye', 'l', 's'], to: { text: 'ils' } },
+  { words: ['i', 'el', 'es'], to: { text: 'ils' } },
+  { words: ['r', 'n', 'a', 'v'], to: { text: 'rnav' } },
+  { words: ['r', 'nav'], to: { text: 'rnav' } },
+  { words: ['are', 'nav'], to: { text: 'rnav' } },
+  { words: ['ar', 'nav'], to: { text: 'rnav' } },
+  { words: ['v', 'o', 'r'], to: { text: 'vor' } },
+  { words: ['l', 'o', 'c'], to: { text: 'loc' } },
 ];
 
 /** Single-word STT / spelling corrections (value may expand to several words). */
@@ -63,7 +74,7 @@ export const ALIASES = rec<readonly string[]>({
   weight: ['wait'], waite: ['wait'], runaway: ['runway'], rwy: ['runway'], taxy: ['taxi'],
   tousand: ['thousand'], decimal: ['point'], dot: ['point'], knot: ['knots'], kts: ['knots'],
   kt: ['knots'], lineup: ['line', 'up'], takeoffs: ['takeoff'], ramps: ['ramp'],
-  centre: ['center'], hedding: ['heading'], goaround: ['go', 'around'],
+  centre: ['center'], localiser: ['localizer'], localizor: ['localizer'], localizers: ['localizer'], hedding: ['heading'], goaround: ['go', 'around'],
 });
 
 /** Alphanumeric fragments that must not be split letter-by-letter ("250kts", "fl180"). */

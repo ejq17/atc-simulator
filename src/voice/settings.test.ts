@@ -20,6 +20,12 @@ describe('voice settings', () => {
     expect(loadVoiceSettings()).toEqual(DEFAULT_VOICE_SETTINGS);
   });
 
+  it('accepts the local Whisper provider id and still rejects unknown ones', () => {
+    expect(sanitizeVoiceSettings({ providerId: 'whisper-local' }).providerId).toBe('whisper-local');
+    expect(sanitizeVoiceSettings({ providerId: 'whisper-cloud' }).providerId).toBe(DEFAULT_VOICE_SETTINGS.providerId);
+    expect(VOICE_PRIVACY_NOTES.providers['whisper-local']).toMatch(/never uploaded/);
+  });
+
   it('persists updates under kacy.voice.settings and reloads them', () => {
     const store = createVoiceSettingsStore();
     store.update({ providerId: 'deepgram', pttKey: 'F2', pttMode: 'toggle', ttsVolume: 0.4 });

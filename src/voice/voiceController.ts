@@ -7,6 +7,7 @@
 import { createPushToTalk } from './ptt.ts';
 import type { PttMode, PushToTalk } from './ptt.ts';
 import { createDeepgramProvider } from './stt/deepgramProvider.ts';
+import { getLocalWhisperProvider } from './stt/localWhisperProvider.ts';
 import { createNoneProvider } from './stt/noneProvider.ts';
 import { sttErrorCode } from './stt/types.ts';
 import type { SpeechRecognitionProvider, SttProviderId, VoiceStatus } from './stt/types.ts';
@@ -87,6 +88,7 @@ export function createVoiceController(options: VoiceControllerOptions): VoiceCon
   const providers: Partial<Record<SttProviderId, SpeechRecognitionProvider>> = {
     webspeech: createWebSpeechProvider(),
     deepgram: createDeepgramProvider(),
+    'whisper-local': getLocalWhisperProvider(),
     none: createNoneProvider(),
     ...options.providers,
   };
@@ -176,7 +178,7 @@ export function createVoiceController(options: VoiceControllerOptions): VoiceCon
   function flush(s: Session) {
     if (s.phase === 'done') return;
     if (s.finals.length) finish(s, s.finals.join(' '), false);
-    else finish(s, s.partial, true);
+    else finish(s, s.provider.placeholderPartial === s.partial ? '' : s.partial, true);
   }
 
   function beginTransmission() {
@@ -241,7 +243,7 @@ export function createVoiceController(options: VoiceControllerOptions): VoiceCon
     if ((s.phase as Phase) === 'done') return;
     s.phase = 'processing';
     emitStatus('processing');
-    s.timer = setTimeout(() => flush(s), finalTimeoutMs);
+    s.timer = setTimeout(() => flush(s), s.provider.finalTimeoutMs ?? finalTimeoutMs);
     try {
       await s.provider.stop();
     } catch (err) {
@@ -250,7 +252,7 @@ export function createVoiceController(options: VoiceControllerOptions): VoiceCon
     }
     if ((s.phase as Phase) === 'done') return;
     if (s.finals.length > 0) finish(s, s.finals.join(' '), false);
-    else if (!s.partial.trim()) finish(s, '', false);
+    else if (!s.partial.trim() || s.partial === s.provider.placeholderPartial) finish(s, '', false);
     // else: wait for the final or the timeout
   }
 
@@ -290,7 +292,10 @@ export function createVoiceController(options: VoiceControllerOptions): VoiceCon
         ok = false;
       }
       if (providerId !== id) return ok; // superseded by a later call
-      if (ok) emitStatus('idle');
+      if (ok) {
+        emitStatus('idle');
+        void p.prepare?.().catch(() => undefined);
+      }
       else if (id === 'none') emitStatus('idle', 'Speech input is off. Type your transmissions.');
       else emitStatus('unsupported', `${p.label} is not available. Check browser support / server configuration, or pick another provider.`);
       return ok;
@@ -329,6 +334,7 @@ export function createVoiceController(options: VoiceControllerOptions): VoiceCon
     dispose() {
       disposed = true;
       ptt?.destroy();
+      void currentProvider().dispose?.().catch(() => undefined);
       if (session) {
         clearTimer(session);
         session.provider.stop().catch(() => undefined);

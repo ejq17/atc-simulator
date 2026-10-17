@@ -17,7 +17,7 @@
  *            |
  *   4 end   A_S ---H4---R4                           t=-680
  */
-import type { Airport, DataProvenance, LatLon, Runway, RunwayEnd, TaxiEdge, TaxiNode, TaxiNodeKind, Vec2 } from '../types';
+import type { Airport, DataProvenance, InstrumentProcedure, LatLon, NavigationAid, Runway, RunwayEnd, TaxiEdge, TaxiNode, TaxiNodeKind, Vec2 } from '../types';
 import { deg2rad, dist, headingToVec } from '../geo';
 
 const prov: DataProvenance = {
@@ -68,6 +68,54 @@ function makeRunway(id: string, a: RunwayEnd, b: RunwayEnd, widthM = 45.72): Run
 }
 
 export const FIXTURE_PARKING_IDS = ['GA1', 'GA2', 'GA3'] as const;
+
+/** Point `dNm` before the threshold of `end` on its extended centreline (negative = past the threshold), `crossNm` to the right of the course. */
+function onFinal(end: RunwayEnd, dNm: number, crossNm = 0): Vec2 {
+  const dir = headingToVec(end.trueHeadingDeg);
+  const right = { x: dir.y, y: -dir.x };
+  return {
+    x: end.threshold.x - dir.x * dNm * 1852 + right.x * crossNm * 1852,
+    y: end.threshold.y - dir.y * dNm * 1852 + right.y * crossNm * 1852,
+  };
+}
+
+/** SYNTHETIC fixes and procedures with the same shape as the real KACY data (IF/IAF -> FAF -> missed approach). Not real. */
+function fixtureNav(r13: RunwayEnd, r31: RunwayEnd, r4: RunwayEnd, r22: RunwayEnd): { navaids: NavigationAid[]; procedures: InstrumentProcedure[] } {
+  const navaids: NavigationAid[] = [];
+  const add = (id: string, pos: Vec2, type: NavigationAid['type'] = 'FIX', name?: string) =>
+    navaids.push({ id, type, name, pos, latLon: toLatLon(pos), provenance: prov, ...(type === 'VOR/DME' ? { frequencyMhz: 115.2 } : {}) });
+  // ILS / LOC 13: feeder VOR -> IF -> FAF; missed approach fix past the airport
+  add('TVO', onFinal(r13, 17.5, 4.3), 'VOR/DME', 'TESTVILLE');
+  add('FX13A', onFinal(r13, 10.66));
+  add('FX13B', onFinal(r13, 4.55));
+  add('FX13M', onFinal(r13, -8.05));
+  add('TARR', onFinal(r13, 24, 8)); // arrival fix NW of the airport
+  // RNAV 22: course offset a few degrees from the runway heading, like the real one
+  add('FX22F', onFinal(r22, 8.36, 7.54));
+  add('FX22A', onFinal(r22, 8.88, 1.55));
+  add('FX22B', onFinal(r22, 5.11, 0.54));
+  add('FX22C', onFinal(r22, 3.08, 0));
+  add('FX22M', onFinal(r22, -9.1, 4.45));
+  // RNAV 4
+  add('FX04F', onFinal(r4, 13, -9.96));
+  add('FX04A', onFinal(r4, 12.99));
+  add('FX04B', onFinal(r4, 5.0));
+  add('FX04C', onFinal(r4, 1.3));
+  // VOR 31
+  add('FX31A', onFinal(r31, 10.13, 1.01));
+  add('FX31B', onFinal(r31, 4.16, 0.4));
+  // en-route VOR southeast
+  add('TSE', { x: 12000, y: -42000 }, 'VOR', 'TEST SEA');
+  const iap = (id: string, name: string, runwayEnd: string, fixes: string[]): InstrumentProcedure => ({ id, name, type: 'IAP', runwayEnd, chartPdfUrl: '', fixes, provenance: prov });
+  const procedures: InstrumentProcedure[] = [
+    iap('FIX-ILS-OR-LOC-RWY-13', 'ILS OR LOC RWY 13', '13', ['TVO', 'FX13A', 'FX13B', 'FX13M']),
+    iap('FIX-RNAV-GPS-RWY-22', 'RNAV (GPS) RWY 22', '22', ['FX22F', 'FX22A', 'FX22B', 'FX22C', 'FX22M']),
+    iap('FIX-RNAV-GPS-RWY-04', 'RNAV (GPS) RWY 04', '4', ['FX04F', 'FX04A', 'FX04B', 'FX04C']),
+    iap('FIX-VOR-RWY-31', 'VOR RWY 31', '31', ['FX31A', 'FX31B']),
+    { id: 'FIX-ATLANTIC-CITY-THREE', name: 'ATLANTIC CITY THREE DEPARTURE', type: 'DP', chartPdfUrl: '', provenance: prov },
+  ];
+  return { navaids, procedures };
+}
 
 export function createTestAirport(): Airport {
   const nodes: Record<string, TaxiNode> = {};
@@ -189,6 +237,7 @@ export function createTestAirport(): Airport {
   const r31 = makeEnd('31', 2048, 0, 298);
   const r4 = makeEnd('4', 0, -700, 28);
   const r22 = makeEnd('22', 0, 1173, 208);
+  const nav = fixtureNav(r13, r31, r4, r22);
 
   return {
     icao: 'KTST',
@@ -215,12 +264,14 @@ export function createTestAirport(): Airport {
     ],
     // FIXTURE-ONLY PLACEHOLDER frequencies. Not real KACY values.
     frequencies: [
+      { id: 'CLNC', name: 'Atlantic City Clearance Delivery', mhz: 127.85, position: 'CLNC', provenance: prov }, // placeholder
       { id: 'GND', name: 'Atlantic City Ground', mhz: 121.9, position: 'GND', provenance: prov }, // placeholder
       { id: 'TWR', name: 'Atlantic City Tower', mhz: 120.3, position: 'TWR', provenance: prov }, // placeholder
       { id: 'APP', name: 'Atlantic City Approach', mhz: 124.6, position: 'APP', provenance: prov }, // placeholder
+      { id: 'DEP', name: 'Atlantic City Departure', mhz: 124.6, position: 'DEP', provenance: prov }, // placeholder (shares the Approach frequency, like KACY)
     ],
-    navaids: [],
-    procedures: [],
+    navaids: nav.navaids,
+    procedures: nav.procedures,
     hotSpots: [],
     airspaceClass: 'D',
     provenance: [prov],

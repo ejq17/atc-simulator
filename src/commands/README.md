@@ -13,7 +13,7 @@ const r = parseTransmission('Spirit four fifty one, runway one three, cleared fo
 
 ## Pipeline
 
-`normalize.ts` -> `callsign.ts` -> `grammar.ts` (rules) -> `assemble.ts` -> `validate.ts` -> `confidence.ts`; orchestrated by `parse.ts`.
+`normalize.ts` -> `callsign.ts` -> `grammar.ts` (rules, built per parse by `buildRules(ctx)` because some need `ctx.fixes`) -> `assemble.ts` -> `validate.ts` -> `confidence.ts`; orchestrated by `parse.ts`.
 
 1. **normalize** lower-cases, strips punctuation, converts spoken numbers
    (`tree fife niner`, `two thousand five hundred`, `one two one point niner`,
@@ -58,11 +58,52 @@ const r = parseTransmission('Spirit four fifty one, runway one three, cleared fo
 | enter left/right downwind/base runway N, make straight in, make left traffic, report [N mile] final/downwind/base | `ENTER_PATTERN` (`patternLeg`, `turnDirection` = side, report forms set `destination: 'REPORT_...'`) |
 | pushback approved | `PUSHBACK` |
 | say again / repeat | `SAY_AGAIN` |
-| squawk, ident, direct, "cleared ... approach", ambiguous `maintain 180` | `UNKNOWN` with an explanatory issue |
+| cleared [for] [the] ILS / I-L-S / localizer / RNAV [GPS] / VOR / visual [approach] [runway] N [approach] | `APPROACH` (`approachType` ILS, LOC, RNAV, VOR, VISUAL; `runwayEnd`, `runwayId`). A bare `runway N` before/after attaches like other runway instructions. Needs approachType + runway |
+| [when able] [proceed\|cleared\|fly] direct [to] <fix> | `DIRECT_FIX` (`fix` = fix id, see Fixes) |
+| resume [your] own nav[igation], proceed on course | `RESUME_OWN_NAVIGATION` |
+| radar contact [N miles <dir> of the field / from <fix>] | `RADAR_CONTACT` (position text consumed and ignored) |
+| cleared to <airport> [via <DP / route>], maintain N, expect N [N minutes after departure], departure [frequency] X, squawk NNNN; "cleared [to X] as filed" | `IFR_CLEARANCE` (`ifr`, see below) |
+| `maintain N until established [on the localizer]`, `until <fix>` | the normal `ALTITUDE`, plus `destination: 'UNTIL_ESTABLISHED'` or `'UNTIL_<FIX>'` (+ `fix`) |
+| standalone squawk, ident, other "cleared ... approach" (NDB, TACAN), ambiguous `maintain 180` | `UNKNOWN` with an explanatory issue |
 | anything else / empty | one `UNKNOWN` with `no recognised instruction` / `empty transmission` |
 
 Runway numbers: `runway four` and `runway zero four` both give end `4`; ids are
 derived from the end (`4/22`, `13/31`). Taxiways: `alpha` -> `A`, `alpha one` -> `A1`.
+
+### IFR clearance (`IFR_CLEARANCE`)
+
+One command per clearance; elements may come in any order and any may be missing (the engine fills
+the rest). Fields in `ParsedCommand.ifr`:
+
+| Field | Spoken |
+|---|---|
+| `destination` | known airport name (Philadelphia/Philly KPHL, Newark KEWR, Kennedy/JFK KJFK, LaGuardia KLGA, Boston/Logan KBOS, Washington National/Reagan KDCA, Dulles KIAD, Baltimore/BWI KBWI, Teterboro KTEB, Charlotte KCLT, Atlanta KATL, Orlando KMCO, Fort Lauderdale KFLL, Myrtle Beach KMYR, Atlantic City KACY), typed `KPHL`, spoken ICAO `kilo papa hotel lima`, or a 3-letter code from that table (`PHL`). Table in `airports.ts`. Unknown name -> issue `unknown destination X`; missing destination -> `missing destination airport` |
+| `routeText` | raw phrase after `via` up to the next element ("Atlantic City Three departure, radar vectors, then as filed"); `as filed` for "cleared to X as filed" |
+| `departureProcedure` | `<name words> <digit> departure` -> `ATLANTIC CITY THREE` |
+| `initialAltitudeFt` | `maintain` / `climb and maintain` N or flight level. `climb via` is not supported (issue) |
+| `expectAltitudeFt` | `expect one zero thousand`, `expect flight level two three zero` (23000); a trailing "N minutes after departure" is consumed and dropped |
+| `departureFrequencyMhz` | `departure frequency 124.6` or `departure 124.6` (108-137 MHz). `contact departure ...` stays a separate `CONTACT_FREQUENCY` |
+| `squawk` | four digits 0-7 as a string (`"4215"`); wrong length or digits 8/9 give an issue and no `squawk` |
+
+Only `destination` is required for confidence. A standalone `squawk` (outside a clearance) is still `UNKNOWN`.
+
+### Fixes (`ParseContext.fixes`)
+
+`fixes?: { id; name?; spoken? }[]` drives `DIRECT_FIX`, `until <fix>` and position text. A phrase of up to
+4 words matches case-insensitively and exactly against `name`, `spoken` or `id` (so "Cedar Lake", "Sea Isle",
+"Atlantic City VOR", spelled letters "sierra india echo"). Otherwise a loose phonetic match applies to `id`
+and `spoken`: Levenshtein distance / length <= 0.34 after a rough phonetic respelling (c->k, y->i, ph->f,
+doubled letters collapsed), so "carol" ~ CARYL, "maybin" ~ MAYBN, "stev" ~ STEVV. Two different fixes at
+equal distance -> `ambiguous fix: A or B` (no `fix`, counts as a conflict). Nothing matches -> the raw
+token goes in `fix` with issue `unknown fix X` (counts as an unknown id). Without `ctx.fixes`, one spoken
+word is accepted as the fix with no validation. Pass `spoken` hints for 5-letter fixes whose pronunciation is
+far from the spelling.
+
+### Numbers and punctuation
+
+A comma/period/semicolon after a raw word now ends a spoken-number run, so "Spirit four fifty one, four miles"
+is `NKS 451`, `4 miles` (typed STT punctuation matters). Before "minutes", `one zero thousand one zero` is split
+into 10000 and 10.
 
 ## Confidence
 
@@ -70,7 +111,8 @@ derived from the end (`4/22`, `13/31`). Taxiways: `alpha` -> `A`, `alpha one` ->
 Fg = coverage ^ 0.75              coverage = fraction of tokens consumed by recognised structure
 Fc = 0.40                         no callsign resolved (missing, ambiguous or score < 0.75)
      0.85 + 0.15*(score-0.75)/0.25  otherwise
-Fe = 0.55 ^ missing required entities (runway, value, hold-short point ...; see requirements.ts)
+Fe = 0.55 ^ missing required entities (runway, value, hold-short point, approachType + runway for APPROACH,
+             fix for DIRECT_FIX, ifr.destination for IFR_CLEARANCE ...; see requirements.ts)
 Fx = 0.60 ^ conflicting entities (two runways, several callsigns, frequency/facility mismatch)
 Fu = 0.85 ^ identifiers invalid or unknown to ctx
 Fn = 0.90 ^ non-standard phraseology ("line up" without "and wait", bare "hold")
@@ -83,9 +125,9 @@ Constants live in `confidence.ts` and `callsign.ts` (`CALLSIGN_ACCEPT`).
 ## Extending
 
 * **New word / alias**: add to `lexicon.ts` (airlines, GA prefixes, STT fixes in `ALIASES`, multi-word `PHRASES`, `FILLERS`).
-* **New instruction**: write a `Rule` (`(tokens, i) => Hit | null`) in a `rules-*.ts` file using `seq`, `skipWords` and `makeDraft`, add it to `RULES` in `grammar.ts` (mind the ordering notes there), add required entities to `requirements.ts` and, if it takes a runway, to `acceptsRunway`/`lacksRunway`/`applyRunway` in `draft.ts`. Add table rows to `transmissions.test.ts`.
+* **New instruction**: write a `Rule` (`(tokens, i) => Hit | null`) in a `rules-*.ts` file using `seq`, `skipWords` and `makeDraft`, add it to `buildRules` in `grammar.ts` (mind the ordering notes there), add required entities to `requirements.ts` and, if it takes a runway, to `acceptsRunway`/`lacksRunway`/`applyRunway` in `draft.ts`. Add table rows to `transmissions.test.ts`.
 * **Airport-specific validation**: pass `taxiways`, `runwayEnds`, `frequencies` in the context; extend `validate.ts` for new id types.
-* Tests: `npm test -- src/commands`. Fixtures are in `testkit.ts`.
+* Tests: `npm test -- src/commands` (`transmissions.test.ts` for tower/ground, `ifr.test.ts` for approach / direct / IFR clearance; fixtures including `FIXES` in `testkit.ts`).
 
 ## Known limits
 

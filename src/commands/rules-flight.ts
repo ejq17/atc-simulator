@@ -1,6 +1,8 @@
-import { applyRunway, cmdHit, makeDraft, type Rule } from './draft';
+import { applyRunway, cmdHit, makeDraft, type Draft, type Rule } from './draft';
 import { runwayAfter } from './entities';
-import { intAt, isOneOf, seq, skipWords, txt } from './match';
+import { makeFixMatcher, type FixMatcher } from './fixes';
+import { intAt, isOneOf, seq, skipWords, txt, type Toks } from './match';
+import { applyFix } from './rules-ifr';
 
 const HEADING_VERBS = ['fly', 'turn', 'maintain', 'continue', 'proceed', 'make', 'depart'];
 
@@ -68,8 +70,28 @@ export const ruleSpeed: Rule = (t, i) => {
 const ALT_VERBS = ['climb', 'descend', 'maintain', 'altitude'];
 const ALT_SKIP = ['and', 'maintain', 'to', 'altitude', 'vfr', 'at', 'or', 'below', 'above', 'immediately', 'expedite'];
 
+const ESTABLISHED_NOISE = ['on', 'the', 'localizer', 'loc', 'final', 'approach', 'course', 'established'];
+
+/**
+ * Condition after an altitude: "until established [on the localizer]" -> destination 'UNTIL_ESTABLISHED';
+ * "until CARYL" -> destination 'UNTIL_CARYL' and fix 'CARYL'. Returns the new end index.
+ */
+function untilCondition(m: FixMatcher, d: Draft, t: Toks, i: number): number {
+  if (txt(t, i) !== 'until') return i;
+  if (txt(t, i + 1) === 'established') {
+    d.fields.destination = 'UNTIL_ESTABLISHED';
+    return skipWords(t, i + 2, ESTABLISHED_NOISE);
+  }
+  const j = skipWords(t, i + 1, ['passing', 'the']);
+  const f = applyFix(d, m, t, j);
+  if (!f.id) return i;
+  d.fields.destination = `UNTIL_${f.id}`;
+  d.fields.fix = f.id;
+  return f.next;
+}
+
 /** "climb and maintain 5000", "maintain VFR at or below 2500", "descend and maintain flight level 180" */
-export const ruleAltitude: Rule = (t, i) => {
+export const makeAltitudeRule = (m: FixMatcher): Rule => (t, i) => {
   const verb = txt(t, i);
   if (!ALT_VERBS.includes(verb)) return null;
   const j = skipWords(t, i + 1, ALT_SKIP);
@@ -92,9 +114,12 @@ export const ruleAltitude: Rule = (t, i) => {
   else {
     d.fields.altitudeFt = ft;
     if (ft % 100 !== 0) d.issues.push(`unusual altitude ${ft}`);
+    return cmdHit(untilCondition(m, d, t, end), d);
   }
   return cmdHit(end, d);
 };
+
+export const ruleAltitude: Rule = makeAltitudeRule(makeFixMatcher());
 
 /** "enter left downwind runway 13", "make straight in runway 13", "report two mile final" */
 export const rulePattern: Rule = (t, i) => {

@@ -13,6 +13,8 @@ export interface Draft {
   conflicts: number;
   /** identifiers that failed hard validation (bad runway number etc.) */
   unknownIds: number;
+  /** IFR clearance: token range of the route phrase, resolved to raw text by parse.ts */
+  routeSpan?: [number, number];
 }
 
 export type Body =
@@ -45,7 +47,7 @@ export function applyRunway(d: Draft, ref: RunwayRef): void {
 
 /** Kinds that take a runway argument, and whether one is still missing. */
 export function acceptsRunway(d: Draft): boolean {
-  return ['TAXI', 'HOLD_SHORT', 'CROSS_RUNWAY', 'LINE_UP_AND_WAIT', 'TAKEOFF', 'LAND', 'ENTER_PATTERN'].includes(d.kind);
+  return ['TAXI', 'HOLD_SHORT', 'CROSS_RUNWAY', 'LINE_UP_AND_WAIT', 'TAKEOFF', 'LAND', 'ENTER_PATTERN', 'APPROACH'].includes(d.kind);
 }
 
 export function lacksRunway(d: Draft): boolean {

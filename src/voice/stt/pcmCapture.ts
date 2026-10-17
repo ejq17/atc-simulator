@@ -80,18 +80,72 @@ export interface PcmCapture {
 
 type AudioContextCtor = new (opts?: AudioContextOptions) => AudioContext;
 
-export async function startPcmCapture(stream: MediaStream, onChunk: (pcm: ArrayBuffer) => void): Promise<PcmCapture> {
+/**
+ * An AudioContext that is already running with the capture worklet registered, but with NO microphone attached.
+ * Creating a context and compiling the worklet takes ~0.5 s, and anything spoken in that window is lost (measured with
+ * Chrome's fake microphone: the first ~0.5 s of the clip vanished). A provider can build this once (it never touches
+ * the microphone, so it is privacy-neutral) and hand it to every startPcmCapture call; the caller owns its lifetime.
+ */
+export interface WarmAudio {
+  readonly ctx: AudioContext;
+  /** False when AudioWorklet is unavailable and startPcmCapture will use the ScriptProcessor fallback. */
+  readonly workletReady: boolean;
+  close(): Promise<void>;
+}
+
+function audioContextCtor(): AudioContextCtor {
   const g = globalThis as unknown as { AudioContext?: AudioContextCtor; webkitAudioContext?: AudioContextCtor };
   const Ctor = g.AudioContext ?? g.webkitAudioContext;
   if (!Ctor) throw new Error('Web Audio is not available in this browser.');
+  return Ctor;
+}
 
+/**
+ * resume() on a context created without a user gesture can stay pending for a long time; never block capture on it.
+ * Real key presses are gestures, so the context is normally running by the time audio is needed.
+ */
+function resumeQuietly(ctx: AudioContext): Promise<void> {
+  if (ctx.state !== 'suspended') return Promise.resolve();
+  return Promise.race([ctx.resume().catch(() => undefined), new Promise<void>((r) => setTimeout(r, 300))]);
+}
+
+async function registerWorklet(ctx: AudioContext): Promise<boolean> {
+  if (!(ctx.audioWorklet && typeof AudioWorkletNode !== 'undefined' && typeof URL.createObjectURL === 'function')) return false;
+  try {
+    const url = URL.createObjectURL(new Blob([WORKLET_SOURCE], { type: 'application/javascript' }));
+    try {
+      await ctx.audioWorklet.addModule(url);
+    } finally {
+      URL.revokeObjectURL(url);
+    }
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export async function warmUpAudio(): Promise<WarmAudio> {
+  const Ctor = audioContextCtor();
   let ctx: AudioContext;
   try {
     ctx = new Ctor({ sampleRate: TARGET_SAMPLE_RATE });
   } catch {
     ctx = new Ctor();
   }
-  if (ctx.state === 'suspended') await ctx.resume().catch(() => undefined);
+  void resumeQuietly(ctx);
+  const workletReady = await registerWorklet(ctx);
+  return { ctx, workletReady, close: () => ctx.close().catch(() => undefined) };
+}
+
+export async function startPcmCapture(
+  stream: MediaStream,
+  onChunk: (pcm: ArrayBuffer) => void,
+  warm?: WarmAudio,
+): Promise<PcmCapture> {
+  const usable = warm && warm.ctx.state !== 'closed' ? warm : undefined;
+  const w = usable ?? (await warmUpAudio());
+  const ctx = w.ctx;
+  await resumeQuietly(ctx);
 
   const resampler = createResampler(ctx.sampleRate);
   const emit = (f: Float32Array) => {
@@ -108,32 +162,18 @@ export async function startPcmCapture(stream: MediaStream, onChunk: (pcm: ArrayB
   sink.connect(ctx.destination);
 
   let teardown: () => Promise<void>;
-
-  let workletOk = false;
-  if (ctx.audioWorklet && typeof AudioWorkletNode !== 'undefined' && typeof URL.createObjectURL === 'function') {
-    try {
-      const url = URL.createObjectURL(new Blob([WORKLET_SOURCE], { type: 'application/javascript' }));
-      try {
-        await ctx.audioWorklet.addModule(url);
-      } finally {
-        URL.revokeObjectURL(url);
-      }
-      const node = new AudioWorkletNode(ctx, 'pcm-capture');
-      node.port.onmessage = (e: MessageEvent<Float32Array>) => emit(e.data);
-      source.connect(node);
-      node.connect(sink);
-      teardown = async () => {
-        node.port.postMessage({ flush: true });
-        await new Promise((r) => setTimeout(r, 40));
-        node.port.onmessage = null;
-        node.disconnect();
-      };
-      workletOk = true;
-    } catch {
-      workletOk = false;
-    }
-  }
-  if (!workletOk) {
+  if (w.workletReady) {
+    const node = new AudioWorkletNode(ctx, 'pcm-capture');
+    node.port.onmessage = (e: MessageEvent<Float32Array>) => emit(e.data);
+    source.connect(node);
+    node.connect(sink);
+    teardown = async () => {
+      node.port.postMessage({ flush: true });
+      await new Promise((r) => setTimeout(r, 40));
+      node.port.onmessage = null;
+      node.disconnect();
+    };
+  } else {
     // Deprecated but universally available fallback.
     const proc = ctx.createScriptProcessor(4096, 1, 1);
     proc.onaudioprocess = (e) => emit(new Float32Array(e.inputBuffer.getChannelData(0)));
@@ -152,7 +192,7 @@ export async function startPcmCapture(stream: MediaStream, onChunk: (pcm: ArrayB
       source.disconnect();
       sink.disconnect();
       stream.getTracks().forEach((t) => t.stop());
-      await ctx.close().catch(() => undefined);
+      if (!usable) await w.close(); // a caller-supplied warm context stays open for the next press
     },
   };
 }

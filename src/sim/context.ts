@@ -3,7 +3,7 @@
  * bookkeeping lives in per-aircraft `AircraftRuntime` records here so determinism and the public
  * type surface are unaffected.
  */
-import type { Aircraft, AircraftPerformance, Clearance, ClearanceKind, ConflictAlert, FlightPhase, SimEvent, SimulationState } from './types';
+import type { Aircraft, AircraftPerformance, ApproachType, Clearance, ClearanceKind, ConflictAlert, FlightPhase, SimEvent, SimulationState } from './types';
 import type { EngineOptions } from './api';
 import type { Rng } from './rng';
 import { getPerformance } from './performance';
@@ -13,10 +13,24 @@ export const EVENT_CAP = 2000;
 
 export interface ReadbackErrorRecord {
   sinceSec: number;
-  kind: 'TAKEOFF' | 'LAND' | 'LINE_UP_AND_WAIT' | 'TAXI' | 'TAXI_TO_PARKING' | 'CROSS_RUNWAY' | 'HEADING';
+  kind: 'TAKEOFF' | 'LAND' | 'LINE_UP_AND_WAIT' | 'TAXI' | 'TAXI_TO_PARKING' | 'CROSS_RUNWAY' | 'HEADING' | 'APPROACH';
   clearanceId: string;
   correct: string;
   spoken: string;
+}
+
+/** An instrument / visual approach the aircraft has been cleared for (engine-private; see approach.ts). */
+export interface ApproachRuntime {
+  type: ApproachType;
+  runwayEnd: string;
+  procedureId?: string;
+  /** Straight-in segment fixes (farthest first). Next fix in this list => glidepath logic applies. */
+  onCourse: string[];
+  /** Distance before the threshold (m) of the outermost on-course fix: the glidepath is flown from here inward. */
+  ifDM?: number;
+  /** Vector-intercept clearance: keep the assigned heading until the course is captured. */
+  pendingCapture: boolean;
+  clearedAtSec: number;
 }
 
 export interface AircraftRuntime {
@@ -57,6 +71,18 @@ export interface AircraftRuntime {
   checkInAtSec?: number;
   /** Time the aircraft stopped on the ground at ARRIVED (for despawn). */
   arrivedAtSec?: number;
+  /** Active approach clearance (IFR approaches and visual approaches). */
+  approach?: ApproachRuntime;
+  /** Nav mode to return to on RESUME_OWN_NAVIGATION after vectors. */
+  navBeforeVectors?: 'route' | 'direct';
+  /** IFR departure: when to tune Ground and ask for taxi after the clearance was read back. */
+  taxiRequestAtSec?: number;
+  /** Arrival spawned at a fix: its first call is the approach check-in (replaces the 'inbound' call). */
+  approachCheckIn?: boolean;
+  /** Identifiers (upper case) of fixes already sequenced; RESUME_OWN_NAVIGATION restarts at the first filed fix not in this set. */
+  passedFixes: Set<string>;
+  /** An altitude / direct / resume instruction was issued after the handoff (IFR departure counts as handled). */
+  depInstructed: boolean;
 }
 
 export interface SimContext {
@@ -91,6 +117,8 @@ export function newRuntime(firstCallAtSec: number): AircraftRuntime {
     enteredRunways: new Set(),
     decisionDone: false,
     handedOff: false,
+    depInstructed: false,
+    passedFixes: new Set(),
   };
 }
 

@@ -27,8 +27,13 @@ import { assessClearanceSafety, recordUnsafeClearance } from './conflicts';
 import { frequencyById, frequencyByMhz, frequencyForPosition, hearsFrequency, formatMhz } from '../radio/frequencies';
 import { buildReadback, buildSayAgain, buildUnable } from '../radio/readback';
 import { SPEED_LIMIT_BELOW_10K_KT } from './performance';
+import { findNavFix, indexOfFix } from './navigation';
+import { assessApproach } from './approach';
+import { buildIfrClearance } from './ifr';
 
 const DUPLICATE_WINDOW_SEC = 5;
+/** IFR departures tune Ground and ask for taxi this long after reading back their clearance. */
+export const IFR_TAXI_REQUEST_DELAY_SEC = 15;
 const TAKEOFF_NEAR_HOLD_M = 100;
 const CROSS_APPROACH_M = 600;
 
@@ -40,6 +45,8 @@ interface Reject {
 interface Plan {
   patch: Partial<Clearance>;
   commit: (clr: Clearance) => void;
+  /** The instruction is flyable but improper (non-training modes accept it): scored as a communication error, not as a correct clearance. */
+  flag?: string;
 }
 type PlanResult = { plan: Plan } | { reject: Reject };
 
@@ -195,6 +202,10 @@ export function executeCommand(
     ...result.plan.patch,
   };
   result.plan.commit(clr);
+  const flagged = result.plan.flag;
+  if (flagged) {
+    emitEvent(ctx, { kind: 'INFO', aircraftId: ac.id, callsign: ac.callsign, text: `Improper instruction accepted: ${flagged}`, severity: 'warning', speaker: 'SYSTEM', data: { improper: true, kind: cmd.kind } });
+  }
   ac.clearances.push(clr);
   ac.activeClearanceId = clr.id;
   const waitSec = ac.pendingRequest ? now - ac.pendingRequest.sinceSec : undefined;
@@ -206,7 +217,8 @@ export function executeCommand(
   }
 
   const rb = buildReadback(ac, clr, { airport, rng: ctx.rng, errorRate: ctx.readbackErrorRate });
-  pilotSay(ctx, ac, rb.text, { readback: true, clearanceId: clr.id });
+  if (rb.text) pilotSay(ctx, ac, rb.text, { readback: true, clearanceId: clr.id });
+  else ac.radioState = rt.readbackError ? 'WAITING_FOR_READBACK' : 'IDLE'; // informational instruction: no readback
   if (rb.error) {
     rt.readbackError = { sinceSec: now, kind: cmd.kind as ReadbackErrorRecord['kind'], clearanceId: clr.id, correct: rb.error.correct, spoken: rb.error.spoken };
     ac.flags.readbackErrorPending = true;
@@ -219,7 +231,7 @@ export function executeCommand(
   emitEvent(ctx, {
     kind: 'COMMAND_ACCEPTED', aircraftId: ac.id, callsign: ac.callsign, severity: assessment.safe ? 'info' : 'critical', speaker: 'SYSTEM',
     text: `${ac.callsign}: ${describeClearance(clr)}${assessment.safe ? '' : ' (UNSAFE)'}`,
-    data: { kind: clr.kind, clearanceId: clr.id, scored: assessment.safe, unsafe: !assessment.safe, waitSec },
+    data: { kind: clr.kind, clearanceId: clr.id, scored: assessment.safe && !flagged, unsafe: !assessment.safe, waitSec, ...(flagged ? { commError: true } : {}) },
   });
   return { status: 'accepted', clearance: clr, readback: rb.text };
 }
@@ -229,7 +241,7 @@ export function executeCommand(
 // ---------------------------------------------------------------------------
 
 function normalizeCommand(airport: Airport, ac: Aircraft, cmd: ParsedCommand, mayInfer: boolean): { cmd: ParsedCommand; g?: RunwayEndGeom } {
-  const needsEnd = cmd.kind === 'TAKEOFF' || cmd.kind === 'LAND' || cmd.kind === 'LINE_UP_AND_WAIT' || cmd.kind === 'ENTER_PATTERN';
+  const needsEnd = cmd.kind === 'TAKEOFF' || cmd.kind === 'LAND' || cmd.kind === 'LINE_UP_AND_WAIT' || cmd.kind === 'ENTER_PATTERN' || cmd.kind === 'APPROACH';
   const n: ParsedCommand = { ...cmd };
   let g: RunwayEndGeom | undefined;
   if (needsEnd) {
@@ -259,6 +271,13 @@ function missingEntities(cmd: ParsedCommand, g?: RunwayEndGeom): string[] {
     case 'ENTER_PATTERN':
       if (!g) m.push('runway');
       break;
+    case 'APPROACH':
+      if (!cmd.approachType) m.push('approach type');
+      if (!g) m.push('runway');
+      break;
+    case 'DIRECT_FIX':
+      if (!cmd.fix) m.push('fix');
+      break;
     case 'CROSS_RUNWAY':
       if (!cmd.crossRunwayId && !cmd.runwayId && !cmd.runwayEnd) m.push('runway to cross');
       break;
@@ -287,6 +306,7 @@ function commandKey(ac: Aircraft, c: ParsedCommand): string {
   return [
     ac.id, c.kind, c.runwayEnd ?? '', c.runwayId ?? '', (c.route ?? []).join('>'), (c.holdShort ?? []).join(','), c.crossRunwayId ?? '',
     c.destination ?? '', c.headingDeg ?? '', c.turnDirection ?? '', c.altitudeFt ?? '', c.speedKt ?? '', c.frequencyMhz ?? '', c.frequencyId ?? '', c.patternLeg ?? '',
+    c.approachType ?? '', c.fix ?? '', c.ifr ? JSON.stringify(c.ifr) : '',
   ].join('|');
 }
 
@@ -296,6 +316,8 @@ function sameParams(clr: Clearance, cmd: ParsedCommand, g?: RunwayEndGeom): bool
     case 'LAND':
     case 'LINE_UP_AND_WAIT':
       return !!g && clr.runwayEnd === g.end.id;
+    case 'APPROACH':
+      return !!g && clr.runwayEnd === g.end.id && clr.approachType === cmd.approachType;
     case 'HEADING':
       return clr.headingDeg !== undefined && cmd.headingDeg !== undefined && Math.abs(clr.headingDeg - cmd.headingDeg) < 0.5 && (cmd.turnDirection ?? undefined) === (clr.turnDirection ?? undefined);
     case 'CROSS_RUNWAY': {
@@ -322,6 +344,9 @@ function describeClearance(c: Clearance): string {
   if (c.altitudeFt !== undefined) bits.push(`${c.altitudeFt} ft`);
   if (c.speedKt !== undefined) bits.push(`${c.speedKt} kt`);
   if (c.frequencyMhz !== undefined) bits.push(`${c.frequencyMhz}`);
+  if (c.approachType) bits.push(`${c.approachType} approach`);
+  if (c.fix) bits.push(`direct ${c.fix}`);
+  if (c.ifr) bits.push(`to ${c.ifr.destination}${c.ifr.departureProcedure ? ` via ${c.ifr.departureProcedure}` : ''} sq ${c.ifr.squawk}`);
   return bits.join(' ');
 }
 
@@ -609,6 +634,13 @@ function planTakeoff(env: Env): PlanResult {
   const { ac, rt, ctx, now } = env;
   const g = env.g!;
   if (!ac.onGround) return unable(env, `${ac.callsign} is airborne.`, "we're airborne");
+  // IFR departures need their clearance first: refused in training, otherwise accepted and flagged as a communication error.
+  let flag: string | undefined;
+  if (ac.flightPlan?.flightRules === 'IFR' && !ac.flightPlan.ifrClearance) {
+    const msg = `no IFR clearance on file for ${ac.callsign}; issue the IFR clearance (Clearance Delivery) before takeoff.`;
+    if (ctx.state.scenario.mode === 'training') return unable(env, msg, "we don't have our IFR clearance yet");
+    flag = msg;
+  }
   if (ac.phase === 'LINE_UP_AND_WAIT') {
     if (ac.assignedRunwayEnd !== g.end.id) {
       return unable(env, `${ac.callsign} is lined up on runway ${ac.assignedRunwayEnd}, not ${g.end.id}.`, `we're lined up on runway ${ac.assignedRunwayEnd}`);
@@ -619,6 +651,7 @@ function planTakeoff(env: Env): PlanResult {
     return {
       plan: {
         patch: { runwayEnd: g.end.id, runwayId: g.runway.id },
+        flag,
         commit: () => {
           rt.takeoffCleared = true;
           rt.rollAtSec = now + 2.5;
@@ -637,6 +670,7 @@ function planTakeoff(env: Env): PlanResult {
   return {
     plan: {
       patch: { runwayEnd: g.end.id, runwayId: g.runway.id },
+      flag,
       commit: () => {
         applyRunwayEntry(env, g, entry.hold, entry.entry, entry.nodeIds);
         rt.takeoffCleared = true;
@@ -682,8 +716,12 @@ function planLand(env: Env): PlanResult {
           rt.pattern = undefined;
         }
         rt.landingEnd = g.end.id;
-        rt.navMode = 'AUTO';
-        ac.target.headingDeg = undefined;
+        if (!rt.approach) {
+          // Not on a cleared approach: the aircraft proceeds to the runway on its own (a route, if any, is dropped).
+          rt.navMode = 'AUTO';
+          ac.target.headingDeg = undefined;
+          ac.nav = undefined;
+        }
         if (!ac.runwayAuthorizations.includes(g.runway.id)) ac.runwayAuthorizations.push(g.runway.id);
         if (ac.phase === 'GO_AROUND') setPhase(ctx, ac, 'APPROACH', 'cleared to land');
         else if (ac.phase === 'PATTERN' && !rt.pattern) rt.pattern = undefined;
@@ -710,8 +748,11 @@ function planContinueApproach(env: Env): PlanResult {
     plan: {
       patch: {},
       commit: () => {
-        rt.navMode = 'AUTO';
-        ac.target.headingDeg = undefined;
+        if (!rt.approach) {
+          rt.navMode = 'AUTO';
+          ac.target.headingDeg = undefined;
+          ac.nav = undefined;
+        }
         if (ac.phase === 'GO_AROUND') setPhase(ctx, ac, 'APPROACH', 'continue approach');
       },
     },
@@ -731,6 +772,19 @@ function leaveFinalIfNeeded(env: Env): void {
   }
 }
 
+/** A heading assignment suspends the route (kept for DIRECT_FIX / RESUME_OWN_NAVIGATION) and cancels an approach clearance. */
+function enterVectors(env: Env): void {
+  const { ac, rt, ctx } = env;
+  if (rt.approach) {
+    rt.approach = undefined;
+    completeClearances(ctx, ac, ['APPROACH']);
+  }
+  if (ac.nav && ac.nav.mode !== 'vectors') {
+    rt.navBeforeVectors = ac.nav.mode === 'direct' ? 'direct' : 'route';
+    ac.nav.mode = 'vectors';
+  }
+}
+
 function planHeading(env: Env): PlanResult {
   const { ac, rt, cmd, airport } = env;
   if (ac.onGround) return unable(env, `${ac.callsign} is on the ground; headings apply to airborne aircraft.`, "we're on the ground");
@@ -742,6 +796,7 @@ function planHeading(env: Env): PlanResult {
       patch: { headingDeg: h, turnDirection: cmd.turnDirection },
       commit: () => {
         leaveFinalIfNeeded(env);
+        enterVectors(env);
         ac.target.headingDeg = magneticToTrue(h, airport.magneticVariationDeg);
         rt.navMode = 'HEADING';
         rt.turnDirection = cmd.turnDirection;
@@ -760,7 +815,15 @@ function planAltitude(env: Env): PlanResult {
   const perf = perfOf(ac);
   if (alt > perf.serviceCeilingFt) return unable(env, `${alt} ft is above the ${ac.type} service ceiling (${perf.serviceCeilingFt} ft).`, 'we cannot reach that altitude');
   if (alt < airport.elevationFt + 300) return unable(env, `${alt} ft is too close to the field elevation (${airport.elevationFt} ft).`, 'that altitude is too low');
-  return { plan: { patch: { altitudeFt: alt }, commit: () => { ac.target.altitudeFt = alt; } } };
+  return {
+    plan: {
+      patch: { altitudeFt: alt },
+      commit: () => {
+        ac.target.altitudeFt = alt;
+        if (ac.isDeparture && env.rt.handedOff) env.rt.depInstructed = true;
+      },
+    },
+  };
 }
 
 function planSpeed(env: Env): PlanResult {
@@ -792,7 +855,7 @@ function planContact(env: Env): PlanResult {
   if (mhz === undefined) return unable(env, `Unknown frequency "${id}".`, 'say again the frequency', false);
   const known = frequencyByMhz(airport, mhz);
   if (!known && !(mhz >= 118 && mhz <= 137)) return unable(env, `${mhz} is not a valid VHF voice frequency.`, 'say again the frequency', false);
-  id = known?.id ?? id;
+  id = byId?.id ?? known?.id ?? id; // positions can share a frequency (APP/DEP): keep the one the controller named
   if (hearsFrequency(ac, mhz)) return unable(env, `${ac.callsign} is already on ${formatMhz(mhz)}.`, "we're already on that frequency", false);
   const finalMhz = mhz;
   const finalId = id;
@@ -823,6 +886,8 @@ function planPattern(env: Env): PlanResult {
         rt.navMode = 'AUTO';
         ac.target.headingDeg = undefined;
         ac.target.altitudeFt = undefined;
+        ac.nav = undefined;
+        rt.approach = undefined;
         if (leg === 'straight_in') {
           rt.pattern = undefined;
           if (ac.phase === 'GO_AROUND') setPhase(ctx, ac, 'APPROACH');
@@ -845,7 +910,195 @@ function planPushback(env: Env): PlanResult {
   return { plan: { patch: {}, commit: () => { if (ac.phase === 'PARKED') setPhase(ctx, ac, 'READY', 'pushback'); } } };
 }
 
+// ---------------------------------------------------------------------------
+// IFR: clearance delivery, radar contact, routing, approaches
+// ---------------------------------------------------------------------------
+
+function planIfrClearance(env: Env): PlanResult {
+  const { ac, rt, cmd, ctx, now } = env;
+  const fp = ac.flightPlan;
+  if (!fp || fp.flightRules !== 'IFR') return unable(env, `${ac.callsign} has no IFR flight plan on file.`, "we're VFR, we have no IFR flight plan");
+  if (!ac.onGround || (ac.phase !== 'PARKED' && ac.phase !== 'READY')) {
+    return unable(env, `${ac.callsign} (${ac.phase}) is not parked; an IFR clearance is issued before taxi.`, "we're already moving");
+  }
+  if (fp.ifrClearance) return unable(env, `${ac.callsign} already has its IFR clearance.`, 'we already have our clearance', false);
+  if (ac.pendingRequest?.kind !== 'IFR_CLEARANCE') return unable(env, `${ac.callsign} has not requested an IFR clearance.`, "we haven't called for our clearance");
+  const built = buildIfrClearance(ctx, ac, cmd.ifr);
+  if (!built.ok) return unable(env, built.reason, built.pilot);
+  const ifr = built.ifr;
+  return {
+    plan: {
+      patch: { ifr },
+      commit: () => {
+        ac.flightPlan = {
+          ...fp,
+          departureProcedure: ifr.departureProcedure,
+          squawk: ifr.squawk,
+          ifrClearance: { ...ifr, readBack: true, issuedAtSec: now },
+        };
+        ac.squawk = ifr.squawk;
+        // The pilot copies the clearance, then tunes Ground and asks for taxi about 15 s later.
+        rt.taxiRequestAtSec = now + IFR_TAXI_REQUEST_DELAY_SEC;
+      },
+    },
+  };
+}
+
+function planRadarContact(env: Env): PlanResult {
+  const { ac, ctx } = env;
+  if (ac.onGround) return unable(env, `${ac.callsign} is on the ground; radar contact applies to airborne aircraft.`, "we're on the ground");
+  return {
+    plan: {
+      patch: {},
+      commit: () => {
+        ac.radarIdentified = true;
+        emitEvent(ctx, { kind: 'INFO', aircraftId: ac.id, callsign: ac.callsign, severity: 'info', speaker: 'SYSTEM', text: `Radar contact: ${ac.callsign}${ac.squawk ? ` (squawk ${ac.squawk})` : ''}`, data: { radarContact: true } });
+      },
+    },
+  };
+}
+
+const ROUTE_PHASES = ['INBOUND', 'APPROACH', 'INITIAL_CLIMB', 'DEPARTURE', 'GO_AROUND'];
+
+/** After a missed approach, a route instruction re-sequences the aircraft for another approach. */
+function rejoinFromGoAround(env: Env, note: string): void {
+  if (env.ac.phase === 'GO_AROUND') setPhase(env.ctx, env.ac, 'APPROACH', note);
+}
+
+function planDirectFix(env: Env): PlanResult {
+  const { ac, rt, cmd, airport, ctx } = env;
+  if (ac.onGround) return unable(env, `${ac.callsign} is on the ground.`, "we're on the ground");
+  if (!ROUTE_PHASES.includes(ac.phase)) {
+    return unable(env, `${ac.callsign} (${ac.phase}) cannot navigate direct to a fix now.`, ac.phase === 'FINAL' || ac.phase === 'LANDING' ? "we're established on the approach" : 'we cannot proceed direct now');
+  }
+  const navFix = findNavFix(airport, cmd.fix);
+  if (!navFix) return unable(env, `Unknown fix "${cmd.fix}" at ${airport.icao}.`, "we don't have that fix");
+  const known = ac.nav?.fixes ?? ac.flightPlan?.route ?? [];
+  const k = indexOfFix(airport, known, navFix.id);
+  const onApproach = !!rt.approach && ac.nav?.mode === 'approach' && indexOfFix(airport, ac.nav.fixes, navFix.id) >= 0;
+  return {
+    plan: {
+      patch: { fix: navFix.id },
+      commit: () => {
+        if (rt.approach && !onApproach) {
+          rt.approach = undefined; // leaving the published procedure cancels the approach clearance
+          completeClearances(ctx, ac, ['APPROACH']);
+        }
+        if (onApproach) ac.nav = { fixes: ac.nav!.fixes, index: indexOfFix(airport, ac.nav!.fixes, navFix.id), mode: 'approach' };
+        else ac.nav = k >= 0 ? { fixes: [...known], index: k, mode: 'direct' } : { fixes: [navFix.id], index: 0, mode: 'direct' };
+        rt.navMode = 'AUTO';
+        rt.turnDirection = undefined;
+        ac.target.headingDeg = undefined;
+        rt.navBeforeVectors = undefined;
+        rejoinFromGoAround(env, `direct ${navFix.id}`);
+        if (ac.isDeparture && rt.handedOff) rt.depInstructed = true;
+      },
+    },
+  };
+}
+
+function planResumeNav(env: Env): PlanResult {
+  const { ac, rt, airport } = env;
+  if (ac.onGround) return unable(env, `${ac.callsign} is on the ground.`, "we're on the ground");
+  if (!ROUTE_PHASES.includes(ac.phase)) return unable(env, `${ac.callsign} (${ac.phase}) cannot resume own navigation now.`, 'we cannot resume own navigation now');
+  if (ac.nav?.mode === 'approach') return unable(env, `${ac.callsign} is already flying the approach route.`, "we're already flying the approach", false);
+  let fixes: string[];
+  let index: number;
+  let mode: 'route' | 'direct';
+  if (ac.nav?.mode === 'vectors') {
+    // Back to what was being flown before the vectors.
+    fixes = ac.nav.fixes;
+    index = ac.nav.index;
+    mode = rt.navBeforeVectors ?? 'route';
+  } else {
+    fixes = ac.flightPlan?.route ?? ac.nav?.fixes ?? [];
+    index = fixes.findIndex((f) => !rt.passedFixes.has((findNavFix(airport, f)?.id ?? f).toUpperCase()));
+    if (index < 0) index = fixes.length;
+    mode = 'route';
+  }
+  if (!fixes.length) return unable(env, `${ac.callsign} has no route to resume.`, "we don't have a route to resume");
+  if (index >= fixes.length) return unable(env, `${ac.callsign} has flown its whole route; there is nothing to resume.`, "we've completed our route");
+  return {
+    plan: {
+      patch: {},
+      commit: () => {
+        ac.nav = { fixes: [...fixes], index, mode };
+        rt.navMode = 'AUTO';
+        rt.turnDirection = undefined;
+        ac.target.headingDeg = undefined;
+        rt.navBeforeVectors = undefined;
+        rejoinFromGoAround(env, 'resume own navigation');
+        if (ac.isDeparture && rt.handedOff) rt.depInstructed = true;
+      },
+    },
+  };
+}
+
+function planApproach(env: Env): PlanResult {
+  const { ac, rt, cmd, ctx } = env;
+  const g = env.g!;
+  const type = cmd.approachType!;
+  if (ac.onGround) return unable(env, `${ac.callsign} is on the ground.`, "we're on the ground");
+  if (ac.phase === 'LANDING') return unable(env, `${ac.callsign} is already landing.`, "we're already landing", false);
+  if ((ac.phase === 'FINAL') && ac.assignedRunwayEnd && ac.assignedRunwayEnd !== g.end.id) {
+    return unable(env, `${ac.callsign} is established on final for runway ${ac.assignedRunwayEnd}.`, `we're established on final for runway ${ac.assignedRunwayEnd}`, false);
+  }
+  if (!['INBOUND', 'APPROACH', 'FINAL', 'GO_AROUND', 'PATTERN', 'HOLDING'].includes(ac.phase) || (ac.isDeparture && ac.phase !== 'GO_AROUND')) {
+    return unable(env, `${ac.callsign} (${ac.phase}) is not inbound for an approach.`, "we're not inbound for an approach");
+  }
+  const autoNav = rt.navMode === 'AUTO' && !ac.nav && ac.phase !== 'GO_AROUND';
+  const a = assessApproach(ctx.state, ac, type, g, { autoNav });
+  if (a.kind === 'hard') return unable(env, a.reason, a.pilot);
+  let flag: string | undefined;
+  if (a.geometry) {
+    if (ctx.state.scenario.mode === 'training') return unable(env, a.geometry.reason, a.geometry.pilot);
+    flag = a.geometry.reason;
+  }
+  const plan = a.plan;
+  const established = ac.phase === 'FINAL';
+  return {
+    plan: {
+      patch: { runwayEnd: g.end.id, runwayId: g.runway.id, approachType: type },
+      flag,
+      commit: () => {
+        completeClearances(ctx, ac, ['APPROACH']);
+        rt.approach = {
+          type, runwayEnd: g.end.id, procedureId: plan.procedureId, onCourse: plan.onCourse, ifDM: plan.ifDM,
+          pendingCapture: !established && plan.mode === 'intercept', clearedAtSec: env.now,
+        };
+        if (ac.flightPlan) ac.flightPlan = { ...ac.flightPlan, arrivalApproach: { type, runwayEnd: g.end.id, procedureId: plan.procedureId } };
+        if (ac.assignedRunwayEnd !== g.end.id) {
+          ac.assignedRunwayEnd = g.end.id;
+          rt.decisionDone = false;
+          rt.pattern = undefined;
+        }
+        if (ac.phase === 'GO_AROUND') setPhase(ctx, ac, 'APPROACH', `cleared ${type} approach`);
+        if (established) return;
+        if (plan.mode === 'route') {
+          ac.nav = { fixes: [...plan.fixes], index: 0, mode: 'approach' };
+          rt.navMode = 'AUTO';
+          rt.turnDirection = undefined;
+          ac.target.headingDeg = undefined;
+        } else if (plan.mode === 'intercept') {
+          ac.target.headingDeg = ac.target.headingDeg ?? ac.headingDeg;
+          rt.navMode = 'HEADING';
+        } else {
+          ac.nav = undefined;
+          rt.navMode = 'AUTO';
+          ac.target.headingDeg = undefined;
+        }
+        rt.navBeforeVectors = undefined;
+      },
+    },
+  };
+}
+
 const PLANNERS: Partial<Record<ClearanceKind, (env: Env) => PlanResult>> = {
+  IFR_CLEARANCE: planIfrClearance,
+  APPROACH: planApproach,
+  DIRECT_FIX: planDirectFix,
+  RESUME_OWN_NAVIGATION: planResumeNav,
+  RADAR_CONTACT: planRadarContact,
   TAXI: planTaxi,
   TAXI_TO_PARKING: planTaxi,
   HOLD_POSITION: planHoldPosition,

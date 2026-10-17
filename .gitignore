@@ -28,3 +28,4 @@ dist-ssr
 data/sources/raw/
 test-results/
 playwright-report/
+.cache/

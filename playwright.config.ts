@@ -1,4 +1,13 @@
+import path from 'node:path';
 import { defineConfig, devices } from '@playwright/test';
+
+/**
+ * Chrome's fake microphone streams ONE wav file per browser launch (the flag is a launch argument), so
+ * e2e/voice.spec.ts launches a fresh persistent browser per clip with the same flags (see e2e/fixtures/voiceBrowser.ts).
+ * This project-level list is the default (the takeoff clip) and documents the flags.
+ */
+export const FAKE_MIC_DEFAULT_WAV = path.resolve(import.meta.dirname, 'e2e/fixtures/takeoff-n723ej.wav');
+
 
 /**
  * E2E runs against the real dev server and the real local backend (live weather + chart proxy).
@@ -21,7 +30,27 @@ export default defineConfig({
     trace: 'retain-on-failure',
     viewport: { width: 1440, height: 900 },
   },
-  projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'], viewport: { width: 1440, height: 900 } } }],
+  projects: [
+    { name: 'chromium', use: { ...devices['Desktop Chrome'], viewport: { width: 1440, height: 900 } } },
+    {
+      name: 'chromium-fake-mic',
+      testMatch: 'voice.spec.ts',
+      timeout: 300_000, // first run downloads the ~40 MB Whisper model
+      use: {
+        ...devices['Desktop Chrome'],
+        viewport: { width: 1440, height: 900 },
+        permissions: ['microphone'],
+        launchOptions: {
+          args: [
+            '--use-fake-device-for-media-stream',
+            '--use-fake-ui-for-media-stream',
+            `--use-file-for-fake-audio-capture=${FAKE_MIC_DEFAULT_WAV}%noloop`,
+            '--autoplay-policy=no-user-gesture-required',
+          ],
+        },
+      },
+    },
+  ],
   webServer: [
     {
       command: 'npm run dev',

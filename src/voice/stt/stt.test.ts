@@ -243,6 +243,20 @@ describe('web speech provider', () => {
     expect(errors.map(sttErrorCode)).toEqual(['no_speech']);
   });
 
+  it('does not hang when the browser exposes SpeechRecognition but never starts it (headless Chromium)', async () => {
+    class SilentRec extends FakeRec {
+      aborted = false;
+      override start() { /* never fires onstart or onerror */ }
+      override abort() { this.aborted = true; }
+    }
+    const provider = createWebSpeechProvider({ ctor: SilentRec as never, startTimeoutMs: 20 });
+    const err = await provider.start({ onPartial() {}, onFinal() {}, onError() {} }).catch((e: unknown) => e);
+    expect(sttErrorCode(err)).toBe('unsupported');
+    expect((err as Error).message).toMatch(/did not start/);
+    expect((SilentRec.last as SilentRec).aborted).toBe(true);
+    await provider.stop(); // no session left: must be a harmless no-op
+  });
+
   it('reports unsupported without an implementation', async () => {
     const provider = createWebSpeechProvider({ ctor: undefined });
     // jsdom has no SpeechRecognition either

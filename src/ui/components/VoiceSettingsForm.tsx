@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
-import { STT_PROVIDER_NOTES, VOICE_PRIVACY_NOTES, TRANSCRIPT_STORAGE_KEY, createWebSpeechProvider } from '../../voice';
-import type { SttProviderId } from '../../voice';
+import { STT_PROVIDER_NOTES, VOICE_PRIVACY_NOTES, TRANSCRIPT_STORAGE_KEY, createWebSpeechProvider, getLocalWhisperProvider } from '../../voice';
+import type { SttProviderId, WhisperProgress } from '../../voice';
 import { voiceSettings, useVoiceSettings } from '../store/voiceSettings';
 import { keyLabel } from '../lib/voiceStatus';
 import { Btn, Field, Kbd, SELECT, Toggle } from './ui';
@@ -17,6 +17,10 @@ function useProviderAvailability(id: SttProviderId): { checking: boolean; availa
           const ok = await createWebSpeechProvider().isAvailable();
           return !cancelled && setState({ checking: false, available: ok, detail: ok ? 'Speech recognition is available in this browser.' : 'This browser has no Web Speech recognition (use Chrome or Edge, or Deepgram).' });
         }
+        if (id === 'whisper-local') {
+          const ok = await getLocalWhisperProvider().isAvailable();
+          return !cancelled && setState({ checking: false, available: ok, detail: ok ? 'Runs on this device (WebAssembly). Prepare the model once below; your voice never leaves this computer.' : 'This browser lacks WebAssembly or microphone support.' });
+        }
         const res = await fetch('/api/voice/deepgram-token', { headers: { Accept: 'application/json' } });
         const body = (await res.json().catch(() => ({}))) as { configured?: boolean };
         if (cancelled) return;
@@ -29,6 +33,25 @@ function useProviderAvailability(id: SttProviderId): { checking: boolean; availa
     return () => { cancelled = true; };
   }, [id]);
   return state;
+}
+
+function LocalModelControls() {
+  const provider = getLocalWhisperProvider();
+  const [p, setP] = useState<WhisperProgress>(provider.getProgress());
+  useEffect(() => provider.onProgress(setP), [provider]);
+  const busy = p.phase === 'downloading' || p.phase === 'loading';
+  return (
+    <div className="flex flex-col gap-1.5 border border-atc-border px-2 py-1.5" data-testid="whisper-model">
+      <div className="flex items-center gap-2">
+        <Btn size="xs" onClick={() => { void provider.warmUp().catch(() => undefined); }} disabled={busy || p.phase === 'ready'} data-testid="whisper-warmup">
+          {p.phase === 'ready' ? 'Local model ready' : busy ? 'Preparing…' : 'Download / prepare local model'}
+        </Btn>
+        <span className="text-atc-muted" data-testid="whisper-phase" data-phase={p.phase}>{p.phase}</span>
+      </div>
+      {busy && <progress className="h-1.5 w-full" max={100} value={p.percent} aria-label="Local model download progress" />}
+      <span className={p.phase === 'error' ? 'text-atc-amber' : 'text-atc-muted'} data-testid="whisper-message" role="status">{p.message}</span>
+    </div>
+  );
 }
 
 export function VoiceSettingsForm({ compact = false }: { compact?: boolean }) {
@@ -65,6 +88,7 @@ export function VoiceSettingsForm({ compact = false }: { compact?: boolean }) {
         <div className={`border px-2 py-1.5 leading-snug ${avail.available === false ? 'border-atc-amber/60 text-atc-amber' : 'border-atc-border text-atc-muted'}`}>
           {avail.checking ? 'Checking availability…' : avail.detail}
         </div>
+        {s.providerId === 'whisper-local' && <LocalModelControls />}
         <div className="border border-atc-border bg-atc-bg px-2 py-1.5 leading-snug text-atc-muted">
           <b className="text-atc-text">Where your audio goes: </b>{note.audioGoesTo} <span className="text-atc-muted">Cost: {note.cost}</span>
         </div>

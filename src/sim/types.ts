@@ -209,7 +209,39 @@ export type FlightPhase = DeparturePhase | ArrivalPhase | 'GO_AROUND' | 'PATTERN
 export type ClearanceKind =
   | 'TAXI' | 'HOLD_POSITION' | 'HOLD_SHORT' | 'CROSS_RUNWAY' | 'LINE_UP_AND_WAIT'
   | 'TAKEOFF' | 'LAND' | 'GO_AROUND' | 'CONTINUE_APPROACH' | 'CONTACT_FREQUENCY'
-  | 'HEADING' | 'ALTITUDE' | 'SPEED' | 'ENTER_PATTERN' | 'PUSHBACK' | 'TAXI_TO_PARKING';
+  | 'HEADING' | 'ALTITUDE' | 'SPEED' | 'ENTER_PATTERN' | 'PUSHBACK' | 'TAXI_TO_PARKING'
+  // IFR operations (Clearance Delivery / Approach / Departure positions)
+  | 'IFR_CLEARANCE'        // "cleared to <dest> via <DP/route>, maintain <alt>, expect <alt>, departure <freq>, squawk <code>"
+  | 'APPROACH'             // "cleared ILS/RNAV/VOR/visual runway <end> approach"
+  | 'DIRECT_FIX'           // "proceed direct <fix>"
+  | 'RESUME_OWN_NAVIGATION'// "resume own navigation" after vectors
+  | 'RADAR_CONTACT';       // "radar contact" (informational; marks the aircraft as identified)
+
+export type ApproachType = 'ILS' | 'LOC' | 'RNAV' | 'VOR' | 'VISUAL';
+
+/** IFR clearance elements (Clearance Delivery). */
+export interface IfrClearanceDetails {
+  destination: string;             // ICAO, e.g. "KPHL"
+  routeText: string;               // e.g. "ATLANTIC CITY THREE departure, radar vectors, then as filed"
+  departureProcedure?: string;     // "ATLANTIC CITY THREE"
+  initialAltitudeFt: number;       // "maintain 2000" (ATLANTIC CITY THREE: 2000)
+  expectAltitudeFt?: number;       // "expect <cruise> ten minutes after departure"
+  departureFrequencyMhz: number;   // from airport.frequencies (DEP / APP)
+  squawk: string;                  // 4-digit octal transponder code
+}
+
+export interface FlightPlan {
+  flightRules: FlightRules;
+  origin: string;
+  destination: string;
+  cruiseAltitudeFt: number;
+  /** Named fixes the aircraft will fly, in order (verified fixes from the airport dataset or the exit fix). */
+  route: string[];
+  departureProcedure?: string;
+  arrivalApproach?: { type: ApproachType; runwayEnd: string; procedureId?: string };
+  squawk?: string;
+  ifrClearance?: IfrClearanceDetails & { readBack: boolean; issuedAtSec: number };
+}
 
 export interface Clearance {
   id: string;
@@ -228,6 +260,10 @@ export interface Clearance {
   frequencyMhz?: number;
   frequencyId?: string;
   patternLeg?: 'left_downwind' | 'right_downwind' | 'straight_in' | 'base';
+  /** IFR / radar fields. */
+  approachType?: ApproachType;
+  fix?: string;                    // DIRECT_FIX target
+  ifr?: IfrClearanceDetails;       // IFR_CLEARANCE
   /** Set when the engine finished executing the clearance. */
   completedAtSec?: number;
 }
@@ -235,7 +271,7 @@ export interface Clearance {
 export type RadioState = 'IDLE' | 'RECEIVING' | 'TRANSMITTING' | 'WAITING_FOR_READBACK';
 
 export interface PendingRequest {
-  kind: 'TAXI' | 'DEPARTURE' | 'LANDING' | 'FREQUENCY_CHANGE' | 'CROSSING' | 'PATTERN' | 'OTHER';
+  kind: 'TAXI' | 'DEPARTURE' | 'LANDING' | 'FREQUENCY_CHANGE' | 'CROSSING' | 'PATTERN' | 'IFR_CLEARANCE' | 'APPROACH' | 'OTHER';
   text: string;
   sinceSec: number;
 }
@@ -274,6 +310,13 @@ export interface Aircraft {
   route?: GroundRoute;
   /** Current targets the autopilot/pilot is flying toward. */
   target: { headingDeg?: number; altitudeFt?: number; speedKt?: number };
+  /** IFR flight plan and lateral navigation state (airborne routing over named fixes). */
+  flightPlan?: FlightPlan;
+  /** Active lateral navigation: flying toward `fixes[index]`; undefined while on vectors/heading. */
+  nav?: { fixes: string[]; index: number; mode: 'route' | 'direct' | 'approach' | 'vectors' };
+  /** Transponder code and radar identification state. */
+  squawk?: string;
+  radarIdentified?: boolean;
   radioState: RadioState;
   pendingRequest?: PendingRequest;
   /** Ids of runways the aircraft currently occupies (polygon test). */
@@ -311,6 +354,9 @@ export interface ParsedCommand {
   frequencyMhz?: number;
   frequencyId?: string;
   patternLeg?: Clearance['patternLeg'];
+  approachType?: ApproachType;
+  fix?: string;
+  ifr?: Partial<IfrClearanceDetails>;
   /** 0..1, calibrated from grammar match quality and entity resolution. */
   confidence: number;
   rawText: string;
@@ -414,10 +460,13 @@ export interface ScenarioAircraftSpawn {
   start:
     | { kind: 'parked'; parkingId: string }
     | { kind: 'holding_short'; nodeId: string; runwayEnd: string }
-    | { kind: 'airborne'; pos: Vec2; altitudeFt: number; headingDeg: number; speedKt: number; runwayEnd?: string; distanceNm?: number };
+    | { kind: 'airborne'; pos: Vec2; altitudeFt: number; headingDeg: number; speedKt: number; runwayEnd?: string; distanceNm?: number }
+    | { kind: 'at_fix'; fix: string; altitudeFt: number; speedKt: number; route: string[]; runwayEnd?: string };
   isDeparture: boolean;
   initialFrequencyId: string;
   initialRequest?: PendingRequest['kind'];
+  /** IFR flight plan (destination, cruise, requested route). Departures without one are VFR. */
+  flightPlan?: Omit<FlightPlan, 'ifrClearance'>;
 }
 
 export interface Scenario {

@@ -1,0 +1,172 @@
+/**
+ * Voice end-to-end: proves the microphone path works and that an aircraft can be controlled by speech alone,
+ * with no cloud key. Chrome's fake audio device plays a pre-recorded WAV (e2e/fixtures/*.wav, made by
+ * scripts/make-voice-fixtures.sh with macOS `say`) into getUserMedia; the on-device Whisper model
+ * (provider 'whisper-local') transcribes it; the real parser + engine act on the transcript.
+ *
+ * Run:  npx playwright test --project=chromium-fake-mic
+ * The first run downloads the ~40 MB model from huggingface.co (and the ONNX runtime from jsdelivr) into the
+ * persistent profile at .cache/playwright-profile; later runs reuse it.
+ */
+import { expect, test } from '@playwright/test';
+import type { Page } from '@playwright/test';
+import { CLIPS, launchVoiceBrowser } from './fixtures/voiceBrowser';
+import type { ClipName, VoiceBrowser } from './fixtures/voiceBrowser';
+import { startScenario, TAKEOFF_READBACK } from './helpers';
+
+test.describe.configure({ mode: 'serial' });
+test.beforeEach(({}, testInfo) => {
+  test.skip(testInfo.project.name !== 'chromium-fake-mic', 'needs the fake-microphone browser launch args');
+});
+
+const LOCAL_LABEL = 'Local Whisper (on-device, no cloud)';
+let vb: VoiceBrowser | null = null;
+test.afterEach(async () => {
+  await vb?.close().catch(() => undefined);
+  vb = null;
+});
+
+/** Seed voice settings once per profile (not on every reload) with TTS and radio effects off. */
+async function seedSettings(page: Page, providerId?: string) {
+  await page.addInitScript((pid) => {
+    const key = 'kacy.voice.settings';
+    if (pid || !localStorage.getItem(key)) {
+      const base = pid ? { providerId: pid } : {};
+      localStorage.setItem(key, JSON.stringify({ ...base, ttsEnabled: false, radioEffectsEnabled: false }));
+    }
+  }, providerId);
+}
+
+async function open(clip: ClipName, providerId?: string) {
+  vb = await launchVoiceBrowser(clip);
+  const errors: string[] = [];
+  vb.page.on('pageerror', (e) => errors.push(String(e)));
+  if (process.env.VOICE_DEBUG) {
+    vb.page.on('console', (m) => console.log('[page]', m.type(), m.text().slice(0, 200)));
+    vb.page.on('framenavigated', (f) => console.log('[nav]', f.url()));
+  }
+  await seedSettings(vb.page, providerId);
+  return { page: vb.page, errors };
+}
+
+/** Hold the PTT key while the fake mic plays the clip, then release; returns wall ms from release to the final text. */
+async function speak(page: Page, clip: ClipName, expectInPartial: RegExp) {
+  await page.locator('body').click({ position: { x: 2, y: 2 } }); // make sure no input has focus
+  await page.keyboard.down('Space');
+  await expect(page.getByTestId('mic-badge')).toHaveText('TRANSMITTING');
+  await page.waitForTimeout(CLIPS[clip].seconds * 1000 + 1000); // %noloop: silence after the clip, so over-holding is safe
+  await page.keyboard.up('Space');
+  const releasedAt = Date.now();
+  await expect(page.getByTestId('mic-badge')).toHaveText('TRANSCRIBING');
+  await expect(page.getByTestId('partial')).toHaveText(/\S/);
+  await expect(page.getByTestId('partial')).toHaveText(expectInPartial, { timeout: 120_000 });
+  const transcribeMs = Date.now() - releasedAt;
+  const heard = (await page.getByTestId('partial').textContent())?.trim() ?? '';
+  test.info().annotations.push({ type: 'transcript', description: `${clip}: "${heard}" (${transcribeMs} ms after key release)` });
+  console.log(`[voice] ${clip}: heard "${heard}" -- ${transcribeMs} ms from key release to transcript`);
+  return { heard, transcribeMs };
+}
+
+test('Settings: select Local Whisper and download/prepare the on-device model', async () => {
+  test.setTimeout(240_000);
+  const { page, errors } = await open('takeoff');
+  await page.goto('/');
+  await expect(page.getByTestId('setup-screen')).toBeVisible();
+
+  await page.getByLabel('Recognition provider').selectOption({ label: LOCAL_LABEL });
+  const panel = page.getByTestId('whisper-model');
+  await expect(panel).toBeVisible();
+  await expect(page.getByText('Your microphone audio stays in this browser tab')).toBeVisible();
+
+  const t0 = Date.now();
+  const warm = page.getByTestId('whisper-warmup');
+  if (await warm.isEnabled()) await warm.click();
+  await expect(page.getByTestId('whisper-phase')).toHaveAttribute('data-phase', 'ready', { timeout: 120_000 });
+  const ms = Date.now() - t0;
+  console.log(`[voice] model ready in ${ms} ms: ${await page.getByTestId('whisper-message').textContent()}`);
+  await expect(page.getByTestId('whisper-warmup')).toHaveText('Local model ready');
+  expect(errors).toEqual([]);
+});
+
+test('hold SPACE while the fake mic says the takeoff clearance: transcript, readback, aircraft departs', async () => {
+  const { page, errors } = await open('takeoff', 'whisper-local');
+  await startScenario(page);
+  await page.getByTestId('speed-4').click();
+  const strip = page.getByTestId('strip-N723EJ');
+  await expect(strip.getByTestId('phase')).toHaveAttribute('data-phase', 'HOLDING_SHORT', { timeout: 20_000 });
+  await expect(page.getByTestId('mic-badge')).toHaveText('READY');
+
+  const { heard } = await speak(page, 'takeoff', /cleared for takeoff/i);
+  expect(heard).toMatch(/723/);
+
+  const log = page.getByTestId('comms-log');
+  await expect(log.getByTestId('log-atc').filter({ hasText: /cleared for takeoff/i })).toHaveCount(1);
+  await expect(log.getByTestId('log-pilot').filter({ hasText: TAKEOFF_READBACK })).toHaveCount(1);
+  await expect(page.getByTestId('last-result')).toContainText('Issued');
+  console.log('[voice] takeoff last-result:', await page.getByTestId('last-result').textContent());
+
+  // 60 s of sim time at 4x = 15 s of wall time.
+  await expect(strip.getByTestId('phase')).toHaveAttribute('data-phase', /^(TAKEOFF_ROLL|INITIAL_CLIMB|DEPARTURE)$/, { timeout: 25_000 });
+  expect(errors).toEqual([]);
+});
+
+test('hold SPACE while the fake mic says "hold position": same pipeline, second phrase', async () => {
+  const { page, errors } = await open('hold', 'whisper-local');
+  await startScenario(page);
+  await page.getByTestId('speed-4').click();
+  const strip = page.getByTestId('strip-N723EJ');
+  await expect(strip.getByTestId('phase')).toHaveAttribute('data-phase', 'HOLDING_SHORT', { timeout: 20_000 });
+
+  await speak(page, 'hold', /hold position/i);
+
+  const log = page.getByTestId('comms-log');
+  await expect(log.getByTestId('log-atc').filter({ hasText: /hold position/i })).toHaveCount(1);
+  console.log('[voice] comms log after "hold position":', JSON.stringify((await log.innerText()).split('\n').filter(Boolean)), 'last-result:', await page.getByTestId('last-result').textContent());
+  // The engine accepts "hold position" (a legal instruction for an aircraft holding short) and the pilot reads it back.
+  await expect(log.getByTestId('log-pilot').filter({ hasText: 'Holding position, Cessna seven two three echo juliet' })).toHaveCount(1);
+  await expect(page.getByTestId('last-result')).toContainText('Issued: hold position N723EJ');
+  // Holding short stays holding short.
+  await expect(strip.getByTestId('phase')).toHaveAttribute('data-phase', 'HOLDING_SHORT');
+  expect(errors).toEqual([]);
+});
+
+test('a clearance for an aircraft that is not on frequency is transcribed but not acted on', async () => {
+  const { page, errors } = await open('land', 'whisper-local');
+  await startScenario(page);
+  await page.getByTestId('speed-4').click();
+  await expect(page.getByTestId('strip-N723EJ').getByTestId('phase')).toHaveAttribute('data-phase', 'HOLDING_SHORT', { timeout: 20_000 });
+
+  await speak(page, 'land', /(spirit|451).*(clear|land)/i);
+
+  await expect(page.getByTestId('last-result')).toContainText(/Clarification|Rejected/);
+  await expect(page.getByTestId('strip-N723EJ').getByTestId('phase')).toHaveAttribute('data-phase', 'HOLDING_SHORT');
+  expect(errors).toEqual([]);
+});
+
+test('Web Speech provider degrades gracefully in headless Chromium (no crash, clear status, typed input still works)', async () => {
+  const { page, errors } = await open('takeoff', 'webspeech');
+  await startScenario(page);
+  await page.getByTestId('speed-4').click();
+  await expect(page.getByTestId('strip-N723EJ').getByTestId('phase')).toHaveAttribute('data-phase', 'HOLDING_SHORT', { timeout: 20_000 });
+
+  const badge = page.getByTestId('mic-badge');
+  // Either the engine is missing ("UNAVAILABLE") or present and ready; both are acceptable, a crash is not.
+  await expect(badge).toHaveText(/^(READY|UNAVAILABLE|ERROR|MIC BLOCKED)$/);
+
+  await page.locator('body').click({ position: { x: 2, y: 2 } });
+  await page.keyboard.down('Space');
+  await page.waitForTimeout(1500);
+  await page.keyboard.up('Space');
+  // Settles in a defined state: no stuck TRANSMITTING/TRANSCRIBING, an explanatory status line, app still alive.
+  await expect(badge).toHaveText(/^(READY|UNAVAILABLE|ERROR|MIC BLOCKED)$/, { timeout: 15_000 });
+  const status = (await page.getByTestId('mic-status').textContent())?.trim() ?? '';
+  expect(status.length).toBeGreaterThan(0);
+  console.log(`[voice] webspeech in headless chromium: badge=${await badge.textContent()} status="${status}"`);
+  await expect(page.getByTestId('sim-screen')).toBeVisible();
+
+  const input = page.getByTestId('command-input');
+  await input.fill('Cessna seven two three echo juliet, hold position');
+  await input.press('Enter');
+  await expect(page.getByTestId('comms-log').getByTestId('log-atc').filter({ hasText: /hold position/i })).toHaveCount(1);
+  expect(errors).toEqual([]);
+});

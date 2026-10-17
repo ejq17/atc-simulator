@@ -4,12 +4,12 @@ import { resolveCallsign, type AircraftRef, type CallsignResolution } from './ca
 import { commandConfidence } from './confidence';
 import type { ParseContext } from './context';
 import { makeDraft } from './draft';
-import { scan } from './grammar';
+import { buildRules, scan } from './grammar';
 import { GA_PREFIXES } from './lexicon';
 import { normalize } from './normalize';
 import { numberWordClass } from './numbers';
 import { missingRequired } from './requirements';
-import type { NormalizedText, Token } from './tokens';
+import { rawSlice, type NormalizedText, type Token } from './tokens';
 import { validateFields } from './validate';
 
 /** Spoken airline names found in the active aircraft ("Foo twelve" for FOO12) -> ICAO prefix. */
@@ -54,7 +54,7 @@ export function parse(text: string, ctx: ParseContext): ParseResult {
   const norm: NormalizedText = normalize(text, { extraAirlines: deriveAirlines(ctx.aircraft) });
   const cs = resolveCallsign(norm.tokens, ctx.aircraft);
   const { toks, masked } = maskCallsign(norm.tokens, cs);
-  const { drafts, consumed } = assemble(scan(toks), toks.length, masked);
+  const { drafts, consumed } = assemble(scan(toks, buildRules(ctx)), toks.length, masked);
   const coverage = toks.length === 0 ? 0 : consumed.filter(Boolean).length / toks.length;
 
   const leftovers = new Map<PlacedDraft, string[]>();
@@ -74,6 +74,10 @@ export function parse(text: string, ctx: ParseContext): ParseResult {
 
   const commands: ParsedCommand[] = placed.map((p) => {
     const d = p.draft;
+    if (d.routeSpan && d.fields.ifr) {
+      const route = rawSlice(norm, d.routeSpan[0], d.routeSpan[1]).replace(/[\s,.;]+$/, '').trim();
+      if (route) d.fields.ifr.routeText = route;
+    }
     const val = validateFields(d.fields, ctx);
     const missing = d.kind === 'UNKNOWN' ? [] : missingRequired(d);
     const confidence = commandConfidence({

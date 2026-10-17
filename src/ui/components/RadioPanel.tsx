@@ -97,7 +97,7 @@ export function RadioPanel() {
 
   const resultTone = last?.summary === 'accepted' ? 'text-atc-green' : last?.summary === 'rejected' ? 'text-atc-red' : last?.summary === 'clarify' ? 'text-atc-amber' : 'text-atc-muted';
 
-  const providerShort = settings.providerId === 'none' ? 'Voice off' : settings.providerId === 'deepgram' ? 'Deepgram' : 'Browser speech';
+  const providerShort = settings.providerId === 'none' ? 'Voice off' : settings.providerId === 'deepgram' ? 'Deepgram' : settings.providerId === 'whisper-local' ? 'Local Whisper' : 'Browser speech';
 
   return (
     <Panel

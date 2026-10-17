@@ -6,9 +6,11 @@ import type { Aircraft, Airport, Clearance, ParkingPosition } from '../sim/types
 import { airportCallName, facilityCallName, frequencyById, frequencyByMhz, positionWord } from './frequencies';
 import {
   capitalize, digitsSpoken, numberWords, phonetic, spokenAltitude, spokenFrequency, spokenFrequencyDecimal,
-  spokenHeading, spokenRunway, spokenSpeed, spokenTaxiway, spokenText,
+  spokenAirportName, spokenHeading, spokenRunway, spokenSpeed, spokenTaxiway, spokenText, titleCase,
 } from './spoken';
 import { cardinal } from '../sim/geo';
+import { findNavFix } from '../sim/navigation';
+import type { ApproachType } from '../sim/types';
 
 export interface ReadbackEnv {
   airport: Airport;
@@ -174,13 +176,49 @@ export function buildReadback(aircraft: Aircraft, c: Clearance, env: ReadbackEnv
       }
       case 'PUSHBACK':
         return 'Pushing back';
+      case 'IFR_CLEARANCE':
+        return ifrClearanceReadback(c);
+      case 'APPROACH': {
+        const rwy = runwaySpoken(c.runwayEnd ?? c.runwayId ?? '');
+        return c.approachType === 'VISUAL' ? `Cleared visual approach runway ${rwy}` : `Cleared ${approachWord(c.approachType)} runway ${rwy} approach`;
+      }
+      case 'DIRECT_FIX':
+        return `Direct ${spokenFix(env.airport, c.fix ?? '')}`;
+      case 'RESUME_OWN_NAVIGATION':
+        return 'Resuming own navigation';
+      case 'RADAR_CONTACT':
+        return ''; // informational: the pilot does not read it back
       default:
         return 'Roger';
     }
   })();
-  const result: ReadbackResult = { text: `${body}, ${cs}` };
+  const result: ReadbackResult = { text: body === '' ? '' : `${body}, ${cs}` };
   if (error) result.error = error;
   return result;
+}
+
+/** "ILS", "localizer", "RNAV", "VOR" as spoken in an approach clearance. */
+export function approachWord(type: ApproachType | undefined): string {
+  return type === 'LOC' ? 'localizer' : type === 'VISUAL' ? 'visual' : (type ?? 'ILS');
+}
+
+/** Navaid name when the airport data has one ("Cedar Lake"), else the identifier as written ("CARYL"). */
+export function spokenFix(airport: Airport, fix: string): string {
+  const n = findNavFix(airport, fix);
+  return n?.name ? titleCase(n.name) : (n?.id ?? fix);
+}
+
+/** "Cleared to Philadelphia, Atlantic City Three departure, radar vectors, maintain two thousand, expect one zero thousand ten minutes after departure, departure one two four point six, squawk four two one five" (callsign appended by the caller). */
+function ifrClearanceReadback(c: Clearance): string {
+  const i = c.ifr;
+  if (!i) return 'Roger';
+  const parts = [`Cleared to ${spokenAirportName(i.destination)}`];
+  parts.push(i.departureProcedure ? `${titleCase(i.departureProcedure)} departure, radar vectors` : 'as filed');
+  parts.push(`maintain ${spokenAltitude(i.initialAltitudeFt)}`);
+  if (i.expectAltitudeFt) parts.push(`expect ${spokenAltitude(i.expectAltitudeFt)} ten minutes after departure`);
+  parts.push(`departure ${spokenFrequency(i.departureFrequencyMhz)}`);
+  parts.push(`squawk ${digitsSpoken(i.squawk)}`);
+  return parts.join(', ');
 }
 
 /** "Unable, <reason>, <callsign>" */
@@ -197,7 +235,7 @@ export function buildSayAgain(aircraft: Aircraft): string {
 // ---------------------------------------------------------------------------
 
 function facility(aircraft: Aircraft, env: ReadbackEnv): string {
-  return facilityCallName(env.airport, aircraft.frequencyMhz);
+  return facilityCallName(env.airport, aircraft.frequencyMhz, aircraft.frequencyId);
 }
 
 export function readyToTaxiCall(aircraft: Aircraft, env: ReadbackEnv, parking?: ParkingPosition): string {
@@ -232,8 +270,9 @@ export function goingAroundCall(aircraft: Aircraft, env: ReadbackEnv, runwayEnd:
   return `${facility(aircraft, env)}, ${aircraft.spokenCallsign}, going around runway ${runwayRef(runwayEnd)}${reason ? `, ${reason}` : ''}.`;
 }
 
-export function goAroundEstablishedCall(aircraft: Aircraft, env: ReadbackEnv, altitudeFt: number): string {
-  return `${facility(aircraft, env)}, ${aircraft.spokenCallsign}, runway heading, level ${spokenAltitude(altitudeFt)}, request another approach.`;
+export function goAroundEstablishedCall(aircraft: Aircraft, env: ReadbackEnv, altitudeFt: number, o: { vectors?: boolean } = {}): string {
+  const ask = o.vectors ? 'request vectors for another approach' : 'request another approach';
+  return `${facility(aircraft, env)}, ${aircraft.spokenCallsign}, runway heading, level ${spokenAltitude(altitudeFt)}, ${ask}.`;
 }
 
 export function clearOfRunwayCall(aircraft: Aircraft, env: ReadbackEnv, runwayRef_: string, taxiway?: string): string {
@@ -254,6 +293,44 @@ export function checkInCall(aircraft: Aircraft, env: ReadbackEnv, o: { taxiway?:
   }
   const alt = spokenAltitude(Math.round(aircraft.altitudeFt / 100) * 100);
   return `${f}, ${aircraft.spokenCallsign}, passing ${alt}.`;
+}
+
+// --- IFR calls ---------------------------------------------------------------
+
+/** Clearance Delivery request: "Atlantic City Clearance, Spirit four fifty one, IFR to Philadelphia, with information bravo, ready to copy." */
+export function ifrClearanceRequestCall(aircraft: Aircraft, env: ReadbackEnv, o: { destination: string; atisLetter?: string }): string {
+  const info = o.atisLetter ? `, with information ${phonetic(o.atisLetter)}` : '';
+  return `${facility(aircraft, env)}, ${aircraft.spokenCallsign}, IFR to ${spokenAirportName(o.destination)}${info}, ready to copy.`;
+}
+
+/** First call of an arrival that enters the area at a fix: "Atlantic City Approach, Spirit four fifty one, five thousand, information bravo." */
+export function approachCheckInCall(aircraft: Aircraft, env: ReadbackEnv, o: { altitudeFt: number; atisLetter?: string }): string {
+  const info = o.atisLetter ? `, information ${phonetic(o.atisLetter)}` : '';
+  return `${facility(aircraft, env)}, ${aircraft.spokenCallsign}, ${spokenAltitude(Math.round(o.altitudeFt / 100) * 100)}${info}.`;
+}
+
+/** IFR departure checking in with Departure: "Atlantic City Departure, Spirit four fifty one, one thousand two hundred climbing two thousand." */
+export function departureCheckInCall(aircraft: Aircraft, env: ReadbackEnv, o: { targetAltitudeFt?: number } = {}): string {
+  const alt = spokenAltitude(Math.round(aircraft.altitudeFt / 100) * 100);
+  const climbing = o.targetAltitudeFt !== undefined && o.targetAltitudeFt > aircraft.altitudeFt + 100;
+  return `${facility(aircraft, env)}, ${aircraft.spokenCallsign}, ${alt}${climbing ? ` climbing ${spokenAltitude(o.targetAltitudeFt!)}` : ''}.`;
+}
+
+/** Established on the approach course while still on the Approach frequency (asks for the tower). */
+export function establishedCall(aircraft: Aircraft, env: ReadbackEnv, o: { type?: ApproachType; runwayEnd: string }): string {
+  const what = o.type === 'VISUAL' ? 'on the visual approach' : `${approachWord(o.type)}`;
+  return `${facility(aircraft, env)}, ${aircraft.spokenCallsign}, established ${what} runway ${runwayRef(o.runwayEnd)}.`;
+}
+
+/** Arrival checking in with Tower after the Approach handoff. */
+export function arrivalTowerCheckInCall(aircraft: Aircraft, env: ReadbackEnv, o: { distanceNm: number; runwayEnd: string }): string {
+  const n = Math.min(99, Math.max(1, Math.round(o.distanceNm)));
+  return `${facility(aircraft, env)}, ${aircraft.spokenCallsign}, ${numberWords(n)} mile final runway ${runwayRef(o.runwayEnd)}, full stop.`;
+}
+
+/** Arrival checking in with Approach after a missed approach / go-around. */
+export function missedApproachCheckInCall(aircraft: Aircraft, env: ReadbackEnv): string {
+  return `${facility(aircraft, env)}, ${aircraft.spokenCallsign}, missed approach, ${spokenAltitude(Math.round(aircraft.altitudeFt / 100) * 100)}.`;
 }
 
 export function stoppedOnRunwayCall(aircraft: Aircraft, env: ReadbackEnv, runwayId: string): string {

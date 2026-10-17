@@ -32,6 +32,15 @@ export const STT_PROVIDER_NOTES: Record<SttProviderId, SttProviderNote> = {
       'While you hold push-to-talk, your microphone audio is streamed directly from your browser to Deepgram (api.deepgram.com) over an encrypted WebSocket. Your API key never reaches the browser; the local server hands out a short-lived token. Deepgram bills per audio minute streamed.',
     cost: 'Pay as you go, billed by Deepgram per streamed minute (see src/voice/README.md).',
   },
+  'whisper-local': {
+    id: 'whisper-local',
+    label: 'Local Whisper (on-device, no cloud)',
+    summary:
+      'Runs OpenAI Whisper (tiny English model) inside your browser. No account, API key or internet needed after a one-time model download (about 40 MB). Transcribes when you release the key, so there is a short pause; first use is slower while the model loads.',
+    audioGoesTo:
+      'Nowhere. Your microphone audio stays in this browser tab: it is buffered in memory while you hold push-to-talk, transcribed on your own computer and then discarded. Only the model files are downloaded (from huggingface.co, once); no audio is uploaded.',
+    cost: 'Free (uses your CPU/GPU; about 40 MB of storage for the cached model).',
+  },
   none: {
     id: 'none',
     label: 'Off (typed commands only)',

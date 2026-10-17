@@ -1,4 +1,4 @@
-import type { Aircraft, ClearanceKind, CommandKind, GameMode, ParsedCommand, Scenario, ScenarioAircraftSpawn } from '../types';
+import type { Aircraft, ClearanceKind, CommandKind, CommandOutcome, ControllerPositionId, GameMode, ParsedCommand, Scenario, ScenarioAircraftSpawn } from '../types';
 import type { SimulationEngine } from '../api';
 import { createEngine } from '../engine';
 import type { EngineOptionsExt } from '../engine';
@@ -69,3 +69,40 @@ export const ARRIVING = (callsign: string, runwayEnd: string, distanceNm: number
 });
 
 export type { ClearanceKind };
+
+/** IFR arrival entering the area over `fix`, flying `route` (fixture fixes: TARR -> FX13A -> FX13B for ILS 13). */
+export const AT_FIX = (
+  callsign: string, fix: string, route: string[], runwayEnd = '13', over: Partial<ScenarioAircraftSpawn> = {},
+  alt = 5000, speed = 210,
+): ScenarioAircraftSpawn => ({
+  atSec: 0, callsign, type: 'A320', flightRules: 'IFR', isDeparture: false, initialFrequencyId: 'APP',
+  start: { kind: 'at_fix', fix, altitudeFt: alt, speedKt: speed, route, runwayEnd }, ...over,
+});
+
+/** IFR departure parked at a gate, on Clearance Delivery, filed to KPHL via `route`. */
+export const IFR_DEPARTURE = (callsign = 'NKS451', parkingId = 'GATE-1', route: string[] = ['TVO'], over: Partial<ScenarioAircraftSpawn> = {}): ScenarioAircraftSpawn => ({
+  atSec: 0, callsign, type: 'A320', flightRules: 'IFR', start: { kind: 'parked', parkingId }, isDeparture: true, initialFrequencyId: 'CLNC',
+  flightPlan: { flightRules: 'IFR', origin: 'KTST', destination: 'KPHL', cruiseAltitudeFt: 10000, route },
+  ...over,
+});
+
+/** IFR departure already holding short of `nodeId` (skips the ground phase), with its IFR clearance already issued. */
+export const IFR_HOLDING = (callsign: string, nodeId: string, runwayEnd: string, route: string[] = ['TVO'], freq = 'TWR'): ScenarioAircraftSpawn => ({
+  atSec: 0, callsign, type: 'A320', flightRules: 'IFR', start: { kind: 'holding_short', nodeId, runwayEnd }, isDeparture: true, initialFrequencyId: freq,
+  flightPlan: { flightRules: 'IFR', origin: 'KTST', destination: 'KPHL', cruiseAltitudeFt: 10000, route },
+});
+
+export const ALL_POSITIONS: ControllerPositionId[] = ['TWR', 'GND', 'APP', 'DEP', 'CLNC'];
+
+/** Scenario overrides for IFR tests: every controller position available. */
+export const ifrScenario = (spawns: ScenarioAircraftSpawn[], over: Partial<Scenario> = {}): Partial<Scenario> => ({ controllerPositions: ALL_POSITIONS, spawns, ...over });
+
+/** Apply a command as a specific controller position. */
+export function say(engine: SimulationEngine, c: ParsedCommand, position: ControllerPositionId): CommandOutcome {
+  return engine.applyCommand(c, { position });
+}
+
+/** Text of every pilot transmission so far. */
+export function pilotTexts(engine: SimulationEngine, callsign?: string): string[] {
+  return engine.getState().events.filter((x) => x.kind === 'TRANSMISSION' && x.speaker === 'PILOT' && (!callsign || x.callsign === callsign)).map((x) => x.text);
+}
