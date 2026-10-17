@@ -13,6 +13,9 @@ import { game } from '../../game';
 import { sameFrequency } from '../../radio/frequencies';
 import { altimeterText, windText } from '../lib/format';
 import { atisNeedsUpdate, generateAtis, nextAtisLetter } from '../../weather/atis';
+import { atisSlot, hourlyAtisAdvance } from '../../weather/atisCycle';
+import { createRealtimeClock } from './realtimeClock';
+import type { ClockStatus } from './realtimeClock';
 import type { SimulatedAtis } from '../../weather/atis';
 import {
   MONITOR_ALL_VOLUME, createBrowserTts, createPilotVoice, createRadioEffects, createTranscriptLog, createVoiceController,
@@ -59,8 +62,17 @@ export interface SessionParams {
   engine: SimulationEngine;
   scenario: Scenario;
   controller: ControllerSetup;
+  /** Real UTC ms of scenario time 0. In real-time mode the clock owns the epoch from here on (see `realtimeClock.ts`). */
   startUtcMs: number;
   atisLetter: string;
+  /**
+   * Real-time mode: sim time follows the wall clock (LIVE) until the user picks 2x/4x, and the ATIS letter advances on the real hourly cycle.
+   * Default false (the engine runs at the speed buttons' multiple of the frame delta, as the tests expect).
+   */
+  realTime?: boolean;
+  /** Test seams for the clock: monotonic ms (default performance.now) and real UTC ms (default Date.now). */
+  now?: () => number;
+  wallUtcMs?: () => number;
   training: TrainingController | null;
   /** Scripted scenario events (wind shift, emergency call); updated once per animation frame. */
   runner?: ScenarioEventRunner;
@@ -92,7 +104,12 @@ export interface Session {
   readonly engine: SimulationEngine;
   readonly buffer: RenderBuffer;
   readonly scenario: Scenario;
+  /** UTC ms of scenario time 0 (first epoch segment). Prefer `utcAt` for display. */
   readonly startUtcMs: number;
+  /** UTC ms of a sim time (handles the epoch moving when real-time mode re-locks after a pause or 2x/4x). */
+  utcAt(simSec: number): number;
+  /** LIVE / SIM / paused, for the top bar. */
+  clockStatus(): ClockStatus;
   readonly voice: VoiceController | null;
   readonly transcript: TranscriptLog;
   /** Flight progress strips (bays, marks, notes). Updated with the state; see `strips/stripModel.ts`. */
@@ -134,7 +151,7 @@ export function approachesInUseFor(state: SimulationState): string[] {
   return out;
 }
 
-export function makeAtis(state: SimulationState, letter: string, startUtcMs: number): SimulatedAtis {
+export function makeAtis(state: SimulationState, letter: string, startUtcMs: number | ((simSec: number) => number)): SimulatedAtis {
   return generateAtis({
     approachesInUse: approachesInUseFor(state),
     airportName: AIRPORT_CALL_NAME,
@@ -143,7 +160,7 @@ export function makeAtis(state: SimulationState, letter: string, startUtcMs: num
     variationDeg: state.airport.magneticVariationDeg,
     activeRunways: state.activeRunways,
     letter,
-    timeUtc: new Date(startUtcMs + state.clock.timeSec * 1000),
+    timeUtc: new Date(typeof startUtcMs === 'function' ? startUtcMs(state.clock.timeSec) : startUtcMs + state.clock.timeSec * 1000),
     elevationFt: state.airport.elevationFt,
     issuedAtSec: state.clock.timeSec,
   });
@@ -166,7 +183,13 @@ export function startSession(p: SessionParams): Session {
   const { engine, hooks } = p;
   const buffer = createRenderBuffer();
   let controller: ControllerSetup = { positions: [...p.controller.positions], aiPositions: [] };
-  let atis = makeAtis(engine.getState(), p.atisLetter, p.startUtcMs);
+  const realTime = p.realTime ?? false;
+  const clock = createRealtimeClock({
+    engine, realTime, now: p.now, wallUtcMs: p.wallUtcMs, startUtcMs: p.startUtcMs,
+    onResync: (gap) => hooks.onNotice('warn', `The simulation fell ${Math.round(gap)} s behind the real clock (tab in the background?) and was re-synchronised; that time was skipped.`),
+  });
+  const utcAt = (sec: number) => clock.utcAt(sec);
+  let atis = makeAtis(engine.getState(), p.atisLetter, utcAt);
   engine.setAtis(atis);
   hooks.onAtis(atis);
 
@@ -249,7 +272,7 @@ export function startSession(p: SessionParams): Session {
   buildAi();
 
   // ----- strips ----------------------------------------------------------------------------------------------------
-  const strips = createStripBoard({ startUtcMs: p.startUtcMs });
+  const strips = createStripBoard({ startUtcMs: utcAt });
   strips.update(engine.getState());
 
   const submit = (text: string, source: 'voice' | 'typed', confidence?: number): TransmitResult => {
@@ -329,15 +352,23 @@ export function startSession(p: SessionParams): Session {
     }
   });
   const nowMs = () => (typeof performance !== 'undefined' ? performance.now() : Date.now());
-  let last = nowMs();
-  buffer.capture(engine.getState(), last);
+  buffer.capture(engine.getState(), nowMs());
+  let atisSlotSeen = atisSlot(utcAt(engine.getState().clock.timeSec));
+  let lastAtisCheck = 0;
 
   const frame = (t: number) => {
     if (disposed) return;
-    const wallDelta = Math.min(0.25, Math.max(0, (t - last) / 1000));
-    last = t;
-    engine.advance(wallDelta);
+    clock.frame(t);
     const st = engine.getState();
+    // Real hourly ATIS cycle (HH:55Z): a new letter once an hour, on top of the weather-driven ones.
+    if (realTime && st.clock.speed > 0 && t - lastAtisCheck >= 1000) {
+      lastAtisCheck = t;
+      const adv = hourlyAtisAdvance(atisSlotSeen, utcAt(st.clock.timeSec), atis.letter);
+      if (adv) {
+        atisSlotSeen = adv.slot;
+        reissueAtis('hourly update', adv.letter);
+      }
+    }
     if (p.runner) {
       for (const ev of p.runner.update()) {
         if (ev.kind === 'weather') {
@@ -372,9 +403,9 @@ export function startSession(p: SessionParams): Session {
   if (typeof requestAnimationFrame !== 'undefined') raf = requestAnimationFrame(frame);
 
   // ----- weather / ATIS ------------------------------------------------------------------------------------------
-  const reissueAtis = (reason: string) => {
+  const reissueAtis = (reason: string, letter?: string) => {
     const st = engine.getState();
-    atis = makeAtis(st, nextAtisLetter(atis.letter), p.startUtcMs);
+    atis = makeAtis(st, letter ?? nextAtisLetter(atis.letter), utcAt);
     engine.setAtis(atis);
     session.atis = atis;
     engine.logEvent({ kind: 'INFO', text: `ATIS information ${atis.phonetic} is current (${reason}).`, severity: 'info', speaker: 'SYSTEM' });
@@ -386,6 +417,8 @@ export function startSession(p: SessionParams): Session {
     buffer,
     scenario: p.scenario,
     startUtcMs: p.startUtcMs,
+    utcAt,
+    clockStatus: () => clock.status(),
     voice,
     transcript,
     strips,
@@ -407,7 +440,7 @@ export function startSession(p: SessionParams): Session {
     },
     submit: (text, source) => submit(text, source),
     setSpeed(speed) {
-      engine.setSpeed(speed);
+      clock.setSpeed(speed);
       hooks.onRev();
     },
     getSpeed: () => engine.getState().clock.speed,

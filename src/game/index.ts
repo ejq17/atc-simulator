@@ -91,7 +91,7 @@ export interface GameApi {
   /** Build a full Scenario (with spawns resolved against the airport) ready for createEngine. */
   buildScenario(id: string, airport: Airport, options?: FreePlayOptions): Scenario;
   buildFreePlay(airport: Airport, options: FreePlayOptions): Scenario;
-  createTrafficGenerator(scenario: Scenario, airport: Airport): TrafficGenerator;
+  createTrafficGenerator(scenario: Scenario, airport: Airport, options?: { densityAt?: (state: Readonly<SimulationState>) => number }): TrafficGenerator;
   createTrainingController(scenario: Scenario): TrainingController | null;
   buildDebrief(state: SimulationState, startedAtSec?: number): DebriefReport;
   loadCareerProgress(): CareerProgress;

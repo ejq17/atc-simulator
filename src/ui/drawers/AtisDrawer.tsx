@@ -15,7 +15,7 @@ export function AtisDrawer({ onClose }: { onClose: () => void }) {
       <div className="flex flex-col gap-4 p-4">
         <div className="flex items-center justify-between gap-3">
           <span className="border border-atc-amber px-2 py-1 font-sans text-[11px] font-semibold uppercase tracking-wider text-atc-amber" data-testid="atis-simulated">{atis.simulatedLabel}</span>
-          <span className="text-[11px] text-atc-muted">Issued {formatZulu(session.startUtcMs, atis.issuedAtSec)} · {atis.timeZulu}Z</span>
+          <span className="text-[11px] text-atc-muted">Issued {formatZulu(session.utcAt, atis.issuedAtSec)} · {atis.timeZulu}Z</span>
         </div>
         <p className="border-l-2 border-atc-cyan bg-atc-bg p-3 text-[13px] leading-relaxed text-atc-text" data-testid="atis-text">{atis.text}</p>
         <div className="flex gap-2">

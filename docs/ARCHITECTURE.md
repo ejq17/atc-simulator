@@ -64,6 +64,14 @@ Fixed step `dtSec = 0.1` s. `advance(wallSec * speed)` accumulates and runs whol
 steps; the renderer interpolates between the last two positions. Seeded PRNG
 (`mulberry32`) for all randomness so a scenario + seed replays identically.
 
+**Real time (session level, not engine).** The engine is unchanged: it never reads the wall clock after creation, tests step it
+directly and `createEngine` still takes an explicit `utcStartMs`. `src/ui/store/realtimeClock.ts` decides how much to feed
+`advance()` each frame. LIVE mode feeds the deficit `(performance.now - lockedAt) - alreadyFed`, so sim time always equals elapsed wall
+time to within one step (no frame counting; bounded catch-up of 10 s of sim per frame, gaps over 300 s are dropped with a notice).
+Pause keeps the lock; resuming at 1x, or choosing 1x after 2x/4x, re-locks and moves the UTC epoch (`setSimulationEpoch`) so `epoch + timeSec`
+is the real UTC again; past times keep their own epoch (`utcAt`). Free-play traffic is thinned by `src/game/trafficDensity.ts`
+(local-time curve, see its header); the live METAR feed is `src/weather/liveFeed.ts` and the hourly ATIS cycle `src/weather/atisCycle.ts`.
+
 ## Coordinates
 
 WGS84 -> local tangent plane (equirectangular about the ARP) in metres, x east, y
