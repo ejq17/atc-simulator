@@ -1,11 +1,3 @@
-Below is a **complete project goal and development prompt for Claude Code**. It's written to give Claude the full vision, technical requirements, design direction, and instructions to actually build the game.
-
-I also verified the official FAA data sources. The FAA provides downloadable airport data, navigation aids, and instrument procedures, while the Aviation Weather Center provides aviation weather through its API. These will be essential for making KACY accurate. [Federal Aviation Administration](https://www.faa.gov/air_traffic/flight_info/aeronav/digital_products/dtpp/?utm_source=chatgpt.com)
-
-You can paste everything below directly into Claude.
-
----
-
 # Claude Code — KACY ATC Simulator
 ## Complete Project Goal & Development Instructions
 

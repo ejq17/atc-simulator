@@ -1,12 +1,26 @@
 /**
- * Holding patterns (standard racetrack over a fix).
+ * Holding patterns (standard racetrack over a fix) with the three AIM 5-3-8 entry procedures.
  *
- * Model: DIRECT ENTRY ONLY. Teardrop and parallel entries are simplified to a direct entry: the aircraft flies to the fix,
- * turns 180 degrees in the pattern direction onto the outbound heading, flies the outbound leg, turns 180 degrees back onto
- * the inbound course and tracks it to the fix. Right turns unless stated. Leg length: the stated leg (minutes or nm), else
- * 1 minute at or below 14,000 ft and 1.5 minutes above. Outbound timing starts when the aircraft is within 5 degrees of the
- * outbound heading ("wings level"). Hold speed: 170 kt for jets, 90 kt for light aircraft (a simplification that keeps the
- * pattern compact; the 180 degree turn takes a standard-rate turn of the type, so the racetrack is ~2 nm wide for a jet).
+ * Entry (AIM 5-3-8 "Entry Procedures", FIG 5-3-4): chosen from the aircraft's heading (its ground track, so a wind-corrected
+ * heading does not move it across a sector boundary) relative to the inbound course when it reaches the fix. With `rel` = track minus inbound course, positive to the right, for a right-turn (standard) hold:
+ *
+ *     direct    -110 < rel < +70       (the 180 degree sector containing the inbound leg: fly to the fix, turn to the pattern)
+ *     parallel   +70 <= rel <= +175    (approaching from the non-holding side)
+ *     teardrop  -175 <= rel <= -110    (the 70 degree sector on the holding side)
+ *
+ * and mirrored for a left-turn hold (nonstandard: the sectors are oriented to the 70 degree line on the holding side just as
+ * in the standard pattern). Within 5 degrees of the outbound heading the aircraft is already outbound: direct.
+ *   direct   : over the fix turn (pattern direction) onto the outbound heading, fly the outbound leg, turn back, fly inbound.
+ *   teardrop : over the fix turn outbound onto a heading 30 degrees off the outbound course toward the holding side, fly the
+ *              leg (timed), then turn in the pattern direction to intercept the inbound course.
+ *   parallel : over the fix fly the outbound heading parallel to the course (timed), then turn toward the HOLDING side (the
+ *              direction opposite to the pattern turns, through more than 180 degrees) and return to the fix / intercept the
+ *              inbound course, then fly the racetrack.
+ * The inbound leg tracks the inbound COURSE (cross-track correction; the caller wind-corrects the heading), not a heading.
+ * Right turns unless stated. Leg length: the stated leg (minutes or nm), else 1 minute at or below 14,000 ft and 1.5 minutes
+ * above. Outbound timing starts when the ground track is within 5 degrees of the outbound (or teardrop) course. Hold speed: 170 kt for
+ * jets, 90 kt for light aircraft (a simplification that keeps the pattern compact; the 180 degree turns are standard rate for
+ * the type, so the racetrack is ~2 nm wide for a jet).
  *
  * Nav mode 'holding': the aircraft stays until a DIRECT_FIX / APPROACH / HEADING / RESUME_OWN_NAVIGATION clearance.
  */
@@ -21,8 +35,19 @@ export const HOLD_SPEED_JET_KT = 170;
 export const HOLD_SPEED_LIGHT_KT = 90;
 const FIX_REACHED_M = nmToM(0.3);
 const LEG_END_TOLERANCE_DEG = 5;
+const TEARDROP_OFFSET_DEG = 30;
 
-export type HoldStage = 'entry' | 'turn_out' | 'outbound' | 'turn_in' | 'inbound';
+/** AIM 5-3-8 entry sector for an aircraft with `headingDeg` reaching a fix whose inbound course is `inboundDeg`. */
+export function holdEntryFor(inboundDeg: number, headingDeg: number, turns: 'left' | 'right'): HoldEntry {
+  let rel = headingDiff(inboundDeg, headingDeg); // + = right of the inbound course
+  if (turns === 'left') rel = -rel;
+  if (Math.abs(rel) > 175) return 'direct'; // already on the outbound heading
+  if (rel > -110 && rel < 70) return 'direct';
+  return rel >= 70 ? 'parallel' : 'teardrop';
+}
+
+export type HoldStage = 'entry' | 'turn_out' | 'outbound' | 'turn_in' | 'inbound' | 'teardrop_out' | 'par_out' | 'par_turn';
+export type HoldEntry = 'direct' | 'teardrop' | 'parallel';
 
 export interface HoldState {
   fix: string;
@@ -33,6 +58,8 @@ export interface HoldState {
   legSec?: number;
   legM?: number;
   stage: HoldStage;
+  /** Entry procedure chosen when the aircraft reached the fix. */
+  entry?: HoldEntry;
   outStartSec?: number;
   outStartPos?: Vec2;
   laps: number;
@@ -132,35 +159,76 @@ export function holdGuidance(ctx: SimContext, ac: Aircraft, rt: AircraftRuntime,
   const speedKt = ac.target.speedKt ?? holdSpeedKt(perf);
   const atFix = dist(ac.pos, h.fixPos) <= FIX_REACHED_M;
 
+  const dirSign = h.turns === 'right' ? 1 : -1; // + when the pattern is on the right of the inbound course
   if (h.stage === 'entry') {
     if (!atFix) return { track: bearingDeg(ac.pos, h.fixPos), speedKt };
-    h.stage = 'turn_out';
+    h.entry = holdEntryFor(inbound, ac.trackDeg, h.turns);
+    h.stage = h.entry === 'direct' ? 'turn_out' : h.entry === 'teardrop' ? 'teardrop_out' : 'par_out';
+    const rel = Math.round(headingDiff(inbound, ac.trackDeg) * dirSign);
+    emitEvent(ctx, {
+      kind: 'INFO', aircraftId: ac.id, callsign: ac.callsign, severity: 'info', speaker: 'SYSTEM',
+      text: `${ac.callsign} over ${h.fix}: ${h.entry} entry (track ${rel >= 0 ? '+' : ''}${rel} deg from the inbound course, ${h.turns} turns; AIM 5-3-8)`,
+      data: { holdEntry: h.entry, relativeHeadingDeg: rel },
+    });
   }
+  const legDone = (): boolean => (h.legM !== undefined ? dist(ac.pos, h.outStartPos ?? ac.pos) >= h.legM : now - (h.outStartSec ?? now) >= (h.legSec ?? 60));
+  const startLegTimer = (): void => {
+    if (h.outStartSec === undefined) {
+      h.outStartSec = now;
+      h.outStartPos = { x: ac.pos.x, y: ac.pos.y };
+    }
+  };
   if (h.stage === 'turn_out') {
-    if (Math.abs(headingDiff(ac.headingDeg, outbound)) >= LEG_END_TOLERANCE_DEG) return { track: outbound, forceDir: h.turns, speedKt };
+    if (Math.abs(headingDiff(ac.trackDeg, outbound)) >= LEG_END_TOLERANCE_DEG) return { track: outbound, forceDir: h.turns, speedKt };
     h.stage = 'outbound';
-    h.outStartSec = now;
-    h.outStartPos = { x: ac.pos.x, y: ac.pos.y };
+    h.outStartSec = undefined;
+    startLegTimer();
     return { track: outbound, speedKt };
   }
-  if (h.stage === 'outbound') {
-    const done = h.legM !== undefined ? dist(ac.pos, h.outStartPos ?? ac.pos) >= h.legM : now - (h.outStartSec ?? now) >= (h.legSec ?? 60);
-    if (!done) return { track: outbound, speedKt };
+  if (h.stage === 'teardrop_out') {
+    // 30 degrees off the outbound course toward the holding side (right-turn hold: the holding side is to the left when outbound)
+    const track = normHeading(outbound - TEARDROP_OFFSET_DEG * dirSign);
+    if (h.outStartSec === undefined) {
+      if (Math.abs(headingDiff(ac.trackDeg, track)) >= LEG_END_TOLERANCE_DEG) return { track, speedKt };
+      startLegTimer();
+    }
+    if (!legDone()) return { track, speedKt };
     h.stage = 'turn_in';
   }
-  if (h.stage === 'turn_in') {
-    if (Math.abs(headingDiff(ac.headingDeg, inbound)) >= LEG_END_TOLERANCE_DEG) return { track: inbound, forceDir: h.turns, speedKt };
+  if (h.stage === 'par_out') {
+    if (h.outStartSec === undefined) {
+      if (Math.abs(headingDiff(ac.trackDeg, outbound)) >= LEG_END_TOLERANCE_DEG) return { track: outbound, speedKt };
+      startLegTimer();
+    }
+    if (!legDone()) return { track: outbound, speedKt };
+    h.stage = 'par_turn';
+  }
+  if (h.stage === 'par_turn') {
+    // toward the holding side (opposite of the pattern turns), through more than 180 degrees, back to the fix / the inbound course
+    const toFix = bearingDeg(ac.pos, h.fixPos);
+    if (Math.abs(headingDiff(ac.trackDeg, toFix)) >= 10) return { track: toFix, forceDir: h.turns === 'right' ? 'left' : 'right', speedKt };
     h.stage = 'inbound';
   }
-  // inbound: track the course to the fix, then turn outbound again
+  if (h.stage === 'outbound') {
+    if (!legDone()) return { track: outbound, speedKt };
+    h.stage = 'turn_in';
+  }
+  // Inbound: track the COURSE (cross-track correction, up to a 45 degree intercept toward it; the caller wind-corrects the
+  // heading). The turn onto the inbound leg rolls out on this intercept track, so wind drift during the pattern is corrected.
+  const gs = Math.max(ac.groundSpeedKt * 0.5144, 15);
+  const gain = clamp(57.3 / (gs * 15), 0.03, 0.15);
+  const inboundTrack = normHeading(inbound - clamp(cross * gain, -45, 45));
+  if (h.stage === 'turn_in') {
+    if (Math.abs(headingDiff(ac.trackDeg, inboundTrack)) >= LEG_END_TOLERANCE_DEG) return { track: inboundTrack, forceDir: h.turns, speedKt };
+    h.stage = 'inbound';
+  }
   if (along >= -FIX_REACHED_M * 0.5 || atFix) {
     h.stage = 'turn_out';
+    h.outStartSec = undefined;
     h.laps++;
     return { track: outbound, forceDir: h.turns, speedKt };
   }
-  const gs = Math.max(ac.groundSpeedKt * 0.5144, 15);
-  const gain = clamp(57.3 / (gs * 15), 0.03, 0.15);
-  return { track: normHeading(inbound - clamp(cross * gain, -30, 30)), speedKt };
+  return { track: inboundTrack, speedKt };
 }
 
 /** Distance (nm) from the aircraft to the hold fix (for displays / tests). */

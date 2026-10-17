@@ -25,7 +25,8 @@ Behavioural realism is verified too: aircraft performance values carry a source 
 (Textron/Cessna, Airbus, EASA, EUROCONTROL), the 250 ft holding-position distance matches
 FAA AC 150/5300-13B, separation rules cite FAA JO 7110.65, published missed approaches and
 holds are flown from the plate text, and 109 radio phrases were audited against the FAA
-(`docs/REALISM-VERIFICATION.md`, `docs/PHRASEOLOGY-AUDIT.md`).
+(`docs/REALISM-VERIFICATION.md`, `docs/PHRASEOLOGY-AUDIT.md`), and 60 simulated behaviours were
+reviewed against the governing FAA text with measurements (`docs/BEHAVIOUR-ACCURACY.md`).
 
 Everything approximate or simplified is documented: runway holding positions are derived
 (250 ft from the centreline per the FAA design standard; the FAA data has no hold-line coordinates), most parking
@@ -52,9 +53,9 @@ KACY METAR or a preset), runway configuration and controller position, then Star
 * **1 / 2** switch Surface and Radar views; **+ / −** zoom; **Esc** deselects.
 * Charts, Navaids, ATIS, Weather & Runways and Settings open from the top bar.
 
-Speech recognition providers: **Local Whisper** (on-device via transformers.js, no cloud,
-~40 MB model downloaded once; proven end to end by the automated fake-microphone test),
-the browser Web Speech API (zero setup; Chrome/Edge send audio to Google/Microsoft), or Deepgram streaming (set `DEEPGRAM_API_KEY` in `.env`,
+Speech recognition providers, all three exercised end to end in automation: **Local Whisper**
+(on-device via transformers.js, no cloud, ~40 MB model downloaded once), the browser **Web
+Speech API** (zero setup; Chrome sends audio to Google; pause a beat after keying), or **Deepgram** streaming (set `DEEPGRAM_API_KEY` in `.env`,
 see `.env.example`; about $0.0048 per audio minute at the time of writing). The key never
 reaches the browser: the backend mints short-lived tokens. No recordings are stored.
 Pilot voices use the browser's speech synthesis with per-aircraft voice/pitch variation.
@@ -63,7 +64,7 @@ Pilot voices use the browser's speech synthesis with per-aircraft voice/pitch va
 
 ```bash
 npm test          # vitest: engine, parser, airport data, weather, charts, voice, game, ui
-npm run test:e2e  # playwright: 14 browser flows + 5 fake-microphone voice flows (starts dev server + backend)
+npm run test:e2e  # playwright: 24 browser flows incl. Whisper, Web Speech (real Chrome) and Deepgram-protocol voice tests
 npm run typecheck
 npm run lint
 npx tsx scripts/build-kacy-airport.ts   # regenerate the airport dataset from data/sources

@@ -9,19 +9,22 @@
  *   (paragraph numbers and titles verified 2026-10-16; see docs/FAA-REFERENCES.md)
  */
 import type { Aircraft, ConflictAlert, ParsedCommand, SimulationState } from './types';
-import { dist, headingDiff, ktToMps, mToNm, nmToM, pointInPolygon } from './geo';
-import { alongCross, crossingRunways, findRunway, findRunwayEnd, isOnFinal } from './runways';
-import { assessApproach } from './approach';
+import { dist, headingDiff, ktToMps, mToFt, mToNm, nmToM, pointInPolygon } from './geo';
+import { alongCross, crossingRunways, findRunway, findRunwayEnd, isOnFinal, runwayIntersection } from './runways';
+import type { Runway } from './types';
+import { assessApproach, courseGeom } from './approach';
 import { computeRunwayActivity } from './runwayOccupancy';
-import type { RunwayActivity } from './runwayOccupancy';
 import { TAXI_PHASES } from './stateMachines';
-import { emitEvent, perfOf } from './context';
+import { activeClearance, emitEvent, perfOf } from './context';
+import { getPerformance, srsCategory } from './performance';
+import type { RunwayEndGeom } from './runways';
 import type { SimContext } from './context';
 
 export const REF_SAME_RUNWAY = 'FAA JO 7110.65 3-9-6 (same runway separation)';
 export const REF_LANDING = 'FAA JO 7110.65 3-10-5 (landing clearance) and 3-10-3 (same runway separation)';
 export const REF_TAXI = 'FAA JO 7110.65 3-7-2 (taxi and ground movement, runway crossings)';
-export const REF_INTERSECTING = 'FAA JO 7110.65 3-9-8 (intersecting runway separation)';
+export const REF_INTERSECTING = 'FAA JO 7110.65 3-9-8 / 3-10-4 (intersecting runway separation)';
+export const REF_WAKE_INTERSECTION = 'FAA JO 7110.65 3-9-7 (wake turbulence separation for intersection departures)';
 /** 7110.65 5-5-4 MINIMA (paragraph number and title verified, docs/REALISM-VERIFICATION.md): 3 nm is the terminal radar minimum. */
 export const REF_RADAR_SEPARATION = 'FAA JO 7110.65 5-5-4 (radar separation minima, simplified here to 3 nm in-trail on the same final)';
 export const REF_WAKE_SEPARATION = 'FAA JO 7110.65 5-5-4 wake turbulence separation (simplified from the 7110.65 5-5-4 wake tables)';
@@ -48,7 +51,6 @@ export interface SafetyAssessment {
 
 const FINAL_TAKEOFF_NM = 2;
 const FINAL_CROSSING_NM = 3;
-const FINAL_ACTIVE_NM = 5;
 
 function cs(state: SimulationState, ids: string[]): string {
   return ids.map((i) => state.aircraft[i]?.callsign ?? i).join(', ');
@@ -69,20 +71,178 @@ function arrivalsOnFinal(state: SimulationState, runwayId: string, nm: number, e
   return out;
 }
 
-function activeOnRunway(state: SimulationState, act: RunwayActivity, exclude: string): string[] {
-  const ids = new Set<string>([...act.departing, ...act.lineUp]);
-  for (const id of act.landing) {
-    const ac = state.aircraft[id];
-    if (!ac) continue;
-    if (ac.onGround) ids.add(id);
-    else if (arrivalsOnFinal(state, act.runwayId, FINAL_ACTIVE_NM, exclude).some((a) => a.id === id)) ids.add(id);
+/**
+ * Same-runway separation, FAA JO 7110.65 3-9-6 (departing aircraft) and 3-10-3 (arriving aircraft), categorical distances:
+ *   both Category I ............................. 3,000 ft      Category I preceded by Category II ... 3,000 ft
+ *   the succeeding (or both) Category II ........ 4,500 ft      either aircraft Category III ......... 6,000 ft
+ * (3-10-3 uses the same figures for a landing aircraft behind a departure that is airborne: measured from the landing
+ * threshold.) Categories: `srsCategory` in performance.ts (C172 = I, A320 = III).
+ */
+export function srsMinimumFt(succeedingType: string, precedingType: string): number {
+  const s = srsCategory(succeedingType);
+  const p = srsCategory(precedingType);
+  if (s === 3 || p === 3) return 6000;
+  if (s === 2) return 4500;
+  return 3000;
+}
+
+/** Aircraft whose lateral offset from the centreline exceeds this have "turned to avert any conflict" (3-9-6 a). */
+const TURNED_AWAY_M = 450;
+
+/**
+ * Preceding AIRBORNE aircraft (departures climbing out, go-arounds) that still block the runway for `ac`:
+ * an aircraft that has crossed the runway end, or turned away, no longer does; one that is airborne only blocks while it is
+ * less than the categorical distance ahead of the succeeding aircraft's start of roll (takeoff, `startAlongM` = its position
+ * along the runway) or of the landing threshold (landing, `startAlongM` = 0). One on the ground never qualifies (callers treat
+ * it as "runway occupied"). Anticipating separation (3-9-5 / 3-10-6) is applied conservatively: only the distance that
+ * ALREADY exists counts.
+ */
+function airborneBlockers(state: SimulationState, ac: Aircraft, g: RunwayEndGeom, startAlongM: number, verb: string, reference: string): SafetyIssue[] {
+  const out: SafetyIssue[] = [];
+  const para = reference === REF_LANDING ? '3-10-3' : '3-9-6';
+  for (const o of Object.values(state.aircraft)) {
+    if (o.id === ac.id || o.onGround) continue;
+    if (o.phase !== 'INITIAL_CLIMB' && o.phase !== 'DEPARTURE' && o.phase !== 'GO_AROUND') continue;
+    const og = findRunwayEnd(state.airport, o.assignedRunwayEnd);
+    if (!og || og.runway.id !== g.runway.id) continue;
+    const { along, cross } = alongCross(g, o.pos);
+    if (Math.abs(cross) > TURNED_AWAY_M || along >= g.lengthM || along < startAlongM - 30) continue; // turned away / crossed the runway end / behind
+    if (og.end.id !== g.end.id) {
+      out.push({ kind: 'RUNWAY_CONFLICT', text: `${verb} for ${ac.callsign} while ${o.callsign} is airborne over runway ${g.runway.id} using the opposite direction`, reference, aircraftIds: [ac.id, o.id], runwayId: g.runway.id });
+      continue;
+    }
+    const gapFt = mToFt(along - startAlongM);
+    const needFt = srsMinimumFt(ac.type, o.type);
+    if (gapFt < needFt) {
+      out.push({
+        kind: 'RUNWAY_CONFLICT',
+        text: `${verb} for ${ac.callsign} (SRS category ${srsCategory(ac.type)}) with ${o.callsign} (category ${srsCategory(o.type)}) airborne only ${Math.round(gapFt)} ft ahead on runway ${g.runway.id}; ${para} needs ${needFt} ft`,
+        reference, aircraftIds: [ac.id, o.id], runwayId: g.runway.id,
+      });
+    }
   }
-  for (const id of act.occupants) {
-    const ac = state.aircraft[id];
-    if (ac && ac.groundSpeedKt > 5) ids.add(id);
+  return out;
+}
+
+/**
+ * Intersecting runway operations, JO 7110.65 3-9-8 (departing aircraft) and 3-10-4 (arriving aircraft), judged at the clearance:
+ *
+ *  - A DEPARTURE must not begin its roll until a preceding departure on the other runway "has departed and passed the intersection"
+ *    (measured by its position along its runway, not by a height), or a preceding arrival there "is clear of the landing runway ...
+ *    or has passed the intersection". A preceding departure that has not passed the intersection, or an arrival still rolling out
+ *    before it, blocks. An arrival that is still airborne on final only matters if it would cross its threshold before the
+ *    departure clears the intersection (estimated from the departure's acceleration, and the arrival's distance / ground speed).
+ *  - An ARRIVAL must not cross its threshold until the other aircraft has "departed and passed the intersection" / is clear / has
+ *    passed it. Estimated the same way: unsafe only if it would cross its threshold before the departure passes the intersection;
+ *    against another arrival, only if that one lands first and would not have passed the intersection by then.
+ * Not modelled: the "acknowledged the instruction to hold short / exit prior to the intersection" release (LAHSO is not simulated).
+ */
+const INTERSECTION_PASS_MARGIN_M = 60;
+const ROLL_START_DELAY_SEC = 2.5;
+
+function timeToCover(distM: number, v0Mps: number, accelMps2: number): number {
+  if (distM <= 0) return 0;
+  if (accelMps2 <= 1e-6) return distM / Math.max(v0Mps, 1);
+  return (-v0Mps + Math.sqrt(v0Mps * v0Mps + 2 * accelMps2 * distM)) / accelMps2;
+}
+
+function intersectingIssues(state: SimulationState, ac: Aircraft, kind: 'TAKEOFF' | 'LAND', g: RunwayEndGeom, other: Runway): SafetyIssue[] {
+  const out: SafetyIssue[] = [];
+  const airport = state.airport;
+  const P = runwayIntersection(g.runway, other);
+  if (!P) return out;
+  const verb = kind === 'TAKEOFF' ? 'Takeoff clearance' : 'Landing clearance';
+  const subjectPerf = perfOf(ac);
+  const sSubjectInt = alongCross(g, P).along; // intersection, along the subject's runway
+  // Time for the subject to be clear (departure: passed the intersection) or to reach its threshold (arrival).
+  let tSubjectDepClear = Infinity;
+  let tSubjectThr = Infinity;
+  if (kind === 'TAKEOFF') {
+    const startAlong = alongCross(g, ac.pos).along;
+    const dist2 = Math.max(0, sSubjectInt + INTERSECTION_PASS_MARGIN_M - startAlong);
+    tSubjectDepClear = ROLL_START_DELAY_SEC + timeToCover(dist2, 0, ktToMps(subjectPerf.accelKtPerSec));
+  } else {
+    tSubjectThr = dist(ac.pos, g.end.threshold) / Math.max(ktToMps(ac.groundSpeedKt), ktToMps(30));
   }
-  ids.delete(exclude);
-  return [...ids];
+  for (const o of Object.values(state.aircraft)) {
+    if (o.id === ac.id) continue;
+    const og = findRunwayEnd(airport, o.assignedRunwayEnd);
+    if (!og || og.runway.id !== other.id) continue;
+    const sO = alongCross(og, o.pos).along;
+    const sInt = alongCross(og, P).along;
+    const passed = sO > sInt + INTERSECTION_PASS_MARGIN_M;
+    const oPerf = perfOf(o);
+    const issue = (text: string): SafetyIssue => ({ kind: 'RUNWAY_CONFLICT', text, reference: REF_INTERSECTING, aircraftIds: [ac.id, o.id], runwayId: g.runway.id });
+    const onSurface = o.onGround && o.occupyingRunways.includes(other.id);
+    const departing = o.phase === 'LINE_UP_AND_WAIT' || o.phase === 'CLEARED_FOR_TAKEOFF' || o.phase === 'TAKEOFF_ROLL' ||
+      (!o.onGround && (o.phase === 'INITIAL_CLIMB' || o.phase === 'DEPARTURE') && o.altitudeFt - airport.elevationFt < 1500 && sO < og.lengthM + 500);
+    const arrivingGround = o.onGround && (o.phase === 'ROLLOUT' || o.phase === 'LANDING');
+    const arrivingAir = !o.onGround && (o.phase === 'FINAL' || o.phase === 'LANDING' || !!activeClearance(o, 'LAND'));
+    if (departing && !o.isDeparture && o.phase !== 'LINE_UP_AND_WAIT') continue;
+    if (departing) {
+      if (passed) continue; // "has departed and passed the intersection"
+      const rolling = o.phase === 'TAKEOFF_ROLL' || !o.onGround;
+      const v0 = ktToMps(o.groundSpeedKt);
+      const tClear = (rolling ? 0 : ROLL_START_DELAY_SEC) + (o.onGround ? timeToCover(sInt + INTERSECTION_PASS_MARGIN_M - sO, rolling ? v0 : 0, ktToMps(oPerf.accelKtPerSec)) : (sInt + INTERSECTION_PASS_MARGIN_M - sO) / Math.max(v0, 1));
+      if (kind === 'TAKEOFF') {
+        out.push(issue(`${verb} for ${ac.callsign} on runway ${g.runway.id} before ${o.callsign} departing runway ${other.id} has passed the intersection (${Math.max(0, Math.round(mToFt(sInt - sO)))} ft short of it)`));
+      } else if (tSubjectThr < tClear) {
+        out.push(issue(`${verb} for ${ac.callsign}: it would cross the threshold of runway ${g.runway.id} in ${Math.round(tSubjectThr)} s, before ${o.callsign} departing runway ${other.id} passes the intersection (about ${Math.round(tClear)} s)`));
+      }
+    } else if (arrivingGround || (onSurface && o.phase === 'RUNWAY_EXIT' && !passed)) {
+      if (passed) continue; // "has passed the intersection"
+      if (o.phase === 'RUNWAY_EXIT' && !onSurface) continue; // clear of the landing runway
+      out.push(issue(`${verb} for ${ac.callsign} on runway ${g.runway.id} while ${o.callsign} is still rolling out on runway ${other.id} and has not passed or exited before the intersection`));
+    } else if (arrivingAir) {
+      const tOThr = dist(o.pos, og.end.threshold) / Math.max(ktToMps(o.groundSpeedKt), ktToMps(30));
+      if (kind === 'TAKEOFF') {
+        if (tOThr < tSubjectDepClear) {
+          out.push(issue(`${verb} for ${ac.callsign} on runway ${g.runway.id}: ${o.callsign} would cross the threshold of runway ${other.id} in ${Math.round(tOThr)} s, before the departure passes the intersection (about ${Math.round(tSubjectDepClear)} s)`));
+        }
+      } else {
+        // two arrivals: the one that lands first must have passed the intersection before the other crosses its threshold
+        const tOPass = tOThr + (sInt + INTERSECTION_PASS_MARGIN_M) / (0.5 * ktToMps(oPerf.touchdownSpeedKt));
+        const tSPass = tSubjectThr + (sSubjectInt + INTERSECTION_PASS_MARGIN_M) / (0.5 * ktToMps(subjectPerf.touchdownSpeedKt));
+        if ((tOThr <= tSubjectThr && tSubjectThr < tOPass) || (tSubjectThr < tOThr && tOThr < tSPass)) {
+          out.push(issue(`${verb} for ${ac.callsign} on runway ${g.runway.id}: it and ${o.callsign} (runway ${other.id}) would cross their thresholds within ${Math.round(Math.abs(tOThr - tSubjectThr))} s of each other, before the first one has passed the intersection (3-10-4)`));
+        }
+      }
+    }
+  }
+  return out;
+}
+
+/**
+ * 3-9-7 WAKE TURBULENCE SEPARATION FOR INTERSECTION DEPARTURES (the part that applies to the aircraft the simulator has):
+ * a Category I aircraft (C172) taking off from an intersection on the same runway (same or opposite direction) behind a departing
+ * Category F, G or H aircraft (the A320 is "Large": F/G) must not start its roll until at least 3 minutes after the preceding
+ * aircraft took off. The pilot-requested waiver is not modelled. Intersection departure = starting more than 500 ft from the
+ * runway end it is departing from. The 3-9-6 / 3-9-8 intervals (2-3 minutes) apply only behind Category A-E (super, heavy, B757):
+ * none of the simulated types is, so they are not modelled; the 4/3-minute intersection intervals for A-D/E likewise.
+ */
+export const INTERSECTION_WAKE_INTERVAL_SEC = 180;
+export const INTERSECTION_DEPARTURE_MIN_FT = 500;
+
+function intersectionWakeIssues(state: SimulationState, ac: Aircraft, g: RunwayEndGeom): SafetyIssue[] {
+  if (srsCategory(ac.type) !== 1 || perfOf(ac).wakeCategory !== 'light') return [];
+  const startAlongFt = mToFt(alongCross(g, ac.pos).along);
+  if (startAlongFt <= INTERSECTION_DEPARTURE_MIN_FT) return [];
+  const now = state.clock.timeSec;
+  const out: SafetyIssue[] = [];
+  for (const ev of state.events) {
+    const d = ev.data as { airborne?: boolean; runwayId?: string } | undefined;
+    if (!d?.airborne || d.runwayId !== g.runway.id || !ev.aircraftId || ev.aircraftId === ac.id) continue;
+    if (now + ROLL_START_DELAY_SEC - ev.timeSec >= INTERSECTION_WAKE_INTERVAL_SEC) continue;
+    const prec = state.aircraft[ev.aircraftId];
+    const precType = prec?.type ?? 'A320';
+    if (getPerformance(precType).wakeCategory === 'light') continue; // a small aircraft ahead is not Category F, G or H
+    out.push({
+      kind: 'RUNWAY_CONFLICT',
+      text: `Takeoff clearance for ${ac.callsign} (Category I) from an intersection (${Math.round(startAlongFt)} ft from the runway end) ${Math.round(now - ev.timeSec)} s after ${ev.callsign ?? 'a larger aircraft'} took off on runway ${g.runway.id}: hold for wake turbulence, 3 minutes required`,
+      reference: REF_WAKE_INTERSECTION, aircraftIds: [ac.id, ...(prec ? [prec.id] : [])], runwayId: g.runway.id,
+    });
+  }
+  return out;
 }
 
 /** An approach clearance must not put the aircraft on a final course within 3 nm (in trail) of another aircraft established on it. */
@@ -95,12 +255,13 @@ function assessApproachSeparation(state: SimulationState, ac: Aircraft, cmd: Par
   // In-trail spacing at the moment the follower joins the course: the follower is measured at its own position when it
   // is already on the course, else at the projected join point; the leader is advanced by its groundspeed over the
   // time the follower needs to get there (floor 0).
+  const gc = courseGeom(g, a.plan.courseTrue); // distances along the procedure's final approach course
   const mine = a.plan.joinDM;
   const tJoinSec = a.plan.joinTravelM / Math.max(ktToMps(ac.groundSpeedKt), ktToMps(40));
   for (const o of Object.values(state.aircraft)) {
     if (o.id === ac.id || o.onGround || o.isDeparture || o.assignedRunwayEnd !== g.end.id) continue;
-    const { along, cross } = alongCross(g, o.pos);
-    const aligned = isOnFinal(g, o.pos, o.headingDeg, 30) && Math.abs(cross) <= nmToM(0.5) && Math.abs(headingDiff(o.headingDeg, g.headingDeg)) < 30;
+    const { along, cross } = alongCross(gc, o.pos);
+    const aligned = isOnFinal(gc, o.pos, o.headingDeg, 30) && Math.abs(cross) <= nmToM(0.5) && Math.abs(headingDiff(o.headingDeg, gc.headingDeg)) < 30;
     const established = o.phase === 'FINAL' || o.phase === 'LANDING' || aligned;
     if (!established) continue;
     const theirsNow = -along;
@@ -155,10 +316,13 @@ export function assessClearanceSafety(state: SimulationState, cmd: ParsedCommand
 
   if (cmd.kind === 'TAKEOFF' || cmd.kind === 'LINE_UP_AND_WAIT') {
     const verb = cmd.kind === 'TAKEOFF' ? 'Takeoff clearance' : 'Line up and wait';
-    const occ = others(act.occupants);
+    const grounded = (ids: string[]) => ids.filter((i) => state.aircraft[i]?.onGround);
+    const occ = grounded(others(act.occupants)); // airborne aircraft are judged by the categorical distance below
     if (occ.length) push(`${verb} for ${ac.callsign} on runway ${runwayId} while it is occupied by ${cs(state, occ)}`, REF_SAME_RUNWAY, occ);
-    const dep = others(act.departing).filter((i) => !occ.includes(i));
+    const dep = grounded(others(act.departing)).filter((i) => !occ.includes(i));
     if (dep.length) push(`${verb} for ${ac.callsign} while ${cs(state, dep)} is cleared for takeoff / rolling on runway ${runwayId}`, REF_SAME_RUNWAY, dep);
+    const gEnd = findRunwayEnd(airport, cmd.runwayEnd ?? cmd.runwayId ?? ac.assignedRunwayEnd);
+    if (gEnd) issues.push(...airborneBlockers(state, ac, gEnd, alongCross(gEnd, ac.pos).along, verb, REF_SAME_RUNWAY));
     const lu = others(act.lineUp).filter((i) => !occ.includes(i));
     if (lu.length) push(`${verb} for ${ac.callsign} while ${cs(state, lu)} is in position on runway ${runwayId}`, REF_SAME_RUNWAY, lu);
     const crossing = others(act.crossing).filter((i) => !occ.includes(i));
@@ -173,10 +337,15 @@ export function assessClearanceSafety(state: SimulationState, cmd: ParsedCommand
       }
     }
   } else if (cmd.kind === 'LAND') {
-    const occ = others(act.occupants);
+    // 3-10-3: not across the threshold until the other aircraft has landed and is clear of the runway (the daylight
+    // distance exception needs the time of day: not applied), or has departed and crossed the runway end / is airborne
+    // the categorical distance ahead of the landing threshold (checked below).
+    const occ = others(act.occupants).filter((i) => state.aircraft[i]?.onGround);
     if (occ.length) push(`Landing clearance for ${ac.callsign} on runway ${runwayId} while it is occupied by ${cs(state, occ)}`, REF_LANDING, occ);
-    const dep = others(act.departing).filter((i) => !occ.includes(i));
+    const dep = others(act.departing).filter((i) => !occ.includes(i) && state.aircraft[i]?.onGround);
     if (dep.length) push(`Landing clearance for ${ac.callsign} while ${cs(state, dep)} is cleared for takeoff / rolling on runway ${runwayId}`, REF_LANDING, dep);
+    const gEnd = findRunwayEnd(airport, cmd.runwayEnd ?? cmd.runwayId ?? ac.assignedRunwayEnd);
+    if (gEnd) issues.push(...airborneBlockers(state, ac, gEnd, 0, 'Landing clearance', REF_LANDING));
     const lu = others(act.lineUp).filter((i) => !occ.includes(i));
     if (lu.length) push(`Landing clearance for ${ac.callsign} while ${cs(state, lu)} is in position on runway ${runwayId}`, REF_LANDING, lu);
     const crossing = others(act.crossing).filter((i) => !occ.includes(i));
@@ -194,20 +363,15 @@ export function assessClearanceSafety(state: SimulationState, cmd: ParsedCommand
     }
   }
 
-  // Simultaneous operations on intersecting runways (e.g. 13/31 and 4/22).
+  // Intersecting runways (e.g. 13/31 and 4/22): JO 7110.65 3-9-8 (departures) and 3-10-4 (arrivals).
   if (cmd.kind === 'TAKEOFF' || cmd.kind === 'LAND') {
-    for (const other of crossingRunways(airport, runwayId)) {
-      const oact = activity[other.id];
-      if (!oact) continue;
-      const busy = activeOnRunway(state, oact, ac.id).filter((i) => !issues.some((x) => x.aircraftIds.includes(i)));
-      if (busy.length) {
-        push(
-          `${cmd.kind === 'TAKEOFF' ? 'Takeoff' : 'Landing'} clearance for ${ac.callsign} on runway ${runwayId} while ${cs(state, busy)} is using intersecting runway ${other.id}`,
-          REF_INTERSECTING,
-          busy,
-        );
-      }
-    }
+    const gEnd = findRunwayEnd(airport, cmd.runwayEnd ?? cmd.runwayId ?? ac.assignedRunwayEnd);
+    if (gEnd) for (const other of crossingRunways(airport, runwayId)) issues.push(...intersectingIssues(state, ac, cmd.kind, gEnd, other));
+  }
+  // Wake turbulence time interval for an intersection departure (3-9-7).
+  if (cmd.kind === 'TAKEOFF') {
+    const gEnd = findRunwayEnd(airport, cmd.runwayEnd ?? cmd.runwayId ?? ac.assignedRunwayEnd);
+    if (gEnd) issues.push(...intersectionWakeIssues(state, ac, gEnd));
   }
   return { safe: issues.length === 0, issues };
 }
@@ -288,6 +452,13 @@ export function detectConflicts(ctx: SimContext): void {
   const activity = computeRunwayActivity(state);
   for (const rid of Object.keys(activity)) {
     const act = activity[rid];
+    // A departure that is already climbing out is judged by the categorical same-runway distance (3-9-6) at clearance time,
+    // so it is not a "surface" conflict here (anticipating separation, 3-9-5).
+    const surface = act.occupants.filter((i) => {
+      const a = state.aircraft[i];
+      return !!a && (a.onGround || !(a.phase === 'INITIAL_CLIMB' || a.phase === 'DEPARTURE'));
+    });
+    act.occupants = surface;
     if (act.occupants.length < 2) continue;
     const moving = act.occupants.filter((i) => {
       const a = state.aircraft[i];

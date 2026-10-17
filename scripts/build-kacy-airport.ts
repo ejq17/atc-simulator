@@ -895,17 +895,22 @@ const spokenName = (nasrName: string): string => titleCase(nasrName.replace(/\bI
 const fsum: J = freqSrc.summary_by_function;
 const callName = titleCase(freqSrc.facility.radio_call as string); // "Atlantic City"
 const freqProv = (note: string): DataProvenance => nasrProv(note, { source: 'FAA NASR 28-day subscription (FRQ.csv, cycle 2026-10-01); cross-checked with d-TPP airport diagram 00669AD cycle 2610' });
-const mkFreq = (id: string, name: string, vhf: string, position: RadioFrequencyPosition, note: string): RadioFrequency => ({ id, name, mhz: parseFloat(vhf), position, provenance: freqProv(note) });
+/** "130-309" -> { fromDeg: 130, toDeg: 309 } (NASR sectorization bearings; may wrap through north, e.g. 310-129). */
+const sector = (s: string | undefined): { sectorBearings: { fromDeg: number; toDeg: number } } | Record<string, never> => {
+  const m = /^(\d{1,3})-(\d{1,3})$/.exec(s ?? '');
+  return m ? { sectorBearings: { fromDeg: parseInt(m[1], 10), toDeg: parseInt(m[2], 10) } } : {};
+};
+const mkFreq = (id: string, name: string, vhf: string, position: RadioFrequencyPosition, note: string, sectorBearings?: string): RadioFrequency => ({ id, name, mhz: parseFloat(vhf), position, ...sector(sectorBearings), provenance: freqProv(note) });
 type RadioFrequencyPosition = RadioFrequency['position'];
 const frequencies: RadioFrequency[] = [
   mkFreq('ATIS', `${callName} ATIS`, fsum.ATIS.vhf, 'ATIS', `UHF ${fsum.ATIS.uhf as string}; hours ${fsum.ATIS.hours as string}; phone ${fsum.ATIS.phone as string}`),
   mkFreq('CLNC', `${callName} Clearance Delivery`, fsum.clearance_delivery.vhf, 'CLNC', `UHF ${fsum.clearance_delivery.uhf as string}; ${fsum.clearance_delivery.note as string}`),
   mkFreq('GND', `${callName} Ground`, fsum.ground.vhf, 'GND', `UHF ${fsum.ground.uhf as string}; ${fsum.ground.note as string}`),
   mkFreq('TWR', `${callName} Tower`, fsum.tower.vhf, 'TWR', `UHF ${fsum.tower.uhf as string}; ${fsum.tower.note as string}. CTAF 120.3 only during ATC zero events.`),
-  mkFreq('APP', `${callName} Approach (south sector, bearings ${fsum.approach_departure_south.sectorization_bearings as string})`, fsum.approach_departure_south.vhf, 'APP', `UHF ${fsum.approach_departure_south.uhf as string}; ${fsum.approach_departure_south.chart_name as string}. Sector bearings as published in NASR; the reference point is not defined in the data.`),
-  mkFreq('DEP', `${callName} Departure (south sector, bearings ${fsum.approach_departure_south.sectorization_bearings as string})`, fsum.approach_departure_south.vhf, 'DEP', `UHF ${fsum.approach_departure_south.uhf as string}; same frequency as approach (NASR use code APCH/P DEP/P)`),
-  mkFreq('APP-N', `${callName} Approach (north sector, bearings ${fsum.approach_departure_north.sectorization_bearings as string})`, fsum.approach_departure_north.vhf, 'APP', `UHF ${fsum.approach_departure_north.uhf as string}; ${fsum.approach_departure_north.chart_name as string}`),
-  mkFreq('DEP-N', `${callName} Departure (north sector, bearings ${fsum.approach_departure_north.sectorization_bearings as string})`, fsum.approach_departure_north.vhf, 'DEP', `UHF ${fsum.approach_departure_north.uhf as string}; same frequency as approach`),
+  mkFreq('APP', `${callName} Approach (south sector, bearings ${fsum.approach_departure_south.sectorization_bearings as string})`, fsum.approach_departure_south.vhf, 'APP', `UHF ${fsum.approach_departure_south.uhf as string}; ${fsum.approach_departure_south.chart_name as string}. Sector bearings as published in NASR; the reference point is not defined in the data.`, fsum.approach_departure_south.sectorization_bearings),
+  mkFreq('DEP', `${callName} Departure (south sector, bearings ${fsum.approach_departure_south.sectorization_bearings as string})`, fsum.approach_departure_south.vhf, 'DEP', `UHF ${fsum.approach_departure_south.uhf as string}; same frequency as approach (NASR use code APCH/P DEP/P)`, fsum.approach_departure_south.sectorization_bearings),
+  mkFreq('APP-N', `${callName} Approach (north sector, bearings ${fsum.approach_departure_north.sectorization_bearings as string})`, fsum.approach_departure_north.vhf, 'APP', `UHF ${fsum.approach_departure_north.uhf as string}; ${fsum.approach_departure_north.chart_name as string}`, fsum.approach_departure_north.sectorization_bearings),
+  mkFreq('DEP-N', `${callName} Departure (north sector, bearings ${fsum.approach_departure_north.sectorization_bearings as string})`, fsum.approach_departure_north.vhf, 'DEP', `UHF ${fsum.approach_departure_north.uhf as string}; same frequency as approach`, fsum.approach_departure_north.sectorization_bearings),
   mkFreq('FAA-OPS', 'FAA Operations', fsum.faa_ops.vhf, 'OTHER', 'Not an ATC frequency (NASR use code OPS).'),
   mkFreq('ANG-OPS', 'ANG Base Operations', fsum.ang_ops.vhf, 'OTHER', 'Not an ATC frequency (NASR use code ANG OPS).'),
   mkFreq('EMERG', 'Emergency', fsum.emergency.vhf, 'OTHER', `UHF ${fsum.emergency.uhf as string}`),
@@ -979,6 +984,23 @@ const textField = <K extends 'missedApproachText' | 'holdingText' | 'minimaText'
   const t = typeof v === 'string' ? v.trim() : '';
   return t && t !== '-' ? ({ [key]: t } as Record<K, string>) : {};
 };
+const holdSrc: J = readJson('kacy-holding-patterns.json');
+const holdsByPdf = new Map<string, J[]>((holdSrc.procedures as J[]).map((p: J) => [p.pdf_name as string, p.holds as J[]]));
+const holdingPatternsOf = (pdfName: string): NonNullable<InstrumentProcedure['holdingPatterns']> =>
+  (holdsByPdf.get(pdfName) ?? []).map((h: J) => ({
+    fix: h.fix,
+    inboundCourseDeg: h.inbound_course_mag_deg,
+    turns: h.turns,
+    ...(h.leg_nm !== undefined ? { legNm: h.leg_nm } : {}),
+    ...(h.leg_minutes !== undefined ? { legMinutes: h.leg_minutes } : {}),
+    role: h.role,
+    ...(h.max_speed_kt ? { maxSpeedKt: h.max_speed_kt } : {}),
+    // extras beyond the core contract (structural superset)
+    outboundCourseDeg: h.outbound_course_mag_deg,
+    legSource: h.leg_source,
+    notes: h.notes,
+    source: h.provenance,
+  }));
 const procedures: InstrumentProcedure[] = [];
 for (const a of procSrc.instrument_approaches as J[]) {
   procedures.push({
@@ -992,6 +1014,7 @@ for (const a of procSrc.instrument_approaches as J[]) {
     ...textField('missedApproachText', a.missed_approach),
     ...textField('holdingText', a.holding),
     ...textField('minimaText', a.minima_summary),
+    holdingPatterns: holdingPatternsOf(a.pdf_name),
     provenance: dtppProv(a.pdf.url, `${a.printed_amendment_on_plate as string}; HTTP ${a.pdf.http_status as number} ${a.pdf.content_type as string}; ${a.data_provenance as string}`),
   });
 }

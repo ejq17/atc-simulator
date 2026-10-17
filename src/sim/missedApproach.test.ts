@@ -5,7 +5,7 @@ import type { SimulationEngine } from './api';
 import { AT_FIX, ALL_POSITIONS, cmd, find, ifrScenario, makeEngine, makeScenario, pilotTexts, run, runUntil, say } from './__fixtures__/testHelpers';
 import { createTestAirport } from './__fixtures__/testAirport';
 import { kacyWithPlates } from './__fixtures__/kacyPlates';
-import { parseMissedApproach, publishedHoldFor, inboundFromRadials } from './missedApproach';
+import { parseMissedApproach, publishedHoldFor, publishedPatternFor, inboundFromRadials } from './missedApproach';
 import { parseHoldingText } from './holding';
 import { dist, mToNm } from './geo';
 import { findNavFix } from './navigation';
@@ -66,14 +66,22 @@ describe('missed approach interpreter', () => {
     expect(parseHoldingText('RODDI 5 NM hold', 'CARYL')).toBeUndefined();
   });
 
-  it('published holds: SMITS is on ACY R-090 (inbound 270); fixes without a radial have no stated course', () => {
+  it('published holds: the charted patterns (holdingPatterns[]) come first; the radial / holdingText remain as fallbacks', () => {
     const kacy = kacyWithPlates();
-    expect(inboundFromRadials(kacy, 'SMITS')?.inboundMag).toBe(270);
-    expect(publishedHoldFor(kacy, 'SMITS')?.hold.inboundCourseMag).toBe(270);
-    expect(publishedHoldFor(kacy, 'RODDI')?.hold).toMatchObject({ legNm: 5 });
-    expect(publishedHoldFor(kacy, 'RODDI')?.hold.inboundCourseMag).toBeUndefined();
-    expect(publishedHoldFor(kacy, 'CARYL')?.hold).toMatchObject({ legMinutes: 1 });
+    expect(inboundFromRadials(kacy, 'SMITS')?.inboundMag).toBe(270); // SMITS is defined on ACY R-090
+    expect(publishedHoldFor(kacy, 'SMITS')?.hold).toMatchObject({ inboundCourseMag: 270, turns: 'right' });
+    expect(publishedHoldFor(kacy, 'RODDI')?.hold).toMatchObject({ inboundCourseMag: 218, turns: 'right', legNm: 5 });
+    expect(publishedHoldFor(kacy, 'TUBER')?.hold).toMatchObject({ inboundCourseMag: 17, turns: 'right', legNm: 6 });
+    expect(publishedHoldFor(kacy, 'CARYL')?.hold).toMatchObject({ inboundCourseMag: 128, turns: 'right', legMinutes: 1 });
+    expect(publishedHoldFor(kacy, 'MEADY')?.hold).toMatchObject({ inboundCourseMag: 48, turns: 'left' });
     expect(publishedHoldFor(kacy, 'NOWHERE')).toBeUndefined();
+    // without the charted patterns the holding text / radial are used (and RODDI has no stated course)
+    const bare = structuredClone(kacy);
+    for (const p of bare.procedures) delete p.holdingPatterns;
+    expect(publishedHoldFor(bare, 'RODDI')?.hold).toMatchObject({ legNm: 5 });
+    expect(publishedHoldFor(bare, 'RODDI')?.hold.inboundCourseMag).toBeUndefined();
+    expect(publishedHoldFor(bare, 'SMITS')?.hold.inboundCourseMag).toBe(270);
+    expect(publishedPatternFor(kacy, 'tuber')?.procedureName).toBe('RNAV (GPS) RWY 22');
   });
 });
 
@@ -234,7 +242,9 @@ describe('published missed approach (real KACY data with plate text)', () => {
     expect(ac.altitudeFt).toBeCloseTo(2000, 0);
     const tuber = findNavFix(ap, 'TUBER')!.pos;
     expect(mToNm(dist(ac.pos, tuber))).toBeLessThan(1);
-    expect(e.getState().events.some((x) => /holding at TUBER: .* 6 nm legs/.test(x.text))).toBe(true);
+    const hold = e.getState().events.find((x) => /holding at TUBER/.test(x.text))!.text;
+    expect(hold).toMatch(/holding at TUBER: inbound course 017 magnetic, right turns, 6 nm legs \(charted holding pattern, RNAV \(GPS\) RWY 22\)/);
+    expect(hold).not.toMatch(/assumption/);
     const g = findRunwayEnd(ap, '22')!;
     expect(alongCross(g, ac.pos).along).toBeGreaterThan(0); // flown past the airport toward the missed approach fix
   });

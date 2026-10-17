@@ -29,6 +29,8 @@ export interface ApproachRuntime {
   procedureId?: string;
   /** Straight-in segment fixes (farthest first). Next fix in this list => glidepath logic applies. */
   onCourse: string[];
+  /** TRUE final approach course of the procedure (undefined for visual approaches). */
+  courseTrue?: number;
   /** Distance before the threshold (m) of the outermost on-course fix: the glidepath is flown from here inward. */
   ifDM?: number;
   /** Vector-intercept clearance: keep the assigned heading until the course is captured. */
@@ -59,7 +61,7 @@ export interface AircraftRuntime {
   calls: Set<string>;
   pendingFreq?: { atSec: number; mhz: number; id?: string };
   readbackError?: ReadbackErrorRecord;
-  rollout?: { exitNodeId?: string; holdNodeId?: string; exitSpeedMps: number };
+  rollout?: { exitNodeId?: string; holdNodeId?: string; exitSpeedMps: number; brakeMps2: number; stopAlongM?: number };
   pattern?: { leg: 'DOWNWIND' | 'BASE'; side: 'left' | 'right'; runwayEnd: string };
   radioFreeAtSec: number;
   lastPilotText?: string;

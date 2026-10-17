@@ -34,6 +34,11 @@ import { assessApproach } from './approach';
 import { buildIfrClearance } from './ifr';
 
 const DUPLICATE_WINDOW_SEC = 5;
+
+/** A controller position covers all of its frequencies (KACY Departure: south 124.6 and north 134.25 are one position, DEP). */
+function sameControllerPosition(airport: Airport, ac: Aircraft, position: ControllerPositionId): boolean {
+  return airport.frequencies.some((f) => f.position === position && hearsFrequency(ac, f.mhz));
+}
 /** IFR departures tune Ground and ask for taxi this long after reading back their clearance. */
 export const IFR_TAXI_REQUEST_DELAY_SEC = 15;
 const TAKEOFF_NEAR_HOLD_M = 100;
@@ -122,7 +127,7 @@ export function executeCommand(
   if (cmdIn.kind === 'UNKNOWN') return clarify(ac, cmdIn.issues[0] ?? `Instruction not understood for ${ac.callsign}.`, false);
 
   // --- frequency ------------------------------------------------------------
-  if (!hearsFrequency(ac, ctrlFreq)) {
+  if (!hearsFrequency(ac, ctrlFreq) && !sameControllerPosition(airport, ac, position)) {
     const here = frequencyByMhz(airport, ac.frequencyMhz);
     const mine = frequencyByMhz(airport, ctrlFreq);
     return reject(ac, {
@@ -856,7 +861,13 @@ function planContact(env: Env): PlanResult {
   }
   let mhz = cmd.frequencyMhz;
   let id = cmd.frequencyId;
-  const byId = id ? frequencyById(airport, id) : undefined;
+  const named = id ? frequencyById(airport, id) : undefined;
+  // "Contact departure" for an IFR departure: the sector frequency of its clearance (KACY: 124.6 south / 134.25 north).
+  const clearedDep = ac.isDeparture ? ac.flightPlan?.ifrClearance?.departureFrequencyMhz : undefined;
+  const byId =
+    clearedDep !== undefined && named?.position === 'DEP' && mhz === undefined
+      ? (airport.frequencies.find((f) => f.position === 'DEP' && Math.abs(f.mhz - clearedDep) < 0.0005) ?? named)
+      : named;
   if (byId) {
     mhz = mhz ?? byId.mhz;
     id = byId.id;
@@ -1084,7 +1095,7 @@ function planApproach(env: Env): PlanResult {
         rt.missedFlown = false;
         if (ac.phase === 'HOLDING' && !ac.isDeparture) setPhase(ctx, ac, 'APPROACH', `cleared ${type} approach`);
         rt.approach = {
-          type, runwayEnd: g.end.id, procedureId: plan.procedureId, onCourse: plan.onCourse, ifDM: plan.ifDM,
+          type, runwayEnd: g.end.id, procedureId: plan.procedureId, onCourse: plan.onCourse, courseTrue: plan.courseTrue, ifDM: plan.ifDM,
           pendingCapture: !established && plan.mode === 'intercept', clearedAtSec: env.now,
         };
         if (ac.flightPlan) ac.flightPlan = { ...ac.flightPlan, arrivalApproach: { type, runwayEnd: g.end.id, procedureId: plan.procedureId } };

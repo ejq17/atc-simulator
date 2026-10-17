@@ -1,0 +1,345 @@
+{
+ "_provenance": {
+  "source": "FAA d-TPP cycle 2610 approach plates (rendered pages data/sources/raw/dtpp_2610_txt/P_*-1.png)",
+  "retrieved": "2026-10-17",
+  "method": "Each hold depiction was located on the rendered plate, cropped and magnified, and read visually: inbound course = the racetrack leg whose arrowhead points at the fix; turns = side of the inbound track the racetrack is drawn on (racetrack to the right of the inbound track = right turns); leg = printed \"N NM\" tick or \"1 min\" label, else default 1 minute (leg_source says which). HUMAN TRANSCRIPTION - verify against the PDFs before any real use.",
+  "courses": "magnetic, as printed",
+  "not_included": "The (a)(b)(c) entry-sector inset on the ZAPOM plates is an entry diagram, not a separate hold. Dotted missed-approach climbing turns near the runway ends are not holds."
+ },
+ "procedures": [
+  {
+   "chart_name": "HI-ILS Y OR LOC Y RWY 13",
+   "pdf_name": "00669HIYLY13.PDF",
+   "plate_image": "P_HIYLY13-1.png",
+   "holds": [
+    {
+     "fix": "ZAPOM",
+     "inbound_course_mag_deg": 35,
+     "outbound_course_mag_deg": 215,
+     "turns": "left",
+     "role": "arrival",
+     "leg_minutes": 1,
+     "leg_source": "default (no leg length printed)",
+     "notes": "Plate shows HOLD 17,500 / 14,000 at the IAF ZAPOM (ACY 24 DME); inbound 035 toward the fix, racetrack on the west side of the inbound track.",
+     "provenance": "transcribed from plate P_HIYLY13-1.png (00669HIYLY13.PDF, d-TPP 2610) by visual read"
+    },
+    {
+     "fix": "SMITS",
+     "inbound_course_mag_deg": 270,
+     "outbound_course_mag_deg": 90,
+     "turns": "right",
+     "role": "missed_approach",
+     "leg_minutes": 1,
+     "leg_source": "default (no leg length printed)",
+     "notes": "Missed-approach hold at SMITS (ACY R-090 / 11 DME): inbound 270 on the ACY R-090, racetrack drawn north of the inbound track.",
+     "provenance": "transcribed from plate P_HIYLY13-1.png (00669HIYLY13.PDF, d-TPP 2610) by visual read"
+    }
+   ]
+  },
+  {
+   "chart_name": "ILS OR LOC/DME RWY 31",
+   "pdf_name": "00669ILD31.PDF",
+   "plate_image": "P_ILD31-1.png",
+   "holds": [
+    {
+     "fix": "STEVV",
+     "inbound_course_mag_deg": 308,
+     "outbound_course_mag_deg": 128,
+     "turns": "right",
+     "role": "hold_in_lieu",
+     "leg_minutes": 1,
+     "leg_source": "printed",
+     "notes": "HILPT at IF/IAF STEVV (I-ACY 12.8): \"1 min\" printed; note on plate: Holding NA at STEVV for Cat E, radar required. Racetrack drawn north of the inbound 308 track.",
+     "provenance": "transcribed from plate P_ILD31-1.png (00669ILD31.PDF, d-TPP 2610) by visual read"
+    },
+    {
+     "fix": "SMITS",
+     "inbound_course_mag_deg": 270,
+     "outbound_course_mag_deg": 90,
+     "turns": "right",
+     "role": "missed_approach",
+     "leg_minutes": 1,
+     "leg_source": "default (no leg length printed)",
+     "notes": "Missed-approach hold at SMITS (ACY R-090 / 11 DME): inbound 270 on the ACY R-090, racetrack drawn north of the inbound track.",
+     "provenance": "transcribed from plate P_ILD31-1.png (00669ILD31.PDF, d-TPP 2610) by visual read"
+    },
+    {
+     "fix": "SMITS",
+     "inbound_course_mag_deg": 286,
+     "outbound_course_mag_deg": 106,
+     "turns": "right",
+     "role": "missed_approach",
+     "leg_minutes": 1,
+     "leg_source": "default (no leg length printed)",
+     "notes": "\"ALTERNATE MISSED APCH FIX\" inset: hold at SMITS defined by VCN 29.1 DME, inbound 286 / outbound 106, racetrack north of the inbound track.",
+     "provenance": "transcribed from plate P_IZLZ13-1.png (00669IZLZ13.PDF, d-TPP 2610) by visual read"
+    }
+   ]
+  },
+  {
+   "chart_name": "ILS Z OR LOC Z RWY 13",
+   "pdf_name": "00669IZLZ13.PDF",
+   "plate_image": "P_IZLZ13-1.png",
+   "holds": [
+    {
+     "fix": "CARYL",
+     "inbound_course_mag_deg": 128,
+     "outbound_course_mag_deg": 308,
+     "turns": "right",
+     "role": "hold_in_lieu",
+     "leg_minutes": 1,
+     "leg_source": "printed",
+     "notes": "HILPT at IF/IAF CARYL (I-PVO 10.5): \"One Minute Holding Pattern\"; HOLD 4500 / 2000 printed. Inbound 128 = final approach course; racetrack drawn south-west of the inbound track.",
+     "provenance": "transcribed from plate P_IZLZ13-1.png (00669IZLZ13.PDF, d-TPP 2610) by visual read"
+    },
+    {
+     "fix": "SMITS",
+     "inbound_course_mag_deg": 270,
+     "outbound_course_mag_deg": 90,
+     "turns": "right",
+     "role": "missed_approach",
+     "leg_minutes": 1,
+     "leg_source": "default (no leg length printed)",
+     "notes": "Missed-approach hold at SMITS (ACY R-090 / 11 DME): inbound 270 on the ACY R-090, racetrack drawn north of the inbound track.",
+     "provenance": "transcribed from plate P_IZLZ13-1.png (00669IZLZ13.PDF, d-TPP 2610) by visual read"
+    },
+    {
+     "fix": "SMITS",
+     "inbound_course_mag_deg": 286,
+     "outbound_course_mag_deg": 106,
+     "turns": "right",
+     "role": "missed_approach",
+     "leg_minutes": 1,
+     "leg_source": "default (no leg length printed)",
+     "notes": "\"ALTERNATE MISSED APCH FIX\" inset: hold at SMITS defined by VCN 29.1 DME, inbound 286 / outbound 106, racetrack north of the inbound track.",
+     "provenance": "transcribed from plate P_IZLZ13-1.png (00669IZLZ13.PDF, d-TPP 2610) by visual read"
+    }
+   ]
+  },
+  {
+   "chart_name": "RNAV (RNP) Z RWY 13",
+   "pdf_name": "00669RRZ13.PDF",
+   "plate_image": "P_RRZ13-1.png",
+   "holds": [
+    {
+     "fix": "RODDI",
+     "inbound_course_mag_deg": 218,
+     "outbound_course_mag_deg": 38,
+     "turns": "right",
+     "role": "missed_approach",
+     "leg_nm": 5,
+     "leg_source": "printed",
+     "notes": "Missed-approach hold at RODDI; 5 NM tick on the outbound 038 leg.",
+     "provenance": "transcribed from plate P_RRZ13-1.png (00669RRZ13.PDF, d-TPP 2610) by visual read"
+    }
+   ]
+  },
+  {
+   "chart_name": "RNAV (RNP) Z RWY 31",
+   "pdf_name": "00669RRZ31.PDF",
+   "plate_image": "P_RRZ31-1.png",
+   "holds": [
+    {
+     "fix": "KOVEC",
+     "inbound_course_mag_deg": 38,
+     "outbound_course_mag_deg": 218,
+     "turns": "right",
+     "role": "missed_approach",
+     "leg_nm": 6,
+     "leg_source": "printed",
+     "notes": "Missed-approach hold at KOVEC (shown in the MISSED APCH FIX inset); 6 NM tick on the outbound 218 leg.",
+     "provenance": "transcribed from plate P_RRZ31-1.png (00669RRZ31.PDF, d-TPP 2610) by visual read"
+    }
+   ]
+  },
+  {
+   "chart_name": "RNAV (GPS) RWY 04",
+   "pdf_name": "00669R4.PDF",
+   "plate_image": "P_R4-1.png",
+   "holds": [
+    {
+     "fix": "JEDOB",
+     "inbound_course_mag_deg": 38,
+     "outbound_course_mag_deg": 218,
+     "turns": "right",
+     "role": "hold_in_lieu",
+     "leg_nm": 6,
+     "leg_source": "printed",
+     "notes": "Hold in lieu of procedure turn at IF/IAF JEDOB (\"6 NM Holding Pattern\" in the profile); inbound 038 = final approach course.",
+     "provenance": "transcribed from plate P_R4-1.png (00669R4.PDF, d-TPP 2610) by visual read"
+    },
+    {
+     "fix": "SMITS",
+     "inbound_course_mag_deg": 270,
+     "outbound_course_mag_deg": 90,
+     "turns": "right",
+     "role": "missed_approach",
+     "leg_nm": 6,
+     "leg_source": "printed",
+     "notes": "Missed-approach hold at SMITS, 6 NM printed on the 090 leg tick; racetrack north of the inbound track.",
+     "provenance": "transcribed from plate P_R4-1.png (00669R4.PDF, d-TPP 2610) by visual read"
+    }
+   ]
+  },
+  {
+   "chart_name": "RNAV (GPS) RWY 22",
+   "pdf_name": "00669R22.PDF",
+   "plate_image": "P_R22-1.png",
+   "holds": [
+    {
+     "fix": "TUBER",
+     "inbound_course_mag_deg": 17,
+     "outbound_course_mag_deg": 197,
+     "turns": "right",
+     "role": "missed_approach",
+     "leg_nm": 6,
+     "leg_source": "printed",
+     "notes": "Missed-approach hold at TUBER; inbound 017 (arrowhead on the 017 leg points at the fix), outbound 197 with the 6 NM tick; racetrack east of the inbound track.",
+     "provenance": "transcribed from plate P_R22-1.png (00669R22.PDF, d-TPP 2610) by visual read"
+    }
+   ]
+  },
+  {
+   "chart_name": "RNAV (GPS) Y RWY 13",
+   "pdf_name": "00669RY13.PDF",
+   "plate_image": "P_RY13-1.png",
+   "holds": [
+    {
+     "fix": "CARYL",
+     "inbound_course_mag_deg": 128,
+     "outbound_course_mag_deg": 308,
+     "turns": "right",
+     "role": "hold_in_lieu",
+     "leg_nm": 6,
+     "leg_source": "printed",
+     "notes": "Hold in lieu of procedure turn at IF/IAF CARYL (\"6 NM Holding Pattern\" in the profile); inbound 128 = final approach course; racetrack south-west of the inbound track.",
+     "provenance": "transcribed from plate P_RY13-1.png (00669RY13.PDF, d-TPP 2610) by visual read"
+    },
+    {
+     "fix": "RODDI",
+     "inbound_course_mag_deg": 218,
+     "outbound_course_mag_deg": 38,
+     "turns": "right",
+     "role": "missed_approach",
+     "leg_nm": 5,
+     "leg_source": "printed",
+     "max_speed_kt": 230,
+     "notes": "Missed-approach hold at RODDI; plate note: Maximum holding airspeed 230 KIAS at RODDI.",
+     "provenance": "transcribed from plate P_RY13-1.png (00669RY13.PDF, d-TPP 2610) by visual read"
+    }
+   ]
+  },
+  {
+   "chart_name": "RNAV (GPS) Y RWY 31",
+   "pdf_name": "00669RY31.PDF",
+   "plate_image": "P_RY31-1.png",
+   "holds": [
+    {
+     "fix": "KOVEC",
+     "inbound_course_mag_deg": 38,
+     "outbound_course_mag_deg": 218,
+     "turns": "right",
+     "role": "missed_approach",
+     "leg_nm": 6,
+     "leg_source": "printed",
+     "notes": "Missed-approach hold at KOVEC; 6 NM tick on the outbound 218 leg.",
+     "provenance": "transcribed from plate P_RY31-1.png (00669RY31.PDF, d-TPP 2610) by visual read"
+    }
+   ]
+  },
+  {
+   "chart_name": "VOR RWY 04",
+   "pdf_name": "00669V4.PDF",
+   "plate_image": "P_V4-1.png",
+   "holds": [
+    {
+     "fix": "MEADY",
+     "inbound_course_mag_deg": 48,
+     "outbound_course_mag_deg": 228,
+     "turns": "left",
+     "role": "hold_in_lieu",
+     "leg_minutes": 1,
+     "leg_source": "printed",
+     "notes": "Hold in lieu of procedure turn at IAF/FAF MEADY INT (ACY 5.5 RADAR): \"1 min\" / \"One Minute Holding Pattern\" printed; inbound 048; racetrack on the north-west (left) side of the inbound track.",
+     "provenance": "transcribed from plate P_V4-1.png (00669V4.PDF, d-TPP 2610) by visual read"
+    },
+    {
+     "fix": "SMITS",
+     "inbound_course_mag_deg": 270,
+     "outbound_course_mag_deg": 90,
+     "turns": "right",
+     "role": "missed_approach",
+     "leg_minutes": 1,
+     "leg_source": "default (no leg length printed)",
+     "notes": "Missed-approach hold at SMITS (ACY R-090 / 11 DME): inbound 270 on the ACY R-090, racetrack drawn north of the inbound track.",
+     "provenance": "transcribed from plate P_V4-1.png (00669V4.PDF, d-TPP 2610) by visual read"
+    }
+   ]
+  },
+  {
+   "chart_name": "VOR RWY 31",
+   "pdf_name": "00669V31.PDF",
+   "plate_image": "P_V31-1.png",
+   "holds": [
+    {
+     "fix": "SMITS",
+     "inbound_course_mag_deg": 270,
+     "outbound_course_mag_deg": 90,
+     "turns": "right",
+     "role": "missed_approach",
+     "leg_minutes": 1,
+     "leg_source": "default (no leg length printed)",
+     "notes": "Missed-approach hold at SMITS (ACY R-090 / 11 DME): inbound 270 on the ACY R-090, racetrack drawn north of the inbound track.",
+     "provenance": "transcribed from plate P_V31-1.png (00669V31.PDF, d-TPP 2610) by visual read"
+    }
+   ]
+  },
+  {
+   "chart_name": "HI-VOR OR TACAN RWY 31",
+   "pdf_name": "00669HVT31.PDF",
+   "plate_image": "P_HVT31-1.png",
+   "holds": [
+    {
+     "fix": "ZAPOM",
+     "inbound_course_mag_deg": 35,
+     "outbound_course_mag_deg": 215,
+     "turns": "left",
+     "role": "arrival",
+     "leg_minutes": 1,
+     "leg_source": "default (no leg length printed)",
+     "notes": "Plate shows HOLD 17,500 / 14,000 at the IAF ZAPOM (ACY 24 DME); inbound 035 toward the fix, racetrack on the west side of the inbound track.",
+     "provenance": "transcribed from plate P_HVT31-1.png (00669HVT31.PDF, d-TPP 2610) by visual read"
+    },
+    {
+     "fix": "SMITS",
+     "inbound_course_mag_deg": 270,
+     "outbound_course_mag_deg": 90,
+     "turns": "right",
+     "role": "missed_approach",
+     "leg_minutes": 1,
+     "leg_source": "default (no leg length printed)",
+     "notes": "Missed-approach hold at SMITS (ACY R-090 / 11 DME): inbound 270 on the ACY R-090, racetrack drawn north of the inbound track.",
+     "provenance": "transcribed from plate P_HVT31-1.png (00669HVT31.PDF, d-TPP 2610) by visual read"
+    }
+   ]
+  },
+  {
+   "chart_name": "COPTER ILS OR LOC/DME RWY 13",
+   "pdf_name": "00669COPTERILD13.PDF",
+   "plate_image": "P_COPTERILD13-1.png",
+   "holds": [
+    {
+     "fix": "SMITS",
+     "inbound_course_mag_deg": 270,
+     "outbound_course_mag_deg": 90,
+     "turns": "right",
+     "role": "missed_approach",
+     "leg_minutes": 1,
+     "leg_source": "default (no leg length printed)",
+     "notes": "Missed-approach hold at SMITS (ACY R-090 / 11 DME): inbound 270 on the ACY R-090, racetrack drawn north of the inbound track.",
+     "provenance": "transcribed from plate P_COPTERILD13-1.png (00669COPTERILD13.PDF, d-TPP 2610) by visual read"
+    }
+   ]
+  }
+ ]
+}

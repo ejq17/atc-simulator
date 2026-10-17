@@ -95,3 +95,18 @@ export function isOnFinal(g: RunwayEndGeom, p: Vec2, headingDeg: number, maxNm: 
   diff = Math.abs(diff);
   return diff < 60;
 }
+
+/** Point where the centrelines of two runways cross (undefined if they do not intersect). */
+export function runwayIntersection(a: Runway, b: Runway): Vec2 | undefined {
+  const [a1, a2] = [a.ends[0].threshold, a.ends[1].threshold];
+  const [b1, b2] = [b.ends[0].threshold, b.ends[1].threshold];
+  const r = vSub(a2, a1);
+  const q = vSub(b2, b1);
+  const denom = r.x * q.y - r.y * q.x;
+  if (Math.abs(denom) < 1e-9) return undefined;
+  const w = vSub(b1, a1);
+  const t = (w.x * q.y - w.y * q.x) / denom;
+  const u = (w.x * r.y - w.y * r.x) / denom;
+  if (t < 0 || t > 1 || u < 0 || u > 1) return undefined;
+  return { x: a1.x + r.x * t, y: a1.y + r.y * t };
+}

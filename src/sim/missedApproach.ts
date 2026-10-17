@@ -120,8 +120,45 @@ export function inboundFromRadials(airport: Airport, fix: string): { inboundMag:
   return undefined;
 }
 
-/** Published hold at a fix: leg length / turns / course from `holdingText`, the inbound course from a radial definition. */
+export interface PublishedPattern {
+  fix: string;
+  /** Magnetic inbound course read from the plate depiction. */
+  inboundCourseMag: number;
+  turns: 'left' | 'right';
+  legNm?: number;
+  legMinutes?: number;
+  role: string;
+  procedureId: string;
+  procedureName: string;
+}
+
+/**
+ * The charted holding pattern at `fix` (`InstrumentProcedure.holdingPatterns[]`, transcribed from the plates): the first source for
+ * "as published" holds and missed-approach holds, before `holdingText` and before any assumption. The pattern of the preferred
+ * procedure wins, then the first procedure that charts one at that fix.
+ */
+export function publishedPatternFor(airport: Airport, fix: string, preferProcedureId?: string): PublishedPattern | undefined {
+  const up = fix.toUpperCase();
+  const procs = [...airport.procedures].sort((a, b) => (a.id === preferProcedureId ? -1 : 0) - (b.id === preferProcedureId ? -1 : 0));
+  for (const p of procs) {
+    const hp = p.holdingPatterns?.find((h) => h.fix.toUpperCase() === up && Number.isFinite(h.inboundCourseDeg));
+    if (hp) {
+      return { fix: up, inboundCourseMag: hp.inboundCourseDeg, turns: hp.turns, legNm: hp.legNm, legMinutes: hp.legMinutes, role: hp.role, procedureId: p.id, procedureName: p.name };
+    }
+  }
+  return undefined;
+}
+
+/** Published hold at a fix: the charted pattern first, then leg length / turns / course from `holdingText`, the inbound course from a radial definition. */
 export function publishedHoldFor(airport: Airport, fix: string, preferProcedureId?: string): { hold: PublishedHold; inboundSource?: string; source: string } | undefined {
+  const chart = publishedPatternFor(airport, fix, preferProcedureId);
+  if (chart) {
+    return {
+      hold: { inboundCourseMag: chart.inboundCourseMag, turns: chart.turns, legNm: chart.legNm, legMinutes: chart.legMinutes },
+      inboundSource: `${chart.procedureName} holding pattern`,
+      source: `${chart.procedureName} charted holding pattern`,
+    };
+  }
   const procs = [...airport.procedures].sort((a, b) => (a.id === preferProcedureId ? -1 : 0) - (b.id === preferProcedureId ? -1 : 0));
   let hold: PublishedHold | undefined;
   let source = '';
@@ -276,7 +313,10 @@ function finishMissed(ctx: SimContext, ac: Aircraft, rt: AircraftRuntime, st: Mi
   const fix = plan.holdFix;
   const last = plan.legs[plan.legs.length - 1];
   const proc = airport.procedures.find((p) => p.id === st.procedureId);
-  const stated = parseHoldingText(proc?.holdingText, fix);
+  const chart = publishedPatternFor(airport, fix, st.procedureId);
+  const stated = chart
+    ? ({ inboundCourseMag: chart.inboundCourseMag, turns: chart.turns, legNm: chart.legNm, legMinutes: chart.legMinutes } as PublishedHold)
+    : parseHoldingText(proc?.holdingText, fix);
   const pub = stated ?? publishedHoldFor(airport, fix, st.procedureId)?.hold;
   const radialIn = inboundFromRadials(airport, fix);
   let inboundMag: number;
@@ -299,7 +339,7 @@ function finishMissed(ctx: SimContext, ac: Aircraft, rt: AircraftRuntime, st: Mi
   }
   const spec = {
     fix, inboundTrueDeg: magneticToTrue(inboundMag, airport.magneticVariationDeg), turns: pub?.turns ?? 'right',
-    legMinutes: pub?.legMinutes, legNm: pub?.legNm, source: 'published missed approach', assumption,
+    legMinutes: pub?.legMinutes, legNm: pub?.legNm, source: chart ? `charted holding pattern, ${chart.procedureName}` : 'published missed approach', assumption,
   } as const;
   startHold(ctx, ac, rt, { ...spec });
   return { track: bearingDeg(ac.pos, fixPos), speedKt };

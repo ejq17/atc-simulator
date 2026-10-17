@@ -21,6 +21,8 @@ export const PROFILE_DIR = path.resolve(import.meta.dirname, '../../.cache/playw
 export const CLIPS = {
   takeoff: { file: 'takeoff-n723ej.wav', seconds: 5.1, says: 'Cessna seven two three echo juliet, runway one three, cleared for takeoff' },
   hold: { file: 'hold-position-n723ej.wav', seconds: 3.6, says: 'Cessna seven two three echo juliet, hold position' },
+  takeoffLead: { file: 'takeoff-n723ej-lead.wav', seconds: 8.1, says: 'three seconds of silence, then the takeoff clearance' },
+  holdLead: { file: 'hold-position-n723ej-lead.wav', seconds: 6.6, says: 'three seconds of silence, then hold position' },
   land: { file: 'land-nks451.wav', seconds: 4.0, says: 'Spirit four fifty one, runway one three, cleared to land' },
 } as const;
 export type ClipName = keyof typeof CLIPS;
@@ -40,9 +42,21 @@ export interface VoiceBrowser {
   close(): Promise<void>;
 }
 
-export async function launchVoiceBrowser(clip: ClipName, baseURL = 'http://localhost:5173'): Promise<VoiceBrowser> {
-  const context = await chromium.launchPersistentContext(PROFILE_DIR, {
-    headless: true,
+export interface LaunchOptions {
+  baseURL?: string;
+  /** 'chrome' = the installed Google Chrome (needed for the Web Speech service); default is Playwright's Chromium. */
+  channel?: 'chrome' | 'chromium';
+  /** Default true. A headed window opens briefly when false. */
+  headless?: boolean;
+  /** Separate profiles keep Chrome and Chromium from sharing (incompatible) user-data-dirs. */
+  profileDir?: string;
+}
+
+export async function launchVoiceBrowser(clip: ClipName, opts: LaunchOptions = {}): Promise<VoiceBrowser> {
+  const { baseURL = 'http://localhost:5173', channel, headless = true, profileDir = PROFILE_DIR } = opts;
+  const context = await chromium.launchPersistentContext(profileDir, {
+    headless,
+    channel,
     baseURL,
     viewport: { width: 1440, height: 900 },
     permissions: ['microphone'],

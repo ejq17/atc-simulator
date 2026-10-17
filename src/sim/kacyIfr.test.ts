@@ -141,8 +141,8 @@ describe('KACY IFR departure to KPHL via the ATLANTIC CITY THREE', () => {
     const clr = say(e, cmd('IFR_CLEARANCE', 'NKS451', { ifr: {} }), 'CLNC');
     expect(clr.status).toBe('accepted');
     if (clr.status === 'accepted') {
-      expect(clr.clearance.ifr).toMatchObject({ destination: 'KPHL', departureProcedure: 'ATLANTIC CITY THREE', initialAltitudeFt: 2000, expectAltitudeFt: 10000, departureFrequencyMhz: 124.6 });
-      expect(clr.readback).toMatch(/^Cleared to Philadelphia airport, Atlantic City Three departure, radar vectors, maintain two thousand, expect one zero thousand, one zero minutes after departure, departure frequency one two four point six, squawk [a-z ]+, Spirit four fifty one$/);
+      expect(clr.clearance.ifr).toMatchObject({ destination: 'KPHL', departureProcedure: 'ATLANTIC CITY THREE', initialAltitudeFt: 2000, expectAltitudeFt: 10000, departureFrequencyMhz: 134.25 }); // CYN is north of the airport: the north departure sector
+      expect(clr.readback).toMatch(/^Cleared to Philadelphia airport, Atlantic City Three departure, radar vectors, maintain two thousand, expect one zero thousand, one zero minutes after departure, departure frequency one three four point two five, squawk [a-z ]+, Spirit four fifty one$/);
     }
     expect(runUntil(e, () => ac.pendingRequest?.kind === 'TAXI', 40)).toBe(true);
     expect(ac.frequencyId).toBe('GND');
@@ -156,8 +156,11 @@ describe('KACY IFR departure to KPHL via the ATLANTIC CITY THREE', () => {
     const to = say(e, cmd('TAKEOFF', 'NKS451', { runwayEnd: '13' }), 'TWR');
     if (to.status !== 'accepted') throw new Error(JSON.stringify(to) + ' ' + ac.phase);
     expect(runUntil(e, () => ac.phase === 'DEPARTURE', 300)).toBe(true);
-    expect(say(e, cmd('CONTACT_FREQUENCY', 'NKS451', { frequencyId: 'DEP' }), 'TWR').status).toBe('accepted');
-    expect(runUntil(e, () => ac.frequencyId === 'DEP' && ac.pendingRequest?.kind === 'OTHER', 20)).toBe(true);
+    const handoff = say(e, cmd('CONTACT_FREQUENCY', 'NKS451', { frequencyId: 'DEP' }), 'TWR'); // "contact departure": the sector of the clearance
+    expect(handoff.status).toBe('accepted');
+    if (handoff.status === 'accepted') expect(handoff.readback).toBe('Departure one three four point two five, Spirit four fifty one');
+    expect(runUntil(e, () => ac.frequencyId === 'DEP-N' && ac.pendingRequest?.kind === 'OTHER', 20)).toBe(true);
+    expect(ac.frequencyMhz).toBe(134.25);
     expect(pilotTexts(e).pop()).toMatch(/^Atlantic City Departure, Spirit four fifty one, .*(climbing )?two thousand\.$/);
     expect(say(e, cmd('RADAR_CONTACT', 'NKS451'), 'DEP').status).toBe('accepted');
     expect(say(e, cmd('ALTITUDE', 'NKS451', { altitudeFt: 10000 }), 'DEP').status).toBe('accepted');
@@ -188,5 +191,45 @@ describe('A320 takeoff distance on KACY 4/22 (6,145 ft)', () => {
     const short4 = tryTakeoff('HP4-22-D-1', '4');
     expect(short4.status).toBe('rejected');
     if (short4.status === 'rejected') expect(short4.reason).toMatch(/Only 4\d{3} ft of runway 4 remain/);
+  });
+});
+
+describe('departure frequency by sector (KACY: south 124.6 = 130-309, north 134.25 = 310-129, magnetic from the airport)', () => {
+  it('data: the sector bearings are on the DEP / APP frequencies', () => {
+    const f = (id: string) => kacy.frequencies.find((x) => x.id === id)!;
+    expect(f('DEP').sectorBearings).toEqual({ fromDeg: 130, toDeg: 309 });
+    expect(f('DEP-N').sectorBearings).toEqual({ fromDeg: 310, toDeg: 129 });
+  });
+
+  it.each([
+    ['CYN', 134.25], ['COL', 134.25], ['RBV', 134.25], ['VCN', 124.6], ['SIE', 124.6], ['ENO', 124.6],
+  ])('a flight plan whose first fix is %s gets departure frequency %s', (fix, mhz) => {
+    const e = engineFor([{
+      atSec: 0, callsign: 'NKS451', type: 'A320', flightRules: 'IFR', isDeparture: true, initialFrequencyId: 'CLNC', start: { kind: 'parked', parkingId: 'GATE-1' },
+      flightPlan: { flightRules: 'IFR', origin: 'KACY', destination: 'KPHL', cruiseAltitudeFt: 10000, route: [fix] },
+    }]);
+    const ac = Object.values(e.getState().aircraft)[0];
+    expect(runUntil(e, () => ac.pendingRequest?.kind === 'IFR_CLEARANCE', 30)).toBe(true);
+    const r = say(e, cmd('IFR_CLEARANCE', 'NKS451', { ifr: {} }), 'CLNC');
+    expect(r.status).toBe('accepted');
+    if (r.status === 'accepted') {
+      expect(r.clearance.ifr?.departureFrequencyMhz).toBe(mhz);
+      expect(r.readback).toContain(`departure frequency ${mhz === 134.25 ? 'one three four point two five' : 'one two four point six'},`);
+    }
+  });
+
+  it('a stated departure frequency is respected; a route without a resolvable fix keeps the first DEP frequency', () => {
+    const mk = (route: string[]) => engineFor([{
+      atSec: 0, callsign: 'NKS451', type: 'A320', flightRules: 'IFR', isDeparture: true, initialFrequencyId: 'CLNC', start: { kind: 'parked', parkingId: 'GATE-1' },
+      flightPlan: { flightRules: 'IFR', origin: 'KACY', destination: 'KPHL', cruiseAltitudeFt: 10000, route },
+    }]);
+    const e1 = mk(['CYN']);
+    runUntil(e1, () => Object.values(e1.getState().aircraft)[0].pendingRequest?.kind === 'IFR_CLEARANCE', 30);
+    const r1 = say(e1, cmd('IFR_CLEARANCE', 'NKS451', { ifr: { departureFrequencyMhz: 124.6 } }), 'CLNC');
+    expect(r1.status === 'accepted' && r1.clearance.ifr?.departureFrequencyMhz).toBe(124.6);
+    const e2 = mk(['NOWHERE']);
+    runUntil(e2, () => Object.values(e2.getState().aircraft)[0].pendingRequest?.kind === 'IFR_CLEARANCE', 30);
+    const r2 = say(e2, cmd('IFR_CLEARANCE', 'NKS451', { ifr: {} }), 'CLNC');
+    expect(r2.status === 'accepted' && r2.clearance.ifr?.departureFrequencyMhz).toBe(124.6);
   });
 });

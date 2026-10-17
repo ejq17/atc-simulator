@@ -87,7 +87,7 @@ describe('takeoff / landing safety', () => {
     expect(rej.status).toBe('rejected');
     if (rej.status === 'rejected') {
       expect(rej.unsafe).toBe(true);
-      expect(rej.reason).toMatch(/intersecting runway 13\/31/);
+      expect(rej.reason).toMatch(/before N1AA departing runway 13\/31 has passed the intersection/);
     }
     const f = mk('free_play');
     expect(f.applyCommand(cmd('TAKEOFF', 'N2BB', { runwayEnd: '22' })).status).toBe('accepted');

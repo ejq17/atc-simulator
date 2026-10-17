@@ -146,6 +146,47 @@ transcribes, the real parser and engine act, and the aircraft departs. Details t
 * The clip restarts each time the page opens a new mic stream (each PTT press); hold the key for the clip length plus a second.
 * Run against a stable server: concurrent edits to `src/` make Vite hot-reload and reset the running session.
 
+### Web Speech in real Chrome (`chrome-webspeech`)
+
+`npx playwright test --project=chrome-webspeech` drives the installed Google Chrome (`channel: 'chrome'`, new headless; the spec
+retries once headed if recognition never starts, and `WEBSPEECH_HEADED=1` forces headed). **It sends the synthetic fixture audio to
+Google's speech service, so it needs internet.** If Google is unreachable the test is skipped with the reason, or fails with
+`WEBSPEECH_REQUIRED=1`. Findings (Chrome 155, observed, repeatable):
+
+* **Chrome's recognizer ignores the fake-microphone flags** and listens to the machine's real microphone (every run ended `no-speech`).
+  The provider's opt-in `audioSource: 'track'` (localStorage `kacy.webspeech.audioSource=track`) opens the microphone with
+  `getUserMedia` and passes the track to `SpeechRecognition.start(track)`; that is how the WAV reaches Google. It is off by default.
+* **`continuous=false` loses calls.** Chrome/Google ended or stalled at the first pause ("... echo juliet, runway ...": only
+  "723 Echo" came back, no final). The provider now uses `continuous=true`.
+* **Chrome's result list is not append-only.** In continuous mode it can replace the whole list by the last final chunk
+  (`"cleared for takeoff"`) and drop the interim text before it, and several non-final segments are alive at once. The provider rebuilds the
+  transcript from `event.results` on every event and `appendTranscript()` merges a collapsed final with the text it had (dropping words
+  the final merely repeats). Before this fix the pilot would hear only "cleared for takeoff" or "Runway 13 cleared for takeoff" with no callsign.
+* **Google needs 1-3 s to open its stream and does not transcribe audio spoken before that.** With the callsign spoken in the first two
+  seconds it came back as "Runway 13 cleared for takeoff". Nothing in the page can buffer audio for Chrome's recognizer, so tell users to
+  pause a moment after keying; the Chrome-test clips (`*-lead.wav`) start with 3 s of silence, and the spec allows 3 presses.
+* The 6 s `start()` deadline was not the problem: `onstart` fires when capture begins (about 10 ms), the service connects afterwards.
+
+### Deepgram path against a protocol mock (`chromium-deepgram-mock`)
+
+`npx playwright test --project=chromium-deepgram-mock` runs `e2e/deepgram.spec.ts` against `e2e/mocks/deepgramMock.ts`, a Node
+HTTP + hand-written RFC 6455 server (`e2e/mocks/wsFrames.ts`, unit-tested in `server/voice/wsFrames.test.ts`; the `ws` package is not
+installed). The spec starts the real `server/index.ts` with `DEEPGRAM_API_KEY=test-key DEEPGRAM_API_BASE=<mock>`, so the real token
+handler calls the mock's `/v1/auth/grant`. The browser opens `/v1/listen` with the `token, <jwt>` subprotocol, `model=nova-3`,
+`encoding=linear16`, `sample_rate=16000`, `interim_results`, `endpointing=300` and the aviation `keyterm`s; the mock verifies the jwt it
+minted, counts the PCM bytes, answers with Deepgram-format `Results` (interim about each second, final with `speech_final` on
+`CloseStream`) and the aircraft obeys. A second and third test make the grant (401) and the upgrade (401) fail and check the error
+message and that typed input still works.
+
+> **This proves the client protocol and audio path only.** The mock does no speech recognition: it picks the transcript from a fixed
+> table by counting how many 100 ms blocks of the audio are loud (4.5 s of speech = takeoff, 3.6 s = land, 3.2 s = hold position).
+> Deepgram's accuracy on callsigns, numbers and phonetics still needs a real key.
+
+Override points added for this: server env `DEEPGRAM_API_BASE` (absolute http(s) URL, default `https://api.deepgram.com`); browser
+`VITE_DEEPGRAM_WS_BASE` (any ws(s) URL, default `wss://api.deepgram.com`) and a runtime localStorage `kacy.deepgram.wsBase` that is
+only honoured for `ws://localhost` / `ws://127.0.0.1`, so a stray value can never send microphone audio to a remote host. The Deepgram
+provider also uses the idle `WarmAudio` graph now, so the first word is not clipped there either.
+
 ## Privacy
 
 * No audio is ever recorded, saved or uploaded by this app. Mic audio is streamed live to the selected provider only while PTT is active.

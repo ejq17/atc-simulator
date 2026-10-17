@@ -18,7 +18,7 @@
  * procedure turns. Altitude handling lives in flightDynamics (hold the assigned altitude, then the 3 degree path).
  */
 import type { Aircraft, Airport, ApproachType, InstrumentProcedure, SimulationState, Weather } from './types';
-import { deg2rad, dist, headingDiff, mToNm, nmToM } from './geo';
+import { bearingDeg, deg2rad, dist, headingDiff, headingToVec, magneticToTrue, mToNm, nmToM } from './geo';
 import type { Vec2 } from './types';
 import { alongCross, normalizeRunwayEndId } from './runways';
 import type { RunwayEndGeom } from './runways';
@@ -28,6 +28,11 @@ import { spokenRunway } from '../radio/spoken';
 export const APPROACH_RANGE_NM = 30;
 export const MAX_INTERCEPT_ANGLE_DEG = 30;
 export const MAX_INTERCEPT_AHEAD_NM = 10;
+/** 7110.65 TBL 5-9-1: 20 degrees when the intercept is less than 2 miles from the approach gate. */
+export const MAX_INTERCEPT_ANGLE_NEAR_GATE_DEG = 20;
+export const GATE_INTERCEPT_MARGIN_M = nmToM(2);
+/** P/CG APPROACH GATE: 1 nm outside the FAF on the final approach course and no closer than 5 nm to the landing threshold. */
+export const approachGateDM = (fafDM: number): number => Math.max(nmToM(5), fafDM + nmToM(1));
 export const FALLBACK_FAF_NM = 4.5;
 /** Aircraft that cleared for an approach join FINAL (glidepath logic) when established inside this distance. */
 export const APPROACH_FINAL_NM = 8;
@@ -47,6 +52,8 @@ export interface CourseFix {
 
 export interface ProcedureInfo {
   procedure: InstrumentProcedure;
+  /** TRUE final approach course (see `finalCourseTrue`). */
+  courseTrue: number;
   feeders: string[];
   onCourse: CourseFix[];
   faf?: CourseFix;
@@ -54,6 +61,30 @@ export interface ProcedureInfo {
 
 export function isOnCourse(dNm: number, crossNm: number): boolean {
   return dNm >= 1 && dNm <= 40 && Math.abs(crossNm) <= 0.2 * dNm + 0.3;
+}
+
+/**
+ * A copy of the runway end geometry whose along/cross frame is the given final approach COURSE (origin: the threshold, unchanged),
+ * so the lateral / approach logic can use `alongCross`, `centrelineHeading` etc. against a course that is not the runway heading.
+ */
+export function courseGeom(g: RunwayEndGeom, courseTrue: number | undefined): RunwayEndGeom {
+  if (courseTrue === undefined || Math.abs(headingDiff(g.headingDeg, courseTrue)) < 1e-9) return g;
+  const dir = headingToVec(courseTrue);
+  return { ...g, dir, right: { x: dir.y, y: -dir.x }, headingDeg: courseTrue };
+}
+
+/**
+ * Final approach course (TRUE) of a procedure:
+ *   ILS / LOC procedures: the NASR localizer course of the runway end (`RunwayEnd.ils.courseDeg`, magnetic) when present;
+ *   otherwise the bearing from the FAF to the runway threshold (the FAF = the on-course fix nearest the threshold that is >= 3 nm out);
+ *   the runway heading only when neither exists.
+ */
+export function finalCourseTrue(airport: Airport, g: RunwayEndGeom, proc: InstrumentProcedure | undefined, faf: CourseFix | undefined): number {
+  if (proc && /\b(ILS|LOC)\b/i.test(proc.name) && g.end.ils && Number.isFinite(g.end.ils.courseDeg)) {
+    return magneticToTrue(g.end.ils.courseDeg, airport.magneticVariationDeg);
+  }
+  const fp = faf ? findNavFix(airport, faf.id)?.pos : undefined;
+  return fp ? bearingDeg(fp, g.end.threshold) : g.headingDeg;
 }
 
 export function analyzeProcedure(airport: Airport, proc: InstrumentProcedure, g: RunwayEndGeom): ProcedureInfo {
@@ -72,7 +103,7 @@ export function analyzeProcedure(airport: Airport, proc: InstrumentProcedure, g:
   const onCourse = listed.filter((f) => f.on).map((f) => ({ id: f.id, dM: f.dM, crossM: f.crossM })).sort((a, b) => b.dM - a.dM);
   const outside3 = onCourse.filter((f) => f.dM >= nmToM(3));
   const faf = outside3.length ? outside3[outside3.length - 1] : onCourse[onCourse.length - 1];
-  return { procedure: proc, feeders, onCourse, faf };
+  return { procedure: proc, courseTrue: finalCourseTrue(airport, g, proc, faf), feeders, onCourse, faf };
 }
 
 const TYPE_PATTERN: Record<Exclude<ApproachType, 'VISUAL'>, RegExp> = {
@@ -109,6 +140,8 @@ export function visualApproachAllowed(w: Weather): { ok: boolean; why?: string }
 }
 
 export interface ApproachPlan {
+  /** TRUE final approach course (undefined for visual approaches: the runway heading). */
+  courseTrue?: number;
   /** route: fly `fixes` (join a published route); intercept: keep the vector, capture the course, then `fixes`; auto: fly to the runway on its own. */
   mode: 'route' | 'intercept' | 'auto';
   procedureId?: string;
@@ -194,7 +227,7 @@ export function assessApproach(
   const best = [...infos].sort((a, b) => b.onCourse.length - a.onCourse.length)[0];
 
   if (o.autoNav) {
-    return { kind: 'ok', plan: { mode: 'auto', procedureId: best.procedure.id, fixes: [], onCourse: best.onCourse.map((f) => f.id), fafDM: best.faf?.dM ?? nmToM(FALLBACK_FAF_NM), joinDM: Math.max(0, d), joinTravelM: 0 } };
+    return { kind: 'ok', plan: { mode: 'auto', courseTrue: best.courseTrue, procedureId: best.procedure.id, fixes: [], onCourse: best.onCourse.map((f) => f.id), fafDM: best.faf?.dM ?? nmToM(FALLBACK_FAF_NM), joinDM: Math.max(0, d), joinTravelM: 0 } };
   }
 
   const nav = ac.nav;
@@ -213,7 +246,7 @@ export function assessApproach(
       const onNow = d > 0 && isOnCourse(mToNm(d), mToNm(cross));
       const firstOn = fixes.findIndex((f) => on.includes(f.toUpperCase()));
       const plan: ApproachPlan = {
-        mode: 'route', procedureId: info.procedure.id, fixes, onCourse: info.onCourse.map((f) => f.id), fafDM,
+        mode: 'route', courseTrue: info.courseTrue, procedureId: info.procedure.id, fixes, onCourse: info.onCourse.map((f) => f.id), fafDM,
         joinDM: onNow ? d : joinFix ? joinFix.dM : Math.max(0, d),
         joinTravelM: onNow ? 0 : pathLengthM(airport, ac.pos, fixes.slice(0, (firstOn < 0 ? fixes.length - 1 : firstOn) + 1)),
         ifDM: info.onCourse[0]?.dM,
@@ -233,27 +266,56 @@ export function assessApproach(
   // --- B. vectors / heading: intercept geometry against the final approach course -------------
   const info = best;
   const fafDM = info.faf?.dM ?? nmToM(FALLBACK_FAF_NM);
-  const rel = headingDiff(g.headingDeg, ac.target.headingDeg ?? ac.headingDeg); // assigned heading (TRUE); + = right of the course
+  const gc = courseGeom(g, info.courseTrue); // the geometry below is against the final approach COURSE
+  const { along: alongC, cross: crossC } = alongCross(gc, ac.pos);
+  const dC = -alongC;
+  const rel = headingDiff(gc.headingDeg, ac.target.headingDeg ?? ac.headingDeg); // assigned heading (TRUE); + = right of the course
   const angle = Math.abs(rel);
   const s = Math.sin(deg2rad(rel));
-  const established = Math.abs(cross) <= ESTABLISHED_CROSS_M;
-  const converging = cross * s < 0 && Math.abs(s) > 1e-3;
-  const tM = established ? 0 : converging ? -cross / s : Infinity;
-  const dInt = established ? d : converging ? d - tM * Math.cos(deg2rad(rel)) : NaN;
+  const established = Math.abs(crossC) <= ESTABLISHED_CROSS_M;
+  const converging = crossC * s < 0 && Math.abs(s) > 1e-3;
+  const tM = established ? 0 : converging ? -crossC / s : Infinity;
+  const dInt = established ? dC : converging ? dC - tM * Math.cos(deg2rad(rel)) : NaN;
   const ahead = (limit: number) => info.onCourse.filter((f) => f.dM < limit - 200).map((f) => f.id);
   const plan: ApproachPlan = {
-    mode: 'intercept', procedureId: info.procedure.id, fixes: Number.isFinite(dInt) ? ahead(dInt) : [], onCourse: info.onCourse.map((f) => f.id), fafDM,
-    joinDM: Number.isFinite(dInt) ? Math.max(0, dInt) : Math.max(0, d), joinTravelM: Number.isFinite(dInt) && !established ? tM : 0, ifDM: info.onCourse[0]?.dM, interceptDM: Number.isFinite(dInt) ? dInt : undefined, interceptAngleDeg: angle,
+    mode: 'intercept', courseTrue: info.courseTrue, procedureId: info.procedure.id, fixes: Number.isFinite(dInt) ? ahead(dInt) : [], onCourse: info.onCourse.map((f) => f.id), fafDM,
+    joinDM: Number.isFinite(dInt) ? Math.max(0, dInt) : Math.max(0, dC), joinTravelM: Number.isFinite(dInt) && !established ? tM : 0, ifDM: info.onCourse[0]?.dM, interceptDM: Number.isFinite(dInt) ? dInt : undefined, interceptAngleDeg: angle,
   };
   const bad = (reason: string, pilot: string): ApproachAssessment => ({ kind: 'ok', plan, geometry: { reason: `Unable: ${reason}`, pilot } });
-  if (d > 0 ? d < fafDM : true) {
-    return bad(`${ac.callsign} is inside the final approach fix for runway ${g.end.id} (${mToNm(Math.max(0, d)).toFixed(1)} nm from the threshold, FAF ${mToNm(fafDM).toFixed(1)} nm); the approach clearance must be issued outside the FAF.`, `we're inside the final approach fix`);
+  if (dC > 0 ? dC < fafDM : true) {
+    return bad(`${ac.callsign} is inside the final approach fix for runway ${g.end.id} (${mToNm(Math.max(0, dC)).toFixed(1)} nm from the threshold, FAF ${mToNm(fafDM).toFixed(1)} nm); the approach clearance must be issued outside the FAF.`, `we're inside the final approach fix`);
   }
-  if (angle > MAX_INTERCEPT_ANGLE_DEG) {
-    return bad(`intercept angle too large (${angle.toFixed(0)} deg; maximum ${MAX_INTERCEPT_ANGLE_DEG}) for runway ${g.end.id}.`, `the intercept angle is too large`);
+  // 7110.65 5-9-1 / 5-9-2 (TBL 5-9-1): approach gate = 1 nm outside the FAF, no closer than 5 nm to the threshold
+  // (P/CG APPROACH GATE). Vector to intercept at least 2 nm outside the gate at <= 30 degrees; closer than 2 nm outside (but not
+  // inside) the gate only with ceiling >= MVA + 500 and visibility >= 3 sm (MVA is not in the data: approximated by the
+  // simplified visual-approach VMC), not for RNAV aircraft on a GPS/RNAV approach, and at <= 20 degrees. Inside the gate (but
+  // outside the FAF) only if the pilot asks, which the simulator cannot express: improper.
+  const gateDM = approachGateDM(fafDM);
+  const maxAngleFar = MAX_INTERCEPT_ANGLE_DEG;
+  if (established) {
+    if (angle > maxAngleFar) return bad(`intercept angle too large (${angle.toFixed(0)} deg; maximum ${maxAngleFar}) for runway ${g.end.id}.`, `the intercept angle is too large`);
+    return { kind: 'ok', plan };
   }
-  if (!established && !converging) return bad(`${ac.callsign} is not on a heading that intercepts the runway ${g.end.id} final approach course.`, `we're not on an intercept heading`);
+  if (!converging) return bad(`${ac.callsign} is not on a heading that intercepts the runway ${g.end.id} final approach course.`, `we're not on an intercept heading`);
   if (dInt < fafDM) return bad(`the intercept point is inside the final approach fix for runway ${g.end.id}.`, `we'd intercept inside the final approach fix`);
+  const outsideGate = dInt - gateDM;
+  const farEnough = outsideGate >= GATE_INTERCEPT_MARGIN_M;
+  const maxAngle = farEnough ? MAX_INTERCEPT_ANGLE_DEG : MAX_INTERCEPT_ANGLE_NEAR_GATE_DEG;
+  if (angle > maxAngle) {
+    return bad(
+      `intercept angle too large (${angle.toFixed(0)} deg; maximum ${maxAngle} ${farEnough ? 'when the intercept is 2 nm or more outside the approach gate' : 'when it is less than 2 nm outside the approach gate'}, 7110.65 5-9-2) for runway ${g.end.id}.`,
+      `the intercept angle is too large`,
+    );
+  }
+  if (!farEnough) {
+    const relaxed = outsideGate >= 0 && type !== 'RNAV' && visualApproachAllowed(weather).ok;
+    if (!relaxed) {
+      return bad(
+        `the intercept point is ${mToNm(dInt).toFixed(1)} nm from the threshold, ${outsideGate < 0 ? 'inside' : 'less than 2 nm outside'} the approach gate (${mToNm(gateDM).toFixed(1)} nm): vector to intercept at least 2 nm outside the gate, ${mToNm(gateDM + GATE_INTERCEPT_MARGIN_M).toFixed(1)} nm for runway ${g.end.id} (7110.65 5-9-1${type === 'RNAV' ? '; the relaxations do not apply to RNAV aircraft' : ''}).`,
+        `the intercept is inside the approach gate`,
+      );
+    }
+  }
   if (mToNm(tM) > MAX_INTERCEPT_AHEAD_NM) {
     return bad(`the final approach course is ${mToNm(tM).toFixed(0)} nm ahead; clear the approach when the intercept is within ${MAX_INTERCEPT_AHEAD_NM} nm.`, `we're too far from the final approach course`);
   }

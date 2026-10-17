@@ -21,7 +21,7 @@ here knows about KACY. Tests run against the synthetic `__fixtures__/testAirport
 | `navigation.ts` | Lateral navigation over fixes: fix lookup (`Airport.navaids`), `distanceToFixNm`, `bearingToFixMag`, fly-by sequencing (`advanceNav`, `turnLeadM`) |
 | `approach.ts` | Instrument / visual approach analysis: procedure classification, `assessApproach` (route join, intercept geometry, weather, range) |
 | `missedApproach.ts` | Interpreter and guidance for the published missed approach text; published-hold lookup |
-| `holding.ts` | Holding patterns (direct entry), `holdingText` parser |
+| `holding.ts` | Holding patterns with the AIM 5-3-8 direct / teardrop / parallel entries, `holdingText` parser |
 | `minima.ts` | Approach minima from `minimaText`, runway-in-sight test for the decision altitude |
 | `ifr.ts` | IFR clearance defaults (DP name from `airport.procedures`, squawk assignment) |
 | `scoring.ts` | `ScoreCard` maintenance and the score formula |
@@ -95,7 +95,7 @@ pilot readback (`onPilotTransmission` fires; callers must NOT speak the returned
 * **Pre-execution assessment** (`assessClearanceSafety`, pure): TAKEOFF / LINE_UP while the runway is
   occupied, another departure rolling / in position, a crossing aircraft cleared, or (TAKEOFF) an arrival
   inside 2 nm final; LAND with the runway occupied / departing / in position; CROSS_RUNWAY in front of a
-  departure or an arrival within 3 nm; and simultaneous use of intersecting runways (13/31 vs 4/22).
+  departure or an arrival within 3 nm; and intersecting-runway operations (13/31 vs 4/22, see below).
   * `scenario.mode === 'training'`: rejected (`unsafe: true`), reason cites the JO 7110.65 topic.
   * otherwise: accepted, flagged (`RUNWAY_CONFLICT` + `UNSAFE_CLEARANCE` alerts, `CONFLICT` events), scored.
   * Topics cited (no text quoted): 3-9-6 same runway separation, 3-10-3 landing clearance,
@@ -106,9 +106,43 @@ pilot readback (`onPilotTransmission` fires; callers must NOT speak the returned
   (< 30 m, parked aircraft excluded), `AIRBORNE_PROXIMITY` (< 1.5 nm and < 500 ft: a **near-miss alert threshold**,
   not the separation minimum - the terminal radar minimum is 3 nm, JO 7110.65 5-5-4). Alerts are keyed so each
   episode emits one event.
-* **Same-runway separation is binary** (runway occupied / a departure rolling / an arrival inside 2 nm): the distance-based
-  rule of 7110.65 3-9-6 / 3-10-3 (3,000 / 4,500 / 6,000 ft between a departing or landing aircraft and the preceding one,
-  by SRS category I = C172, III = A320) is **not implemented** and is a known limitation.
+* **Same-runway separation (JO 7110.65 3-9-6 departures, 3-10-3 arrivals, text fetched 2026-10-17)**: categorical distances
+  (`srsMinimumFt`, categories from `srsCategory` in performance.ts: C172 = I, A320 = III, unknown light = I, other = III;
+  II = small twin, none yet). Both Category I: 3,000 ft; the succeeding aircraft Category II (or both): 4,500 ft; Category I
+  preceded by II: 3,000 ft; either Category III: 6,000 ft. In `assessClearanceSafety`:
+  * TAKEOFF / LINE_UP: a preceding aircraft **on the ground** on the runway (rolling, cleared, in position, any occupant) is
+    always unsafe. A preceding **airborne** departure (INITIAL_CLIMB / DEPARTURE / GO_AROUND) blocks only while it is on the
+    runway (not past the runway end, not turned away: > 450 m off the centreline) and less than the categorical distance ahead of
+    the succeeding aircraft's start of roll (its position along the runway). The text's alternative "has departed and crossed the
+    runway end or turned to avert any conflict" is the "past the end / turned away" case; the distance alternative needs
+    landmark-determinable distance, which the simulator always has.
+  * LAND: a preceding aircraft on the ground on the runway (landed and not clear, rolling, cleared for takeoff, in position) is
+    unsafe; the 3-10-3 sunrise-to-sunset exception (a landed aircraft need not be clear if 3,000 / 4,500 ft down the runway) is NOT
+    applied because the simulator has no time of day. A preceding airborne departure blocks unless it has crossed the runway end /
+    turned away or is the categorical distance (same figures, 3-10-3 b) beyond the landing threshold.
+  * Anticipating separation (3-9-5 / 3-10-6) is the conservative version: only the separation that ALREADY exists counts, a
+    clearance given while the leader is still rolling is refused (training; the other modes flag it as `UNSAFE_CLEARANCE`).
+  * The per-tick surface-conflict check ignores aircraft that are already climbing out (they were judged at clearance time).
+  Not modelled: helicopter / powered-lift visual separation, the 3-9-6 time intervals (wake, 2-3 minutes), arrivals judged against
+  a preceding arrival that is still airborne (that is the approach-separation rule below), the "arrival inside 2 nm final blocks a
+  takeoff" rule remains a controller-judgment simplification.
+* **Intersecting runways (3-9-8 departures, 3-10-4 arrivals, text fetched 2026-10-17)**: judged by position, not by a height: a
+  departure on one runway is blocked until the preceding departure on the other runway "has departed and passed the intersection"
+  (its position along its runway beyond the centreline intersection + 60 m), or a preceding arrival there is clear of the runway /
+  has passed the intersection (an arrival still rolling out before it blocks; the hold-short / exit-acknowledgement releases and
+  LAHSO are not modelled). An arrival that is still airborne on final does NOT by itself make a departure unsafe: only if it would
+  cross its threshold before the departure clears the intersection (arrival: distance / ground speed; departure: 2.5 s roll
+  delay + `sqrt(2 d / a)` with the type's acceleration). Likewise an arrival clearance is unsafe only if the arrival would reach its
+  threshold before a departing aircraft on the other runway passes the intersection; between two arrivals, only if the one that
+  lands first would not have passed the intersection (touchdown speed / 2 over the roll) when the other crosses its threshold.
+* **Wake turbulence time intervals (2-1-19, 3-9-6, 3-9-7, 3-9-8; P/CG AIRCRAFT WAKE CATEGORIES)**: A = A380, B/C/D = heavy, E = B757,
+  F/G = other aircraft over 41,000 lb (the A320), H/I = under 41,000 lb (the C172). So the 3-9-6 and 3-9-8 time intervals (behind
+  categories A-E only) never apply to the simulated types and are NOT modelled, nor are the 4- and 3-minute 3-9-7 intervals behind A-E.
+  What applies is 3-9-7: a Category I aircraft (C172) departing from an intersection on the same runway (same or opposite direction;
+  an intersection = more than 500 ft from the runway end) behind a departing Category F, G or H aircraft (the A320) must not start its roll
+  until 3 minutes after the preceding aircraft took off (liftoff time from the `airborne` INFO event; the clearance's 2.5 s roll
+  delay counts): refused in training with "hold for wake turbulence, 3 minutes required", flagged otherwise. The pilot-requested
+  waiver is not modelled. A full-length departure behind an A320 has no time interval; the categorical distances above still apply.
 * Ground spacing: stop at `1.5 * max(length) + 20 m` behind an aircraft ahead on the same path.
 
 ## Pilot behaviour and readback errors
@@ -200,13 +234,16 @@ information alpha."*, pending request `APPROACH`.
    `IFR_CLEARANCE` request and no clearance yet. A stated destination must match the flight plan (K prefix ignored);
    `squawk` must be 4 octal digits, not 0000/1200/7500/7600/7700, not in use. Defaults: DP name = first `procedures[].type ===
    'DP'` without "DEPARTURE" (ATLANTIC CITY THREE), initial altitude 2000 (ATLANTIC CITY THREE says maintain 2000), expect =
-   cruise, departure frequency = DEP else APP, squawk = seeded unused code. Stored on `flightPlan.ifrClearance` (`readBack:
+   cruise, departure frequency = the DEP frequency whose `sectorBearings` (magnetic bearings from the airport) contain the bearing from
+   the ARP to the first fix of the route (KACY: 310-129 north -> 134.25 [CYN, COL, RBV], 130-309 south -> 124.6 [VCN, SIE]), else the
+   first DEP, else APP; a controller position covers all of its sector frequencies (the `DEP` controller can talk to an aircraft on
+   `DEP-N`); squawk = seeded unused code. Stored on `flightPlan.ifrClearance` (`readBack:
    true`), `ac.squawk` set.
 3. 15 s later (`IFR_TAXI_REQUEST_DELAY_SEC`) the pilot tunes Ground by itself and calls *"... Ground, Spirit four fifty one, at
    Gate one, ready to taxi, IFR to Philadelphia."* (pending `TAXI`).
 4. `TAKEOFF` without an IFR clearance: training -> refused ("no IFR clearance on file"); otherwise accepted, an INFO event, and
    a communication error (`COMMAND_ACCEPTED` with `data.commError`, no "correct clearance" credit).
-5. After takeoff: runway heading, climb to `ifrClearance.initialAltitudeFt`. Tower: `CONTACT_FREQUENCY` `frequencyId: 'DEP'`
+5. After takeoff: runway heading, climb to `ifrClearance.initialAltitudeFt`. Tower: `CONTACT_FREQUENCY` `frequencyId: 'DEP'` (for an IFR departure this resolves to the *sector* frequency of its clearance, see below)
    (resolves; the id the controller named is kept when APP and DEP share a frequency, so the pilot says "Departure"). Check-in:
    *"Atlantic City Departure, Spirit four fifty one, leaving one thousand two hundred, climbing to two thousand."* (pending `OTHER`).
 6. `RADAR_CONTACT` is informational: `radarIdentified = true`, INFO event, **no pilot transmission** (the outcome's `readback` is
@@ -225,8 +262,15 @@ information alpha."*, pending request `APPROACH`.
   published IAP for that runway end (`procedures[]` of type IAP whose name contains ILS / LOC / RNAV / VOR, copter variants
   ignored, HI- variants last); more than 30 nm from the threshold; VISUAL unless the weather is VFR or MVFR with ceiling (lowest
   BKN/OVC/VV) >= 1000 ft AGL and visibility >= 3 sm (simplified VMC); an aircraft on a route that does not join the procedure.
-* **Improper geometry** (aircraft on vectors, using the assigned heading): inside the FAF, intercept angle > 30 degrees, heading
-  that does not converge on the course, intercept point inside the FAF, or the course more than 10 nm ahead. Training:
+* **Improper geometry** (aircraft on vectors, using the assigned heading): inside the FAF, intercept angle too large, heading
+  that does not converge on the course, intercept point inside the FAF or the **approach gate**, or the course more than 10 nm ahead.
+  Gate and angles per JO 7110.65 5-9-1 / 5-9-2 (TBL 5-9-1, text fetched 2026-10-17) and the P/CG definition: the *approach gate* is
+  on the final approach course 1 nm outside the FAF and no closer than 5 nm to the threshold (KACY ILS 13: FAF 4.55 nm -> gate 5.55
+  nm). Vectors must intercept at least 2 nm outside the gate (7.55 nm for ILS 13) at <= 30 degrees. Closer than 2 nm outside the gate
+  (but not inside it) the maximum angle is 20 degrees and it needs ceiling >= MVA + 500 and visibility >= 3 sm (the MVA is not in
+  the data: approximated by the simplified VMC of the visual approach, ceiling >= 1000 ft / 3 sm), and the relaxation does not apply
+  to RNAV aircraft being vectored for an RNAV approach. Inside the gate (but outside the FAF) is allowed only on the pilot's request,
+  which the simulator cannot express: improper. An aircraft already established on the course is exempt from the gate rule. Training:
   refused ("intercept angle too large", "inside the final approach fix"); other modes: accepted, an INFO event and a
   communication error (not credited as a correct clearance).
 * **Separation** (`conflicts.ts`): 3 nm in trail *at the moment of joining* between the follower and every aircraft
@@ -243,8 +287,15 @@ information alpha."*, pending request `APPROACH`.
 Procedure geometry (all relative to the runway end; no airport knowledge): *on-course* fixes (1-40 nm out, `|cross| <= 0.2 d +
 0.3 nm`) form the straight-in segment (farthest = IF/IAF, the one closest but >= 3 nm out = FAF); fixes listed *before* the
 last on-course fix are *feeders* (VCN for ILS 13); fixes listed after it or past the threshold (missed approach, holds) are
-never flown. Final approach course = runway heading for every type (simplification; RNAV 22 / VOR 4 are really a few degrees
-off).
+never flown.
+
+Final approach course (`finalCourseTrue`, per procedure): ILS / LOC procedures use the NASR localizer course of the runway end
+(`RunwayEnd.ils.courseDeg`, magnetic -> true; KACY 127.99 / 308.01); every other procedure uses the bearing from its FAF to the
+runway threshold; the runway heading only when neither exists (e.g. an ILS-less runway whose procedure has no on-course fix). The
+vector-intercept geometry, the capture / "established" test, the centreline guidance and the FINAL logic all work against this course
+(`courseGeom`); touchdown and the rollout use the runway heading. On KACY this makes VOR 4 fly 36.8 degrees true (runway 28) and VOR 31
+292.6 (runway 298); RNAV 22 comes out at 208.02 versus the runway's 208.00 because its FAF (EFEWY) lies on the extended centreline, and
+the RNAV 4 / 13 / 31 courses are within 0.05 degrees of their runways (the test prints the table).
 
 On acceptance (`rt.approach` is set; the clearance is `completeClearances`-ed when replaced, vectored off, or on go-around):
 
@@ -292,15 +343,23 @@ thousand, direct SMITS, request further clearance."* (or "holding at SMITS, two 
 
 ### Holding (`holding.ts`)
 
-Standard racetrack, **direct entry only** (teardrop / parallel entries are simplified to a direct entry: fly to the fix, turn
-180 degrees in the pattern direction onto the outbound heading, fly the leg, turn back, track the inbound course). Right turns
+Standard racetrack with the three AIM 5-3-8 entry procedures, chosen from the aircraft's ground track relative to the inbound course
+when it reaches the fix (`rel` = track minus inbound course, positive right; mirrored for left-turn holds):
+**direct** for -110 < rel < +70 (and within 5 degrees of the outbound course: already outbound), **parallel** for +70 to +175,
+**teardrop** for -175 to -110 (the 70 degree sector on the holding side). Direct: turn onto the outbound heading in the pattern
+direction. Teardrop: outbound 30 degrees off the outbound course toward the holding side for one leg, then turn in the pattern direction
+to intercept the inbound course. Parallel: outbound parallel to the course for one leg, then turn toward the holding side (opposite
+to the pattern turns, through more than 180 degrees) back to the fix, then the racetrack. The entry chosen is in the INFO event
+("over TVO: parallel entry (track +130 deg from the inbound course, right turns; AIM 5-3-8)"). The inbound leg tracks the inbound
+COURSE: cross-track correction up to a 45 degree intercept, the turn onto the inbound leg rolls out on the intercept track, and the
+heading is wind-corrected (a 30 kt crosswind is a ~10 degree crab). Right turns
 unless stated. Legs: the stated minutes or nm, else 1 minute at or below 14,000 ft and 1.5 minutes above; outbound timing starts
-within 5 degrees of the outbound heading. Hold speed 170 kt (jets) / 90 kt (light): a jet's racetrack is ~2.2 nm wide and the
+within 5 degrees of the outbound track. Hold speed 170 kt (jets) / 90 kt (light): a jet's racetrack is ~2.2 nm wide and the
 whole pattern stays within ~4.5 nm of the fix for 1-minute legs (the 180 degree turns at a standard-rate turn of the type add
-about a nautical mile beyond the leg). The aircraft stays until `DIRECT_FIX` / `APPROACH` / `HEADING` / `RESUME_OWN_NAVIGATION`
-(an arrival returns to phase APPROACH).
+about a nautical mile beyond the leg); a parallel or teardrop entry stays within 6 nm. The aircraft stays until `DIRECT_FIX` /
+`APPROACH` / `HEADING` / `RESUME_OWN_NAVIGATION` (an arrival returns to phase APPROACH).
 
-Inbound course, in order: the instruction; the plate `holdingText` when it states one ("270 deg inbound"); for the hold at the end of
+Inbound course, in order: the instruction; the charted pattern (`InstrumentProcedure.holdingPatterns[]`, transcribed from the plates: inbound course, turns, leg length; TUBER 017 right 6 NM, SMITS 270, RODDI 218 right 5 NM, CARYL 128 one minute); the plate `holdingText` when it states one ("270 deg inbound"); for the hold at the end of
 a published missed approach, the reciprocal of the radial it ends on (SMITS on ACY R-090 -> 270), the radial that any procedure
 defines the fix on, or the stated track; otherwise the course from the previous route fix (or from the aircraft) to the fix. Every
 case that is not stated by the instruction or the holding text records an `assumption` in the INFO event. Leg length / turns come
@@ -329,6 +388,18 @@ to the decision point) and the weather is the scenario's single METAR-like obser
 | `HOLD_AT_FIX` | `hold`: `fix`, `turns`, `asPublished`, optional `inboundCourseDeg` (magnetic, to the fix), `legMinutes`, `legNm`, `efcZulu` |
 | `RESUME_OWN_NAVIGATION`, `RADAR_CONTACT`, `MISSED_APPROACH` | none |
 | `CONTACT_FREQUENCY` | `frequencyId` `CLNC`/`GND`/`TWR`/`APP`/`DEP` (or `frequencyMhz`) |
+
+## Landing rollout and runway exit
+
+Braking follows the sourced landing distances (A320 6 kt/s, C172 4.4 kt/s; maximum braking = 1.4x). At touchdown `chooseExit` takes the
+FIRST exit (runway node beside a hold position of that runway) the aircraft can reach at that exit's safe speed braking no harder
+than normal, else no harder than the maximum. Exit speed: 60 kt for a 30 degree connector falling to 30 kt for a 90 degree one, and
+never more than the speed from which it can stop at the hold line (~22 kt for a 76 m connector). The aircraft brakes at least at the
+planned rate, harder if it falls behind, and rolls at the exit speed to the exit. If no exit is reachable it stops short of the runway
+end (60 m) and short of any intersecting runway's hold line (60 m + half its length): never in the intersection, and asks for taxi
+instructions ("stopped on runway ..., unable to exit, request taxi instructions"). Measured on KACY in calm air (touchdown at
+~1,284 / 1,601 ft): C172 13 exits at 2,017 ft, clear 14 s after touchdown; C172 31 2,200 ft / 17 s; C172 4 3,397 ft / 49 s; C172 22 2,748 ft
+/ 31 s; A320 13 4,444 ft / 25 s; A320 31 5,557 ft / 34 s; A320 4 3,397 ft (taxiway B, braking ~7.8 kt/s) / 17 s; A320 22 6,101 ft / 38 s.
 
 ## Phraseology audit (docs/PHRASEOLOGY-AUDIT.md)
 
@@ -359,8 +430,7 @@ surface carry `onRunwayId`; parking nodes of kind `parking`; GND/TWR frequencies
 * Pattern work is minimal (downwind -> base -> final, fixed 0.8 nm offset); holding patterns are not flown.
 * Pushback is a state change only (no motion). No vehicles, no de-icing, no helicopters.
 * After a go-around the aircraft flies runway heading at a fixed altitude until instructed.
-* IFR: no holding patterns, procedure turns, DME arcs, STARs, speed/altitude restrictions per fix or minimums; the final approach
-  course is always the runway heading; one transponder code per aircraft, no radar coverage model (everything is "radar
+* IFR: no procedure turns, DME arcs, STARs, speed/altitude restrictions per fix; one transponder code per aircraft, no radar coverage model (everything is "radar
   contact" once identified); departure clearance has no void time; the missed approach is "2000 ft on runway heading" only when the plate text is unavailable or not interpretable.
 * Free-play traffic generation still spawns arrivals on the extended centreline, not at fixes (scenarios use `at_fix`).
 * `radioState` `RECEIVING` is not used (readbacks are instantaneous); no frequency congestion yet.

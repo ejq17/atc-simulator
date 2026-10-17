@@ -1,12 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import type { SimulationEngine } from './api';
-import type { HoldingInstruction } from './types';
+import type { HoldingInstruction, Weather } from './types';
 import { ALL_POSITIONS, AT_FIX, cmd, find, GA_PARKED, ifrScenario, makeEngine, makeScenario, run, runUntil, say } from './__fixtures__/testHelpers';
 import { createEngine } from './engine';
 import { createTestAirport, FIXTURE_MAG_VAR } from './__fixtures__/testAirport';
 import { kacyWithPlates } from './__fixtures__/kacyPlates';
 import { buildReadback } from '../radio/readback';
-import { dist, headingDiff, headingToVec, mToNm, normHeading } from './geo';
+import { dist, headingDiff, headingToVec, mToNm, nmToM, normHeading } from './geo';
+import { holdEntryFor } from './holding';
 import { findNavFix } from './navigation';
 
 const airport = createTestAirport();
@@ -158,7 +159,7 @@ describe('published holds', () => {
     expect(t).not.toMatch(/assumption/);
   });
 
-  it('real KACY plate text: CARYL one-minute (course assumed), SMITS inbound 270 from ACY R-090, RODDI 5 NM legs', () => {
+  it('real KACY charted patterns (holdingPatterns[]): CARYL 128 one-minute, SMITS 270, RODDI 218 with 5 NM legs, no assumptions', () => {
     const kacy = kacyWithPlates();
     const events = (fix: string) => {
       const e = createEngine({
@@ -172,11 +173,15 @@ describe('published holds', () => {
       expect(say(e, holdCmd({ fix, asPublished: true, turns: 'right' }), 'APP').status).toBe('accepted');
       return e.getState().events.filter((x) => x.kind === 'INFO').map((x) => x.text).find((x) => new RegExp(`holding at ${fix}`).test(x))!;
     };
-    expect(events('CARYL')).toMatch(/1 min legs \(published .*assumption: inbound course \d{3} = the course/);
+    const caryl = events('CARYL');
+    expect(caryl).toMatch(/inbound course 128 magnetic, right turns, 1 min legs \(published \(ILS Z OR LOC Z RWY 13 holding pattern\)\)/);
+    expect(caryl).not.toMatch(/assumption/);
     const smits = events('SMITS');
     expect(smits).toMatch(/inbound course 270 magnetic, right turns, 1 min legs/);
     expect(smits).not.toMatch(/assumption/);
-    expect(events('RODDI')).toMatch(/5 nm legs/);
+    const roddi = events('RODDI');
+    expect(roddi).toMatch(/inbound course 218 magnetic, right turns, 5 nm legs/);
+    expect(roddi).not.toMatch(/assumption/);
   });
 });
 
@@ -234,3 +239,146 @@ describe('holding is deterministic', () => {
   });
 });
 
+
+describe('AIM 5-3-8 holding entries (fixture fix TVO, inbound course 000 magnetic)', () => {
+  const INBOUND_MAG = 0;
+  const inboundTrue = normHeading(INBOUND_MAG + FIXTURE_MAG_VAR);
+  const cases: { name: string; turns: 'left' | 'right'; rel: number; entry: 'direct' | 'teardrop' | 'parallel' }[] = [
+    { name: 'right, flying the inbound course', turns: 'right', rel: 0, entry: 'direct' },
+    { name: 'right, 60 left of the course (inside the direct sector)', turns: 'right', rel: -60, entry: 'direct' },
+    { name: 'right, 100 right of the course (parallel sector)', turns: 'right', rel: 100, entry: 'parallel' },
+    { name: 'right, 130 right (parallel sector)', turns: 'right', rel: 130, entry: 'parallel' },
+    { name: 'right, 150 left (teardrop sector)', turns: 'right', rel: -150, entry: 'teardrop' },
+    { name: 'right, 120 left (teardrop sector)', turns: 'right', rel: -120, entry: 'teardrop' },
+    { name: 'left, flying the inbound course', turns: 'left', rel: 0, entry: 'direct' },
+    { name: 'left, 130 left (mirrored parallel)', turns: 'left', rel: -130, entry: 'parallel' },
+    { name: 'left, 150 right (mirrored teardrop)', turns: 'left', rel: 150, entry: 'teardrop' },
+  ];
+
+  it('sector boundaries', () => {
+    expect(holdEntryFor(0, 0, 'right')).toBe('direct');
+    expect(holdEntryFor(0, 69, 'right')).toBe('direct');
+    expect(holdEntryFor(0, 71, 'right')).toBe('parallel');
+    expect(holdEntryFor(0, 178, 'right')).toBe('direct'); // already outbound
+    expect(holdEntryFor(0, 250, 'right')).toBe('teardrop'); // -110: the 70 degree line on the holding side
+    expect(holdEntryFor(0, 249, 'right')).toBe('teardrop');
+    expect(holdEntryFor(0, 251, 'right')).toBe('direct'); // -109
+    expect(holdEntryFor(0, 291, 'right')).toBe('direct');
+    expect(holdEntryFor(0, 290, 'left')).toBe('parallel'); // mirrored: -70 for a left hold
+    expect(holdEntryFor(0, 110, 'left')).toBe('teardrop');
+    expect(holdEntryFor(90, 90 + 130, 'right')).toBe('parallel'); // relative to the course, not north
+  });
+
+  it.each(cases)('$name -> $entry entry: established inbound on the course within 6 minutes, never > 6 nm from the fix', ({ turns, rel, entry }) => {
+    const e = makeEngine({ scenario: ifrScenario([AT_FIX('NKS451', 'TARR', ['TARR', 'TVO'], '13', {}, 4000)], { mode: 'training' }) });
+    const ac = find(e, 'NKS451');
+    const heading = normHeading(inboundTrue + rel);
+    const v = headingToVec(heading);
+    ac.pos = { x: TVO.x - v.x * nmToM(8), y: TVO.y - v.y * nmToM(8) };
+    ac.headingDeg = heading;
+    ac.trackDeg = heading;
+    ac.airspeedKt = 170;
+    ac.groundSpeedKt = 170;
+    ac.target.speedKt = 170;
+    expect(say(e, holdCmd(hold({ inboundCourseDeg: INBOUND_MAG, turns, legMinutes: 1 })), 'APP').status).toBe('accepted');
+
+    let tArrive: number | undefined;
+    let tInbound: number | undefined;
+    let maxD = 0;
+    const dt = e.getState().clock.dtSec;
+    for (let i = 0; i < 900 / dt; i++) {
+      e.step();
+      const t = e.getState().clock.timeSec;
+      const d = mToNm(dist(ac.pos, TVO));
+      if (tArrive === undefined && d < 0.5) tArrive = t;
+      if (tArrive !== undefined) {
+        maxD = Math.max(maxD, d);
+        if (tInbound === undefined && d < 0.6 && Math.abs(headingDiff(ac.trackDeg, inboundTrue)) < 10 && (entry === 'direct' || t - tArrive > 20)) tInbound = t;
+        if (tInbound !== undefined && t - tArrive > 400) break;
+      }
+    }
+    expect(tArrive).toBeDefined();
+    expect(maxD).toBeLessThan(6);
+    expect(tInbound, 'crossed the fix inbound on the inbound course').toBeDefined();
+    expect(tInbound! - tArrive!).toBeLessThan(360);
+    const info = e.getState().events.filter((x) => x.kind === 'INFO' && /entry \(track/.test(x.text)).map((x) => x.text);
+    expect(info).toHaveLength(1);
+    expect(info[0]).toMatch(new RegExp(`over TVO: ${entry} entry .*${turns} turns; AIM 5-3-8`));
+    expect(ac.phase).toBe('HOLDING');
+  });
+
+  it('teardrop: the outbound leg is 30 degrees off the outbound course toward the holding side; parallel turns toward the holding side', () => {
+    const run1 = (rel: number) => {
+      const e = makeEngine({ scenario: ifrScenario([AT_FIX('NKS451', 'TARR', ['TARR', 'TVO'], '13', {}, 4000)], { mode: 'training' }) });
+      const ac = find(e, 'NKS451');
+      const heading = normHeading(inboundTrue + rel);
+      const v = headingToVec(heading);
+      ac.pos = { x: TVO.x - v.x * nmToM(4), y: TVO.y - v.y * nmToM(4) };
+      ac.headingDeg = heading;
+      ac.trackDeg = heading;
+      say(e, holdCmd(hold({ inboundCourseDeg: INBOUND_MAG, turns: 'right', legMinutes: 1 })), 'APP');
+      return { e, ac };
+    };
+    // teardrop: on the outbound leg the track is outbound - 30 (holding side = east of a northbound inbound course)
+    const td = run1(-150);
+    const outbound = normHeading(inboundTrue + 180);
+    let seen = 0;
+    for (let i = 0; i < 4000; i++) {
+      td.e.step();
+      if (td.ac.phase === 'HOLDING' && Math.abs(headingDiff(td.ac.headingDeg, outbound - 30)) < 2 && mToNm(dist(td.ac.pos, TVO)) < 4) seen++;
+    }
+    expect(seen).toBeGreaterThan(200); // ~1 minute of flying the 30 degree teardrop leg
+    // parallel: after the outbound leg the aircraft turns toward the holding side (left for a right-turn hold): the heading passes through east
+    const pa = run1(130);
+    let passedHoldingSide = false;
+    for (let i = 0; i < 5000; i++) {
+      pa.e.step();
+      if (Math.abs(headingDiff(pa.ac.headingDeg, normHeading(inboundTrue + 90))) < 3 && mToNm(dist(pa.ac.pos, TVO)) < 5 && pa.e.getState().clock.timeSec > 120) passedHoldingSide = true;
+    }
+    expect(passedHoldingSide).toBe(true);
+  });
+});
+
+describe('wind: the inbound leg tracks the course, not the heading', () => {
+  it('30 kt crosswind: the heading is crabbed into the wind (> 5 deg) while the track stays on the inbound course', () => {
+    const base = makeScenario().weather as Weather;
+    const e = makeEngine({
+      scenario: ifrScenario([AT_FIX('NKS451', 'TARR', ['TARR', 'TVO'], '13', {}, 4000)], { mode: 'training', weather: { ...base, windDirDeg: 90, windSpeedKt: 30 } }),
+    });
+    const ac = find(e, 'NKS451');
+    const inboundTrue = normHeading(0 + FIXTURE_MAG_VAR);
+    const c = headingToVec(inboundTrue);
+    const right = { x: c.y, y: -c.x };
+    const v = headingToVec(inboundTrue);
+    ac.pos = { x: TVO.x - v.x * nmToM(8), y: TVO.y - v.y * nmToM(8) };
+    ac.headingDeg = inboundTrue;
+    ac.trackDeg = inboundTrue;
+    ac.airspeedKt = 170;
+    ac.groundSpeedKt = 170;
+    ac.target.speedKt = 170;
+    say(e, holdCmd(hold({ inboundCourseDeg: 0, turns: 'right', legMinutes: 1 })), 'APP');
+    const crab: number[] = [];
+    const crossings: number[] = [];
+    let prevAlong = -8;
+    for (let i = 0; i < 12000; i++) {
+      e.step();
+      const t = e.getState().clock.timeSec;
+      const rel = { x: ac.pos.x - TVO.x, y: ac.pos.y - TVO.y };
+      const along = mToNm(rel.x * c.x + rel.y * c.y);
+      const cross = mToNm(rel.x * right.x + rel.y * right.y);
+      // on the way in: the nose is crabbed into the wind while the TRACK stays on the course
+      if (t > 20 && t < 140) {
+        expect(Math.abs(cross)).toBeLessThan(0.1);
+        crab.push(headingDiff(ac.trackDeg, ac.headingDeg));
+      }
+      // every later pass over the fix inbound is on the course despite the wind pushing the racetrack off it
+      if (t > 300 && prevAlong < 0 && along >= 0 && Math.abs(headingDiff(ac.trackDeg, inboundTrue)) < 25) crossings.push(cross);
+      prevAlong = along;
+    }
+    const median = [...crab].sort((a, b) => a - b)[Math.floor(crab.length / 2)];
+    expect(median).toBeGreaterThan(8); // wind from the east pushes west: nose east of the track (asin(29/170) = 9.8 deg)
+    expect(median).toBeLessThan(12);
+    expect(crossings.length).toBeGreaterThanOrEqual(2);
+    for (const x of crossings) expect(Math.abs(x)).toBeLessThan(0.3);
+  });
+});

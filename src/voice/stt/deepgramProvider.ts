@@ -17,13 +17,49 @@
  * own backend (server/voice/deepgramToken.ts).
  */
 import { AVIATION_KEYTERMS } from './aviationVocab.ts';
-import { startPcmCapture, TARGET_SAMPLE_RATE } from './pcmCapture.ts';
-import type { PcmCapture } from './pcmCapture.ts';
+import { startPcmCapture, TARGET_SAMPLE_RATE, warmUpAudio } from './pcmCapture.ts';
+import type { PcmCapture, WarmAudio } from './pcmCapture.ts';
 import type { SpeechRecognitionProvider, SttStartOptions } from './types.ts';
 import { mapMediaError } from './mediaErrors.ts';
 import { SttError } from './types.ts';
 
-export const DEEPGRAM_LISTEN_URL = 'wss://api.deepgram.com/v1/listen';
+export const DEEPGRAM_WS_BASE = 'wss://api.deepgram.com';
+export const DEEPGRAM_LISTEN_PATH = '/v1/listen';
+export const DEEPGRAM_LISTEN_URL = `${DEEPGRAM_WS_BASE}${DEEPGRAM_LISTEN_PATH}`;
+/** Runtime override for tests only: honoured when it is a ws:// URL on this machine (see resolveDeepgramWsBase). */
+export const DEEPGRAM_WS_BASE_STORAGE_KEY = 'kacy.deepgram.wsBase';
+
+const isLoopbackHost = (h: string) => h === 'localhost' || h === '127.0.0.1' || h === '[::1]';
+
+/**
+ * Where to open the streaming socket. Default wss://api.deepgram.com.
+ *  - `VITE_DEEPGRAM_WS_BASE` (build/dev-server env) may point at any ws(s) URL, e.g. a company proxy.
+ *  - localStorage `kacy.deepgram.wsBase` (set by e2e/deepgram.spec.ts) is honoured only for ws://localhost or
+ *    ws://127.0.0.1, so a stray storage value can never send microphone audio to a remote host.
+ */
+export function resolveDeepgramWsBase(sources: { env?: string; stored?: string | null } = {}): string {
+  const env = sources.env ?? (import.meta as unknown as { env?: Record<string, string | undefined> }).env?.VITE_DEEPGRAM_WS_BASE;
+  let stored = sources.stored;
+  if (stored === undefined) {
+    try {
+      stored = typeof localStorage !== 'undefined' ? localStorage.getItem(DEEPGRAM_WS_BASE_STORAGE_KEY) : null;
+    } catch {
+      stored = null;
+    }
+  }
+  const parse = (raw: string | null | undefined, loopbackOnly: boolean): string | undefined => {
+    if (!raw?.trim()) return undefined;
+    try {
+      const u = new URL(raw.trim());
+      if (u.protocol !== 'ws:' && u.protocol !== 'wss:') return undefined;
+      if (loopbackOnly && !(u.protocol === 'ws:' && isLoopbackHost(u.hostname))) return undefined;
+      return `${u.protocol}//${u.host}${u.pathname.replace(/\/+$/, '')}`;
+    } catch {
+      return undefined;
+    }
+  };
+  return parse(stored, true) ?? parse(env, false) ?? DEEPGRAM_WS_BASE;
+}
 export const DEEPGRAM_TOKEN_PATH = '/api/voice/deepgram-token';
 
 export type DeepgramAuthScheme = 'token' | 'bearer';
@@ -74,7 +110,11 @@ export interface DeepgramProviderOptions {
   fetchFn?: typeof fetch;
   WebSocketCtor?: WebSocketCtor;
   getUserMedia?: (c: MediaStreamConstraints) => Promise<MediaStream>;
-  startCapture?: (stream: MediaStream, onChunk: (pcm: ArrayBuffer) => void) => Promise<PcmCapture>;
+  startCapture?: (stream: MediaStream, onChunk: (pcm: ArrayBuffer) => void, warm?: WarmAudio) => Promise<PcmCapture>;
+  /** Test seam for the idle audio graph (see warmUpAudio). */
+  warmUpAudio?: () => Promise<WarmAudio>;
+  /** Streaming socket base, e.g. `ws://127.0.0.1:8799`; default resolveDeepgramWsBase(). */
+  wsBase?: string;
   closeTimeoutMs?: number;
   now?: () => number;
 }
@@ -135,7 +175,7 @@ export function createDeepgramProvider(options: DeepgramProviderOptions = {}): S
     for (const model of models) {
       for (const scheme of schemes) {
         try {
-          const ws = await openSocket(WS, buildDeepgramListenUrl(model), [scheme, token]);
+          const ws = await openSocket(WS, buildDeepgramListenUrl(model, `${options.wsBase ?? resolveDeepgramWsBase()}${DEEPGRAM_LISTEN_PATH}`), [scheme, token]);
           preferredScheme = scheme;
           return ws;
         } catch (err) {
@@ -204,9 +244,23 @@ export function createDeepgramProvider(options: DeepgramProviderOptions = {}): S
     }
   }
 
+  let warm: Promise<WarmAudio | null> | null = null;
+  const getWarm = (): Promise<WarmAudio | null> => {
+    warm ??= (options.warmUpAudio ?? warmUpAudio)().catch(() => null);
+    return warm;
+  };
+
   const provider: SpeechRecognitionProvider = {
     id: 'deepgram',
     label: 'Deepgram',
+    async prepare() {
+      await getWarm();
+    },
+    async dispose() {
+      const w = warm;
+      warm = null;
+      await (await w)?.close();
+    },
     async isAvailable() {
       if (!getWS() || !getMedia()) return false;
       try {
@@ -225,10 +279,17 @@ export function createDeepgramProvider(options: DeepgramProviderOptions = {}): S
       if (active) await provider.stop();
 
       let stream: MediaStream;
+      let graph: WarmAudio | null;
       try {
-        stream = await media({ audio: { echoCancellation: true, noiseSuppression: true } });
+        // Open the microphone and (first press only) build the audio graph at the same time: building it on demand
+        // costs about half a second of speech (see pcmCapture.warmUpAudio).
+        [stream, graph] = await Promise.all([media({ audio: { echoCancellation: true, noiseSuppression: true } }), getWarm()]);
       } catch (err) {
         throw mapMediaError(err);
+      }
+      if (graph && graph.ctx.state === 'closed') {
+        warm = null;
+        graph = null;
       }
 
       // Start capturing right away and buffer, so connection latency never clips the first word.
@@ -237,10 +298,14 @@ export function createDeepgramProvider(options: DeepgramProviderOptions = {}): S
       const startCapture = options.startCapture ?? startPcmCapture;
       let capture: PcmCapture;
       try {
-        capture = await startCapture(stream, (pcm) => {
-          if (live) live.send(pcm);
-          else pending.push(pcm);
-        });
+        capture = await startCapture(
+          stream,
+          (pcm) => {
+            if (live) live.send(pcm);
+            else pending.push(pcm);
+          },
+          graph ?? undefined,
+        );
       } catch (err) {
         stream.getTracks().forEach((t) => t.stop());
         throw new SttError('no_microphone', 'Could not process microphone audio in this browser.', { cause: err });

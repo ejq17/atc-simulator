@@ -15,7 +15,24 @@
  */
 import type { IncomingMessage, ServerResponse } from 'node:http';
 
-export const DEEPGRAM_GRANT_URL = 'https://api.deepgram.com/v1/auth/grant';
+export const DEEPGRAM_API_BASE = 'https://api.deepgram.com';
+export const DEEPGRAM_GRANT_URL = `${DEEPGRAM_API_BASE}/v1/auth/grant`;
+
+/**
+ * Upstream base URL. `DEEPGRAM_API_BASE` (optional) points the grant call elsewhere, e.g. the protocol mock used by
+ * e2e/deepgram.spec.ts. Returns undefined when the override is not an absolute http(s) URL.
+ */
+export function resolveGrantUrl(env: Record<string, string | undefined>): string | undefined {
+  const raw = env.DEEPGRAM_API_BASE?.trim();
+  if (!raw) return DEEPGRAM_GRANT_URL;
+  try {
+    const u = new URL(raw);
+    if (u.protocol !== 'http:' && u.protocol !== 'https:') return undefined;
+    return `${u.origin}${u.pathname.replace(/\/+$/, '')}/v1/auth/grant`;
+  } catch {
+    return undefined;
+  }
+}
 /** The token only needs to be valid while the WebSocket handshake happens. */
 export const TOKEN_TTL_SECONDS = 60;
 
@@ -69,6 +86,12 @@ export async function handleDeepgramToken(
     return;
   }
 
+  const grantUrl = resolveGrantUrl(env);
+  if (!grantUrl) {
+    sendJson(res, 503, { error: 'DEEPGRAM_API_BASE must be an absolute http:// or https:// URL (or unset to use https://api.deepgram.com).' });
+    return;
+  }
+
   const t = now();
   while (recentGrants.length && t - recentGrants[0] > 60_000) recentGrants.shift();
   if (recentGrants.length >= RATE_LIMIT_PER_MINUTE) {
@@ -79,7 +102,7 @@ export async function handleDeepgramToken(
 
   let upstream: Response;
   try {
-    upstream = await doFetch(DEEPGRAM_GRANT_URL, {
+    upstream = await doFetch(grantUrl, {
       method: 'POST',
       headers: { Authorization: `Token ${apiKey}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({ ttl_seconds: TOKEN_TTL_SECONDS }),

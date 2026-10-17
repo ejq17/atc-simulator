@@ -50,6 +50,19 @@ export default defineConfig({
         },
       },
     },
+    {
+      // Installed Google Chrome (has the Web Speech service). Sends the synthetic fixture audio to Google: see e2e/webspeech.spec.ts.
+      name: 'chrome-webspeech',
+      testMatch: 'webspeech.spec.ts',
+      timeout: 240_000,
+      use: { ...devices['Desktop Chrome'], channel: 'chrome', viewport: { width: 1440, height: 900 }, permissions: ['microphone'] },
+    },
+    {
+      name: 'chromium-deepgram-mock',
+      testMatch: 'deepgram.spec.ts',
+      timeout: 120_000,
+      use: { ...devices['Desktop Chrome'], viewport: { width: 1440, height: 900 } },
+    },
   ],
   webServer: [
     {

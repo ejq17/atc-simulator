@@ -7,12 +7,12 @@
  */
 import type { Aircraft, AircraftPerformance, FlightPhase, Vec2, Weather } from './types';
 import {
-  clamp, deg2rad, dist, headingDiff, headingToVec, ktToMps, mpsToKt, mToFt, mToNm, nmToM, normHeading, rad2deg,
+  clamp, deg2rad, dist, headingDiff, headingToVec, ktToMps, mpsToKt, mToFt, mToNm, nmToM, normHeading, pointInPolygon, rad2deg,
   vAdd, vDot, vScale, vSub, vecToHeading, bearingDeg,
 } from './geo';
 import { activeClearance, completeClearances, emitEvent, getRuntime, perfOf, pilotSay, setPhase } from './context';
 import type { AircraftRuntime, SimContext } from './context';
-import { alongCross, findRunwayEnd } from './runways';
+import { alongCross, crossingRunways, findRunwayEnd } from './runways';
 import type { RunwayEndGeom } from './runways';
 import { neighborIds, shortestDistances } from './pathfinding';
 import { goingAroundCall } from '../radio/readback';
@@ -20,7 +20,7 @@ import { advanceNav, fixPosition } from './navigation';
 import { holdGuidance } from './holding';
 import { missedGuidance, startPublishedMissed } from './missedApproach';
 import { resolveMinima, runwayInSight } from './minima';
-import { APPROACH_FINAL_NM, isOnCourse } from './approach';
+import { APPROACH_FINAL_NM, courseGeom, isOnCourse } from './approach';
 
 export const GLIDEPATH_DEG = 3;
 export const TCH_FT = 50;
@@ -108,7 +108,7 @@ function stepTakeoffRoll(ctx: SimContext, ac: Aircraft, dt: number): void {
     ac.flags.holdingPosition = false;
     completeClearances(ctx, ac, ['TAKEOFF', 'LINE_UP_AND_WAIT', 'TAXI']);
     setPhase(ctx, ac, 'INITIAL_CLIMB', 'airborne');
-    emitEvent(ctx, { kind: 'INFO', aircraftId: ac.id, callsign: ac.callsign, text: `${ac.callsign} airborne runway ${g.end.id}`, severity: 'info', speaker: 'SYSTEM' });
+    emitEvent(ctx, { kind: 'INFO', aircraftId: ac.id, callsign: ac.callsign, text: `${ac.callsign} airborne runway ${g.end.id}`, severity: 'info', speaker: 'SYSTEM', data: { airborne: true, runwayEnd: g.end.id, runwayId: g.runway.id } });
   }
 }
 
@@ -122,37 +122,103 @@ function centreOnRunway(ac: Aircraft, g: RunwayEndGeom, dt: number): void {
 // Landing rollout and runway exit
 // ---------------------------------------------------------------------------
 
-function chooseExit(ctx: SimContext, ac: Aircraft, g: RunwayEndGeom, tdAlong: number, vTd: number): { exitNodeId?: string; holdNodeId?: string } {
+/** Hardest braking available, as a multiple of the normal landing-roll rate (autobrake / max manual braking). */
+export const MAX_BRAKE_FACTOR = 1.4;
+/** Margin (m) short of an intersecting runway's edge at which a stopping aircraft must be, nose included (the hold line is ~250 ft from its centreline). */
+const INTERSECTION_HOLD_MARGIN_M = 60;
+const RUNWAY_END_STOP_MARGIN_M = 60;
+
+/** Where (m along `g`) an intersecting runway's surface begins, if it is ahead of `fromAlong`. */
+function intersectionStartAlong(ctx: SimContext, g: RunwayEndGeom, fromAlong: number): number | undefined {
+  let best: number | undefined;
+  for (const other of crossingRunways(ctx.state.airport, g.runway.id)) {
+    for (let s = Math.max(0, fromAlong); s <= g.lengthM; s += 10) {
+      const c = vAdd(g.end.threshold, vScale(g.dir, s));
+      const inside = [-20, 0, 20].some((lat) => pointInPolygon(vAdd(c, vScale(g.right, lat)), other.polygon));
+      if (inside) {
+        if (best === undefined || s < best) best = s;
+        break;
+      }
+    }
+  }
+  return best;
+}
+
+/** Exit speed (m/s) for a connector leaving at `angleDeg` from the runway direction, limited so the aircraft can stop at the hold line `holdDistM` away. */
+export function exitSpeedMps(angleDeg: number, holdDistM: number): number {
+  // 90 degree exits <= 30 kt, shallow (high-speed) exits up to 60 kt
+  const byAngle = clamp(60 - 0.5 * (angleDeg - 30), 20, 60);
+  const byHold = 0.95 * Math.sqrt(2 * TAXI_DECEL_PLAN_FOR_EXIT * Math.max(20, holdDistM));
+  return ktToMps(Math.min(byAngle, mpsToKt(byHold)));
+}
+const TAXI_DECEL_PLAN_FOR_EXIT = 0.9;
+
+interface RolloutPlan {
+  exitNodeId?: string;
+  holdNodeId?: string;
+  exitSpeedMps: number;
+  /** Braking rate (m/s^2) the plan needs (never above the maximum). */
+  brakeMps2: number;
+  /** No exit: the along-runway position (m) the aircraft must stop short of. */
+  stopAlongM?: number;
+}
+
+/**
+ * Plan the rollout: the FIRST exit the aircraft can make at a safe exit speed (`exitSpeedMps`) braking no harder than the
+ * normal landing rate; failing that, the first exit it can make braking up to the maximum rate; failing that, no exit: stop
+ * short of the runway end and of any intersecting runway (never stopping in or beyond its hold line) and ask for taxi instructions.
+ */
+function chooseExit(ctx: SimContext, ac: Aircraft, g: RunwayEndGeom, tdAlong: number, vTd: number): RolloutPlan {
   const graph = ctx.state.airport.taxiwayGraph;
   const perf = perfOf(ac);
-  const vExit = ktToMps(perf.taxiTurnSpeedKt);
-  const brake = ktToMps(perf.decelKtPerSec);
-  const stopDist = Math.max(0, (vTd * vTd - vExit * vExit) / (2 * brake));
+  const normal = ktToMps(perf.decelKtPerSec);
+  const maxBrake = normal * MAX_BRAKE_FACTOR;
   const cands: { id: string; along: number; holds: string[] }[] = [];
   for (const id of Object.keys(graph.nodes)) {
     const n = graph.nodes[id];
     if (n.kind !== 'runway' || n.runwayId !== g.runway.id) continue;
     const holds = neighborIds(graph, id).filter((h) => graph.nodes[h].kind === 'holding_position' && graph.nodes[h].runwayId === g.runway.id);
     if (!holds.length) continue;
-    cands.push({ id, along: alongCross(g, n.pos).along, holds });
+    cands.push({ id, along: alongCross(g, graph.nodes[id].pos).along, holds });
   }
   cands.sort((a, b) => a.along - b.along || (a.id < b.id ? -1 : 1));
-  let pick = cands.find((c) => c.along >= tdAlong + stopDist + 30);
-  if (!pick) pick = [...cands].reverse().find((c) => c.along >= tdAlong + stopDist * 0.7);
-  if (!pick) return {};
-  // Prefer the side from which parking is closest by taxi.
-  let bestHold = pick.holds[0];
-  let bestCost = Infinity;
-  for (const h of pick.holds) {
-    const dm = shortestDistances(graph, h);
-    let c = Infinity;
-    for (const p of ctx.state.airport.parking) c = Math.min(c, dm.get(p.nodeId) ?? Infinity);
-    if (c < bestCost) {
-      bestCost = c;
-      bestHold = h;
+  const pickHold = (c: { id: string; holds: string[] }): string => {
+    // the side from which parking is closest by taxi
+    let bestHold = c.holds[0];
+    let bestCost = Infinity;
+    for (const h of c.holds) {
+      const dm = shortestDistances(graph, h);
+      let cost = Infinity;
+      for (const p of ctx.state.airport.parking) cost = Math.min(cost, dm.get(p.nodeId) ?? Infinity);
+      if (cost < bestCost) {
+        bestCost = cost;
+        bestHold = h;
+      }
     }
-  }
-  return { exitNodeId: pick.id, holdNodeId: bestHold };
+    return bestHold;
+  };
+  const evaluate = (limit: number): RolloutPlan | undefined => {
+    for (const c of cands) {
+      const d = c.along - tdAlong;
+      if (d < 20) continue;
+      const hold = pickHold(c);
+      const from = graph.nodes[c.id].pos;
+      const to = graph.nodes[hold].pos;
+      const angle = Math.abs(headingDiff(g.headingDeg, bearingDeg(from, to)));
+      const vC = exitSpeedMps(angle, dist(from, to));
+      const aReq = vTd > vC ? (vTd * vTd - vC * vC) / (2 * d) : 0;
+      if (aReq <= limit) return { exitNodeId: c.id, holdNodeId: hold, exitSpeedMps: vC, brakeMps2: Math.max(aReq, 0.5 * normal) };
+    }
+    return undefined;
+  };
+  const plan = evaluate(normal) ?? evaluate(maxBrake);
+  if (plan) return plan;
+  // No exit within reach: stop on the remaining runway, short of an intersection and of the end.
+  const natural = tdAlong + (vTd * vTd) / (2 * normal);
+  const inter = intersectionStartAlong(ctx, g, tdAlong);
+  const stopTarget = Math.min(natural, g.lengthM - RUNWAY_END_STOP_MARGIN_M, inter !== undefined ? inter - INTERSECTION_HOLD_MARGIN_M - perf.lengthM / 2 : Infinity);
+  const room = Math.max(1, stopTarget - tdAlong);
+  return { exitSpeedMps: 0, brakeMps2: clamp((vTd * vTd) / (2 * room), normal, maxBrake), stopAlongM: stopTarget };
 }
 
 function touchdown(ctx: SimContext, ac: Aircraft, rt: AircraftRuntime, g: RunwayEndGeom): void {
@@ -171,10 +237,8 @@ function touchdown(ctx: SimContext, ac: Aircraft, rt: AircraftRuntime, g: Runway
   rt.navMode = 'AUTO';
   rt.turnRateDegPerSec = 0;
   setPhase(ctx, ac, 'ROLLOUT', 'touchdown');
-  const perf = perfOf(ac);
   const { along } = alongCross(g, ac.pos);
-  const exit = chooseExit(ctx, ac, g, along, ktToMps(ac.groundSpeedKt));
-  rt.rollout = { ...exit, exitSpeedMps: ktToMps(perf.taxiTurnSpeedKt) };
+  rt.rollout = chooseExit(ctx, ac, g, along, ktToMps(ac.groundSpeedKt));
   emitEvent(ctx, {
     kind: 'INFO', aircraftId: ac.id, callsign: ac.callsign, severity: 'info', speaker: 'SYSTEM',
     text: `${ac.callsign} touched down runway ${g.end.id} ${Math.round(along)} m from threshold`,
@@ -188,7 +252,7 @@ function stepRollout(ctx: SimContext, ac: Aircraft, dt: number): void {
   const g = findRunwayEnd(ctx.state.airport, ac.assignedRunwayEnd);
   const graph = ctx.state.airport.taxiwayGraph;
   if (!g || !rt.rollout) return;
-  const brake = ktToMps(perf.decelKtPerSec);
+  const maxBrake = ktToMps(perf.decelKtPerSec) * MAX_BRAKE_FACTOR;
   let v = ktToMps(ac.groundSpeedKt);
   const exitNode = rt.rollout.exitNodeId ? graph.nodes[rt.rollout.exitNodeId] : undefined;
   const vExit = rt.rollout.exitSpeedMps;
@@ -196,11 +260,14 @@ function stepRollout(ctx: SimContext, ac: Aircraft, dt: number): void {
   if (exitNode) {
     const d = alongCross(g, exitNode.pos).along - along;
     if (v > vExit) {
-      const aReq = d > 1 ? (v * v - vExit * vExit) / (2 * d) : brake;
-      v = Math.max(vExit, v - clamp(aReq, 0.5 * brake, brake) * dt);
+      // brake to reach the exit at the exit speed: at least the planned rate, harder if it fell behind (up to the maximum)
+      const aReq = d > 1 ? (v * v - vExit * vExit) / (2 * d) : maxBrake;
+      v = Math.max(vExit, v - clamp(Math.max(aReq, rt.rollout.brakeMps2), 0, maxBrake) * dt);
     }
   } else {
-    v = Math.max(0, v - brake * dt);
+    const room = (rt.rollout.stopAlongM ?? g.lengthM) - along;
+    const aReq = room > 1 ? (v * v) / (2 * room) : maxBrake;
+    v = Math.max(0, v - clamp(Math.max(aReq, rt.rollout.brakeMps2), 0, maxBrake) * dt);
   }
   let step = v * dt;
   ac.pos = vAdd(ac.pos, vScale(g.dir, step));
@@ -287,6 +354,12 @@ interface Guidance {
   speedKt: number;
 }
 
+/**
+ * Default speeds. 14 CFR 91.117(b) (200 kt at or below 2,500 ft AGL within 4 nm of a Class C/D primary airport, KACY is Class C) is met
+ * by the A320 defaults: DEPARTURE below 2,500 ft AGL flies the climb speed (175 kt), APPROACH the mean of climb and approach speed
+ * (~155 kt), FINAL the approach speed (135 kt); the 250 kt cap (91.117(a)) only applies to INBOUND / en-route flight, far out.
+ * An explicit SPEED assignment can exceed 200 kt in that area: nothing warns about it (known limitation).
+ */
 function defaultSpeedKt(ac: Aircraft, perf: AircraftPerformance, aglFt: number): number {
   const cap = (v: number) => (ac.altitudeFt < 10000 && perf.category !== 'light' ? Math.min(v, 250) : v);
   switch (ac.phase) {
@@ -581,17 +654,20 @@ function stepAirborne(ctx: SimContext, ac: Aircraft, dt: number): void {
   const agl = ac.altitudeFt - elev;
   const wind = windVector(ctx.state.weather);
 
+  // Lateral approach logic (capture, establishment, centreline) is flown against the procedure's final approach COURSE
+  // (localizer course / FAF-to-threshold bearing), which can differ from the runway heading; touchdown uses the runway.
+  const gc = g ? courseGeom(g, rt.approach?.courseTrue) : g;
   const navPhase = ac.phase === 'INBOUND' || ac.phase === 'APPROACH' || ac.phase === 'FINAL' || ac.phase === 'LANDING' || ac.phase === 'PATTERN';
   if (g && rt.approach && (ac.phase === 'INBOUND' || ac.phase === 'APPROACH')) {
-    capturePendingApproach(ctx, ac, rt, g, perf);
-    if (!rt.approach.pendingCapture) maybeEstablishFinal(ctx, ac, rt, g, perf);
+    capturePendingApproach(ctx, ac, rt, gc!, perf);
+    if (!rt.approach.pendingCapture) maybeEstablishFinal(ctx, ac, rt, gc!, perf);
   }
   let guid: Guidance | undefined;
-  if (ac.nav && ac.nav.mode !== 'vectors' && NAV_PHASES.includes(ac.phase)) guid = routeGuidance(ctx, ac, rt, g, perf, wind, agl);
+  if (ac.nav && ac.nav.mode !== 'vectors' && NAV_PHASES.includes(ac.phase)) guid = routeGuidance(ctx, ac, rt, gc, perf, wind, agl);
   if (guid) {
     /* flying the route */
   } else if (g && navPhase && (rt.navMode === 'AUTO' || ac.phase === 'FINAL' || ac.phase === 'LANDING')) {
-    guid = approachGuidance(ctx, ac, rt, g, perf, wind, agl);
+    guid = approachGuidance(ctx, ac, rt, gc!, perf, wind, agl);
   } else {
     const speed = ac.target.speedKt ?? defaultSpeedKt(ac, perf, agl);
     guid = { desiredHeading: ac.target.headingDeg ?? ac.headingDeg, altTargetFt: ac.target.altitudeFt, speedKt: speed, forceDir: rt.turnDirection };

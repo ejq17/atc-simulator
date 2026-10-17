@@ -1,8 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
 import { pickBestAlternative, scoreAviationPlausibility } from './aviationVocab.ts';
-import { buildDeepgramListenUrl, createDeepgramProvider } from './deepgramProvider.ts';
+import { buildDeepgramListenUrl, createDeepgramProvider, DEEPGRAM_WS_BASE, resolveDeepgramWsBase } from './deepgramProvider.ts';
 import { createResampler, floatToInt16 } from './pcmCapture.ts';
-import { createWebSpeechProvider, describeWebSpeechError } from './webSpeechProvider.ts';
+import { appendTranscript, createWebSpeechProvider, describeWebSpeechError, sameStart } from './webSpeechProvider.ts';
 import { sttErrorCode } from './types.ts';
 
 describe('aviation plausibility', () => {
@@ -176,6 +176,47 @@ describe('deepgram', () => {
   });
 });
 
+describe('deepgram socket base override', () => {
+  it('defaults to wss://api.deepgram.com', () => {
+    expect(resolveDeepgramWsBase({ env: undefined, stored: null })).toBe(DEEPGRAM_WS_BASE);
+    expect(resolveDeepgramWsBase({ env: ' ', stored: '' })).toBe('wss://api.deepgram.com');
+  });
+  it('VITE_DEEPGRAM_WS_BASE may point at any ws(s) URL; junk and other schemes are ignored', () => {
+    expect(resolveDeepgramWsBase({ env: 'wss://proxy.example.test/dg/', stored: null })).toBe('wss://proxy.example.test/dg');
+    expect(resolveDeepgramWsBase({ env: 'https://api.deepgram.com', stored: null })).toBe(DEEPGRAM_WS_BASE);
+    expect(resolveDeepgramWsBase({ env: 'not a url', stored: null })).toBe(DEEPGRAM_WS_BASE);
+  });
+  it('the runtime (localStorage) override is honoured only for ws://localhost or ws://127.0.0.1', () => {
+    expect(resolveDeepgramWsBase({ env: undefined, stored: 'ws://127.0.0.1:8799' })).toBe('ws://127.0.0.1:8799');
+    expect(resolveDeepgramWsBase({ env: undefined, stored: 'ws://localhost:9' })).toBe('ws://localhost:9');
+    // a remote host (or wss to a remote host) in storage must never receive microphone audio
+    expect(resolveDeepgramWsBase({ env: undefined, stored: 'ws://evil.example:80' })).toBe(DEEPGRAM_WS_BASE);
+    expect(resolveDeepgramWsBase({ env: undefined, stored: 'wss://evil.example' })).toBe(DEEPGRAM_WS_BASE);
+  });
+  it('the provider opens the socket on the overridden base with the token subprotocol', async () => {
+    const urls: string[] = [];
+    const protocols: unknown[] = [];
+    class WS {
+      static OPEN = 1;
+      binaryType = ''; readyState = 1;
+      onopen: ((e: unknown) => void) | null = null; onmessage = null; onerror = null; onclose = null;
+      constructor(url: string, p?: string | string[]) { urls.push(url); protocols.push(p); queueMicrotask(() => this.onopen?.({})); }
+      send() {} close() {}
+    }
+    const provider = createDeepgramProvider({
+      wsBase: 'ws://127.0.0.1:8799', WebSocketCtor: WS as never,
+      fetchFn: (async () => new Response(JSON.stringify({ access_token: 'jwt-1' }), { status: 200 })) as typeof fetch,
+      getUserMedia: async () => ({ getTracks: () => [] }) as unknown as MediaStream,
+      startCapture: async () => ({ stop: async () => undefined, inputSampleRate: 16000 }),
+      warmUpAudio: async () => { throw new Error('none'); },
+    });
+    await provider.start({ onPartial() {}, onFinal() {}, onError() {} });
+    expect(urls[0]).toMatch(/^ws:\/\/127\.0\.0\.1:8799\/v1\/listen\?model=nova-3&/);
+    expect(protocols[0]).toEqual([expect.stringMatching(/^(token|bearer)$/), 'jwt-1']);
+    await provider.stop();
+  });
+});
+
 describe('web speech provider', () => {
   it('maps error codes to readable messages', () => {
     expect(sttErrorCode(describeWebSpeechError('not-allowed'))).toBe('not_allowed');
@@ -221,14 +262,15 @@ describe('web speech provider', () => {
     const finals: string[] = [];
     await provider.start({ onPartial: (t) => partials.push(t), onFinal: (t) => finals.push(t), onError: () => undefined });
     const rec = FakeRec.last;
-    expect(rec.continuous).toBe(false);
+    expect(rec.continuous).toBe(true); // keeps listening through pauses in a call
     expect(rec.interimResults).toBe(true);
     expect(rec.lang).toBe('en-US');
     expect(rec.maxAlternatives).toBe(3);
 
     rec.onresult?.({ resultIndex: 0, results: { length: 1, 0: result(true, [['spirit wine two', 0.9], ['spirit one two taxi runway one three', 0.6]]) } });
     expect(partials.at(-1)).toBe('spirit one two taxi runway one three');
-    rec.onend?.(); // Chrome ended on a pause while key still held -> restart
+    rec.onend?.(); // Chrome ended the session while the key is still held -> restart
+    await Promise.resolve();
     expect(rec.starts).toBe(2);
     rec.onresult?.({ resultIndex: 0, results: { length: 1, 0: result(false, [['hold short', 0.5]]) } });
     await provider.stop();
@@ -241,6 +283,101 @@ describe('web speech provider', () => {
     await provider.start({ onPartial() {}, onFinal() {}, onError: (e) => errors.push(e) });
     await provider.stop();
     expect(errors.map(sttErrorCode)).toEqual(['no_speech']);
+  });
+
+  it('rebuilds the transcript from ALL results, so earlier not-yet-final segments are not lost (real Chrome keeps several)', async () => {
+    const provider = createWebSpeechProvider({ ctor: FakeRec as never });
+    const partials: string[] = [];
+    const finals: Array<[string, number | undefined]> = [];
+    await provider.start({ onPartial: (t) => partials.push(t), onFinal: (t, m) => finals.push([t, m.confidence]), onError: () => undefined });
+    const rec = FakeRec.last;
+    // Event 2 reports resultIndex 1, but result 0 is still alive and non-final: it must stay in the text.
+    rec.onresult?.({ resultIndex: 0, results: { length: 1, 0: result(false, [['Cessna 723 Echo Juliet', 0.01]]) } });
+    rec.onresult?.({ resultIndex: 1, results: { length: 2, 0: result(false, [['Cessna 723 Echo Juliet runway 13', 0.9]]), 1: result(false, [['clear', 0.01]]) } });
+    expect(partials.at(-1)).toBe('Cessna 723 Echo Juliet runway 13 clear');
+    rec.onresult?.({ resultIndex: 1, results: { length: 2, 0: result(true, [['Cessna 723 Echo Juliet runway 13', 0.9]]), 1: result(true, [['cleared for takeoff', 0.95]]) } });
+    await provider.stop();
+    expect(finals).toEqual([['Cessna 723 Echo Juliet runway 13 cleared for takeoff', 0.925]]);
+  });
+
+  it('survives Chrome replacing its whole result list with only the last final chunk (observed with Google\'s service)', async () => {
+    const provider = createWebSpeechProvider({ ctor: FakeRec as never });
+    const finals: string[] = [];
+    await provider.start({ onPartial() {}, onFinal: (t) => finals.push(t), onError: () => undefined });
+    const rec = FakeRec.last;
+    const ev = (...segs: Array<[boolean, string]>) => rec.onresult?.({ resultIndex: 0, results: { length: segs.length, ...Object.fromEntries(segs.map(([f, t], i) => [i, result(f, [[t, 0.9]])])) } });
+    ev([false, 'Cessna 723 Echo']);
+    ev([false, 'Cessna 723 Echo Juliet Runway 13']);
+    ev([false, 'Cessna 723 Echo Juliet Runway 13'], [false, ' clear']);
+    ev([false, 'Cessna 723 Echo Juliet Runway 13 cleared for'], [false, ' takeoff']);
+    ev([true, 'cleared for takeoff']); // the whole list collapsed to the final chunk
+    await provider.stop();
+    expect(finals).toEqual(['Cessna 723 Echo Juliet Runway 13 cleared for takeoff']);
+  });
+
+  it('a short hypothesis that is revised (sesame -> Cessna 723) is not kept as extra text', async () => {
+    const provider = createWebSpeechProvider({ ctor: FakeRec as never });
+    const finals: string[] = [];
+    await provider.start({ onPartial() {}, onFinal: (t) => finals.push(t), onError: () => undefined });
+    const ev = (f: boolean, t: string) => FakeRec.last.onresult?.({ resultIndex: 0, results: { length: 1, 0: result(f, [[t, 0.9]]) } });
+    ev(false, 'sesame');
+    ev(false, 'Cessna 723 Echo');
+    ev(true, 'Cessna 723 Echo Juliet hold position');
+    await provider.stop();
+    expect(finals).toEqual(['Cessna 723 Echo Juliet hold position']);
+  });
+
+  it('transcript helpers', () => {
+    expect(appendTranscript('a b c', 'c d')).toBe('a b c d');
+    expect(appendTranscript('runway 13', 'cleared for takeoff')).toBe('runway 13 cleared for takeoff');
+    expect(appendTranscript('', 'x y')).toBe('x y');
+    expect(appendTranscript('Cleared for', 'cleared FOR takeoff')).toBe('Cleared for takeoff');
+    expect(sameStart('Cessna 723', 'cessna 723 echo')).toBe(true);
+    expect(sameStart('Cessna 723 echo', 'cleared for takeoff')).toBe(false);
+    expect(sameStart('cess', 'Cessna 723')).toBe(true);
+  });
+
+  it('continuous can be switched off by option or localStorage', async () => {
+    const mk = async (opts: object) => {
+      const provider = createWebSpeechProvider({ ctor: FakeRec as never, ...opts });
+      await provider.start({ onPartial() {}, onFinal() {}, onError() {} });
+      await provider.stop();
+      return FakeRec.last.continuous;
+    };
+    expect(await mk({})).toBe(true);
+    expect(await mk({ continuous: false })).toBe(false);
+    vi.stubGlobal('localStorage', { getItem: (k: string) => (k === 'kacy.webspeech.continuous' ? '0' : null) });
+    try {
+      expect(await mk({})).toBe(false);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it('track audio source: opens the mic with getUserMedia, hands the track to start(track), releases it afterwards', async () => {
+    const stopped = vi.fn();
+    const track = { kind: 'audio' } as MediaStreamTrack;
+    const stream = { getAudioTracks: () => [track], getTracks: () => [{ stop: stopped }] } as unknown as MediaStream;
+    class TrackRec extends FakeRec {
+      got: unknown[] = [];
+      override start(t?: MediaStreamTrack) { this.got.push(t); super.start(); }
+    }
+    const provider = createWebSpeechProvider({ ctor: TrackRec as never, audioSource: 'track', getUserMedia: async () => stream });
+    await provider.start({ onPartial() {}, onFinal() {}, onError() {} });
+    expect((FakeRec.last as TrackRec).got).toEqual([track]);
+    await provider.stop();
+    expect(stopped).toHaveBeenCalled();
+  });
+
+  it('track audio source falls back to Chrome\'s own capture when start(track) is not supported', async () => {
+    const stream = { getAudioTracks: () => [{}], getTracks: () => [{ stop() {} }] } as unknown as MediaStream;
+    let calls = 0;
+    class OldRec extends FakeRec {
+      override start(t?: MediaStreamTrack) { if (t && calls++ === 0) throw new TypeError('too many arguments'); super.start(); }
+    }
+    const provider = createWebSpeechProvider({ ctor: OldRec as never, audioSource: 'track', getUserMedia: async () => stream });
+    await provider.start({ onPartial() {}, onFinal() {}, onError() {} });
+    expect((FakeRec.last as OldRec).starts).toBe(1);
   });
 
   it('does not hang when the browser exposes SpeechRecognition but never starts it (headless Chromium)', async () => {

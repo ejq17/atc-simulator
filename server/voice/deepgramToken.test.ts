@@ -1,6 +1,6 @@
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { handleDeepgramToken, resetDeepgramTokenRateLimit } from './deepgramToken.ts';
+import { DEEPGRAM_GRANT_URL, handleDeepgramToken, resetDeepgramTokenRateLimit, resolveGrantUrl } from './deepgramToken.ts';
 
 function fakeRes() {
   const headers: Record<string, string> = {};
@@ -74,5 +74,37 @@ describe('handleDeepgramToken', () => {
       last = r.res.statusCode;
     }
     expect(last).toBe(429);
+  });
+});
+
+describe('DEEPGRAM_API_BASE override', () => {
+  beforeEach(() => resetDeepgramTokenRateLimit());
+
+  it('defaults to api.deepgram.com and accepts absolute http(s) bases', () => {
+    expect(resolveGrantUrl({})).toBe(DEEPGRAM_GRANT_URL);
+    expect(resolveGrantUrl({ DEEPGRAM_API_BASE: ' ' })).toBe(DEEPGRAM_GRANT_URL);
+    expect(resolveGrantUrl({ DEEPGRAM_API_BASE: 'http://127.0.0.1:8799' })).toBe('http://127.0.0.1:8799/v1/auth/grant');
+    expect(resolveGrantUrl({ DEEPGRAM_API_BASE: 'https://proxy.example.test/dg/' })).toBe('https://proxy.example.test/dg/v1/auth/grant');
+  });
+
+  it('rejects relative URLs and other schemes', () => {
+    for (const bad of ['api.deepgram.com', '/v1', 'ftp://x', 'file:///etc/passwd', 'javascript:alert(1)']) {
+      expect(resolveGrantUrl({ DEEPGRAM_API_BASE: bad }), bad).toBeUndefined();
+    }
+  });
+
+  it('POST calls the overridden grant URL, and a bad override is a clear 503 that never calls fetch', async () => {
+    const fetchFn = vi.fn(async () => new Response(JSON.stringify({ access_token: 'mock-jwt', expires_in: 60 }), { status: 200 }));
+    const ok = fakeRes();
+    await handleDeepgramToken(req('POST'), ok.res, { env: { DEEPGRAM_API_KEY: 'test-key', DEEPGRAM_API_BASE: 'http://127.0.0.1:8799' }, fetchFn: fetchFn as never });
+    expect(ok.res.statusCode).toBe(200);
+    expect((fetchFn.mock.calls[0] as unknown as [string])[0]).toBe('http://127.0.0.1:8799/v1/auth/grant');
+
+    fetchFn.mockClear();
+    const bad = fakeRes();
+    await handleDeepgramToken(req('POST'), bad.res, { env: { DEEPGRAM_API_KEY: 'k', DEEPGRAM_API_BASE: 'nope' }, fetchFn: fetchFn as never });
+    expect(bad.res.statusCode).toBe(503);
+    expect(JSON.parse(bad.res.body).error).toMatch(/DEEPGRAM_API_BASE/);
+    expect(fetchFn).not.toHaveBeenCalled();
   });
 });

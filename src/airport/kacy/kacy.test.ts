@@ -144,6 +144,19 @@ describe('frequencies equal the verified source', () => {
     expect(f('DEP-N').mhz).toBe(parseFloat(s.approach_departure_north.vhf));
     expect([f('ATIS').mhz, f('CLNC').mhz, f('GND').mhz, f('TWR').mhz, f('APP').mhz, f('APP-N').mhz]).toEqual([125.725, 127.85, 121.9, 120.3, 124.6, 134.25]);
   });
+  it('approach/departure sector bearings come from NASR (south 130-309 on APP/DEP = 124.6, north 310-129 on APP-N/DEP-N = 134.25)', () => {
+    expect(s.approach_departure_south.sectorization_bearings).toBe('130-309');
+    expect(s.approach_departure_north.sectorization_bearings).toBe('310-129');
+    for (const id of ['APP', 'DEP']) {
+      expect(f(id).mhz).toBe(124.6);
+      expect(f(id).sectorBearings).toEqual({ fromDeg: 130, toDeg: 309 });
+    }
+    for (const id of ['APP-N', 'DEP-N']) {
+      expect(f(id).mhz).toBe(134.25);
+      expect(f(id).sectorBearings).toEqual({ fromDeg: 310, toDeg: 129 });
+    }
+    for (const id of ['ATIS', 'CLNC', 'GND', 'TWR']) expect(f(id).sectorBearings).toBeUndefined();
+  });
   it('positions and UHF notes', () => {
     expect(f('ATIS').position).toBe('ATIS');
     expect(f('CLNC').position).toBe('CLNC');
@@ -220,6 +233,51 @@ describe('procedures', () => {
       expect(p.provenance.notes).toMatch(/transcription/);
     }
     expect(iap('ILS Z OR LOC Z RWY 13').holdingText).toMatch(/CARYL/);
+  });
+});
+
+describe('holding patterns (plate transcriptions)', () => {
+  const proc = (name: string) => ap.procedures.find((p) => p.name === name)!;
+  const hold = (name: string, fix: string) => proc(name).holdingPatterns!.filter((h) => h.fix === fix);
+
+  it('TUBER on RNAV (GPS) RWY 22: inbound 017 (outbound 197), right turns, 6 NM, missed approach', () => {
+    const [h] = hold('RNAV (GPS) RWY 22', 'TUBER');
+    expect(h).toMatchObject({ inboundCourseDeg: 17, turns: 'right', legNm: 6, role: 'missed_approach' });
+    expect(h.legMinutes).toBeUndefined();
+    expect((h as unknown as { outboundCourseDeg: number }).outboundCourseDeg).toBe(197);
+  });
+
+  it('SMITS missed-approach hold is inbound 270 (ACY R-090) with right turns on every plate that uses it', () => {
+    for (const n of ['ILS Z OR LOC Z RWY 13', 'ILS OR LOC/DME RWY 31', 'HI-ILS Y OR LOC Y RWY 13', 'VOR RWY 04', 'VOR RWY 31', 'HI-VOR OR TACAN RWY 31', 'COPTER ILS OR LOC/DME RWY 13', 'RNAV (GPS) RWY 04']) {
+      const h = hold(n, 'SMITS').find((x) => x.inboundCourseDeg === 270);
+      expect(h, n).toBeDefined();
+      expect(h).toMatchObject({ turns: 'right', role: 'missed_approach' });
+    }
+    expect(hold('RNAV (GPS) RWY 04', 'SMITS')[0].legNm).toBe(6);
+    expect(hold('VOR RWY 31', 'SMITS')[0].legMinutes).toBe(1);
+  });
+
+  it('hold-in-lieu and arrival holds, leg lengths and speed limits as printed', () => {
+    expect(hold('ILS OR LOC/DME RWY 31', 'STEVV')[0]).toMatchObject({ inboundCourseDeg: 308, turns: 'right', legMinutes: 1, role: 'hold_in_lieu' });
+    expect(hold('ILS Z OR LOC Z RWY 13', 'CARYL')[0]).toMatchObject({ inboundCourseDeg: 128, turns: 'right', legMinutes: 1, role: 'hold_in_lieu' });
+    expect(hold('RNAV (GPS) Y RWY 13', 'CARYL')[0]).toMatchObject({ inboundCourseDeg: 128, turns: 'right', legNm: 6, role: 'hold_in_lieu' });
+    expect(hold('RNAV (GPS) RWY 04', 'JEDOB')[0]).toMatchObject({ inboundCourseDeg: 38, turns: 'right', legNm: 6, role: 'hold_in_lieu' });
+    expect(hold('VOR RWY 04', 'MEADY')[0]).toMatchObject({ inboundCourseDeg: 48, turns: 'left', legMinutes: 1, role: 'hold_in_lieu' });
+    expect(hold('HI-ILS Y OR LOC Y RWY 13', 'ZAPOM')[0]).toMatchObject({ inboundCourseDeg: 35, turns: 'left', role: 'arrival' });
+    expect(hold('RNAV (GPS) Y RWY 13', 'RODDI')[0]).toMatchObject({ inboundCourseDeg: 218, turns: 'right', legNm: 5, maxSpeedKt: 230, role: 'missed_approach' });
+    expect(hold('RNAV (RNP) Z RWY 13', 'RODDI')[0]).toMatchObject({ legNm: 5, role: 'missed_approach' });
+    expect(hold('RNAV (GPS) Y RWY 31', 'KOVEC')[0]).toMatchObject({ inboundCourseDeg: 38, turns: 'right', legNm: 6, role: 'missed_approach' });
+    expect(hold('RNAV (RNP) Z RWY 31', 'KOVEC')).toHaveLength(1);
+  });
+
+  it('every IAP has a missed-approach hold; every hold has a leg length and plate provenance', () => {
+    for (const p of ap.procedures.filter((x) => x.type === 'IAP')) {
+      expect(p.holdingPatterns!.some((h) => h.role === 'missed_approach'), p.name).toBe(true);
+      for (const h of p.holdingPatterns!) {
+        expect(h.legNm !== undefined || h.legMinutes !== undefined, `${p.name} ${h.fix}`).toBe(true);
+        expect((h as unknown as { source: string }).source, p.name).toMatch(/transcribed from plate P_.*\.png .* by visual read/);
+      }
+    }
   });
 });
 

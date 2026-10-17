@@ -225,13 +225,13 @@ describe('APPROACH clearance: intercept geometry', () => {
     if (r2.status === 'rejected') expect(r2.reason).toMatch(/not on a heading that intercepts/);
   });
 
-  it('a proper vector (about 25 degrees, intercept 6-9 nm outside the FAF) is accepted in training, captures the course, and lands', () => {
+  it('a proper vector (30 degrees, intercept 2+ nm outside the approach gate) is accepted in training, captures the course, and lands', () => {
     const e = makeEngine({ scenario: ifrScenario([AT_FIX('NKS451', 'TARR', ROUTE, '13', {}, 4000)], { mode: 'training' }) });
     const ac = find(e, 'NKS451');
     run(e, 5);
-    expect(say(e, cmd('HEADING', 'NKS451', { headingDeg: 105 }), 'APP').status).toBe('accepted'); // 93 true: 25 degrees to the course
+    expect(say(e, cmd('HEADING', 'NKS451', { headingDeg: 100 }), 'APP').status).toBe('accepted'); // 88 true: 30 degrees to the course
     // clear the approach when the course is about 4 nm away
-    expect(runUntil(e, () => Math.abs(alongCross(g13, ac.pos).cross) < nmToM(4), 400)).toBe(true);
+    expect(runUntil(e, () => Math.abs(alongCross(g13, ac.pos).cross) < nmToM(4.7), 400)).toBe(true);
     const r = say(e, appr('NKS451', 'ILS', '13'), 'APP');
     expect(r.status).toBe('accepted');
     expect(ac.nav?.mode).toBe('vectors'); // still flying the assigned heading until established
@@ -300,7 +300,7 @@ describe('flying approaches to touchdown', () => {
     expect(finalAtNm).toBeLessThan(8.5);
     expect(maxGlideErr).toBeLessThan(200);
     run(e, 60);
-    expect(ac.phase).toBe('ROLLOUT');
+    expect(['ROLLOUT', 'RUNWAY_EXIT', 'TAXI_TO_PARKING']).toContain(ac.phase); // landed (the exit is now made at the first reachable exit)
     const texts = pilotTexts(e);
     expect(texts).toContain('Atlantic City Approach, Spirit four fifty one, established on the ILS runway one three.');
     expect(texts.some((t) => /^Atlantic City Tower, Spirit four fifty one, \w+ mile final runway one three, full stop\.$/.test(t))).toBe(true);

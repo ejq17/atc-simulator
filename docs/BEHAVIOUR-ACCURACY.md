@@ -2,6 +2,15 @@
 
 Review date 2026-10-17. Reviewer scope: compare what the engine does with the governing FAA text or chart, with a measurement where a number can be measured. No source code was edited. This is not ATC training material.
 
+
+> **Resolution note (2026-10-17, orchestrator):** all five INACCURATE items below were fixed after this review and re-measured:
+> F9 rollout/exit (sourced braking, exit choice; A320 on runway 4 now exits at taxiway B 17 s after touchdown, C172 on 13 clear in 14 s),
+> I5 approach gate (FAA JO 7110.65 5-9-1/5-9-2: gate 1 NM outside the FAF and ≥ 5 NM from the threshold; 30°/20° rules),
+> I10b TUBER hold (now from the plate: inbound 017, right turns, 6 NM; all 22 published holds transcribed with provenance),
+> I3 departure frequency by NASR sector (north fixes → 134.25, south → 124.6),
+> W4 ATIS names only published approaches. Also addressed: intersecting-runway release by position (3-9-8/3-10-4),
+> 3-9-7 wake interval for intersection departures, 5 kt calm-wind rule (3-5-1). See src/sim/README.md and the tests named there.
+
 ## 0. Method, evidence and caveats
 
 * **Official pages fetched with a generic browser User-Agent** (no identifier sent), saved as HTML plus text under `/private/tmp/claude-501/review/`: JO 7110.65 chapter 2 sections 4 and 9; chapter 3 sections 5, 7, 9, 10; chapter 4 sections 2, 3, 5, 8; chapter 5 sections 5, 9, 10 (`atc_html_chap*_section_*.txt`; the web edition is JO 7110.65BB); AIM chapter 1-1, 2-1, 2-3, 4-1, 4-2, 4-3, 4-4, 5-3, 5-5, 3-5, 7-1 (`aim_html_chap*_section_*.txt`); P/CG glossary pages A, H, L, M, R, S (`pcg_html_glossary-*.txt`); 14 CFR 91.117 and 91.175 from the eCFR renderer (`ecfr91117.txt`, `ecfr91175.txt`); live KACY METAR from aviationweather.gov (`metar_now.json`). Chart text is the saved d-TPP cycle 2610 in `data/sources/raw/dtpp_2610_txt/` (ATLANTIC CITY THREE, airport diagram, LAHSO table NE2LAHSO, ILS Z 13, RNAV 22, RNAV 4, VOR 4/31 plates, plus the PNG plates for ILS Z 13 and RNAV 22 that I looked at).
