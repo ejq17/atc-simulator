@@ -73,6 +73,7 @@ export function SimScreen() {
   const detailsOpen = useUiStore((s) => s.stripDetailsOpen);
   const setDetailsOpen = useUiStore((s) => s.setStripDetailsOpen);
   const selectedId = useSimStore((s) => s.session?.engine.getState().selectedAircraftId);
+  const icao = useSimStore((s) => s.session?.engine.getState().airport.icao ?? 'KACY');
   useSimStore((s) => s.rev);
   useShortcuts();
   const close = () => setDrawer(null);
@@ -140,8 +141,8 @@ export function SimScreen() {
         </div>
         <div className="w-[380px] shrink-0 border-l border-atc-border xl:w-[400px]"><RadioPanel /></div>
       </div>
-      {drawer === 'charts' && <ChartsDrawer onClose={close} />}
-      {drawer === 'navaids' && <NavaidsDrawer onClose={close} />}
+      {drawer === 'charts' && <ChartsDrawer onClose={close} icao={icao} />}
+      {drawer === 'navaids' && <NavaidsDrawer onClose={close} icao={icao} />}
       {drawer === 'settings' && <SettingsDrawer onClose={close} />}
       {drawer === 'atis' && <AtisDrawer onClose={close} />}
       {drawer === 'weather' && <WeatherDrawer onClose={close} />}

@@ -24,14 +24,22 @@ export const FREE_PLAY_SCENARIOS: ScenarioDef[] = [
   freePlayDef('free-play-busy-arrivals', 'Free play: Arrival push', 'A stream of inbound traffic with few departures.', 4, 'busy_arrivals'),
 ];
 
-export const ALL_SCENARIOS: ScenarioDef[] = [...CAREER_SCENARIOS, ...TRAINING_SCENARIOS, ...FREE_PLAY_SCENARIOS];
+/**
+ * The career steps and training lessons are written around one airport's real geometry (KACY: runway 13 hold lines, taxiways
+ * Alpha/Bravo/Delta, GA-2, GATE-4, neighbouring airports): they are offered only there. Free play works at every airport.
+ */
+const AUTHORED_FOR: readonly string[] = ['KACY'];
+const tagged = (defs: ScenarioDef[]): ScenarioDef[] => defs.map((d) => ({ ...d, summary: { ...d.summary, airports: AUTHORED_FOR } }));
+
+export const ALL_SCENARIOS: ScenarioDef[] = [...tagged(CAREER_SCENARIOS), ...tagged(TRAINING_SCENARIOS), ...FREE_PLAY_SCENARIOS];
 
 export function findScenarioDef(id: string): ScenarioDef | undefined {
   return ALL_SCENARIOS.find((d) => d.summary.id === id);
 }
 
-export function listScenarioSummaries(): ScenarioSummary[] {
-  return ALL_SCENARIOS.map((d) => ({ ...d.summary }));
+/** Scenario summaries; with an airport, only those that can be played there. */
+export function listScenarioSummaries(icao?: string): ScenarioSummary[] {
+  return ALL_SCENARIOS.filter((d) => !icao || !d.summary.airports || d.summary.airports.includes(icao.toUpperCase())).map((d) => ({ ...d.summary }));
 }
 
 /**
@@ -62,6 +70,7 @@ export function defaultPlayerPositions(id: string): ControllerPositionId[] | und
 export function buildCatalogueScenario(id: string, airport: Airport, options?: FreePlayOptions): GameScenario {
   const d = findScenarioDef(id);
   if (!d) throw new Error(`Unknown scenario "${id}"`);
+  if (d.summary.airports && !d.summary.airports.includes(airport.icao)) throw new Error(`Scenario "${id}" is authored for ${d.summary.airports.join(', ')} only, not ${airport.icao}`);
   const sc = d.build(airport, options);
   // Explicit option wins; otherwise a career/training scenario defaults to the position it is about (free play: all positions).
   const wanted = options?.playerPositions?.length ? [...new Set(options.playerPositions)] : d.summary.mode === 'free_play' ? undefined : defaultPlayerPositions(id);

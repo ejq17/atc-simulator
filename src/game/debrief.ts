@@ -111,6 +111,7 @@ function ifrImprovements(events: SimEvent[], state: SimulationState): string[] {
   for (const e of events) if (e.callsign && e.kind === 'COMMAND_ACCEPTED' && e.data?.kind === 'IFR_CLEARANCE') ifr.add(e.callsign.toUpperCase());
   for (const e of noClr) if (e.callsign) ifr.add(e.callsign.toUpperCase());
   for (const a of Object.values(state.aircraft)) if (a.isDeparture && a.flightPlan?.flightRules === 'IFR') ifr.add(a.callsign.toUpperCase());
+  const depMhz = state.airport?.frequencies.find((f) => f.position === 'DEP')?.mhz;
   const posByMhz = new Map((state.airport?.frequencies ?? []).map((f) => [Math.round(f.mhz * 1000), f.position]));
   const late: string[] = [];
   for (const cs of ifr) {
@@ -128,7 +129,7 @@ function ifrImprovements(events: SimEvent[], state: SimulationState): string[] {
   if (late.length) {
     out.push(
       `${late.join(', ')} ${late.length === 1 ? 'was' : 'were'} airborne for more than ${IFR_DEPARTURE_HANDOFF_LIMIT_SEC / 60} minutes before being handed to Departure. ` +
-      'Tower hands an IFR departure to Departure (124.6 at KACY) soon after takeoff; until then nobody can climb, turn or route it.',
+      `Tower hands an IFR departure to Departure${depMhz ? ` (${depMhz} at ${state.airport.icao})` : ''} soon after takeoff; until then nobody can climb, turn or route it.`,
     );
   }
   return out;
@@ -144,7 +145,7 @@ export function buildImprovements(state: SimulationState, events: SimEvent[]): s
     const who = [...new Set(events.filter((e) => e.kind === 'RUNWAY_INCURSION').map((e) => e.callsign).filter(Boolean))].join(', ');
     out.push(
       `${plural(s.runwayIncursions, 'runway incursion')}${who ? ` (${who})` : ''}: an aircraft was on a runway without a clearance. Give every taxi route an explicit hold-short instruction, ` +
-      `make sure the pilot reads it back (the KACY diagram requires readback of all runway holding instructions), and issue crossings only with "cross runway ... at ..." ${cite('3-7-2', '2-4-3')}.`,
+      `make sure the pilot reads it back (the ${state.airport.icao} airport diagram requires readback of all runway holding instructions), and issue crossings only with "cross runway ... at ..." ${cite('3-7-2', '2-4-3')}.`,
     );
   }
 
@@ -166,7 +167,7 @@ export function buildImprovements(state: SimulationState, events: SimEvent[]): s
       out.push(`You cleared ${plural(g('crossing'), 'runway crossing')} while the runway was busy - look at the runway and the final before you say "cross" ${cite('3-7-2', '3-1-3')}.`);
     }
     if (g('intersecting')) {
-      out.push(`You used intersecting runways 13/31 and 4/22 at the same time ${g('intersecting') === 1 ? 'once' : g('intersecting') + ' times'} - separate operations on intersecting runways ${cite('3-9-8')}.`);
+      out.push(`You used intersecting runways ${state.airport.runways.map((r) => r.id).join(' and ')} at the same time ${g('intersecting') === 1 ? 'once' : g('intersecting') + ' times'} - separate operations on intersecting runways ${cite('3-9-8')}.`);
     }
     if (g('approach')) {
       out.push(`You issued ${plural(g('approach'), 'approach clearance')} that put an aircraft within 3 nm in trail of one already established on the same final (the simulator uses 3 nm as a simplification) - space arrivals with speed or vectors before clearing the next one ${cite('5-9-1')}.`);

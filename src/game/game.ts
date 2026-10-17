@@ -11,7 +11,7 @@ import { buildDebrief } from './debrief';
 import { isScenarioComplete, loadCareerProgress, saveCareerResult } from './career';
 
 export const game: GameApi = {
-  listScenarios: () => listScenarioSummaries(),
+  listScenarios: (icao?: string) => listScenarioSummaries(icao),
   buildScenario: (id: string, airport: Airport, options?: FreePlayOptions): Scenario => buildCatalogueScenario(id, airport, options),
   buildFreePlay: (airport: Airport, options: FreePlayOptions): Scenario => buildFreePlay(airport, options),
   createTrafficGenerator,

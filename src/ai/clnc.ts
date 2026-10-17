@@ -3,7 +3,7 @@
  * (destination, departure procedure, initial altitude, expect-altitude, departure frequency by sector, squawk).
  */
 import type { Aircraft, ParsedCommand } from '../sim/types';
-import { departureFrequencyFor, departureProcedureName, DEFAULT_INITIAL_ALTITUDE_FT, isAssignableSquawk, squawksInUse } from '../sim/ifr';
+import { departureFrequencyFor, departureProcedureName, defaultInitialAltitudeFt, isAssignableSquawk, squawksInUse } from '../sim/ifr';
 import { mkCmd } from './core';
 import type { Agent, AgentView, Plan } from './core';
 import * as say from './phrase';
@@ -46,7 +46,7 @@ export function ifrClearancePlan(v: AgentView, ac: Aircraft, store: ClearanceSto
   const ifr: NonNullable<ParsedCommand['ifr']> = {
     destination: fp.destination,
     departureProcedure: departureProcedureName(airport),
-    initialAltitudeFt: DEFAULT_INITIAL_ALTITUDE_FT,
+    initialAltitudeFt: defaultInitialAltitudeFt(airport),
     expectAltitudeFt: fp.cruiseAltitudeFt,
     departureFrequencyMhz: dep.mhz,
     squawk,

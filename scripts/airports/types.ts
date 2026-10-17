@@ -1,0 +1,137 @@
+/**
+ * Per-airport build profile for scripts/build-airport.ts.
+ *
+ * The generic build owns everything that is the same for every airport: runways from NASR, the OSM taxiway network
+ * (planarised, identifiers inferred, hold lines derived, parking attached), validation and the report. A profile supplies
+ * only what is genuinely airport specific: which source files to read, the FAA diagram's taxiway identifiers, where the
+ * parking stands come from, how the frequencies are named, and optional layers (MVA sectors, diagram labels, hot spot).
+ * A profile may only read source data; it never invents values.
+ */
+import type { DataProvenance, LatLon, RadioFrequency, Vec2 } from '../../src/sim/types.ts';
+import type { KacyMvaSector, KacyParking } from '../../src/airport/types.ts';
+import type { P } from '../lib/geom.ts';
+import type { DiagramLabel } from '../lib/inference.ts';
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export type J = any;
+
+/** One parking record while the graph is being built (the generic build attaches it to the taxi network). */
+export interface ParkRec {
+  id: string;
+  name: string;
+  pos: P;
+  category: KacyParking['category'];
+  headingDeg?: number;
+  source: 'osm' | 'synthetic';
+  approximate: boolean;
+  zone: string;
+  notes?: string;
+  /** polyline from the lane (first) to the stop point (last); for point stands / synthetic spots just [stop]. */
+  leadIn: P[];
+  node: number;
+  connectorLengthM: number;
+  connected: boolean;
+}
+
+export interface BuildingRec {
+  id: string;
+  kind: 'terminal' | 'hangar' | 'helipad';
+  name?: string;
+  osmId: number;
+  polygon: Vec2[];
+}
+
+export interface ApronRec {
+  osmId: number;
+  name: string | null;
+  ring: P[];
+}
+
+/** What the generic build hands to `AirportProfile.parking`. */
+export interface ParkingCtx {
+  /** OSM features of one aeroway kind (taxiway, gate, parking_position, helipad, ...). */
+  featsOf(aeroway: string): J[];
+  /** GeoJSON [lon, lat] list -> local metres. */
+  toLocalPts(coords: [number, number][]): P[];
+  loc(lat: number, lon: number): P;
+  ringsOf(feature: J): P[][];
+  buildings: BuildingRec[];
+  apronRecs: ApronRec[];
+  apronOf(osmId: number): ApronRec;
+  /** All non-helipad building polygons (local metres). */
+  buildingPolys: P[][];
+  parkRecs: ParkRec[];
+  /** Distance (m) from a point to the nearest non-runway taxi/apron edge. */
+  networkDistance(p: P): number;
+  sampleSpots(poly: P[], opts: { spacing: number; margin: number; avoidBuildingsM: number; accept: (p: P) => boolean }): P[];
+  pickSpots(cands: P[], n: number, minSep: number, maxNet: number): P[];
+  addSynthetic(ids: { id: string; name: string; category: KacyParking['category']; zone: string; notes: string }, p: P): void;
+  warn(message: string): void;
+  syntheticSpotSpacingM: number;
+  parkingConnectMaxM: number;
+}
+
+/** Everything the frequency hook may read (all values come from the source JSON). */
+export interface FrequencyCtx {
+  freqSrc: J;
+  /** "Atlantic City" / "Manchester": the tower radio call, title-cased. */
+  callName: string;
+  /** Radio call of the approach/departure facility, title-cased ("Atlantic City", "Boston"). */
+  approachCallName: string;
+  mk(id: string, name: string, vhf: string, position: RadioFrequency['position'], note: string, sectorBearings?: string): RadioFrequency;
+}
+
+export interface MvaResult {
+  sectors: KacyMvaSector[];
+  /** Provenance entry listed in airport.provenance. */
+  provenance: DataProvenance;
+  /** Report paragraph(s) printed under "Minimum vectoring altitude sectors". */
+  reportIntro: string;
+}
+
+export interface AirportProfile {
+  icao: string;
+  /** Lower-case file prefix: data/sources/<slug>-*.json and src/airport/<slug>/. */
+  slug: string;
+  /** Text stored as airport.build.script and printed in the report ("scripts/build-kacy-airport.ts"). */
+  buildCommand: string;
+  /** Taxiway identifiers printed on the FAA airport diagram. OSM refs outside this set are kept as geometry but unnamed. */
+  taxiwayIds: readonly string[];
+  /** Airport-diagram PDF name used in provenance strings ("00669AD.PDF"). */
+  diagramPdf: string;
+  /** Charted magnetic heading of a runway end (the build checks it against true alignment and the NASR variation). */
+  chartedMagneticHeading(endId: string, ctx: { procSrc: J; endSrc: J }): number;
+  /** Text appended to each runway's provenance note about where the charted magnetic heading comes from. */
+  headingSourceNote: string;
+  /** Names of optional plate-transcription files (relative to data/sources); absent = that layer is empty. */
+  holdingPatternsFile?: string;
+  fixAltitudesFile?: string;
+  /** FAA airport-diagram label positions (taxiway identifier words georeferenced to lat/lon), when available. */
+  diagramLabels?(): { labels: { id: string; lat: number; lon: number; ptX: number; ptY: number }[]; from: string; note: string };
+  /** Parking stands, GA/FBO/cargo spots. Returns the OSM parking ways deliberately not used (for the report). */
+  parking(ctx: ParkingCtx): { unusedParkingWays: string[]; reportParagraph: string; approximateSummary: string[] };
+  /** The frequency list (names, positions, notes). */
+  frequencies(ctx: FrequencyCtx): RadioFrequency[];
+  /** MVA sectors, when the FAA MVA product is part of the dataset. */
+  mva?(helpers: { loc(lat: number, lon: number): P; pr(p: P): Vec2 }): MvaResult;
+  /** Hot spot (from the d-TPP hot-spot text) - only when the source file has `supporting_charts.hot_spot_text`. */
+  hotSpotProvenanceNote?: string;
+  /** Id / name / notes of the runway-runway crossing node. */
+  crossing: { nodeId: string; name: string; notes: string };
+  /** File with the OSM-versus-diagram comparison appended to the report (relative to scripts/data). */
+  diagramComparisonFile?: string;
+  /** Sentence about diagram label words that are not taxiway labels (report only). */
+  diagramLabelNote?: string;
+  /** Sentence fragment appended to the "Taxiway geometry in general" bullet (OSM runway endpoint offsets vs NASR), e.g. " (the OSM runway endpoints differ ...)". */
+  runwayEndpointNote: string;
+  /** Extra "Approximate elements" bullets specific to this airport. */
+  extraApproximate?: string[];
+  /** Spoken airport name from the NASR name; default: INTL -> International, RGNL -> Regional, title-cased. */
+  spokenName?(nasrName: string): string;
+  /** Remove degree-2 OSM vertices between a runway node and its hold line (densely digitised entrances), so the hold is adjacent. */
+  simplifyEntryChains?: boolean;
+  /** One-line notes for the airport.provenance entries (source file summaries with counts). */
+  provenanceNotes: { navaids: string; procedures: string; osm: string; diagramReconciliation: string };
+}
+
+export type { DiagramLabel, LatLon };

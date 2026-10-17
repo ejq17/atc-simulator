@@ -141,7 +141,7 @@ const AIRPORT_CITIES: Record<string, string> = {
   KPHL: 'Philadelphia', KJFK: 'Kennedy', KLGA: 'LaGuardia', KEWR: 'Newark', KBOS: 'Boston', KDCA: 'Reagan National', KIAD: 'Dulles',
   KBWI: 'Baltimore', KORD: 'Chicago O\'Hare', KATL: 'Atlanta', KCLT: 'Charlotte', KMIA: 'Miami', KMCO: 'Orlando', KFLL: 'Fort Lauderdale',
   KPIT: 'Pittsburgh', KDTW: 'Detroit', KRDU: 'Raleigh Durham', KTPA: 'Tampa', KILG: 'Wilmington', KTTN: 'Trenton', KMIV: 'Millville',
-  KWWD: 'Wildwood', KVAY: 'Mount Holly', KACY: 'Atlantic City', KPNE: 'Northeast Philadelphia', KABE: 'Allentown',
+  KWWD: 'Wildwood', KVAY: 'Mount Holly', KACY: 'Atlantic City', KMHT: 'Manchester', KPNE: 'Northeast Philadelphia', KABE: 'Allentown',
 };
 
 /** Spoken name of an airport for clearances: "KPHL" -> "Philadelphia"; unknown ids are spelled in phonetics. */

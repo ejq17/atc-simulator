@@ -1,15 +1,21 @@
-# KACY ATC Simulator
+# ATC Simulator (KACY and KMHT)
 
-A browser-based, single-player air traffic control simulator for **Atlantic City
-International Airport (KACY)**, New Jersey. You work Tower and/or Ground, speak or
-type clearances in real ATC phraseology, and simulated pilots read back, taxi on the
-real taxiway layout, line up, take off, fly approaches and land.
+A browser-based, single-player air traffic control simulator for two real airports,
+chosen on the setup screen: **Atlantic City International (KACY)**, New Jersey (the
+default) and **Manchester-Boston Regional (KMHT)**, New Hampshire. You work Clearance
+Delivery, Ground, Tower and/or Approach/Departure, speak or type clearances in real ATC
+phraseology, and simulated pilots read back, taxi on the real taxiway layout, line up,
+take off, fly approaches and land.
 
 This is entertainment and learning software. It is **not** ATC training and must never
 be used for real-world operations. Nothing here connects to real radio frequencies,
 ADS-B, or live traffic.
 
 ## What is real
+
+Each airport is built from its own verified source files by one script (`scripts/build-airport.ts <ICAO>`); the table
+describes KACY, the KMHT counterparts follow it. Every airport-specific string the sim shows or speaks (facility call names,
+ATIS, charts, navaids, runway ends, parking) comes from that airport's data.
 
 | Data | Source | Cycle |
 |---|---|---|
@@ -22,6 +28,15 @@ ADS-B, or live traffic.
 | Minimum vectoring altitudes (9 sectors) | FAA MVA/MIA digital product, Atlantic City ATCT/TRACON chart ACY_MVA_FUS3 | server date 2025-10-20 |
 | LAHSO hold-short points and available landing distances; published fix altitudes and holding patterns | FAA NASR; d-TPP plates (transcribed, with provenance) | 2026-10-01 / cycle 2610 |
 | Procedural references in training/debrief | FAA JO 7110.65 paragraph numbers and titles verified against the FAA web edition (`docs/FAA-REFERENCES.md`) | 2026-10-16 |
+
+**KMHT (second airport)**, same sources and cycle (NASR 2026-10-01, d-TPP 2610, OSM snapshot 2026-10-17): runways 06/24 (7651 x 150 ft) and
+17/35 (9250 x 150 ft) with displaced thresholds recorded, ILS on 6 (I-MJE 109.95), 17 (I-MNA 109.1) and 35 (I-MHT 109.1, CAT III), ATIS 119.55,
+Clearance 135.9, Ground 121.9, Tower 121.3 (24 h, Class C), Boston Approach/Departure 124.9 (the Boston Consolidated TRACON), the MHT DME,
+the CON and GDM VOR/DMEs, 26 approach fixes, the 18 d-TPP charts (diagram, 11 approaches of which 7 are transcribed, MANCHESTER ONE and
+PPORT FOUR departures, ROZZE TWO arrival, minimums pages), 19 taxiway identifiers of the 22 on the diagram, 14 gates and 15 GA/FBO stands (OSM). KMHT
+has **no** LAHSO, hot spot, MVA sectors, plate holding patterns or plate fix altitudes in the dataset: those layers are empty, not invented
+(`data/sources/README.md`, "KACY layers with no KMHT equivalent"). The career steps and training lessons are written around KACY's
+runway ends, taxiways and stands, so at KMHT the setup offers Free play (all five presets, custom traffic, IFR flows).
 
 Behavioural realism is verified too: aircraft performance values carry a source each
 (Textron/Cessna, Airbus, EASA, EUROCONTROL), the 250 ft holding-position distance matches
@@ -46,8 +61,9 @@ npm run server   # local backend on :8787 (AWC weather proxy, FAA chart proxy, o
 npm run dev      # Vite on http://localhost:5173
 ```
 
-Open the app, pick a mode (Free Play, Career, Training), a scenario, weather (live
-KACY METAR or a preset), runway configuration and controller position, then Start.
+Open the app, pick the airport (KACY by default, or KMHT), a mode (Free Play, Career,
+Training; the last two are KACY-only), a scenario, weather (live METAR of the chosen airport
+or a preset), runway configuration and controller position, then Start.
 
 * **Push-to-talk:** hold **Space** (configurable in Settings) and speak, e.g.
   "Cessna seven two three echo juliet, runway one three, cleared for takeoff".
@@ -69,7 +85,8 @@ npm test          # vitest: engine, parser, airport data, weather, charts, voice
 npm run test:e2e  # playwright: 24 browser flows incl. Whisper, Web Speech (real Chrome) and Deepgram-protocol voice tests
 npm run typecheck
 npm run lint
-npx tsx scripts/build-kacy-airport.ts   # regenerate the airport dataset from data/sources
+npm run build:airport -- KMHT           # regenerate an airport dataset from data/sources (KACY or KMHT); also: npx tsx scripts/build-airport.ts KACY
+npx tsx scripts/build-kacy-airport.ts   # same as build-airport.ts KACY (kept)
 ```
 
 ## Architecture
@@ -103,10 +120,11 @@ Ground, Tower, Approach/Departure, or any combination.
 ## Layout
 
 ```
-src/sim        simulation engine        src/airport   verified KACY dataset + taxiway graph
+src/sim        simulation engine        src/airport   verified KACY / KMHT datasets + taxiway graphs
 src/commands   phraseology parser       src/radio     readbacks, frequencies
 src/voice      PTT, STT, TTS, radio FX  src/weather   METAR, presets, ATIS, runway selection
 src/charts     FAA chart viewer         src/game      scenarios, traffic, training, career, debrief
 src/ui         React app               server/       weather/chart proxy, Deepgram token
 data/sources   FAA/OSM/AWC extracts with provenance (raw downloads are git-ignored)
+scripts        build-airport.ts <ICAO> (+ airports/<icao>.ts profiles), extract-nasr-airport.ts, osm-overpass-to-geojson.ts
 ```

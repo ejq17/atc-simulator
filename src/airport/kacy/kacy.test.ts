@@ -43,7 +43,7 @@ describe('airport basics (NASR)', () => {
     expect(getAirport('kacy')).toBe(ap);
     expect(getAirport('ACY')).toBe(ap);
     expect(getAirport('KJFK')).toBeUndefined();
-    expect(listAirports()).toEqual(['KACY']);
+    expect(listAirports()).toEqual(['KACY', 'KMHT']);
     expect(OSM_ATTRIBUTION).toBe('© OpenStreetMap contributors, ODbL 1.0');
     expect(ap.osmAttribution).toBe(OSM_ATTRIBUTION);
     expect(g.provenance.source).toMatch(/OpenStreetMap/);

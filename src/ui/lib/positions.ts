@@ -41,7 +41,7 @@ export const POSITION_NOTE: Record<PositionChoice, string> = {
   GND: 'Taxi routes, hold-short points, runway crossings and pushback.',
   TWR: 'Runway clearances (takeoff, line up and wait, land), sequencing, handoffs to Departure and Ground.',
   'TWR+GND': 'Both frequencies at once. Each call goes out on the addressed aircraft’s frequency.',
-  APP: 'Airborne IFR traffic: vectors, direct-to, altitudes, approach clearances, radar contact, handoff to Tower. Approach and Departure share 124.6 at KACY.',
+  APP: 'Airborne IFR traffic: vectors, direct-to, altitudes, approach clearances, radar contact, handoff to Tower. Approach and Departure share one frequency at the airports built so far.',
   DEP: 'Departing IFR traffic only: radar contact, climb, direct-to and routing after Tower hands them off.',
   'APP+TWR': 'Bring arrivals down the approach and land them yourself, and release the departures to Departure.',
   ALL: 'Every position at once: clearance to taxi to takeoff to departure and approach to landing.',

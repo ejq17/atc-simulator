@@ -163,6 +163,24 @@ export const IFR_DESTINATIONS: readonly Destination[] = [
   { icao: 'KBOS', jet: [21000, 23000], exit: 'COL' },
 ];
 
+/**
+ * Gameplay destinations for airports other than KACY. Not aeronautical data: just airports the command parser knows (src/commands/airports.ts)
+ * and that make sense as airline legs from the airport; no departure exit fix is named (the filed route is empty, the departure frequency
+ * is the airport's first DEP frequency).
+ */
+const IFR_DESTINATIONS_KMHT: readonly Destination[] = [
+  { icao: 'KPHL', jet: [14000, 16000], exit: '' },
+  { icao: 'KBWI', jet: [16000, 18000], exit: '' },
+  { icao: 'KDCA', jet: [16000, 18000], exit: '' },
+  { icao: 'KEWR', jet: [12000, 14000], exit: '' },
+  { icao: 'KJFK', jet: [12000, 14000], exit: '' },
+];
+
+/** The destination list for an airport (KACY: the short hops above). */
+export function ifrDestinationsFor(airport: Pick<Airport, 'icao'>): readonly Destination[] {
+  return airport.icao === 'KMHT' ? IFR_DESTINATIONS_KMHT : IFR_DESTINATIONS;
+}
+
 /** C172 IFR cruise: 4,000-6,000 ft. */
 export const C172_IFR_CRUISE_FT: readonly number[] = [4000, 5000, 6000];
 
@@ -170,11 +188,12 @@ export function ifrFlightPlan(
   airport: Airport, rng: Rng, type: string, o: { destination?: string; cruiseAltitudeFt?: number } = {},
 ): Omit<FlightPlan, 'ifrClearance'> {
   const light = getPerformance(type).category === 'light';
-  const pool = light ? IFR_DESTINATIONS.slice(0, 2) : IFR_DESTINATIONS; // a Cessna flies the short hops (Philadelphia, Baltimore)
-  const dest = (o.destination ? pool.concat(IFR_DESTINATIONS).find((d) => d.icao === o.destination) : undefined) ?? pool[Math.min(pool.length - 1, Math.floor(rng() * pool.length))];
+  const all = ifrDestinationsFor(airport);
+  const pool = light ? all.slice(0, 2) : all; // a Cessna flies the short hops (the first two destinations)
+  const dest = (o.destination ? pool.concat(all).find((d) => d.icao === o.destination) : undefined) ?? pool[Math.min(pool.length - 1, Math.floor(rng() * pool.length))];
   const alts = light ? C172_IFR_CRUISE_FT : dest.jet;
   const cruise = o.cruiseAltitudeFt ?? alts[Math.min(alts.length - 1, Math.floor(rng() * alts.length))];
-  const exit = findNavFix(airport, dest.exit)?.id;
+  const exit = dest.exit ? findNavFix(airport, dest.exit)?.id : undefined;
   return { flightRules: 'IFR', origin: airport.icao, destination: dest.icao, cruiseAltitudeFt: cruise, route: exit ? [exit] : [] };
 }
 

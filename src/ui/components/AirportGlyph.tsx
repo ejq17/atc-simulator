@@ -2,7 +2,7 @@ import { useMemo } from 'react';
 import type { Airport } from '../../sim/types';
 import { buildSurfaceStatic } from '../display/surfaceStatic';
 
-/** Decorative-but-true KACY plan view for the setup header, drawn from the real taxiway and runway geometry. */
+/** Decorative-but-true plan view for the setup header, drawn from the real taxiway and runway geometry. */
 export function AirportGlyph({ airport, className = '' }: { airport: Airport; className?: string }) {
   const { paths, runways, viewBox } = useMemo(() => {
     const b = buildSurfaceStatic(airport).bounds;
@@ -20,7 +20,7 @@ export function AirportGlyph({ airport, className = '' }: { airport: Airport; cl
     return { paths, runways, viewBox: `0 0 ${w.toFixed(0)} ${h.toFixed(0)}` };
   }, [airport]);
   return (
-    <svg viewBox={viewBox} className={className} role="img" aria-label="KACY runway and taxiway layout">
+    <svg viewBox={viewBox} className={className} role="img" aria-label={`${airport.icao} runway and taxiway layout`}>
       {paths.map((d, i) => (<path key={i} d={d} fill="none" stroke="#2c3946" strokeWidth="9" strokeLinecap="round" strokeLinejoin="round" />))}
       {runways.map((d, i) => (<path key={i} d={d} fill="#1f272e" stroke="#39c5e8" strokeWidth="9" strokeLinejoin="round" />))}
     </svg>

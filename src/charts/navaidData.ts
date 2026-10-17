@@ -1,10 +1,11 @@
 /**
- * Typed accessors over data/sources/kacy-navaids.json (NASR 2026-10-01 +
+ * Typed accessors over data/sources/<icao>-navaids.json (NASR 2026-10-01 +
  * d-TPP 2610 plate readings). Display-only; nothing is derived except the
- * great-circle distance/bearing from the ACY VORTAC, which is labelled as
- * computed in the UI.
+ * great-circle distance/bearing from the airport's own navaid (ACY VORTAC,
+ * MHT DME), which is labelled as computed in the UI.
  */
 import rawNavaids from '../../data/sources/kacy-navaids.json';
+import rawKmhtNavaids from '../../data/sources/kmht-navaids.json';
 
 export interface Vortac {
   id: string;
@@ -16,9 +17,9 @@ export interface Vortac {
   lat: number;
   lon: number;
   elevFt: number;
-  magVar: string;
-  magVarEpoch: string;
-  hours: string;
+  magVar?: string;
+  magVarEpoch?: string;
+  hours?: string;
   remarks: string[];
   locationNote: string;
 }
@@ -62,7 +63,15 @@ export interface ApproachFix {
 }
 
 export interface NavaidDataset {
+  /** The airport's own navaid (KACY: the ACY VORTAC; KMHT: the MHT DME). */
   vortac: Vortac;
+  /** FAA id used in the UI labels ("ACY", "MHT"). */
+  faaId: string;
+  icao: string;
+  /** Fixes shown by default (final approach fixes, intermediate fixes and missed-approach holds). */
+  keyFixIds: readonly string[];
+  /** Sentence about the runways without an ILS. */
+  noIlsNote: string;
   ils: IlsSystem[];
   runwaysWithoutIls: string[];
   ilsNote: string;
@@ -77,40 +86,50 @@ interface RawFix {
   id: string;
   lat: number;
   lon: number;
-  roles_on_kacy_plates: Record<string, string | null>;
+  roles_on_kacy_plates?: Record<string, string | null>;
+  roles_on_plates?: Record<string, string | null>;
   reference_navaid_radial_distance: null | Array<{ nav: string; nav_type: string; bearing_deg: number; dist_nm: number | null }>;
 }
+interface RawIls {
+  runways_without_ils_or_loc: string[];
+  note: string;
+  systems: Array<{
+    runway_end: string;
+    plate_ident: string;
+    category: string;
+    loc_freq_mhz: number;
+    dme_channel: string | null;
+    front_course_mag_deg: number;
+    status: string;
+    approach_lighting: string;
+    glideslope: { angle_deg: number; freq_mhz: number };
+    plate_data: { plate_minima: string; tdze_plate_ft: number };
+  }>;
+}
+interface RawOther { id: string; type: string; name: string; status: string; freq_mhz: string | number; channel: string; lat: number; lon: number }
+/** Two key spellings exist: the first airport's hand-written file and the extractor's generic output. */
 interface RawNav {
   _provenance: { sources: string[]; retrieved: string; faa_cycle_effective: string };
-  vortac_acy: Record<string, unknown> & { remarks: string[] };
-  ils_localizers_at_kacy: {
-    runways_without_ils_or_loc: string[];
-    note: string;
-    systems: Array<{
-      runway_end: string;
-      plate_ident: string;
-      category: string;
-      loc_freq_mhz: number;
-      dme_channel: string;
-      front_course_mag_deg: number;
-      status: string;
-      approach_lighting: string;
-      glideslope: { angle_deg: number; freq_mhz: number };
-      plate_data: { plate_minima: string; tdze_plate_ft: number };
-    }>;
-  };
-  other_navaids_referenced_by_kacy_procedures: Array<{
-    id: string; type: string; name: string; status: string; freq_mhz: string; channel: string; lat: number; lon: number;
-  }>;
-  fixes_named_on_kacy_approach_charts: RawFix[];
+  vortac_acy?: Record<string, unknown> & { remarks: string[] };
+  primary_navaid?: Record<string, unknown> & { remarks: string[] };
+  ils_localizers_at_kacy?: RawIls;
+  ils_localizers?: RawIls;
+  other_navaids_referenced_by_kacy_procedures?: RawOther[];
+  other_navaids_referenced?: RawOther[];
+  fixes_named_on_kacy_approach_charts?: RawFix[];
+  fixes_named_on_approach_charts?: RawFix[];
   unverified: string[];
 }
-const raw = rawNavaids as unknown as RawNav;
 
-/** Approach fixes the brief calls out: final-approach fixes/IFs for 13 and 31 plus the missed-approach hold. */
+/** KACY approach fixes the brief calls out: final-approach fixes/IFs for 13 and 31 plus the missed-approach hold. */
 export const KEY_FIX_IDS = ['CARYL', 'MAYBN', 'STEVV', 'PRSTY', 'SMITS'] as const;
-/** The nearby VORs the brief names, shown first. */
+/** The nearby KACY VORs the brief names, shown first. */
 export const PRIMARY_NEARBY_IDS = ['VCN', 'SIE', 'CYN'] as const;
+
+const AIRPORTS: Record<string, { raw: RawNav; faaId: string; noIlsNote: string; keyFixIds?: readonly string[]; primaryNearby: readonly string[] }> = {
+  KACY: { raw: rawNavaids as unknown as RawNav, faaId: 'ACY', noIlsNote: 'RNAV (GPS) and VOR approaches only.', keyFixIds: KEY_FIX_IDS, primaryNearby: PRIMARY_NEARBY_IDS },
+  KMHT: { raw: rawKmhtNavaids as unknown as RawNav, faaId: 'MHT', noIlsNote: 'RNAV (GPS) approaches only (see the approach charts).', primaryNearby: ['CON', 'GDM'] },
+};
 
 const toRad = (d: number) => (d * Math.PI) / 180;
 
@@ -125,8 +144,11 @@ export function distanceBearing(a: { lat: number; lon: number }, b: { lat: numbe
   return { nm, bearing: (Math.atan2(y, x) * 180 / Math.PI + 360) % 360 };
 }
 
-function build(): NavaidDataset {
-  const v = raw.vortac_acy as Record<string, any>; // eslint-disable-line @typescript-eslint/no-explicit-any
+function build(icao: string): NavaidDataset {
+  const cfg = AIRPORTS[icao];
+  const raw = cfg.raw;
+  const rawIls = (raw.ils_localizers ?? raw.ils_localizers_at_kacy)!;
+  const v = (raw.primary_navaid ?? raw.vortac_acy) as Record<string, any>; // eslint-disable-line @typescript-eslint/no-explicit-any
   const vortac: Vortac = {
     id: v.id,
     type: v.type,
@@ -140,15 +162,15 @@ function build(): NavaidDataset {
     magVar: v.mag_var,
     magVarEpoch: v.mag_var_epoch,
     hours: v.hours,
-    remarks: v.remarks,
+    remarks: v.remarks ?? [],
     locationNote: v.location_note,
   };
-  const ils: IlsSystem[] = raw.ils_localizers_at_kacy.systems.map((s) => ({
+  const ils: IlsSystem[] = rawIls.systems.map((s) => ({
     runway: s.runway_end,
     plateIdent: s.plate_ident,
     category: s.category,
     freqMhz: s.loc_freq_mhz,
-    dmeChannel: s.dme_channel,
+    dmeChannel: s.dme_channel ?? '-',
     frontCourseMag: Math.round(s.front_course_mag_deg),
     gsAngleDeg: s.glideslope.angle_deg,
     gsFreqMhz: s.glideslope.freq_mhz,
@@ -157,36 +179,41 @@ function build(): NavaidDataset {
     minima: s.plate_data.plate_minima,
     tdzePlateFt: s.plate_data.tdze_plate_ft,
   }));
-  const nearby: NearbyNavaid[] = raw.other_navaids_referenced_by_kacy_procedures
+  const nearby: NearbyNavaid[] = (raw.other_navaids_referenced ?? raw.other_navaids_referenced_by_kacy_procedures ?? [])
     .map((n) => {
       const db = distanceBearing(vortac, n);
       return {
-        id: n.id, type: n.type, name: n.name, status: n.status, freqMhz: n.freq_mhz, channel: n.channel, lat: n.lat, lon: n.lon,
+        id: n.id, type: n.type, name: n.name, status: n.status, freqMhz: String(n.freq_mhz), channel: n.channel, lat: n.lat, lon: n.lon,
         distanceNmFromAcy: db.nm, bearingTrueFromAcy: db.bearing,
       };
     })
     .sort((a, b) => {
-      const pa = PRIMARY_NEARBY_IDS.indexOf(a.id as (typeof PRIMARY_NEARBY_IDS)[number]);
-      const pb = PRIMARY_NEARBY_IDS.indexOf(b.id as (typeof PRIMARY_NEARBY_IDS)[number]);
+      const pa = cfg.primaryNearby.indexOf(a.id);
+      const pb = cfg.primaryNearby.indexOf(b.id);
       return (pa < 0 ? 99 : pa) - (pb < 0 ? 99 : pb) || a.distanceNmFromAcy - b.distanceNmFromAcy;
     });
-  const fixes: ApproachFix[] = raw.fixes_named_on_kacy_approach_charts.map((f) => ({
+  const keyFixIds: readonly string[] = cfg.keyFixIds ?? deriveKeyFixes(raw);
+  const fixes: ApproachFix[] = (raw.fixes_named_on_approach_charts ?? raw.fixes_named_on_kacy_approach_charts ?? []).map((f) => ({
     id: f.id,
     lat: f.lat,
     lon: f.lon,
-    roles: Object.entries(f.roles_on_kacy_plates)
+    roles: Object.entries(f.roles_on_plates ?? f.roles_on_kacy_plates ?? {})
       .filter((e): e is [string, string] => typeof e[1] === 'string')
       .map(([procedure, role]) => ({ procedure, role })),
     reference: (f.reference_navaid_radial_distance ?? []).map(
       (r) => `${r.nav} ${r.bearing_deg.toFixed(0)}°${r.dist_nm != null ? ` / ${r.dist_nm} NM` : ''}`,
     ),
-    key: (KEY_FIX_IDS as readonly string[]).includes(f.id),
+    key: keyFixIds.includes(f.id),
   }));
   return {
     vortac,
+    faaId: cfg.faaId,
+    icao,
+    keyFixIds,
+    noIlsNote: cfg.noIlsNote,
     ils,
-    runwaysWithoutIls: raw.ils_localizers_at_kacy.runways_without_ils_or_loc,
-    ilsNote: raw.ils_localizers_at_kacy.note,
+    runwaysWithoutIls: rawIls.runways_without_ils_or_loc,
+    ilsNote: rawIls.note,
     nearby,
     fixes,
     provenance: { sources: raw._provenance.sources, retrieved: raw._provenance.retrieved, cycle: raw._provenance.faa_cycle_effective },
@@ -194,7 +221,23 @@ function build(): NavaidDataset {
   };
 }
 
-export const NAVAIDS: NavaidDataset = build();
+/** Key fixes of an airport without a hand-picked list: every fix that is a FAF, IF or missed-approach hold on some plate. */
+function deriveKeyFixes(raw: RawNav): string[] {
+  return (raw.fixes_named_on_approach_charts ?? [])
+    .filter((f) => Object.values(f.roles_on_plates ?? {}).some((r) => typeof r === 'string' && /\b(FAF|IF)\b|missed approach hold/i.test(r)))
+    .map((f) => f.id);
+}
+
+const cache = new Map<string, NavaidDataset>();
+/** Navaid dataset of an airport (default KACY). */
+export function navaidsFor(icao: string = 'KACY'): NavaidDataset {
+  const key = AIRPORTS[icao.toUpperCase()] ? icao.toUpperCase() : 'KACY';
+  let d = cache.get(key);
+  if (!d) cache.set(key, (d = build(key)));
+  return d;
+}
+
+export const NAVAIDS: NavaidDataset = navaidsFor('KACY');
 
 /** "39-27.3N" style is overkill for a reference table; decimal degrees with hemisphere. */
 export function formatLatLon(lat: number, lon: number): string {

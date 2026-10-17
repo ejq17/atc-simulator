@@ -1,8 +1,10 @@
 import { useMemo, useState } from 'react';
-import { NAVAIDS, formatLatLon } from './navaidData';
+import { formatLatLon, navaidsFor } from './navaidData';
 
 export interface NavaidPanelProps {
   className?: string;
+  /** Airport whose navaids are listed (default KACY). */
+  icao?: string;
 }
 
 const TH = 'px-2 py-1 text-left text-[10px] font-normal uppercase tracking-wider text-atc-muted';
@@ -29,8 +31,9 @@ function StatusBadge({ status }: { status: string }) {
   return <span className={`inline-block rounded-sm border px-1.5 text-[10px] uppercase tracking-wider ${cls}`}>{status}</span>;
 }
 
-export function NavaidPanel({ className = '' }: NavaidPanelProps) {
-  const { vortac, ils, nearby, fixes, provenance, runwaysWithoutIls, unverified } = NAVAIDS;
+export function NavaidPanel({ className = '', icao = 'KACY' }: NavaidPanelProps) {
+  const NAVAIDS = navaidsFor(icao);
+  const { vortac, ils, nearby, fixes, provenance, runwaysWithoutIls, unverified, faaId } = NAVAIDS;
   const [showAll, setShowAll] = useState(false);
   const [query, setQuery] = useState('');
   const visibleFixes = useMemo(() => {
@@ -44,32 +47,34 @@ export function NavaidPanel({ className = '' }: NavaidPanelProps) {
   return (
     <div aria-label="Navigation aids reference" className={`flex flex-col gap-3 overflow-y-auto bg-atc-bg p-3 text-atc-text ${className}`}>
       <div className="flex items-baseline justify-between">
-        <h2 className="text-sm font-semibold tracking-wide">KACY navigation aids</h2>
+        <h2 className="text-sm font-semibold tracking-wide">{NAVAIDS.icao} navigation aids</h2>
         <span className="text-[10px] text-atc-muted">Reference only - not for navigation</span>
       </div>
 
       <Section
-        title="ACY VORTAC"
-        footer={<>{src} Unusable sectors are quoted from the NASR remarks. VORTAC position vs ARP: {vortac.locationNote}</>}
+        title={`${faaId} ${vortac.type}`}
+        footer={<>{src} Unusable sectors, where listed, are quoted from the NASR remarks. Position vs ARP: {vortac.locationNote}</>}
       >
         <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
           <span className="text-lg text-atc-green">{vortac.id}</span>
           <span>{vortac.name} {vortac.type}</span>
           <span className="text-atc-cyan">{vortac.freqMhz.toFixed(2)} MHz</span>
-          <span>TACAN/DME ch {vortac.channel}</span>
+          <span>{vortac.type === 'DME' ? 'DME' : 'TACAN/DME'} ch {vortac.channel}</span>
           <StatusBadge status={vortac.status} />
         </div>
         <p className="mt-1 text-[11px] text-atc-muted">
-          {formatLatLon(vortac.lat, vortac.lon)} - elev {vortac.elevFt} ft - mag var {vortac.magVar} ({vortac.magVarEpoch}) - hours {vortac.hours}
+          {formatLatLon(vortac.lat, vortac.lon)} - elev {vortac.elevFt} ft{vortac.magVar ? ` - mag var ${vortac.magVar}${vortac.magVarEpoch ? ` (${vortac.magVarEpoch})` : ''}` : ''}{vortac.hours ? ` - hours ${vortac.hours}` : ''}
         </p>
-        <div className="mt-2 border-l-2 border-atc-amber bg-atc-panel-2 px-3 py-2">
-          <div className="text-[10px] uppercase tracking-wider text-atc-amber">Operational restricted - unusable sectors</div>
-          <ul className="mt-1 space-y-1 text-[11px]">
-            {vortac.remarks.map((r) => (
-              <li key={r}>{r}</li>
-            ))}
-          </ul>
-        </div>
+        {vortac.remarks.length > 0 && (
+          <div className="mt-2 border-l-2 border-atc-amber bg-atc-panel-2 px-3 py-2">
+            <div className="text-[10px] uppercase tracking-wider text-atc-amber">Operational restricted - unusable sectors</div>
+            <ul className="mt-1 space-y-1 text-[11px]">
+              {vortac.remarks.map((r) => (
+                <li key={r}>{r}</li>
+              ))}
+            </ul>
+          </div>
+        )}
       </Section>
 
       <Section
@@ -77,7 +82,7 @@ export function NavaidPanel({ className = '' }: NavaidPanelProps) {
         footer={<>{src} Decision altitudes, RVR and TDZE are read from the d-TPP plates (not in NASR) by transcription - verify against the chart. {NAVAIDS.ilsNote}</>}
       >
         <div className="mb-2 border-l-2 border-atc-red bg-atc-panel-2 px-3 py-1.5 text-xs">
-          No ILS or localizer on runway {noIls}. RNAV (GPS) and VOR approaches only.
+          No ILS or localizer on runway {noIls}. {NAVAIDS.noIlsNote}
         </div>
         <div className="overflow-x-auto">
           <table className="w-full min-w-[34rem] border-collapse">
@@ -114,14 +119,14 @@ export function NavaidPanel({ className = '' }: NavaidPanelProps) {
 
       <Section
         title="Nearby VOR / VORTAC / VOR-DME"
-        footer={<>{src} Distance and bearing are computed here from the NASR coordinates (great circle, true bearing from the ACY VORTAC), not FAA-published.</>}
+        footer={<>{src} Distance and bearing are computed here from the NASR coordinates (great circle, true bearing from the {faaId} {vortac.type}), not FAA-published.</>}
       >
         <div className="overflow-x-auto">
           <table className="w-full min-w-[34rem] border-collapse">
             <thead>
               <tr className="border-b border-atc-border">
                 <th className={TH}>Id</th><th className={TH}>Name</th><th className={TH}>Type</th><th className={TH}>MHz</th>
-                <th className={TH}>Chan</th><th className={TH}>From ACY (computed)</th><th className={TH}>Status</th>
+                <th className={TH}>Chan</th><th className={TH}>From {faaId} (computed)</th><th className={TH}>Status</th>
               </tr>
             </thead>
             <tbody>
@@ -163,7 +168,7 @@ export function NavaidPanel({ className = '' }: NavaidPanelProps) {
           <table className="w-full min-w-[34rem] border-collapse">
             <thead className="sticky top-0 bg-atc-panel">
               <tr className="border-b border-atc-border">
-                <th className={TH}>Fix</th><th className={TH}>Position</th><th className={TH}>Roles on KACY plates</th>
+                <th className={TH}>Fix</th><th className={TH}>Position</th><th className={TH}>Roles on {NAVAIDS.icao} plates</th>
               </tr>
             </thead>
             <tbody>

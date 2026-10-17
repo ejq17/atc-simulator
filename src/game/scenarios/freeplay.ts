@@ -21,7 +21,7 @@ import { mulberry32 } from '../../sim/rng';
 import type { Rng } from '../../sim/rng';
 import { getPresetWeather, randomWeather, WEATHER_PRESET_IDS } from '../../weather/presets';
 import type { WeatherPresetId } from '../../weather/presets';
-import { recommendRunways } from '../../weather/runwaySelection';
+import { preferredEndOrder, recommendRunways } from '../../weather/runwaySelection';
 import type { GameScenario } from '../types';
 import { randomAirlineCallsign, randomNNumber, runwayIdOf, runwayLongEnoughFor, callsignTail } from '../world';
 import { pickArrivalStart, pickParking } from '../placement';
@@ -49,7 +49,7 @@ const DIFF_PROFILE: Record<Diff, { rate: number; max: number }> = {
  * Preferred runway order when the wind does not decide (calm wind, or headwinds within the tolerance of each other). 13/31 comes first because it is the
  * longer pair (10,001 ft against 6,145 ft): an operator preference, not a limitation - an A320 can depart 4/22 from full length.
  */
-const PREFERRED_ORDER = ['13', '31', '22', '4'];
+// (KACY: ['13', '31', '22', '4']; see `preferredEndOrder`)
 
 export function resolveWeather(w: FreePlayOptions['weather'], seed: number): Weather | 'live' {
   if (w === undefined || w === null) return getPresetWeather('clear');
@@ -66,7 +66,7 @@ export function recommendConfig(airport: Airport, weather: Weather | 'live', jet
   const usable = jets ? ends.filter((e) => runwayLongEnoughFor(airport, 'A320', e.id)) : ends;
   const pool = usable.length ? usable : ends;
   const w = weather === 'live' ? { windDirDeg: 0 as const, windSpeedKt: 0 } : weather;
-  const rec = recommendRunways(w, pool, { preferredOrder: PREFERRED_ORDER, variationDeg: airport.magneticVariationDeg });
+  const rec = recommendRunways(w, pool, { preferredOrder: preferredEndOrder(airport, 'low'), variationDeg: airport.magneticVariationDeg });
   return { departing: [rec.primary], landing: [rec.primary] };
 }
 

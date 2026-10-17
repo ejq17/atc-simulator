@@ -26,11 +26,11 @@ import { controllerFrequencies, transmit } from '../commands/transmit';
 import type { ControllerSetup, TransmitResult } from '../commands/transmit';
 import { voiceSettings } from './voiceSettings';
 import { aiPositionsFor } from '../lib/positions';
-import { frequencyForPosition } from '../../radio/frequencies';
+import { airportCallName, frequencyForPosition } from '../../radio/frequencies';
 import { createStripBoard } from '../strips/stripModel';
 import type { StripBoard } from '../strips/stripModel';
 
-export const AIRPORT_CALL_NAME = 'Atlantic City';
+
 
 export interface SessionHooks {
   /** State changed in a way the React tree should re-read (throttled ~10 Hz, and immediately after commands). */
@@ -137,7 +137,7 @@ export function approachesInUseFor(state: SimulationState): string[] {
 export function makeAtis(state: SimulationState, letter: string, startUtcMs: number): SimulatedAtis {
   return generateAtis({
     approachesInUse: approachesInUseFor(state),
-    airportName: AIRPORT_CALL_NAME,
+    airportName: airportCallName(state.airport),
     icao: state.airport.icao,
     weather: state.weather,
     variationDeg: state.airport.magneticVariationDeg,

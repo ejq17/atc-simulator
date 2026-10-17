@@ -5,7 +5,7 @@
  * Source of every default:
  *   destination            flightPlan.destination (a different stated destination is refused)
  *   departureProcedure     `airport.procedures` entry of type 'DP' (name without its trailing "DEPARTURE")
- *   initialAltitudeFt      the command, else 2000 (ATLANTIC CITY THREE says maintain 2000)
+ *   initialAltitudeFt      the command, else the DP's maintain altitude (`defaultInitialAltitudeFt`: ATLANTIC CITY THREE 2000, MANCHESTER ONE 3000)
  *   expectAltitudeFt       the command, else flightPlan.cruiseAltitudeFt
  *   departureFrequencyMhz  the command, else the DEP frequency whose sector (RadioFrequency.sectorBearings, magnetic bearings from the
  *                          airport) contains the bearing to the first fix of the filed route, else the first DEP frequency, else APP
@@ -20,7 +20,13 @@ import { bearingDeg, trueToMagnetic } from './geo';
 import type { RadioFrequency } from './types';
 import { spokenAirportName } from '../radio/spoken';
 
+/** Initial altitude when the airport's DP data states none (KACY: ATLANTIC CITY THREE says maintain 2000). */
 export const DEFAULT_INITIAL_ALTITUDE_FT = 2000;
+
+/** The altitude a clearance says to maintain: the departure procedure's own (`maintainAltitudeFt`, KMHT: 3000), else the default. */
+export function defaultInitialAltitudeFt(airport: Airport): number {
+  return airport.procedures.find((p) => p.type === 'DP')?.maintainAltitudeFt ?? DEFAULT_INITIAL_ALTITUDE_FT;
+}
 export const RESERVED_SQUAWKS: ReadonlySet<string> = new Set(['0000', '1200', '7500', '7600', '7700']);
 
 export function isAssignableSquawk(code: string): boolean {
@@ -113,7 +119,7 @@ export function buildIfrClearance(ctx: SimContext, ac: Aircraft, given: ParsedCo
     destination: fp.destination,
     routeText: dp ? `${dp} departure, radar vectors, then as filed` : 'as filed',
     departureProcedure: dp,
-    initialAltitudeFt: p.initialAltitudeFt ?? DEFAULT_INITIAL_ALTITUDE_FT,
+    initialAltitudeFt: p.initialAltitudeFt ?? defaultInitialAltitudeFt(airport),
     expectAltitudeFt: p.expectAltitudeFt ?? fp.cruiseAltitudeFt,
     departureFrequencyMhz: depFreq,
     squawk,
