@@ -154,6 +154,8 @@ export interface AircraftRuntime {
   segmentTurn?: { dir: 'left' | 'right'; taxiway: string; atSec: number };
   /** Runway exit instruction for the rollout in progress / about to start. */
   exit?: ExitInstruction;
+  /** "Make a one eighty" on a taxiway: the aircraft stops, then turns to this heading (groundMovement.ts) and holds position for new instructions. */
+  turnAround?: { headingDeg: number };
   /** "Hold short of runway N" given during the landing roll / on final: the intersecting runway the rollout must stop short of. */
   exitHoldShort?: string;
   /** Touch-and-go ground roll in progress (phase ROLLOUT, runway occupied): see `stepTouchAndGo` in flightDynamics.ts. */

@@ -603,7 +603,7 @@ docs/PHRASEOLOGY-AUDIT.md section G, docs/BEHAVIOUR-ACCURACY.md T8, T11, T13-T17
 ## Landing rollout and runway exit
 
 Braking follows the sourced landing distances (A320 6 kt/s, C172 4.4 kt/s; maximum braking = 1.4x). At touchdown `chooseExit` takes the
-FIRST exit (runway node beside a hold position of that runway) the aircraft can reach at that exit's safe speed braking no harder
+PREFERRED exit (runway node beside a hold position of that runway; `exitChoice.ts`, below) among those the aircraft can reach at that exit's safe speed braking no harder
 than normal, else no harder than the maximum. Exit speed: 60 kt for a 30 degree connector falling to 30 kt for a 90 degree one, and
 never more than the speed from which it can stop at the hold line (~22 kt for a 76 m connector). The aircraft brakes at least at the
 planned rate, harder if it falls behind, and rolls at the exit speed to the exit. If no exit is reachable it stops short of the runway
@@ -660,12 +660,18 @@ for every runway end a `holding_position` node (runwayId set, optional `protects
 `runway` node; exits = `runway` nodes adjacent to a `holding_position` of the same runway; edges on a runway
 surface carry `onRunwayId`; parking nodes of kind `parking`; GND/TWR frequencies.
 
+### Exit preference, lander stubs, one eighty (exit-choice round)
+
+* `exitChoice.ts`: `scoreExit` = taxi metres from the hold line to the nearest free parking of the type's natural category (`holdToParking`, cached Dijkstra over taxiways, runway crossings allowed at +600 m) + crossings + immediate crossing of an active runway + far side + blocked stub (`exitBlockage`: stopped / pushback / head-on within 35 m of the first 400 m beyond the hold line) + runway rolled beyond the first exit. `flightDynamics.rolloutExitOptions` lists the reachable exits best first (tests, Tower), `predictedExit(state, ac, g, instruction?, holdShortRunwayId?)` says what an aircraft will take and what is wrong with it, `checkExitRequest` says whether an instruction or a hold short after landing can be flown. An exit INSTRUCTION still wins: the first exit of the pool, only the side is picked by the score.
+* `exitStubs.ts`: `landerStubs` (once per simulated second) = arrivals inside 2 nm on final, rolling out, or rolling to the hold line of their exit, with the exit's stub; `groundMovement.findLeader` treats the hold line as a stopped leader for aircraft whose route runs over it; `ai/world.opposingTraffic` keeps AI Ground from routing onto it.
+* `TURN_AROUND` (`turnAround.ts`): see docs/BEHAVIOUR-ACCURACY.md G12. Landline `EXIT` topic: see "Coordination" below.
+
 ## Coordination between positions (`coordination.ts`, `state.coordination`)
 
 A typed message channel between controller positions, replayable and deterministic (ids are counters, times are sim seconds, nothing random). `state.coordination`
 = `{ requests, messages, human, staffed }`; every message is also a `COORDINATION` `SimEvent` (`data.msgKind`, `from`, `to`, `requestId`, `standard`), so a session replays from the log.
 
-* **Requests** (`CoordRequest`): topic `CROSSING` (runway id, point), `RELEASE`, `POINT_OUT` (position text, altitude); status `pending -> standby | approved | denied`, `approved -> used | expired | rescinded`, `used -> completed`.
+* **Requests** (`CoordRequest`): topic `CROSSING` (runway id, point), `RELEASE`, `POINT_OUT` (position text, altitude), `EXIT` (Ground asks Tower to have an arrival exit at `point` on `exitSide` and/or hold short of `holdShortRunwayId` after landing; 3-1-4, wording non-standard; messages `EXIT_REQUEST / EXIT_APPROVED / EXIT_UNABLE`; an approval lasts 240 s or until the aircraft is clear); status `pending -> standby | approved | denied`, `approved -> used | expired | rescinded`, `used -> completed`.
   A repeated request for the same aircraft / runway is the same request with `asks + 1` (a repeat inside 5 s is ignored); a request nobody answers is dropped (`expired`) 240 s after the last ask.
 * **Messages** (`CoordMessage`): `CROSS_REQUEST / APPROVED / UNABLE / STANDBY / RESCINDED / COMPLETE`, `RELEASE_REQUEST / RELEASED / HOLD_FOR_RELEASE / RELEASE_STANDBY`, `POINT_OUT / POINT_OUT_APPROVED / POINT_OUT_UNABLE / TRAFFIC_OBSERVED`,
   `ROLLING`, `GOING_AROUND`, `TRAFFIC`, `TEXT`, each with `text` (digits), `spoken` (words), `standard` (the FAA's wording, 7110.65 3-1-3 / 4-3-4 / 5-4-3) and the `reference`. `describeMessage` builds them.

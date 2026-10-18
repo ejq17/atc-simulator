@@ -17,7 +17,9 @@ import { activeClearance, completeClearances, emitEvent, getRuntime, perfOf, pil
 import type { AircraftRuntime, ExitInstruction, SimContext } from './context';
 import { alongCross, crossingRunways, findRunwayEnd } from './runways';
 import type { RunwayEndGeom } from './runways';
-import { neighborIds, shortestDistances } from './pathfinding';
+import { neighborIds } from './pathfinding';
+import { arrivalParkingTargets, parkingSide, scoreExit } from './exitChoice';
+import type { ExitScore } from './exitChoice';
 import { closedTaxiways } from './airportOps';
 import { findStar, onStarRoute, starProfile } from './star';
 import type { StarProfileEntry } from './star';
@@ -390,19 +392,85 @@ function holdBeyondTaxiway(ctx: SimContext, g: RunwayEndGeom, n: TaxiNode): Runw
 
 const sameTwy = (list: readonly string[], twy: string): boolean => list.some((x) => x.toUpperCase() === twy.toUpperCase());
 
+interface ExitCand { id: string; along: number; holds: string[]; exitRow: RunwayExit }
+
+/** A hold line the aircraft can reach on the rollout, with the plan that flies it and the cost `exitChoice` gives it. */
+export interface ScoredExit {
+  exitNodeId: string;
+  holdNodeId: string;
+  side: 'left' | 'right';
+  /** Position of the exit along the runway (m from the threshold). */
+  along: number;
+  plan: RolloutPlan;
+  score: ExitScore;
+}
+
+/** Every (exit, hold line) of `pool` the aircraft can make within the braking `limit` (m/s^2), scored by `exitChoice` (lowest cost first is `betterExit`). */
+function scoreReachableExits(ctx: SimContext, ac: Aircraft, g: RunwayEndGeom, tdAlong: number, vTd: number, limit: number, pool: ExitCand[], holdIds?: (c: ExitCand) => readonly string[] | undefined): ScoredExit[] {
+  const graph = ctx.state.airport.taxiwayGraph;
+  const normal = ktToMps(perfOf(ac).decelKtPerSec);
+  const opts: Omit<ScoredExit, 'score'>[] = [];
+  for (const c of pool) {
+    const d = c.along - tdAlong;
+    if (d < 20) continue;
+    const only = holdIds?.(c);
+    const holds = only?.length ? c.holds.filter((h) => only.includes(h)) : c.holds;
+    for (const hold of holds) {
+      const from = graph.nodes[c.id].pos;
+      const to = graph.nodes[hold].pos;
+      const angle = Math.abs(headingDiff(g.headingDeg, bearingDeg(from, to)));
+      const vC = exitSpeedMps(angle, dist(from, to));
+      const aReq = vTd > vC ? (vTd * vTd - vC * vC) / (2 * d) : 0;
+      if (aReq > limit) continue;
+      const row = c.exitRow.holds.find((h) => h.id === hold);
+      const via = row?.via;
+      opts.push({ exitNodeId: c.id, holdNodeId: hold, side: row?.side ?? 'right', along: c.along, plan: { exitNodeId: c.id, holdNodeId: hold, ...(via ? { viaNodeIds: via } : {}), exitSpeedMps: vC, brakeMps2: Math.max(aReq, 0.5 * normal) } });
+    }
+  }
+  if (!opts.length) return [];
+  const targets = arrivalParkingTargets(ctx.state, ac);
+  const touch = { x: g.end.threshold.x + g.dir.x * tdAlong, y: g.end.threshold.y + g.dir.y * tdAlong };
+  const sideOfParking = parkingSide(ctx.state, g, targets, touch);
+  const firstAlong = Math.min(...opts.map((o) => o.along));
+  return opts.map((o) => ({ ...o, score: scoreExit({ state: ctx.state, ac, g, holdId: o.holdNodeId, holdSide: o.side, extraRolloutM: o.along - firstAlong, targets, sideOfParking }) }));
+}
+
+/** Is `x` the better exit: lower cost; equal cost: the earlier exit, then the lower hold id (deterministic). */
+function betterExit(x: ScoredExit, y: ScoredExit): boolean {
+  return x.score.cost < y.score.cost - 1e-6 || (Math.abs(x.score.cost - y.score.cost) <= 1e-6 && (x.along < y.along || (x.along === y.along && x.holdNodeId < y.holdNodeId)));
+}
+
 /**
- * Plan the rollout: the FIRST exit the aircraft can make at a safe exit speed (`exitSpeedMps`) braking no harder than the
- * normal landing rate; failing that, the first exit it can make braking up to the maximum rate; failing that, no exit: stop
+ * The exits an aircraft touching down at `tdAlong` with `vTd` can make, best first: the ones within the normal landing braking, or - when there
+ * are none - the ones within the maximum braking. Closed taxiways are left out. For the AI Tower (what to instruct) and for tests.
+ */
+export function rolloutExitOptions(state: SimContext['state'], ac: Aircraft, g: RunwayEndGeom, tdAlong: number, vTd: number): ScoredExit[] {
+  const ctx = { state } as SimContext;
+  const closedTwy = closedTaxiways(state);
+  const cands: ExitCand[] = [];
+  for (const row of runwayExits(ctx, g, false)) {
+    const open = row.holds.filter((h) => !h.taxiways.some((t) => closedTwy.has(t.toUpperCase())));
+    if (open.length) cands.push({ id: row.id, along: row.along, holds: open.map((h) => h.id), exitRow: row });
+  }
+  const normal = ktToMps(perfOf(ac).decelKtPerSec);
+  let scored = scoreReachableExits(ctx, ac, g, tdAlong, vTd, normal, cands);
+  if (!scored.length) scored = scoreReachableExits(ctx, ac, g, tdAlong, vTd, normal * MAX_BRAKE_FACTOR, cands);
+  return scored.sort((x, y) => (betterExit(x, y) ? -1 : betterExit(y, x) ? 1 : 0));
+}
+
+/**
+ * Plan the rollout: among the exits the aircraft can make at a safe exit speed (`exitSpeedMps`) braking no harder than the normal landing
+ * rate, the preferred one (`exitChoice.ts`: parking side, free stub, no runway crossing, shortest taxi); failing that, the same among the exits it
+ * can make braking up to the maximum rate; failing that, no exit: stop
  * short of the runway end and of any intersecting runway (never stopping in or beyond its hold line) and ask for taxi instructions.
  */
 function chooseExit(ctx: SimContext, ac: Aircraft, g: RunwayEndGeom, tdAlong: number, vTd: number, lahsoStopAlong?: number, exit?: ExitInstruction, holdShortAlong?: number): RolloutPlan {
-  const graph = ctx.state.airport.taxiwayGraph;
   const closedTwy = closedTaxiways(ctx.state);
   const perf = perfOf(ac);
   const normal = ktToMps(perf.decelKtPerSec);
   const maxBrake = normal * MAX_BRAKE_FACTOR;
   const stopLimit = Math.min(lahsoStopAlong ?? Infinity, holdShortAlong ?? Infinity);
-  type Cand = { id: string; along: number; holds: string[]; exitRow: RunwayExit };
+  type Cand = ExitCand;
   const cands: Cand[] = [];
   const extCands: Cand[] = [];
   // A runway exit taxiway that is closed (NOTAM, marked with a yellow X: AC 150/5370-2G 2.18.2.1) is not used.
@@ -414,46 +482,17 @@ function chooseExit(ctx: SimContext, ac: Aircraft, g: RunwayEndGeom, tdAlong: nu
   if (Number.isFinite(stopLimit)) {
     for (const list of [cands, extCands]) for (let i = list.length - 1; i >= 0; i--) if (list[i].along > stopLimit) list.splice(i, 1);
   }
-  // The hold on the side from which parking is closest by taxi WITHOUT crossing any runway (`shortestDistances` never uses runway
-  // surfaces): cost = Infinity when every side needs a runway crossing (re-crossing the landing or an intersecting runway).
-  const pickHold = (c: { id: string; holds: string[] }, only?: readonly string[]): { hold: string; cost: number } => {
-    const holds = only?.length ? c.holds.filter((h) => only.includes(h)) : c.holds;
-    let bestHold = holds[0];
-    let bestCost = Infinity;
-    for (const h of holds) {
-      const dm = shortestDistances(graph, h, { avoidTaxiways: closedTwy });
-      let cost = Infinity;
-      for (const p of ctx.state.airport.parking) cost = Math.min(cost, dm.get(p.nodeId) ?? Infinity);
-      if (cost < bestCost) {
-        bestCost = cost;
-        bestHold = h;
-      }
-    }
-    return { hold: bestHold, cost: bestCost };
-  };
-  // The first reachable exit, but an exit whose taxi route to parking needs no runway crossing is preferred over earlier ones that
-  // lead onto a hold beyond which the aircraft must cross a runway again (if none exists the first exit is used: the aircraft
-  // stops at the hold and asks for the crossing). With an exit instruction (`pool`) the controller's choice wins: the first exit of
-  // the pool the aircraft can make, the cost preference is not applied.
+  // With an exit instruction (`instructed`) the controller's choice wins: the first exit of the pool the aircraft can make; only the hold line
+  // (side) of that exit is picked by the score. Without one the best-scored reachable (exit, hold line) is taken (`scoreReachableExits`).
   const evaluate = (limit: number, pool: Cand[] = cands, instructed = false, holdIds?: (c: Cand) => readonly string[] | undefined): RolloutPlan | undefined => {
-    let firstAny: RolloutPlan | undefined;
-    for (const c of pool) {
-      const d = c.along - tdAlong;
-      if (d < 20) continue;
-      const { hold, cost } = pickHold(c, holdIds?.(c));
-      const from = graph.nodes[c.id].pos;
-      const to = graph.nodes[hold].pos;
-      const angle = Math.abs(headingDiff(g.headingDeg, bearingDeg(from, to)));
-      const vC = exitSpeedMps(angle, dist(from, to));
-      const aReq = vTd > vC ? (vTd * vTd - vC * vC) / (2 * d) : 0;
-      if (aReq <= limit) {
-        const via = c.exitRow.holds.find((h) => h.id === hold)?.via;
-        const plan: RolloutPlan = { exitNodeId: c.id, holdNodeId: hold, ...(via ? { viaNodeIds: via } : {}), exitSpeedMps: vC, brakeMps2: Math.max(aReq, 0.5 * normal) };
-        if (instructed || Number.isFinite(cost)) return plan;
-        firstAny ??= plan;
-      }
+    const scored = scoreReachableExits(ctx, ac, g, tdAlong, vTd, limit, pool, holdIds);
+    if (!scored.length) return undefined;
+    let pickFrom = scored;
+    if (instructed) {
+      const firstExit = scored.reduce((m, x) => Math.min(m, x.along), Infinity);
+      pickFrom = scored.filter((x) => x.along === firstExit);
     }
-    return firstAny;
+    return pickFrom.reduce((m, x) => (betterExit(x, m) ? x : m)).plan;
   };
   if (exit && (exit.taxiway || exit.toEnd || exit.next || exit.side)) {
     const all = [...cands, ...extCands].sort((a, b) => a.along - b.along);
@@ -516,15 +555,83 @@ function chooseExit(ctx: SimContext, ac: Aircraft, g: RunwayEndGeom, tdAlong: nu
   return { exitSpeedMps: 0, brakeMps2: clamp(aStop, 0.5 * normal, maxBrake), stopAlongM: stopTarget };
 }
 
-/** The exit the default rollout plan would take for an aircraft already rolling out: its taxiway and the side of the runway (what the tower names in an exit instruction). */
-export function predictedExit(state: SimContext['state'], ac: Aircraft, g: RunwayEndGeom): { taxiway: string; side: 'left' | 'right' } | undefined {
-  const ctx = { state } as SimContext;
-  const plan = chooseExit(ctx, ac, g, alongCross(g, ac.pos).along, ktToMps(ac.groundSpeedKt));
+/** What an exit instruction to this aircraft would come to: the exit it would use, why it is a poor one, and (for a request) whether it can be flown. */
+export interface PredictedExit {
+  taxiway: string;
+  side: 'left' | 'right';
+  holdNodeId: string;
+  /** Taxi distance (m) from that hold line to the parking position Ground would offer, and the runway crossings on the way. */
+  taxiM: number;
+  crossings: number;
+  /** The exit is on the other side of the runway from the parking position. */
+  wrongSide: boolean;
+  /** Something stands on, or comes along, the taxiway beyond the hold line. */
+  blockedBy?: string;
+}
+
+/**
+ * The exit the rollout plan would take for an aircraft that is rolling out or about to touch down (`instruction`: the one a controller gave, if
+ * any): its taxiway and the side of the runway (what the tower names in an exit instruction), and what is wrong with it, if anything.
+ * Before touchdown (`ac` airborne) the aircraft is taken to touch down at its typical point at its touchdown speed. `holdShortRunwayId`: the
+ * intersecting runway it was told to stop short of (land and hold short, "hold short of runway N"), which limits the exits ahead.
+ */
+export function predictedExit(state: SimContext['state'], ac: Aircraft, g: RunwayEndGeom, instruction?: ExitInstruction, holdShortRunwayId?: string): PredictedExit | undefined {
+  const plan = predictedPlan(state, ac, g, instruction, holdShortRunwayId);
   if (!plan.exitNodeId || !plan.holdNodeId) return undefined;
-  const row = runwayExits(ctx, g).find((r) => r.id === plan.exitNodeId);
+  const ctx = { state } as SimContext;
+  const row = runwayExits(ctx, g, true).find((r) => r.id === plan.exitNodeId);
   const hold = row?.holds.find((h) => h.id === plan.holdNodeId);
   const taxiway = hold?.taxiways[0] ?? row?.taxiways[0];
-  return hold && taxiway ? { taxiway, side: hold.side } : undefined;
+  if (!hold || !taxiway) return undefined;
+  const targets = arrivalParkingTargets(state, ac);
+  const { along } = alongCross(g, ac.pos);
+  const sc = scoreExit({ state, ac, g, holdId: hold.id, holdSide: hold.side, extraRolloutM: 0, targets, sideOfParking: parkingSide(state, g, targets, ac.onGround ? ac.pos : { x: g.end.threshold.x + g.dir.x * Math.max(along, 0), y: g.end.threshold.y + g.dir.y * Math.max(along, 0) }) });
+  return { taxiway, side: hold.side, holdNodeId: hold.id, taxiM: sc.taxiM, crossings: sc.crossings, wrongSide: sc.wrongSide, blockedBy: sc.blocked?.callsign };
+}
+
+/** The rollout plan of `ac` now (on the ground) or at its typical touchdown (airborne), optionally with an exit instruction and a "hold short of runway N". */
+function predictedPlan(state: SimContext['state'], ac: Aircraft, g: RunwayEndGeom, instruction?: ExitInstruction, holdShortRunwayId?: string): RolloutPlan {
+  const ctx = { state } as SimContext;
+  const perf = perfOf(ac);
+  const tdAlong = ac.onGround ? alongCross(g, ac.pos).along : projectArrival(state, ac, g).tdAlongM;
+  const v = ac.onGround ? ktToMps(ac.groundSpeedKt) : ktToMps(perf.touchdownSpeedKt);
+  return chooseExit(ctx, ac, g, tdAlong, v, undefined, instruction, holdShortStopAlong(ctx, ac, g, ac.onGround ? tdAlong : 0, holdShortRunwayId));
+}
+
+export interface ExitRequestCheck {
+  /** The aircraft can fly what was asked for. */
+  ok: boolean;
+  reason?: string;
+  /** The exit it would take: the one asked for when `ok`, otherwise the one it can make instead. */
+  taxiway?: string;
+  side?: 'left' | 'right';
+}
+
+/**
+ * Can this aircraft (on final or rolling out) fly an exit instruction and a "hold short of runway N" after landing? The same braking logic as the
+ * landing roll itself (`chooseExit`, and `planLandingHoldShort` for the stop short of an intersecting runway), so that Tower can say yes only to
+ * what the pilot would accept.
+ */
+export function checkExitRequest(state: SimContext['state'], ac: Aircraft, g: RunwayEndGeom, instruction: ExitInstruction, holdShortRunwayId?: string): ExitRequestCheck {
+  const ctx = { state } as SimContext;
+  const perf = perfOf(ac);
+  const tdAlong = ac.onGround ? alongCross(g, ac.pos).along : projectArrival(state, ac, g).tdAlongM;
+  const v = ac.onGround ? ktToMps(ac.groundSpeedKt) : ktToMps(perf.touchdownSpeedKt);
+  if (holdShortRunwayId) {
+    const stop = holdShortStopAlong(ctx, ac, g, ac.onGround ? tdAlong : 0, holdShortRunwayId);
+    if (stop === undefined) return { ok: false, reason: `runway ${holdShortRunwayId} does not cross runway ${g.runway.id} ahead of the aircraft` };
+    const aMax = ktToMps(perf.decelKtPerSec) * MAX_BRAKE_FACTOR;
+    if (tdAlong + (v * v) / (2 * aMax) > stop) return { ok: false, reason: `a ${ac.type} cannot stop short of runway ${holdShortRunwayId} after landing` };
+  }
+  const plan = predictedPlan(state, ac, g, instruction, holdShortRunwayId);
+  const row = plan.exitNodeId ? runwayExits(ctx, g, true).find((r) => r.id === plan.exitNodeId) : undefined;
+  const hold = row?.holds.find((h) => h.id === plan.holdNodeId);
+  const taxiway = hold?.taxiways[0] ?? row?.taxiways[0];
+  if (instruction.taxiway || instruction.side) {
+    if (plan.honoured === false) return { ok: false, reason: plan.unableReason, taxiway, side: hold?.side };
+    return { ok: true, taxiway, side: hold?.side };
+  }
+  return { ok: true, taxiway, side: hold?.side };
 }
 
 /** Along-runway limit (m) for "hold short of runway N" during the landing roll: short of that intersecting runway's surface. */

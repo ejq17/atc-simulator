@@ -16,6 +16,7 @@ import type { AircraftRuntime, SimContext } from './context';
 import { findRunwayEnd } from './runways';
 import { runwayCrossingsAlong } from './pathfinding';
 import { taxiSpeedKtFor } from './rotorcraft';
+import { landerStubs } from './exitStubs';
 import { seeded01 } from './rng';
 
 export const TAXI_ACCEL_MPS2 = 1.0;
@@ -110,6 +111,19 @@ export function findLeader(ctx: SimContext, ac: Aircraft): { gap: number; minGap
     if (!best || gap < best.gap) {
       const minGap = 1.5 * Math.max(perf.lengthM * (ac.formation?.size ?? 1), perfOf(o).lengthM * (o.formation?.size ?? 1)) + 20;
       best = { gap, minGap };
+    }
+  }
+  // An arrival inside 2 nm (or rolling out) is about to stop on its exit's hold line: until it is there, that spot counts as a stopped aircraft on the
+  // route (exitStubs.ts), so a taxiing aircraft does not run into the exit stub ahead of the lander.
+  if (ac.route) {
+    for (const s of landerStubs(ctx.state)) {
+      if (s.aircraftId === ac.id) continue;
+      const lander = ctx.state.aircraft[s.aircraftId];
+      const spot = ctx.state.airport.taxiwayGraph.nodes[s.holdNodeId]?.pos;
+      if (!lander || !spot) continue;
+      const g = gapAlongRoute(ctx, ac, spot);
+      if (g === undefined) continue;
+      if (!best || g < best.gap) best = { gap: g, minGap: 1.5 * Math.max(perf.lengthM * (ac.formation?.size ?? 1), perfOf(lander).lengthM) + 20 };
     }
   }
   return best;
@@ -237,6 +251,23 @@ function stepGround(ctx: SimContext, ac: Aircraft, dt: number): void {
 
   let v = ktToMps(ac.groundSpeedKt);
   const route = ac.route;
+
+  // "Make a one eighty" (turnAround.ts): brake to a stop, turn in place at the type's ground turn rate, then hold position for new instructions.
+  if (rt.turnAround) {
+    holdStill(ac, v, dt);
+    if (ac.groundSpeedKt === 0) {
+      turnToward(ac, rt.turnAround.headingDeg, perf.groundTurnRateDegPerSec, dt);
+      if (Math.abs(headingDiff(ac.headingDeg, rt.turnAround.headingDeg)) < 0.5) {
+        ac.headingDeg = rt.turnAround.headingDeg;
+        rt.turnAround = undefined;
+        emitEvent(ctx, { kind: 'INFO', aircraftId: ac.id, callsign: ac.callsign, text: `${ac.callsign} turned around, holding position`, severity: 'info', speaker: 'SYSTEM' });
+        pilotSay(ctx, ac, `${ac.spokenCallsign}, one eighty complete, holding position.`);
+      }
+    }
+    ac.trackDeg = ac.headingDeg;
+    ac.verticalSpeedFpm = 0;
+    return;
+  }
 
   // Process an arrival at the node we are standing on (e.g. a new route starting at a hold line).
   if (route) {

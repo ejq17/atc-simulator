@@ -46,7 +46,7 @@ describe('KMHT engine smoke', () => {
     expect(e.getState().events.filter((x) => x.kind === 'RUNWAY_INCURSION' || x.kind === 'CONFLICT')).toEqual([]);
   });
 
-  it('arrival: A320 cleared to land on 35 rolls out, exits (taxiway Bravo) and taxis to the GA ramp', () => {
+  it('arrival: A320 cleared to land on 35 rolls out, exits (taxiway Bravo, on the terminal side) and taxis to a gate', () => {
     const e = setup([ARRIVING('NKS451', '35', 6, 'A320', 'TWR')]);
     const ac = find(e, 'NKS451');
     expect(say(e, cmd('LAND', 'NKS451', { runwayEnd: '35' }), 'TWR').status).toBe('accepted');
@@ -56,7 +56,7 @@ describe('KMHT engine smoke', () => {
     expect(runUntil(e, () => pilotTexts(e, 'NKS451').some((t) => t.startsWith('Manchester Tower, Spirit four fifty one, clear of runway three five at bravo')), 60)).toBe(true);
     expect(say(e, cmd('CONTACT_FREQUENCY', 'NKS451', { frequencyId: 'GND' }), 'TWR').status).toBe('accepted');
     run(e, 30);
-    expect(say(e, cmd('TAXI', 'NKS451', { destination: 'FBO-1' }), 'GND').status).toBe('accepted');
+    expect(say(e, cmd('TAXI', 'NKS451', { destination: 'GATE-1' }), 'GND').status).toBe('accepted');
     expect(runUntil(e, () => ac.phase === 'PARKED' || !has(e, 'NKS451'), 1500)).toBe(true);
     expect(e.getState().events.filter((x) => x.kind === 'RUNWAY_INCURSION' || x.kind === 'CONFLICT')).toEqual([]);
   });

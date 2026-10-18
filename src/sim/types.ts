@@ -318,6 +318,7 @@ export type ClearanceKind =
   // Tower vocabulary (JO 7110.65 3-10-9, 3-9-11, 3-1-6, 3-8-1, 3-10-11, 7-6-11, 5-2-1; see docs/FAA-REFERENCES.md)
   | 'EXIT_RUNWAY'         // "turn left at Charlie" / "exit right Bravo" / "continue to the end" (+ optional "hold short of runway N")
   | 'CANCEL_TAKEOFF'      // "cancel takeoff clearance" / "abort takeoff"
+  | 'TURN_AROUND'         // "make a one eighty" (NON-STANDARD, no 7110.65 phrase): the aircraft on a taxiway stops and turns 180 degrees where there is room
   | 'TRAFFIC_ADVISORY'    // "traffic, Cessna two-mile final"
   | 'FOLLOW_TRAFFIC'      // "number two, follow the Skyhawk on base"
   | 'PATTERN_INSTRUCTION' // destination EXTEND_DOWNWIND | TURN_BASE_NOW | SHORT_APPROACH | CIRCLE | CLOSED_TRAFFIC

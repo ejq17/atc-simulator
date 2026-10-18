@@ -19,7 +19,7 @@ import { describeTraffic, luawTraffic } from '../sim/towerCommands';
 import { stoppedExitOptionsFor } from '../sim/runwayStop';
 import { getPerformance } from '../sim/performance';
 import { holdTooShort } from '../sim/holdSelection';
-import { hasActive, lastClearance, mkCmd } from './core';
+import { hasActive, landingHoldShort, lastClearance, mkCmd } from './core';
 import { isSequenceable, patternLeg, sequenceDownwind, turnsBaseSoon } from './sequence';
 import type { SeqWindow } from './sequence';
 import type { Agent, AgentView, Plan } from './core';
@@ -373,6 +373,24 @@ export function createTowerAgent(): Agent {
         continue;
       }
 
+      // An exit arranged with Ground over the landline (3-1-4: "have Spirit ten thirty three exit left at Charlie", "hold short of runway four after
+      // landing"): the instruction goes to the pilot now, on final or on the roll (3-10-9). The coordination agent answered the request already.
+      const exitReq = !ac.isDeparture && (ac.phase === 'FINAL' || ac.phase === 'LANDING' || ac.phase === 'ROLLOUT') ? findOpenRequest(state, 'EXIT', ac.id) : undefined;
+      if (exitReq && exitReq.status === 'approved' && exitReq.to === v.position && hasActive(ac, 'LAND')) { // (the landing clearance goes first)
+        const cmds = [
+          ...(exitReq.point || exitReq.exitSide ? [mkCmd('EXIT_RUNWAY', ac, { exitTaxiway: exitReq.point, turnDirection: exitReq.exitSide })] : []),
+          ...(exitReq.holdShortRunwayId ? [mkCmd('HOLD_SHORT', ac, { holdShort: [exitReq.holdShortRunwayId], runwayId: exitReq.holdShortRunwayId })] : []),
+        ];
+        if (cmds.length) {
+          plans.push({
+            key: `${ac.id}:exit-req:${exitReq.id}`, aircraftId: ac.id, callsign: ac.callsign, priority: 69, once: true, cmds,
+            phrase: say.exitInstruction(ac, { taxiway: exitReq.point, side: exitReq.exitSide, holdShortRunway: exitReq.holdShortRunwayId }),
+            summary: `${ac.callsign} ${[exitReq.point || exitReq.exitSide ? `turn ${exitReq.exitSide ?? ''} at ${exitReq.point ?? 'the exit'}`.replace(/ +/g, ' ') : '', exitReq.holdShortRunwayId ? `hold short of runway ${exitReq.holdShortRunwayId}` : ''].filter(Boolean).join(', ')} (asked by Ground)`,
+          });
+          continue;
+        }
+      }
+
       // Arrival rolling out with Ground staffed: the exit and the frequency change in one transmission (3-10-9 example); the aircraft changes once clear.
       // (not for a touch-and-go / option: the aircraft is about to take off again, 3-8-2)
       const landDest = lastClearance(ac, 'LAND')?.destination;
@@ -380,12 +398,13 @@ export function createTowerAgent(): Agent {
       if (!ac.isDeparture && ac.onGround && ac.phase === 'ROLLOUT' && !goesAgain && v.staffed.has('GND') && ac.groundSpeedKt <= EXIT_CALL_MAX_KT && !hasActive(ac, 'EXIT_RUNWAY')) {
         const g = findRunwayEnd(airport, ac.assignedRunwayEnd);
         const gnd = frequencyForPosition(airport, 'GND');
-        const ex = g ? predictedExit(state, ac, g) : undefined;
+        const ex = g ? predictedExit(state, ac, g, undefined, landingHoldShort(ac)) : undefined;
         if (g && gnd && ex) {
           plans.push({
             key: `${ac.id}:exit-gnd`, aircraftId: ac.id, callsign: ac.callsign, priority: 56, once: true,
             cmds: [mkCmd('EXIT_RUNWAY', ac, { exitTaxiway: ex.taxiway, turnDirection: ex.side }), mkCmd('CONTACT_FREQUENCY', ac, { frequencyId: gnd.id })],
-            phrase: say.exitAndContact(ac, airport, ex.taxiway, ex.side, gnd.id, gnd.mhz), summary: `${ac.callsign} turn ${ex.side} at ${ex.taxiway}, contact Ground`,
+            phrase: say.exitAndContact(ac, airport, ex.taxiway, ex.side, gnd.id, gnd.mhz),
+            summary: `${ac.callsign} turn ${ex.side} at ${ex.taxiway}, contact Ground${ex.wrongSide ? ' (the only exit it can make is on the far side of the runway from its parking)' : ''}${ex.blockedBy ? ` (taxiway occupied by ${ex.blockedBy})` : ''}`,
           });
           continue;
         }

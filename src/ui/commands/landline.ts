@@ -120,6 +120,16 @@ export function transmitLandline(input: LandlineInput): LandlineResult {
       const req = api.request({ topic: 'CROSSING', from, to, aircraftId: ac!.id, runwayId: cmd.runwayId, point: cmd.point, source: 'player' });
       return req ? done(`Asked ${WORD[to]} for ${ac!.callsign} to cross runway ${req.runwayId}`, cmd, req.id) : fail('rejected', 'The request could not be made.', cmd);
     }
+    case 'REQUEST_EXIT': {
+      const e = need('Exit request');
+      if (e) return e;
+      if (to !== 'TWR') return fail('rejected', 'A runway exit for an arrival is coordinated with Tower.', cmd);
+      const req = api.request({
+        topic: 'EXIT', from, to, aircraftId: ac!.id, point: cmd.point, exitSide: cmd.exitSide,
+        holdShortRunwayId: cmd.holdShortAfterLanding ? cmd.runwayId : undefined, source: 'player',
+      });
+      return req ? done(`Asked ${WORD[to]} to have ${ac!.callsign} ${[cmd.point || cmd.exitSide ? `exit${cmd.exitSide ? ` ${cmd.exitSide}` : ''}${cmd.point ? ` at ${cmd.point}` : ''}` : '', cmd.holdShortAfterLanding ? `hold short of runway ${cmd.runwayEnd ?? cmd.runwayId}` : ''].filter(Boolean).join(', ')}`, cmd, req.id) : fail('rejected', 'The request could not be made.', cmd);
+    }
     case 'APPROVE':
       return answerWith(cmd.runwayId || cmd.point ? 'CROSSING' : undefined, (r) => {
         const after = cmd.afterCallsign ? aircraftBy(state, cmd.afterCallsign) : undefined;

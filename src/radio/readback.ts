@@ -335,6 +335,8 @@ export function buildReadback(aircraft: Aircraft, c: Clearance, env: ReadbackEnv
         return exitReadback(c);
       case 'CANCEL_TAKEOFF':
         return 'Cancelling takeoff clearance, stopping';
+      case 'TURN_AROUND':
+        return 'Making a one eighty';
       case 'TRAFFIC_ADVISORY':
         return c.trafficResponse === 'in_sight' ? 'Traffic in sight' : c.trafficResponse === 'looking' ? 'Looking for traffic' : 'Negative contact';
       case 'FOLLOW_TRAFFIC': {

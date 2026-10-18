@@ -12,7 +12,8 @@
 import type {
   Aircraft, Airport, Clearance, ClearanceKind, CommandOutcome, ControllerPositionId, ParsedCommand, Runway, TaxiNode, TaxiwayGraph, Vec2,
 } from './types';
-import { cardinal, dist, ftToM, headingDiff, headingToVec, magneticToTrue, nmToM, vCross, vLen, vSub } from './geo';
+import { cardinal, dist, ftToM, headingDiff, headingToVec, magneticToTrue, nmToM, normHeading, vCross, vLen, vSub } from './geo';
+import { turnAroundCheck } from './turnAround';
 import {
   activeClearance, advancePhase, completeClearances, emitEvent, getRuntime, groundBehaviour, perfOf, pilotSay, setPhase, speechDurationSec,
 } from './context';
@@ -1049,6 +1050,25 @@ export function taxiwayStopNode(graph: TaxiwayGraph, nodeIds: readonly string[],
     return n.id;
   }
   return undefined;
+}
+
+/** "Make a one eighty": see turnAround.ts. The aircraft stops where it is, turns, and waits for taxi instructions. */
+function planTurnAround(env: Env): PlanResult {
+  const { ac, rt, ctx } = env;
+  const check = turnAroundCheck(ctx, ac);
+  if (!check.ok) return unable(env, check.reason ?? 'cannot turn around here.', check.pilot ?? "we can't turn around here", false);
+  return {
+    plan: {
+      patch: {},
+      commit: () => {
+        rt.turnAround = { headingDeg: normHeading(ac.headingDeg + 180) };
+        ac.route = undefined;
+        rt.stoppedAtNodeId = undefined;
+        ac.flags.holdingPosition = true;
+        completeClearances(ctx, ac, ['TAXI', 'TAXI_TO_PARKING']);
+      },
+    },
+  };
 }
 
 function planHoldPosition(env: Env): PlanResult {
@@ -2161,6 +2181,7 @@ const PLANNERS: Partial<Record<ClearanceKind, (env: Env) => PlanResult>> = {
   PUSHBACK: planPushback,
   EXIT_RUNWAY: planExitRunway,
   CANCEL_TAKEOFF: planCancelTakeoff,
+  TURN_AROUND: planTurnAround,
   TRAFFIC_ADVISORY: planTrafficAdvisory,
   FOLLOW_TRAFFIC: planFollowTraffic,
   PATTERN_INSTRUCTION: planPatternInstruction,

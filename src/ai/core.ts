@@ -122,3 +122,11 @@ export function pickBest(plans: Plan[]): Plan | undefined {
   for (const p of plans) if (!best || p.priority > best.priority) best = p; // stable: first of equal priority wins (state order)
   return best;
 }
+
+/** The intersecting runway the aircraft was told to hold short of on landing ("cleared to land, hold short of runway 13", a later "hold short of runway 13"), if any. */
+export function landingHoldShort(ac: Aircraft): string | undefined {
+  const land = lastClearance(ac, 'LAND');
+  const hold = lastClearance(ac, 'HOLD_SHORT');
+  const c = hold && (!land || hold.issuedAtSec >= land.issuedAtSec) ? hold : land;
+  return c && c.completedAtSec === undefined ? c.holdShort?.[0] : undefined;
+}

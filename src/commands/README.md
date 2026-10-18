@@ -233,3 +233,9 @@ realised -> released, and everything the shared normaliser already fixes (NATO l
 ## Traffic variety grammar (`rules-special.ts`)
 
 `ruleAirTaxi` ("air taxi via alpha to the Coast Guard ramp", "hover taxi to Coast Guard helipad three"), `makeProceedRule` ("proceed on runway one three, report runway inspection complete" = PROCEED, "proceed on the taxiways", "proceed to runway ... via ..." = the taxi rule), `ruleHeliTakeoff` ("[pad,] make right turn for southeast departure, cleared for takeoff [from present position]"), `ruleHeliLand` ("make straight-in approach to Coast Guard helipad two, cleared to land"), `ruleOverhead` ("runway N, wind ..., pattern altitude N, right turns, report initial", "break at midfield, report break"), `ruleTrafficDirection` ("make right traffic", 3-10-1). Callsigns: "Coast Guard" and "Air Guard" are two-word telephony (`lexicon.ts` PHRASES) followed by 5 digits; "Airport <n> vehicle" (the word "airport" is a callsign only before a number); "flight of two / three / four" is dropped. "Proceed as requested" is deliberately not parsed (3-1-5 NOTE). Tests: `special.test.ts`.
+
+
+### Exit request and one eighty (exit-choice round)
+
+* Landline `REQUEST_EXIT`: "Tower, Ground, have Spirit ten thirty three exit left at Charlie" / "... hold short of runway four after landing" (`exitSide`, `point`, `holdShortAfterLanding` + `runwayId`). 7110.65 3-1-4 asks for the exchange but prescribes no wording: `nonStandard`, confidence x0.9. `looksLikeLandline` is true for one position name followed by "have ... exit ..." or "hold short ... after landing". Tests: `exitRequest.test.ts`.
+* Radio `TURN_AROUND` (`ruleTurnAround`, rules-ground.ts): "make a one eighty", "do a 180", "turn around", "turn back", "reverse course". No 7110.65 phrase exists for an aircraft on a taxiway (3-7-2 gives step-by-step directions and directional turns): non-standard, confidence x0.9, the issue text says so. Executed by `sim/turnAround.ts`.

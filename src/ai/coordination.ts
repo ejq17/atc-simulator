@@ -17,13 +17,15 @@
 import type { Aircraft, ControllerPositionId } from '../sim/types';
 import { assessClearanceSafety } from '../sim/conflicts';
 import {
-  COORDINATION_DESIGN, awaitingAnswer, releaseNeeded, releasePosition, sameController,
+  COORDINATION_DESIGN, awaitingAnswer, isHuman, releaseNeeded, releasePosition, sameController,
 } from '../sim/coordination';
+import { checkExitRequest, predictedExit } from '../sim/flightDynamics';
+import { spokenTaxiway } from '../radio/spoken';
 import type { CoordRequest } from '../sim/coordination';
 import { findRunwayEnd } from '../sim/runways';
 import { bearingDeg, cardinal, dist, mToNm } from '../sim/geo';
 import { numberWords } from '../radio/spoken';
-import { hasActive, mkCmd } from './core';
+import { hasActive, landingHoldShort, mkCmd } from './core';
 import type { Agent, AgentView, Plan } from './core';
 import { runwayInUse } from './ground';
 import { assignedEnd, distToThresholdNm, etaToThresholdSec, interactingRunways, isInboundArrival } from './world';
@@ -126,6 +128,18 @@ export const coordinationAgent: Agent = (v) => {
         plans.push(coordPlan(ac, `co:${r.id}:rel-standby`, 64, r.from, `${ac.callsign} release stand by`,
           (api) => api.respond(r.id, 'standby', { by: me, source: 'ai' }) && lastMessage(v, r), { once: true }));
       }
+    } else if (r.topic === 'EXIT' && me === 'TWR') {
+      const verdict = exitVerdict(v, r, ac);
+      if (verdict.answer === 'approve') {
+        plans.push(coordPlan(ac, `co:${r.id}:exit-ok`, 71, r.from, `${ac.callsign}: exit request accepted`,
+          (api) => api.respond(r.id, 'approve', { by: me, source: 'ai', exitTaxiway: verdict.taxiway, exitSide: verdict.side }) && lastMessage(v, r), { once: true }));
+      } else if (verdict.answer === 'deny') {
+        plans.push(coordPlan(ac, `co:${r.id}:exit-no`, 71, r.from, `${ac.callsign}: exit request unable, ${verdict.reason}`,
+          (api) => api.respond(r.id, 'deny', { by: me, source: 'ai', reason: verdict.reason }) && lastMessage(v, r), { once: true }));
+      } else if (r.status === 'pending') {
+        plans.push(coordPlan(ac, `co:${r.id}:exit-sb`, 64, r.from, `${ac.callsign}: exit request, stand by`,
+          (api) => api.respond(r.id, 'standby', { by: me, source: 'ai', reason: verdict.reason }) && lastMessage(v, r), { once: true }));
+      }
     } else if (r.topic === 'POINT_OUT') {
       plans.push(coordPlan(ac, `co:${r.id}:po-ok`, 62, r.from, `${ac.callsign} point out approved`,
         (api) => api.respond(r.id, 'approve', { by: me, source: 'ai' }) && lastMessage(v, r), { once: true }));
@@ -150,6 +164,18 @@ export const coordinationAgent: Agent = (v) => {
       }
     }
     for (const ac of v.onFrequency) {
+      // 3-1-4: Tower tells a Ground controller who is a person when the exit an arrival will have to take is a poor one for its parking (the far side
+      // of the runway, a runway crossing on the way, or a taxiway with aircraft on it), while there is still time to ask for another (see `exitVerdict`).
+      if (!ac.isDeparture && !ac.onGround && ac.phase === 'FINAL' && v.staffed.has('GND') && isHuman(state, 'GND') && !isHuman(state, 'TWR')) {
+        const g = assignedEnd(v.airport, ac);
+        const ex = g && distToThresholdNm(ac, g) <= EXIT_INFO_NM ? predictedExit(state, ac, g, undefined, landingHoldShort(ac)) : undefined;
+        if (ex && (ex.wrongSide || ex.blockedBy || ex.crossings > 0)) {
+          const twy = spokenTaxiway(ex.taxiway);
+          const why = ex.blockedBy ? `${ex.blockedBy} is on that taxiway` : ex.wrongSide ? 'the far side of the runway from its parking' : 'a runway crossing to its parking';
+          plans.push(coordPlan(ac, `${ac.id}:exit-info`, 57, 'GND', `${ac.callsign} exit information to Ground`,
+            (api) => api.inform({ kind: 'TEXT', from: me, to: 'GND', aircraftId: ac.id, text: `${ac.spokenCallsign} will exit ${ex.side} at ${twy}, ${why}`, source: 'ai' }), { once: true }));
+        }
+      }
       const rel = releaseNeeded(state, 'TWR', ac);
       if (rel && ac.isDeparture && (ac.phase === 'CLEARED_FOR_TAKEOFF' || ac.phase === 'TAKEOFF_ROLL')) {
         const g = findRunwayEnd(v.airport, ac.assignedRunwayEnd);
@@ -168,6 +194,27 @@ export const coordinationAgent: Agent = (v) => {
   if (me === 'DEP' || me === 'APP') plans.push(...pointOutPlans(v));
   return plans;
 };
+
+/** Tower tells Ground about a poor exit from this distance on final (nm): about two minutes for a jet, enough to ask for another. DESIGN VALUE. */
+const EXIT_INFO_NM = 4;
+
+type ExitVerdict = { answer: 'approve'; taxiway?: string; side?: 'left' | 'right' } | { answer: 'deny'; reason: string } | { answer: 'standby'; reason: string };
+
+/**
+ * Ground's request "have <callsign> exit <side> at <taxiway>" / "hold short of runway N after landing" (3-1-4): Tower gives it to the pilot when the
+ * aircraft can fly it (the landing roll's own braking logic, `checkExitRequest`); otherwise "unable, <why>, will exit at <taxiway>". Before the aircraft is
+ * on final the exit instruction cannot be given (the pilot takes it on final or on the roll): stand by.
+ */
+function exitVerdict(v: AgentView, r: CoordRequest, ac: Aircraft): ExitVerdict {
+  const g = assignedEnd(v.airport, ac);
+  if (!g || ac.isDeparture) return { answer: 'deny', reason: `${ac.spokenCallsign} is not landing` };
+  if (ac.onGround && ac.phase !== 'ROLLOUT' && ac.phase !== 'LANDING') return { answer: 'deny', reason: 'already clear of the runway' };
+  if (ac.phase !== 'FINAL' && ac.phase !== 'LANDING' && ac.phase !== 'ROLLOUT') return { answer: 'standby', reason: 'not on final yet' };
+  const check = checkExitRequest(v.state, ac, g, { taxiway: r.point, side: r.exitSide }, r.holdShortRunwayId ?? landingHoldShort(ac));
+  if (check.ok) return { answer: 'approve', taxiway: r.point ?? undefined, side: r.exitSide };
+  const why = /^no exit/.test(check.reason ?? '') ? 'no such exit ahead of the aircraft' : /too far|too fast|cannot slow/.test(check.reason ?? '') ? 'too fast for that exit' : check.reason ?? 'cannot';
+  return { answer: 'deny', reason: `${why}${check.taxiway ? `, will exit at ${spokenTaxiway(check.taxiway)}` : ''}` };
+}
 
 function isStaffedAndSeparate(v: AgentView, other: ControllerPositionId): boolean {
   return v.staffed.has(other) && !sameController(v.state, v.position, other);

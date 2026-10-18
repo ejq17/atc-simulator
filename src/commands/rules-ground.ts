@@ -79,6 +79,27 @@ export function holdShortTarget(d: Draft, t: Toks, j: number, runwayEnds?: reado
   return j;
 }
 
+/**
+ * "make a one eighty", "do a 180", "turn around", "reverse course": the aircraft on a taxiway turns back. JO 7110.65 has no phrase for it (3-7-2
+ * gives step-by-step directions and directional turns only); "one eighty" is common usage, so the command is flagged non-standard.
+ */
+export const ruleTurnAround: Rule = (t, i) => {
+  // "one eighty" arrives as the number 180 (or as 1 + 80 when the normaliser keeps the words apart)
+  const lead = seq(t, i, 'make|do|perform|execute|take a? an?');
+  const k0 = lead >= 0 ? lead : i;
+  let j = -1;
+  if (txt(t, k0) === '180') j = k0 + 1;
+  else if (intAt(t, k0) === '1' && intAt(t, k0 + 1) === '80') j = k0 + 2;
+  if (j >= 0) j = skipWords(t, j, ['degree', 'degrees', 'turn', 'right', 'there', 'now']);
+  if (j < 0) j = seq(t, i, 'turn around|back');
+  if (j < 0) j = seq(t, i, 'reverse course|direction');
+  if (j < 0) return null;
+  const d = makeDraft('TURN_AROUND');
+  d.nonstandard++;
+  d.issues.push('non-standard phraseology: JO 7110.65 has no "one eighty" for an aircraft on a taxiway (3-7-2 gives step-by-step directions and directional turns)');
+  return cmdHit(j, d);
+};
+
 /** "hold position", "stop", bare "hold" (non-standard) */
 export const ruleHoldPosition: Rule = (t, i) => {
   let j = seq(t, i, 'hold your? position');

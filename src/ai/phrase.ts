@@ -130,6 +130,14 @@ export function exitAndContact(ac: Aircraft, airport: Airport, taxiway: string, 
 }
 
 /**
+ * "N1AA, turn left at Charlie, hold short of runway 4" (JO 7110.65 3-10-9 PHRASEOLOGY and example), given before touchdown or on the rollout when the
+ * exit was arranged with Ground (3-1-4) or the pilot's own choice would put the aircraft in the way. Either part may be left out.
+ */
+export function exitInstruction(ac: Aircraft, e: { taxiway?: string; side?: 'left' | 'right'; holdShortRunway?: string }): Phrase {
+  return clauses(callsign(ac), e.taxiway ? words('turn', e.side, 'at', taxiwayList([e.taxiway])) : e.side ? words('turn', e.side) : undefined, e.holdShortRunway ? words('hold short of runway', rwy(e.holdShortRunway)) : undefined);
+}
+
+/**
  * "N1AA, cross runway 13, turn right at Alpha, contact Ground point niner": the answer to an aircraft stopped on the runway (exit instruction
  * 3-10-9, crossing of the intersecting runway 3-7-2 / 3-1-3, then the frequency change).
  */

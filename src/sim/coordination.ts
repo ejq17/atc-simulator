@@ -37,6 +37,8 @@ export const COORDINATION_DESIGN = {
   crossingApprovalTtlSec: 60,
   /** A departure release stays valid this long (s); Tower must issue the takeoff clearance inside it. DESIGN VALUE. */
   releaseTtlSec: 120,
+  /** An approved exit request stays valid this long (s): an aircraft on final is a minute or two from touchdown. DESIGN VALUE. */
+  exitRequestTtlSec: 240,
   /** A request nobody answered (or that is on stand-by) is dropped after this long without a repeat (s). DESIGN VALUE. */
   openRequestTimeoutSec: 240,
   /** An AI requester repeats an unanswered request after this long (s). DESIGN VALUE. */
@@ -56,13 +58,14 @@ export const COORDINATION_REFERENCES = {
   crossing: '7110.65 3-1-3 Use of Active Runways',
   release: '7110.65 4-3-4 Departure Release (and the letter of agreement)',
   pointOut: '7110.65 5-4-7 Point Out',
+  exit: '7110.65 3-1-4 Coordination Between Local and Ground Controllers (exchange information as necessary for the safe and efficient use of runways and movement areas); 3-10-9 Runway Exiting',
 } as const;
 
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
 
-export type CoordTopic = 'CROSSING' | 'RELEASE' | 'POINT_OUT';
+export type CoordTopic = 'CROSSING' | 'RELEASE' | 'POINT_OUT' | 'EXIT';
 export type CoordStatus = 'pending' | 'standby' | 'approved' | 'denied' | 'rescinded' | 'expired' | 'used' | 'completed';
 export type CoordSource = 'player' | 'ai' | 'system';
 
@@ -70,6 +73,7 @@ export type CoordMessageKind =
   | 'CROSS_REQUEST' | 'CROSS_APPROVED' | 'CROSS_UNABLE' | 'CROSS_STANDBY' | 'CROSS_RESCINDED' | 'CROSS_COMPLETE'
   | 'RELEASE_REQUEST' | 'RELEASED' | 'HOLD_FOR_RELEASE' | 'RELEASE_STANDBY'
   | 'POINT_OUT' | 'POINT_OUT_APPROVED' | 'POINT_OUT_UNABLE' | 'TRAFFIC_OBSERVED'
+  | 'EXIT_REQUEST' | 'EXIT_APPROVED' | 'EXIT_UNABLE'
   | 'ROLLING' | 'GOING_AROUND' | 'TRAFFIC' | 'TEXT';
 
 export interface CoordRequest {
@@ -84,8 +88,12 @@ export interface CoordRequest {
   spokenCallsign: string;
   /** CROSSING: runway id ("13/31"). */
   runwayId?: string;
-  /** CROSSING: the point / intersection of the operation (3-1-3), e.g. the taxiway "A". */
+  /** CROSSING: the point / intersection of the operation (3-1-3), e.g. the taxiway "A". EXIT: the taxiway of the exit asked for. */
   point?: string;
+  /** EXIT: the side of the exit ("exit left at Charlie"). */
+  exitSide?: 'left' | 'right';
+  /** EXIT: "hold short of runway N after landing": the intersecting runway id ("13/31"). */
+  holdShortRunwayId?: string;
   /** POINT_OUT: position of the target relative to a fix ("two miles west of Cedar Lake") and altitude. */
   positionText?: string;
   altitudeFt?: number;
@@ -266,6 +274,7 @@ export function describeMessage(
   m: {
     from: ControllerPositionId; to: ControllerPositionId; spokenCallsign?: string; runwayId?: string; point?: string; afterCallsign?: string;
     afterSpoken?: string; reason?: string; positionText?: string; altitudeFt?: number; extra?: string;
+    exitSide?: 'left' | 'right'; holdShortRunwayId?: string;
   },
 ): Said {
   const head = addressee(m.to, m.from);
@@ -290,6 +299,19 @@ export function describeMessage(
       return say(`hold short ${rwyT}${m.reason ? `, ${m.reason}` : ''}, disregard the crossing`, `hold short ${rwyS}${m.reason ? `, ${m.reason}` : ''}, disregard the crossing`, false);
     case 'CROSS_COMPLETE':
       return say(`${cs} across ${rwyT}`, `${cs} across ${rwyS}`, false, '3-1-3 (advice of completion; verbal or visual aid)');
+    case 'EXIT_REQUEST': {
+      // "have Spirit ten thirty three exit left at Charlie" / "... hold short of runway four after landing"
+      const parts = [m.point || m.exitSide ? `exit${m.exitSide ? ` ${m.exitSide}` : ''}${m.point ? ` at ${m.point}` : ''}` : '', m.holdShortRunwayId ? `hold short of runway ${runwayName(m.holdShortRunwayId)} after landing` : ''].filter(Boolean);
+      const partsS = [m.point || m.exitSide ? `exit${m.exitSide ? ` ${m.exitSide}` : ''}${m.point ? ` at ${spokenTaxiway(m.point)}` : ''}` : '', m.holdShortRunwayId ? `hold short of runway ${spokenRunway(m.holdShortRunwayId)} after landing` : ''].filter(Boolean);
+      return say(`have ${cs} ${parts.join(', ')}`, `have ${cs} ${partsS.join(', ')}`, false, '3-1-4 (the wording of the request is not prescribed); the instruction to the pilot is 3-10-9');
+    }
+    case 'EXIT_APPROVED': {
+      const what = [m.exitSide || m.point ? `exit${m.exitSide ? ` ${m.exitSide}` : ''}${m.point ? ` at ${m.point}` : ''}` : '', m.holdShortRunwayId ? `hold short of runway ${runwayName(m.holdShortRunwayId)}` : ''].filter(Boolean);
+      const whatS = [m.exitSide || m.point ? `exit${m.exitSide ? ` ${m.exitSide}` : ''}${m.point ? ` at ${spokenTaxiway(m.point)}` : ''}` : '', m.holdShortRunwayId ? `hold short of runway ${spokenRunway(m.holdShortRunwayId)}` : ''].filter(Boolean);
+      return say(`${cs} will ${what.join(', ')}`, `${cs} will ${whatS.join(', ')}`, false, '3-1-4 (plain words); 3-10-9 instruction issued to the pilot');
+    }
+    case 'EXIT_UNABLE':
+      return say(`unable${m.reason ? `, ${m.reason}` : ''}`, `unable${m.reason ? `, ${m.reason}` : ''}`, false, '3-1-4 (plain words)');
     case 'RELEASE_REQUEST':
       return say(`request release ${cs}`, `request release ${cs}`, false, '4-3-4 / LOA (the request wording is not prescribed)');
     case 'RELEASED':
@@ -365,6 +387,9 @@ export interface RequestInput {
   aircraftId: string;
   runwayId?: string;
   point?: string;
+  /** EXIT: the side of the exit asked for, and the intersecting runway to hold short of after landing. */
+  exitSide?: 'left' | 'right';
+  holdShortRunwayId?: string;
   positionText?: string;
   altitudeFt?: number;
   /** POINT_OUT: restrictions / other pertinent information. */
@@ -388,28 +413,32 @@ export function coordRequest(ctx: SimContext, input: RequestInput): CoordRequest
     open.asks++;
     open.lastAskSec = now;
     if (input.point) open.point = input.point;
-    post(ctx, kindOfRequest(open.topic), open.from, open.to, input.source, open, describeMessage(kindOfRequest(open.topic), { from: open.from, to: open.to, spokenCallsign: ac.spokenCallsign, runwayId: open.runwayId, point: open.point, positionText: open.positionText, altitudeFt: open.altitudeFt, extra: input.extra }));
+    post(ctx, kindOfRequest(open.topic), open.from, open.to, input.source, open, describeMessage(kindOfRequest(open.topic), { from: open.from, to: open.to, spokenCallsign: ac.spokenCallsign, runwayId: open.runwayId, point: open.point, positionText: open.positionText, altitudeFt: open.altitudeFt, extra: input.extra, exitSide: open.exitSide, holdShortRunwayId: open.holdShortRunwayId }));
     return open;
   }
   if (ctx.dryRun) return undefined;
   const req: CoordRequest = {
     id: `cr-${++c.seq}`, topic: input.topic, from: input.from, to: input.to, aircraftId: ac.id, callsign: ac.callsign, spokenCallsign: ac.spokenCallsign,
     runwayId, point: input.point ?? (runwayId && input.topic === 'CROSSING' ? crossingPointFor(state, ac, runwayId) : undefined),
+    exitSide: input.exitSide, holdShortRunwayId: input.holdShortRunwayId ? findRunway(state.airport, input.holdShortRunwayId)?.id ?? input.holdShortRunwayId : undefined,
     positionText: input.positionText, altitudeFt: input.altitudeFt, createdSec: now, lastAskSec: now, asks: 1, status: 'pending', source: input.source,
   };
   c.requests.push(req);
   const kind = kindOfRequest(req.topic);
-  post(ctx, kind, req.from, req.to, input.source, req, describeMessage(kind, { from: req.from, to: req.to, spokenCallsign: ac.spokenCallsign, runwayId: req.runwayId, point: req.point, positionText: req.positionText, altitudeFt: req.altitudeFt, extra: input.extra }));
+  post(ctx, kind, req.from, req.to, input.source, req, describeMessage(kind, { from: req.from, to: req.to, spokenCallsign: ac.spokenCallsign, runwayId: req.runwayId, point: req.point, positionText: req.positionText, altitudeFt: req.altitudeFt, extra: input.extra, exitSide: req.exitSide, holdShortRunwayId: req.holdShortRunwayId }));
   return req;
 }
 
-const kindOfRequest = (t: CoordTopic): CoordMessageKind => (t === 'CROSSING' ? 'CROSS_REQUEST' : t === 'RELEASE' ? 'RELEASE_REQUEST' : 'POINT_OUT');
+const kindOfRequest = (t: CoordTopic): CoordMessageKind => (t === 'CROSSING' ? 'CROSS_REQUEST' : t === 'RELEASE' ? 'RELEASE_REQUEST' : t === 'EXIT' ? 'EXIT_REQUEST' : 'POINT_OUT');
 
 export interface RespondOptions {
   by: ControllerPositionId;
   source: CoordSource;
   /** Approve only: "after the landing <callsign>". */
   afterAircraftId?: string;
+  /** EXIT, approve: the exit Tower will actually have the pilot take (it may differ from the one asked for: the request named only a side). */
+  exitTaxiway?: string;
+  exitSide?: 'left' | 'right';
   reason?: string;
 }
 
@@ -423,7 +452,7 @@ export function coordRespond(ctx: SimContext, requestId: string, answer: CoordAn
   const ac = state.aircraft[req.aircraftId];
   const now = state.clock.timeSec;
   const after = o.afterAircraftId ? state.aircraft[o.afterAircraftId] : undefined;
-  const base = { from: req.to, to: req.from, spokenCallsign: req.spokenCallsign, runwayId: req.runwayId, point: req.point, reason: o.reason };
+  const base = { from: req.to, to: req.from, spokenCallsign: req.spokenCallsign, runwayId: req.runwayId, point: req.point, reason: o.reason, exitSide: req.exitSide, holdShortRunwayId: req.holdShortRunwayId };
   if (ctx.dryRun) return req;
   const apply = (status: CoordStatus, kind: CoordMessageKind, extra: Partial<Parameters<typeof describeMessage>[1]> = {}): void => {
     req.status = status;
@@ -449,6 +478,14 @@ export function coordRespond(ctx: SimContext, requestId: string, answer: CoordAn
         apply('approved', 'RELEASED');
       } else if (answer === 'deny') apply('denied', 'HOLD_FOR_RELEASE');
       else apply('standby', 'RELEASE_STANDBY');
+      break;
+    case 'EXIT':
+      if (answer === 'approve') {
+        req.approvedSec = now;
+        req.expiresSec = now + COORDINATION_DESIGN.exitRequestTtlSec;
+        apply('approved', 'EXIT_APPROVED', { point: o.exitTaxiway ?? req.point, exitSide: o.exitSide ?? req.exitSide });
+      } else if (answer === 'deny') apply('denied', 'EXIT_UNABLE');
+      else apply('standby', 'TEXT', { extra: 'stand by' });
       break;
     case 'POINT_OUT':
       if (answer === 'approve') {
@@ -521,6 +558,7 @@ export function updateCoordination(ctx: SimContext): void {
         break;
       case 'approved':
         if (!ac) r.status = 'expired';
+        else if (r.topic === 'EXIT' && ((ac.onGround && ac.phase !== 'ROLLOUT' && ac.phase !== 'LANDING') || ac.phase === 'GO_AROUND')) r.status = 'completed'; // landed and clear, or sent around: nothing left to arrange
         else if (r.topic === 'CROSSING' && r.afterAircraftId && !afterAircraftClear(state, r)) {
           r.expiresSec = now + COORDINATION_DESIGN.crossingApprovalTtlSec; // "behind the landing X": the interval starts when X is clear
         } else if (r.expiresSec !== undefined && now >= r.expiresSec) {

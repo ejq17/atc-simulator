@@ -3,7 +3,7 @@ import type { ParseContext } from './context';
 import { makeFixMatcher } from './fixes';
 import type { Toks } from './match';
 import {
-  makeClearedToParkingRule, makeContinueTaxiRule, makeHoldShortRule, makeTaxiRule, ruleCancel, ruleContinueSegment, ruleCross, ruleHoldPosition, ruleLineUp, ruleReadBackHold, ruleTaxiIntoPosition,
+  makeClearedToParkingRule, makeContinueTaxiRule, makeHoldShortRule, makeTaxiRule, ruleCancel, ruleContinueSegment, ruleCross, ruleHoldPosition, ruleLineUp, ruleReadBackHold, ruleTaxiIntoPosition, ruleTurnAround,
 } from './rules-ground';
 import { ruleHoldAtFix, ruleMissedApproach } from './rules-hold';
 import { makeAltitudeRule, ruleHeading, rulePattern, ruleSpeed } from './rules-flight';
@@ -46,7 +46,7 @@ export function buildRules(ctx: Pick<ParseContext, 'fixes' | 'taxiways' | 'runwa
   return [
     ruleAirTaxi, makeProceedRule(taxiRule), ruleHeliTakeoff, ruleHeliLand, ruleOverhead, ruleTrafficDirection,
     ruleAirportInfo, ruleWind, ruleDidYouCopy, ruleSayAgain, ruleUnable, ruleBirdAdvisory, ruleBrakingAdvisory, ruleRvr, ruleRunwayLights, ruleStar(ctx.arrivals ?? [], fixes), ruleTaxiIntoPosition, withLuawTraffic(ruleLineUp), ruleCancelTakeoff, ruleRadarServiceTerminated, ruleFrequencyApproved, ruleSquawk,
-    ruleExitRunway, rulePatternInstruction, ruleReportPosition, ruleFollowTraffic, ruleTrafficAdvisory, ruleTakeoff, ruleLand, ruleHoldAtFix(fixes),
+    ruleTurnAround, ruleExitRunway, rulePatternInstruction, ruleReportPosition, ruleFollowTraffic, ruleTrafficAdvisory, ruleTakeoff, ruleLand, ruleHoldAtFix(fixes),
     ruleMissedApproach, ruleGoAround, rulePushback, ruleReadBackHold, ruleContinueSegment, ruleRadarContact(fixes), ruleResumeNav, makeClearedToParkingRule(ctx.taxiways, ctx.runwayEnds), ruleApproach, ruleDirectFix(fixes),
     ruleIfrClearance, ruleContact, makeHoldShortRule(ctx.runwayEnds), ruleHoldPosition, ruleCancel, ruleCross, makeContinueTaxiRule(ctx.taxiways, ctx.runwayEnds), makeTaxiRule(ctx.taxiways, ctx.runwayEnds),
     ruleHeading, ruleSpeed, makeAltitudeRule(fixes), rulePattern, ruleContinue, ruleUnsupported,

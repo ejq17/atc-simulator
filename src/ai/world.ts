@@ -14,6 +14,7 @@ import { getPerformance } from '../sim/performance';
 import { pickRunwayHold } from '../sim/holdSelection';
 import { closedTaxiways } from '../sim/airportOps';
 import { runwayEntryNodes } from '../airport/graphUtils';
+import { landerStubOnRoute } from '../sim/exitStubs';
 
 // ---------------------------------------------------------------------------------------------------------------------
 // Arrivals
@@ -426,6 +427,10 @@ function pathBearingAt(graph: SimulationState['airport']['taxiwayGraph'], nodeId
 }
 
 export function opposingTraffic(state: SimulationState, nodeIds: string[], exceptId: string): Aircraft | undefined {
+  // The exit stub a lander inside 2 nm (or rolling out) is about to use is as good as occupied: a route over it ends head-on with the lander
+  // (exitStubs.ts). AI Ground waits; the lander is returned as the blocker.
+  const lander = landerStubOnRoute(state, nodeIds, exceptId);
+  if (lander) return state.aircraft[lander.aircraftId];
   const graph = state.airport.taxiwayGraph;
   const mine = new Map<string, number>();
   nodeIds.forEach((id, i) => mine.set(id, i));

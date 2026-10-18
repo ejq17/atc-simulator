@@ -100,6 +100,8 @@ export function markForClearance(c: Clearance): Pick<StripMark, 'text' | 'title'
       return { text: 'PB', title: 'Pushback approved' };
     case 'HOLD_POSITION':
       return { text: 'HP', title: 'Hold position' };
+    case 'TURN_AROUND':
+      return { text: '180', title: 'Turn around (one eighty)' };
     case 'GO_AROUND':
       return { text: 'GA', title: 'Go around' };
     case 'CONTINUE_APPROACH':
