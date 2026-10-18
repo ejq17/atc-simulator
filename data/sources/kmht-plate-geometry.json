@@ -1,0 +1,179 @@
+{
+ "_provenance": {
+  "source": "FAA d-TPP cycle 2610 instrument approach plates for KMHT (the PDFs listed in kmht-procedures.json)",
+  "retrieved": "2026-10-18",
+  "method": "Glidepath angle / TCH and the missed approach climb altitudes were read from each plate: PDF text layer extracted with pdfjs-dist and the MISSED APPROACH box and TCH labels located by page position; the two USAF plates without a text layer (HI-ILS Y 13, HI-VOR or TACAN 31) were rendered to images and read visually. Every altitude and TCH below equals the figure already transcribed in kmht-procedures.json (plate_notes / missed_approach), except for plates that file lists as not transcribed (KMHT RNP Z 17, RNP Z 35, CAT II-III, SA CAT I), which are new and were read from the plate text layer. HUMAN TRANSCRIPTION - verify against the PDFs before any real use.",
+  "terms": "TCH = threshold crossing height above the runway threshold of the plate's glidepath (GS = ILS glideslope, GP = RNAV glidepath, VDA = visual descent angle of a non-precision approach). It is NOT the VGSI TCH printed in the '(VGSI Angle x/TCH y)' note, which belongs to the visual glide slope indicator (NASR threshold_crossing_height_ft in the facility file)."
+ },
+ "procedures": [
+  {
+   "chart_name": "ILS OR LOC RWY 06",
+   "pdf_name": "00246IL6.PDF",
+   "glidepath": {
+    "kind": "GS",
+    "angle_deg": 3.0,
+    "tch_ft": 50
+   },
+   "missed_approach": {
+    "initial_climb_altitude_ft": 700,
+    "final_altitude_ft": 3000,
+    "plate_text": "MISSED APPROACH: Climb to 700 then climbing right turn to 3000 on heading 087 deg and CON VOR/DME R-154 to KHRIS/CON 21.3 DME and hold, continue climb-in-hold to 3000."
+   },
+   "read_by": "pdf text layer (pdfjs-dist) of the d-TPP 2610 PDF"
+  },
+  {
+   "chart_name": "RNAV (GPS) RWY 06",
+   "pdf_name": "00246R6.PDF",
+   "glidepath": {
+    "kind": "GP",
+    "angle_deg": 3.0,
+    "tch_ft": 50
+   },
+   "missed_approach": {
+    "initial_climb_altitude_ft": null,
+    "final_altitude_ft": 3000,
+    "plate_text": "MISSED APPROACH: Climb to 3000 direct CUXOV and track 142 deg to KHRIS and hold, continue climb-in-hold to 3000."
+   },
+   "read_by": "pdf text layer (pdfjs-dist) of the d-TPP 2610 PDF"
+  },
+  {
+   "chart_name": "ILS OR LOC RWY 17",
+   "pdf_name": "00246IL17.PDF",
+   "glidepath": {
+    "kind": "GS",
+    "angle_deg": 3.1,
+    "tch_ft": 49
+   },
+   "missed_approach": {
+    "initial_climb_altitude_ft": 900,
+    "final_altitude_ft": 2100,
+    "plate_text": "MISSED APPROACH: Climb to 900 then climbing left turn to 2100 on heading 145 deg and on CON VOR/DME R-171 to MANCH/CON 22.9 DME and hold, continue climb-in-hold to 2100."
+   },
+   "read_by": "pdf text layer (pdfjs-dist) of the d-TPP 2610 PDF"
+  },
+  {
+   "chart_name": "RNAV (GPS) Y RWY 17",
+   "pdf_name": "00246RY17.PDF",
+   "glidepath": {
+    "kind": "GP",
+    "angle_deg": 3.1,
+    "tch_ft": 49
+   },
+   "missed_approach": {
+    "initial_climb_altitude_ft": null,
+    "final_altitude_ft": 2000,
+    "plate_text": "MISSED APPROACH: Climb to 2000 direct YOULL and hold."
+   },
+   "read_by": "pdf text layer (pdfjs-dist) of the d-TPP 2610 PDF"
+  },
+  {
+   "chart_name": "RNAV (RNP) Z RWY 17",
+   "pdf_name": "00246RRZ17.PDF",
+   "glidepath": {
+    "kind": "GP",
+    "angle_deg": 3.1,
+    "tch_ft": 49
+   },
+   "missed_approach": {
+    "initial_climb_altitude_ft": null,
+    "final_altitude_ft": 2100,
+    "plate_text": "MISSED APPROACH: Climb to 2100 on track 172 deg to YOULL and hold."
+   },
+   "read_by": "pdf text layer (pdfjs-dist) of the d-TPP 2610 PDF",
+   "note": "Authorization-required procedure: geometry recorded, but the procedure itself is not transcribed beyond this."
+  },
+  {
+   "chart_name": "RNAV (GPS) RWY 24",
+   "pdf_name": "00246R24.PDF",
+   "glidepath": {
+    "kind": "GP",
+    "angle_deg": 3.0,
+    "tch_ft": 50
+   },
+   "missed_approach": {
+    "initial_climb_altitude_ft": 700,
+    "final_altitude_ft": 2600,
+    "plate_text": "MISSED APPROACH: Climb to 700 then climbing right turn to 2600 direct CON VOR/DME and hold."
+   },
+   "read_by": "pdf text layer (pdfjs-dist) of the d-TPP 2610 PDF"
+  },
+  {
+   "chart_name": "ILS OR LOC RWY 35",
+   "pdf_name": "00246IL35.PDF",
+   "glidepath": {
+    "kind": "GS",
+    "angle_deg": 3.0,
+    "tch_ft": 55
+   },
+   "missed_approach": {
+    "initial_climb_altitude_ft": null,
+    "final_altitude_ft": 4000,
+    "plate_text": "MISSED APPROACH: Climb to 4000 direct CON VOR/DME and hold."
+   },
+   "read_by": "pdf text layer (pdfjs-dist) of the d-TPP 2610 PDF"
+  },
+  {
+   "chart_name": "ILS RWY 35 (CAT II - III)",
+   "pdf_name": "00246I35C2_3.PDF",
+   "glidepath": {
+    "kind": "GS",
+    "angle_deg": 3.0,
+    "tch_ft": 55
+   },
+   "missed_approach": {
+    "initial_climb_altitude_ft": null,
+    "final_altitude_ft": 4000,
+    "plate_text": "MISSED APPROACH: Climb to 4000 direct CON VOR/DME and hold."
+   },
+   "read_by": "pdf text layer (pdfjs-dist) of the d-TPP 2610 PDF",
+   "note": "Special authorization / certification required."
+  },
+  {
+   "chart_name": "ILS RWY 35 (SA CAT I)",
+   "pdf_name": "00246I35SAC1.PDF",
+   "glidepath": {
+    "kind": "GS",
+    "angle_deg": 3.0,
+    "tch_ft": 55
+   },
+   "missed_approach": {
+    "initial_climb_altitude_ft": null,
+    "final_altitude_ft": 4000,
+    "plate_text": "MISSED APPROACH: Climb to 4000 direct CON VOR/DME and hold."
+   },
+   "read_by": "pdf text layer (pdfjs-dist) of the d-TPP 2610 PDF",
+   "note": "Special authorization required."
+  },
+  {
+   "chart_name": "RNAV (GPS) Y RWY 35",
+   "pdf_name": "00246RY35.PDF",
+   "glidepath": {
+    "kind": "GP",
+    "angle_deg": 3.0,
+    "tch_ft": 55
+   },
+   "missed_approach": {
+    "initial_climb_altitude_ft": null,
+    "final_altitude_ft": 3000,
+    "plate_text": "MISSED APPROACH: Climb to 3000 direct BLUUM and hold, continue climb-in-hold to 3000."
+   },
+   "read_by": "pdf text layer (pdfjs-dist) of the d-TPP 2610 PDF"
+  },
+  {
+   "chart_name": "RNAV (RNP) Z RWY 35",
+   "pdf_name": "00246RRZ35.PDF",
+   "glidepath": {
+    "kind": "GP",
+    "angle_deg": 3.0,
+    "tch_ft": 55
+   },
+   "missed_approach": {
+    "initial_climb_altitude_ft": null,
+    "final_altitude_ft": 3000,
+    "plate_text": "MISSED APPROACH: Climb to 3000 on track 352 deg to BLUUM and hold, continue climb-in-hold to 3000."
+   },
+   "read_by": "pdf text layer (pdfjs-dist) of the d-TPP 2610 PDF",
+   "note": "Authorization-required procedure: geometry recorded only."
+  }
+ ]
+}

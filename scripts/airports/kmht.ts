@@ -34,6 +34,7 @@ export const kmhtProfile: AirportProfile = {
     name: 'Runway 6/24 x 17/35 intersection',
     notes: 'Intersection of the two runway centrelines (no FAA hot spot is charted at KMHT).',
   },
+  plateGeometryFile: 'kmht-plate-geometry.json',
   diagramComparisonFile: 'kmht-diagram-comparison.md',
   simplifyEntryChains: true,
   runwayEndpointNote: ' (OSM runway endpoints were not compared with NASR: OSM maps each runway as several ways including displaced-threshold segments, and the runways come from NASR)',
@@ -44,7 +45,7 @@ export const kmhtProfile: AirportProfile = {
     diagramReconciliation: 'Taxiway identifier reconciliation against the airport diagram (identifiers read from the chart text; no label positions georeferenced).',
   },
   extraApproximate: [
-    '- Displaced thresholds (runway ends 6, 17 and 35 per NASR) are recorded in `displacedThresholdFt` but not modelled: the runway end node is the pavement end (NASR RWY_END_LAT/LONG) for takeoff, taxi and rollout, and landings aim from the same point.',
+    '- Displaced thresholds (runway ends 6, 17 and 35 per NASR, 442 / 336 / 850 ft) are modelled by the simulator: `RunwayEnd.threshold` stays the pavement end (takeoff, taxi, rollout, occupancy, TORA), `displacedThresholdFt` moves the landing threshold (glidepath, decision point, LDA) along the runway.',
     '- No MVA sectors, holding patterns or fix altitudes are included for this airport (not transcribed; never invented).',
   ],
   parking(ctx: ParkingCtx) {

@@ -91,7 +91,8 @@ describe('rollout and exit on real KACY (calm)', () => {
     const { r } = kacyLanding('A320', '13');
     // first exit at or beyond the sourced landing roll: the C-1 exit (2,017 ft) is too soon after touchdown at 6 kt/s, the next is 4,444 ft
     expect(Math.round(r.exitAlongFt)).toBe(4444);
-    expect(r.exitAlongFt - r.tdAlongFt).toBeGreaterThan(2500);
+    // touchdown ~2,010 ft in since the A320's visual path crosses at the 71 ft VGSI TCH of runway 13 (50 ft before this change)
+    expect(r.exitAlongFt - r.tdAlongFt).toBeGreaterThan(2000);
   });
 });
 

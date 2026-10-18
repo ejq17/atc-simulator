@@ -13,7 +13,8 @@ here knows about KACY. Tests run against the synthetic `__fixtures__/testAirport
 | `stateMachines.ts` | Explicit departure/arrival transition table; `canTransition`, `assertTransition` (throws), `tryTransition`, `transitionPath` |
 | `pathfinding.ts` | Dijkstra over `TaxiwayGraph` honouring an ordered `via` list; `validateRoute`, `nearestNode`, hold/runway helpers |
 | `groundMovement.ts` | Continuous taxi: bounded accel/braking, corner speeds, stop nodes, spacing, parking |
-| `flightDynamics.ts` | Takeoff roll, climb/descent, bank-limited turns, wind, approach guidance, flare, rollout, exit, go-around |
+| `flightDynamics.ts` | Takeoff roll, climb/descent, bank-limited turns, wind, approach guidance (plate / VGSI glidepath, displaced landing threshold), flare, rollout, exit, go-around |
+| `wind.ts` | Steady wind vector, seeded per-aircraft gust model, wind components per runway end, crosswind / tailwind limit test |
 | `runwayOccupancy.ts` | `computeRunwayActivity` (pure) + per-tick occupancy, enter/exit events, authorisation expiry |
 | `conflicts.ts` | `assessClearanceSafety` (pure) + per-tick incursion/proximity detection |
 | `commandExecutor.ts` | `applyCommand` implementation (validation, safety gate, commit, readback) |
@@ -30,7 +31,7 @@ here knows about KACY. Tests run against the synthetic `__fixtures__/testAirport
 | `minima.ts` | Approach minima from `minimaText`, runway-in-sight test for the decision altitude |
 | `ifr.ts` | IFR clearance defaults (DP name from `airport.procedures`, squawk assignment) |
 | `scoring.ts` | `ScoreCard` maintenance and the score formula |
-| `geo.ts`, `rng.ts`, `performance.ts`, `runways.ts` | Math, mulberry32 PRNG, C172/A320 tables, runway geometry |
+| `geo.ts`, `rng.ts`, `performance.ts`, `runways.ts` | Math, mulberry32 PRNG, performance tables (+ `patternAltitudeFt`, cited wind limits), runway geometry (+ displaced thresholds, LDA / TORA) |
 | `airportCheck.ts` | `checkAirportForSim(airport)`: validates the data contract below |
 | `../radio/` | `readback.ts` (phraseology), `spoken.ts` (numbers), `frequencies.ts` (who hears what) |
 
@@ -578,3 +579,16 @@ surface carry `onRunwayId`; parking nodes of kind `parking`; GND/TWR frequencies
   contact" once identified); departure clearance has no void time; the missed approach is "2000 ft on runway heading" only when the plate text is unavailable or not interpretable.
 * Free-play traffic generation still spawns arrivals on the extended centreline, not at fixes (scenarios use `at_fix`).
 * `radioState` `RECEIVING` is not used (readbacks are instantaneous); no frequency congestion yet.
+
+
+## Wind, gusts and runway-end physics (2026-10-18)
+
+* **Gusts (`wind.ts`)**: with `Weather.windGustKt > windSpeedKt` every aircraft flies in its own seeded gust process (first-order Gauss-Markov, time constant 8 s, smoothed with 2 s, scaled by the gust spread; speed in [mean - 0.5 x spread, gust], direction wander up to 2 sigma, sigma = min(10 deg, 0.6 deg per kt of spread)). Seed = `hash(scenario seed, aircraft id)`: it never touches the shared `engine.random()` stream, so the same seed replays identically, spawn order does not matter, and every other random decision is unchanged. No gust, calm or VRB: exactly the steady wind and no draw. All constants are DESIGN VALUES (no source); see the header of `wind.ts`.
+* **Effects**: the airborne kinematics use the gusted wind while the guidance (crab angle) assumes the steady wind, so gusts move the track; the change of the headwind component is added to the airspeed (ground speed is continuous) and the speed controller removes it at the type's accel / decel rate (`rt.gustAirKt`); in the takeoff roll the airspeed follows the gusted headwind (rotation time and ground run vary); in the flare the gust-added airspeed balloons the aircraft and a lull sinks it (25 ft/min per kt, `GUST_LIFT_FPM_PER_KT`), so the float and the touchdown point scatter. Touchdown ground speed = airspeed - effective headwind, so the rollout follows the wind component.
+* **Limits**: `AircraftPerformance.maxCrosswindKt / maxTailwindKt` exist only where a source is cited (C172 15 kt, POH172S demonstrated; every other type undefined = no limit, see `docs/REALISM-VERIFICATION.md` section 8). `commandExecutor.windRefusal`: LAND or TAKEOFF onto an end whose EFFECTIVE component, steady + 0.5 x (gust - steady) (design decision: the C172's 15 kt is a demonstrated value, not a limitation), exceeds a limit is refused ("Unable, runway four, crosswind is above our limit, request runway three one, <callsign>", best other end within limits by headwind); not a controller communication error. On final (inside 1 nm, above 50 ft AGL) the instantaneous gusted component over the limit by 5 kt or more for 2 s is a go-around with the reason "crosswind exceeds our limit" / "tailwind exceeds our limit".
+* **Glidepath (`glidePathFor`)**: a cleared instrument approach flies its plate angle and TCH (`InstrumentProcedure.glidepath`, from `data/sources/*-plate-geometry.json`); a visual approach or no approach flies the runway end's NASR VGSI angle and TCH (`RunwayEnd.visualGlidepath`), except light aircraft (50 ft, design); anything else the labelled 3 deg / 50 ft default. `glideAltitudeFt(elev, d, gp)`.
+* **Missed approach altitude**: `publishedMissedAltitudeFt` (structured `InstrumentProcedure.missedApproach.finalAltitudeFt`, else the parsed text). `initiateGoAround` targets it for IFR aircraft, 2,000 ft only when the dataset has none. `parseMissedApproach` also reads the "CON VOR/DME R-154 to KHRIS/CON 21.3 DME" form of the KMHT plates.
+* **Pattern altitude (`patternAltitudeFt`)**: AIM 4-3-3, propeller field + 1,000 ft; large or turbine-powered (`AircraftPerformance.propulsion`) field + 1,500 ft; `Airport.trafficPatternAltitudeFt` (none in the datasets) when published.
+* **Displaced thresholds (`runways.ts`)**: `RunwayEnd.threshold` is the PAVEMENT end; `RunwayEndGeom.displacedM / landingThreshold` move the landing threshold. `courseGeom` rebases the approach frame (glidepath, decision point, capture) on it; takeoff, rollout, exits and occupancy stay on the pavement; `ldaM` / `toraM` are the NASR declared distances (declared LDA wins over the geometry); LAND is refused if `landingDistanceFt` exceeds the LDA; the takeoff run check uses TORA. The `touched down` INFO event reports `alongM` from the landing threshold (plus `alongPavementEndM`, `displacedM`).
+* Spacing and timing: `projectArrival`, `timeToThreshold`, the intersecting-runway arrival check and the 3-10-3 landed-aircraft distance use the landing threshold (`displacedM`); pavement-end positions remain for takeoff, rollout and occupancy.
+* Known simplifications: no turbulence or wind shear, no vertical gust component.

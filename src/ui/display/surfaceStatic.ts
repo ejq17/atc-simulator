@@ -108,11 +108,13 @@ export function runwayLabels(rw: Runway, insetM = 110): RunwayLabel[] {
     const dx = other.threshold.x - e.threshold.x;
     const dy = other.threshold.y - e.threshold.y;
     const len = Math.hypot(dx, dy) || 1;
+    // the number sits inside the LANDING threshold: past the displaced area where there is one
+    const inset = insetM + (e.displacedThresholdFt ?? 0) * 0.3048;
     return {
       text: e.id,
       endId: e.id,
-      x: e.threshold.x + (dx / len) * insetM,
-      y: e.threshold.y + (dy / len) * insetM,
+      x: e.threshold.x + (dx / len) * inset,
+      y: e.threshold.y + (dy / len) * inset,
       angleDeg: uprightAngleDeg((Math.atan2(dy, dx) * 180) / Math.PI),
       headingDeg: e.trueHeadingDeg,
     };

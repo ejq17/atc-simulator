@@ -6,7 +6,7 @@ Pure TypeScript, no DOM dependency (except `liveWeather.ts`, which uses `fetch`)
 | File | Purpose |
 |---|---|
 | `metar.ts` | `parseMetar(raw)` -> `Weather`; `parseMetarDetailed(raw)` (adds station, time group, AUTO/COR, variable wind sector, remarks, missing/unparsed groups); `computeFlightCategory`, `ceilingFt`, `windMagnetic`, `KACY_MAGNETIC_VARIATION_DEG` (-10) |
-| `presets.ts` | `WEATHER_PRESETS` (clear, light-crosswinds, strong-winds, low-visibility, rain, thunderstorms, imc), `getPresetWeather(id)`, `randomWeather(seed)` (inline mulberry32) |
+| `presets.ts` | `WEATHER_PRESETS` (clear, light-crosswinds, strong-winds, gusty-crosswind, low-visibility, rain, thunderstorms, imc), `getPresetWeather(id)`, `randomWeather(seed)` (inline mulberry32) |
 | `runwaySelection.ts` | `headwindComponent`, `crosswindComponent`, `crosswindSigned`, `recommendRunways` |
 | `atis.ts` | `generateAtis`, `nextAtisLetter`, `atisNeedsUpdate` / `atisUpdateReasons`, spoken-number helpers |
 | `liveWeather.ts` | `fetchLiveMetar(icao)`: local backend (AWC), else the NWS API from the browser; typed `LiveWeatherError` |

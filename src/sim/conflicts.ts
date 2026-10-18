@@ -101,7 +101,7 @@ export function landedDistanceExceptionApplies(state: SimulationState, subject: 
   const og = findRunwayEnd(state.airport, other.assignedRunwayEnd);
   if (!og || og.end.id !== g.end.id) return false;
   if (Math.abs(alongCross(g, other.pos).cross) >= TURNED_AWAY_M) return false;
-  return landedExceptionHolds(state, subject, other, alongCross(g, other.pos).along - perfOf(other).lengthM / 2);
+  return landedExceptionHolds(state, subject, other, alongCross(g, other.pos).along - g.displacedM - perfOf(other).lengthM / 2); // tail distance from the LANDING threshold
 }
 
 /** The 3-10-3 daylight rule given the preceding (landed) aircraft's TAIL position `tailAlongM` from the landing threshold. */
@@ -242,7 +242,7 @@ function intersectingIssues(state: SimulationState, ac: Aircraft, kind: 'TAKEOFF
     const delay = ac.phase === 'LINE_UP_AND_WAIT' ? ROLL_START_DELAY_SEC : lineUpTimeSec(subjectPerf, Math.abs(alongCross(g, ac.pos).cross) + 20);
     tSubjectDepClear = delay + timeToCover(dist2, 0, ktToMps(subjectPerf.accelKtPerSec));
   } else {
-    tSubjectThr = dist(ac.pos, g.end.threshold) / Math.max(ktToMps(ac.groundSpeedKt), ktToMps(30));
+    tSubjectThr = dist(ac.pos, g.landingThreshold) / Math.max(ktToMps(ac.groundSpeedKt), ktToMps(30));
   }
   for (const o of Object.values(state.aircraft)) {
     if (o.id === ac.id) continue;
@@ -278,7 +278,7 @@ function intersectingIssues(state: SimulationState, ac: Aircraft, kind: 'TAKEOFF
       if (o.phase === 'RUNWAY_EXIT' && !onSurface) continue; // clear of the landing runway
       out.push(issue(`${verb} for ${ac.callsign} on runway ${g.runway.id} while ${o.callsign} is still rolling out on runway ${other.id} and has not passed or exited before the intersection`));
     } else if (arrivingAir) {
-      const tOThr = dist(o.pos, og.end.threshold) / Math.max(ktToMps(o.groundSpeedKt), ktToMps(30));
+      const tOThr = dist(o.pos, og.landingThreshold) / Math.max(ktToMps(o.groundSpeedKt), ktToMps(30));
       if (kind === 'TAKEOFF') {
         if (tOThr < tSubjectDepClear) {
           out.push(issue(`${verb} for ${ac.callsign} on runway ${g.runway.id}: ${o.callsign} would cross the threshold of runway ${other.id} in ${Math.round(tOThr)} s, before the departure passes the intersection (about ${Math.round(tSubjectDepClear)} s)`));
@@ -525,7 +525,7 @@ export function precedingArrivalBlockers(state: SimulationState, ac: Aircraft, g
     if (along <= myAlong || Math.abs(cross) > FINAL_LATERAL_M) continue; // behind the subject: it is the follower
     const proj = projectArrival(state, o, g);
     if (tMine >= proj.tClear + ARRIVAL_CLEAR_MARGIN_SEC) continue; // landed and clear when the follower crosses the threshold
-    if (tMine >= proj.tTd && landedExceptionHolds(state, ac, o, proj.alongAt(tMine) - perfOf(o).lengthM / 2)) continue; // by day, 3,000 / 4,500 ft down the runway
+    if (tMine >= proj.tTd && landedExceptionHolds(state, ac, o, proj.alongAt(tMine) - g.displacedM - perfOf(o).lengthM / 2)) continue; // by day, 3,000 / 4,500 ft down the runway
     out.push({ other: o, tMine, tTd: proj.tTd, tClear: proj.tClear });
   }
   return out;

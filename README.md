@@ -72,6 +72,16 @@ Open the app, pick the airport (KACY by default, or KMHT), a mode (Free Play, Ca
 Training; the last two are KACY-only), a scenario, weather (**live METAR of the chosen airport** is the
 default; or a simulated preset), runway configuration and controller position, then Start.
 
+**Wind.** Gusts in the METAR (or in a preset, e.g. *Gusty crosswind*) are flown: each aircraft sees its own seeded gust
+sequence, so finals and takeoff rolls are unsteady and the float in the flare varies (gust model constants are design values,
+not sourced). The **Weather and runways** panel lists head / tail and crosswind components per runway end, steady and at the
+gust speed. Where a source exists for a type (only the Cessna 172: 15 kt demonstrated crosswind, 172S POH) the pilot says
+"Unable, runway four, crosswind is above our limit, request runway three one" to a landing or takeoff clearance when the
+effective crosswind (halfway between steady and gust, a design choice) exceeds it, and goes around only if the gusted
+crosswind exceeds it by 5 kt or more for 2 s on final. Large and turbine-powered aircraft fly a 1,500 ft pattern, arrivals
+use the glidepath angle and threshold crossing height of the cleared approach plate (or the runway's visual glide slope), go-arounds climb to the
+published missed approach altitude, and the displaced thresholds at Manchester (6, 17, 35) are modelled and drawn.
+
 **Real time by default.** The session clock is the real clock: sim time advances one second per wall-clock second
 (corrected against `performance.now`, so it does not drift), the Zulu time, sunrise/sunset (DAY/NIGHT in the top bar) and
 free-play traffic volume follow the real date and time at the airport (quiet overnight, busy morning and evening banks),

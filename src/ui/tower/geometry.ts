@@ -202,6 +202,8 @@ export interface RunwayMarkings {
   threshold: MarkingRect[];
   aiming: MarkingRect[];
   edge: MarkingRect[];
+  /** Displaced threshold arrows (shafts and arrowheads) on the centreline of the displaced area. */
+  displaced: MarkingRect[];
 }
 
 export interface RunwayAxis { origin: Vec2; headingDeg: number; length: number; widthM: number }
@@ -221,19 +223,23 @@ export function runwayMarkings(rw: Runway): RunwayMarkings {
   const f = { x: Math.sin(r), y: Math.cos(r) };
   const s = { x: f.y, y: -f.x };
   const at = (along: number, across = 0): Vec2 => ({ x: ax.origin.x + f.x * along + s.x * across, y: ax.origin.y + f.y * along + s.y * across });
-  const out: RunwayMarkings = { centreline: [], threshold: [], aiming: [], edge: [] };
+  const out: RunwayMarkings = { centreline: [], threshold: [], aiming: [], edge: [], displaced: [] };
   const L = ax.length;
   const W = ax.widthM;
+  // Displaced thresholds (NASR): the landing threshold of an end is `displacedThresholdFt` in from its pavement end. The threshold bars, the
+  // aiming point and the centreline run from the LANDING thresholds; the displaced area carries arrows instead (AC 150/5340-1 marking 5.x, simplified).
+  const disp: [number, number] = [(rw.ends[0].displacedThresholdFt ?? 0) * FT, (rw.ends[1].displacedThresholdFt ?? 0) * FT];
+  const landing: [number, number] = [disp[0], L - disp[1]];
 
   // Centreline: 36.6 m (120 ft) dashes on a 61 m (200 ft) pitch, from 150 m after one threshold to 150 m before the other.
   const dash = 120 * FT;
   const pitch = 200 * FT;
   const start = 150;
-  const usable = L - 2 * start;
+  const usable = landing[1] - landing[0] - 2 * start;
   if (usable > dash) {
     const count = Math.floor((usable - dash) / pitch) + 1;
     const used = (count - 1) * pitch + dash;
-    const first = start + (usable - used) / 2;
+    const first = landing[0] + start + (usable - used) / 2;
     for (let i = 0; i < count; i++) out.centreline.push({ c: at(first + i * pitch + dash / 2), headingDeg: ax.headingDeg, length: dash, width: 0.9 });
   }
 
@@ -244,7 +250,7 @@ export function runwayMarkings(rw: Runway): RunwayMarkings {
   const gap = (W - 3 - stripes * barW) / Math.max(1, stripes); // spread across the width, leaving 1.5 m at each edge
   for (const end of [0, 1] as const) {
     const sign = end === 0 ? 1 : -1;
-    const base = end === 0 ? 0 : L;
+    const base = landing[end];
     const along = base + sign * (6 * FT + barLen / 2);
     for (let i = 0; i < stripes; i++) {
       const across = -W / 2 + 1.5 + gap / 2 + barW / 2 + i * (barW + gap);
@@ -256,8 +262,30 @@ export function runwayMarkings(rw: Runway): RunwayMarkings {
   if (L > 900) {
     for (const end of [0, 1] as const) {
       const sign = end === 0 ? 1 : -1;
-      const base = end === 0 ? 0 : L;
+      const base = landing[end];
       for (const side of [-1, 1]) out.aiming.push({ c: at(base + sign * (1000 * FT + 22.8), side * 11), headingDeg: ax.headingDeg, length: 150 * FT, width: 9 });
+    }
+  }
+
+  // Displaced-threshold arrows: 36.6 m shafts on a 61 m pitch along the centreline of the displaced area, each with a chevron head pointing at the landing threshold.
+  for (const end of [0, 1] as const) {
+    if (!(disp[end] > 0)) continue;
+    const sign = end === 0 ? 1 : -1;
+    const base = end === 0 ? 0 : L;
+    const n = Math.max(1, Math.floor(disp[end] / pitch));
+    const step = disp[end] / n;
+    const headingToward = end === 0 ? ax.headingDeg : (ax.headingDeg + 180) % 360;
+    for (let k = 0; k < n; k++) {
+      const tip = (k + 1) * step - 4;
+      const shaft = Math.min(dash, step * 0.6);
+      out.displaced.push({ c: at(base + sign * (tip - shaft / 2)), headingDeg: headingToward, length: shaft, width: 0.9 });
+      for (const sgn of [-1, 1]) {
+        const head = (headingToward + sgn * 40 + 360) % 360; // chevron arms trail the tip at +-40 degrees
+        const arm = 5;
+        const hr = (head * Math.PI) / 180;
+        const tipPos = at(base + sign * tip);
+        out.displaced.push({ c: { x: tipPos.x - Math.sin(hr) * arm / 2, y: tipPos.y - Math.cos(hr) * arm / 2 }, headingDeg: head, length: arm, width: 0.9 });
+      }
     }
   }
 
@@ -395,12 +423,13 @@ export function runwayLights(rw: Runway, opts: RunwayLightOptions & { approachEn
   const at = (along: number, across: number): Vec2 => ({ x: ax.origin.x + f.x * along + s.x * across, y: ax.origin.y + f.y * along + s.y * across });
   const out: LightPoint[] = [];
   const half = ax.widthM / 2 + 1.5;
+  const dispFt: [number, number] = [rw.ends[0].displacedThresholdFt ?? 0, rw.ends[1].displacedThresholdFt ?? 0];
   for (let d = 0; d <= ax.length + 1e-6; d += 60) for (const side of [-1, 1]) out.push({ pos: at(d, side * half), h: 0.4, colour: 'white' });
   // Threshold lights (green) in a row across the full width at both ends.
   for (let k = 0; k <= 12; k++) {
     const across = -half + (k * 2 * half) / 12;
-    out.push({ pos: at(-1, across), h: 0.3, colour: 'green' });
-    out.push({ pos: at(ax.length + 1, across), h: 0.3, colour: 'green' });
+    out.push({ pos: at(dispFt[0] * FT - 1, across), h: 0.3, colour: 'green' });
+    out.push({ pos: at(ax.length - dispFt[1] * FT + 1, across), h: 0.3, colour: 'green' });
   }
   if (opts.centreline) for (let d = 15; d < ax.length - 15; d += 15) out.push({ pos: at(d, 0), h: 0.15, colour: 'white' });
   if (opts.approach) {
@@ -408,7 +437,7 @@ export function runwayLights(rw: Runway, opts: RunwayLightOptions & { approachEn
       const idx = rw.ends.findIndex((e) => e.id === end);
       if (idx < 0) continue;
       const sign = idx === 0 ? -1 : 1;
-      const base = idx === 0 ? 0 : ax.length;
+      const base = idx === 0 ? dispFt[0] * FT : ax.length - dispFt[1] * FT;
       for (let d = 10; d <= 720; d += 30) out.push({ pos: at(base + sign * d, 0), h: 1.2, colour: 'white' });
       for (const dd of [150, 300]) for (let x = -12; x <= 12; x += 3) out.push({ pos: at(base + sign * dd, x), h: 1.2, colour: 'white' });
     }

@@ -13,6 +13,7 @@ export type WeatherPresetId =
   | 'clear'
   | 'light-crosswinds'
   | 'strong-winds'
+  | 'gusty-crosswind'
   | 'low-visibility'
   | 'rain'
   | 'thunderstorms'
@@ -65,6 +66,16 @@ const PRESET_DEFS: { id: WeatherPresetId; label: string; description: string; in
       windDirDeg: 310, windSpeedKt: 24, windGustKt: 36, visibilitySm: 10,
       clouds: [{ cover: 'SCT', baseFtAgl: 5000 }],
       temperatureC: 8, dewpointC: -3, altimeterInHg: 29.78, phenomena: [],
+    },
+  },
+  {
+    id: 'gusty-crosswind',
+    label: 'Gusty crosswind',
+    description: 'Northwest 16 kt gusting 28, VFR. At KACY the gust is a 26 kt crosswind on 4/22 (over a Cessna 172\'s 15 kt) but only about 10 kt on 31, so light aircraft ask for 31; the gusts make final approaches and takeoff rolls visibly unsteady.',
+    init: {
+      windDirDeg: 320, windSpeedKt: 16, windGustKt: 28, visibilitySm: 10,
+      clouds: [{ cover: 'FEW', baseFtAgl: 5000 }, { cover: 'SCT', baseFtAgl: 9000 }],
+      temperatureC: 12, dewpointC: 2, altimeterInHg: 29.92, phenomena: [],
     },
   },
   {
@@ -134,7 +145,7 @@ function mulberry32(seed: number): () => number {
 
 /** Relative likelihood of each preset in `randomWeather` (clear days dominate). */
 const RANDOM_WEIGHTS: Record<WeatherPresetId, number> = {
-  clear: 30, 'light-crosswinds': 22, 'strong-winds': 10, 'low-visibility': 6,
+  clear: 30, 'light-crosswinds': 22, 'strong-winds': 10, 'gusty-crosswind': 8, 'low-visibility': 6,
   rain: 14, thunderstorms: 8, imc: 10,
 };
 

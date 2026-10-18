@@ -1,6 +1,6 @@
 /** Runway geometry helpers shared by dynamics, occupancy, conflicts and the executor. */
 import type { Airport, Runway, RunwayEnd, Vec2 } from './types';
-import { dist, nmToM, pointInPolygon, polygonsOverlap, vDot, vNorm, vSub, vecToHeading } from './geo';
+import { dist, ftToM, nmToM, pointInPolygon, polygonsOverlap, vDot, vNorm, vSub, vecToHeading } from './geo';
 
 export interface RunwayEndGeom {
   runway: Runway;
@@ -14,6 +14,14 @@ export interface RunwayEndGeom {
   headingDeg: number;
   lengthM: number;
   elevationFt: number;
+  /** Displaced landing threshold: metres from the pavement end (`end.threshold`) along `dir`; 0 when none. */
+  displacedM: number;
+  /** The landing threshold (`end.threshold` moved `displacedM` along `dir`); equals `end.threshold` when none. */
+  landingThreshold: Vec2;
+  /** Landing distance available (m): the NASR declared LDA when published (it wins over the geometry: KMHT 35 declares 7,650 ft where the geometry gives 8,400), else the pavement length less the displacement. */
+  ldaM: number;
+  /** Takeoff run available (m): NASR declared TORA when published, else the pavement length. */
+  toraM: number;
 }
 
 /** "RWY 04L" / "04" -> "4L"; leaves "13/31" untouched. */
@@ -33,6 +41,10 @@ export function findRunwayEnd(airport: Airport, endId: string | undefined): Runw
       if (normalizeRunwayEndId(end.id) === id) {
         const other = runway.ends[1 - i];
         const dir = vNorm(vSub(other.threshold, end.threshold));
+        const lengthM = dist(end.threshold, other.threshold);
+        const displacedM = ftToM(end.displacedThresholdFt ?? 0);
+        const lda = end.declaredDistancesFt?.lda;
+        const tora = end.declaredDistancesFt?.tora;
         return {
           runway,
           end,
@@ -40,8 +52,12 @@ export function findRunwayEnd(airport: Airport, endId: string | undefined): Runw
           dir,
           right: { x: dir.y, y: -dir.x },
           headingDeg: vecToHeading(dir),
-          lengthM: dist(end.threshold, other.threshold),
+          lengthM,
           elevationFt: end.tdzeFt ?? airport.elevationFt,
+          displacedM,
+          landingThreshold: displacedM > 0 ? { x: end.threshold.x + dir.x * displacedM, y: end.threshold.y + dir.y * displacedM } : end.threshold,
+          ldaM: typeof lda === 'number' ? ftToM(lda) : lengthM - displacedM,
+          toraM: typeof tora === 'number' ? ftToM(tora) : lengthM,
         };
       }
     }
@@ -109,4 +125,30 @@ export function runwayIntersection(a: Runway, b: Runway): Vec2 | undefined {
   const u = (w.x * r.y - w.y * r.x) / denom;
   if (t < 0 || t > 1 || u < 0 || u > 1) return undefined;
   return { x: a1.x + r.x * t, y: a1.y + r.y * t };
+}
+
+export interface DisplacedThreshold {
+  endId: string;
+  /** The pavement end (`RunwayEnd.threshold`). */
+  pavementEnd: Vec2;
+  /** The displaced landing threshold. */
+  threshold: Vec2;
+  /** Unit vector in the landing direction of this end. */
+  dir: Vec2;
+  displacedM: number;
+}
+
+/** The displaced thresholds of a runway (ends without one are omitted); `threshold` is `displacedThresholdFt` from the pavement end along the runway. */
+export function displacedThresholds(rw: Runway): DisplacedThreshold[] {
+  const out: DisplacedThreshold[] = [];
+  for (let i = 0; i < 2; i++) {
+    const e = rw.ends[i];
+    const o = rw.ends[1 - i];
+    const ft = e.displacedThresholdFt ?? 0;
+    if (!(ft > 0)) continue;
+    const dir = vNorm(vSub(o.threshold, e.threshold));
+    const displacedM = ftToM(ft);
+    out.push({ endId: e.id, pavementEnd: e.threshold, threshold: { x: e.threshold.x + dir.x * displacedM, y: e.threshold.y + dir.y * displacedM }, dir, displacedM });
+  }
+  return out;
 }

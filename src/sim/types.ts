@@ -39,7 +39,15 @@ export interface RunwayEnd {
   thresholdLatLon: LatLon;
   trueHeadingDeg: number;  // NASR "true alignment"
   magneticHeadingDeg: number;
+  /**
+   * Length (ft) of the displaced landing threshold from NASR (DISPLACED_THR_LEN). `threshold` is always the PAVEMENT end; the landing
+   * threshold is `displacedThresholdFt` further along the runway (takeoff and rollout use the full pavement, landings aim for the landing threshold).
+   */
   displacedThresholdFt?: number;
+  /** Declared distances (ft) from NASR: TORA, TODA, ASDA, LDA (null: not published). */
+  declaredDistancesFt?: { tora: number | null; toda: number | null; asda: number | null; lda: number | null };
+  /** Visual glide slope (VGSI) angle and threshold crossing height from NASR (RWY_END VGSI / THR_CROSSING_HGT); used for visual approaches. */
+  visualGlidepath?: { angleDeg: number; tchFt: number };
   tdzeFt?: number;
   ils?: { ident: string; frequencyMhz: number; courseDeg: number; glideslopeDeg?: number } | null;
   /** NASR LAHSO: available landing distance when holding short of the intersecting runway, and the hold-short point. */
@@ -143,6 +151,10 @@ export interface InstrumentProcedure {
   missedApproachText?: string;
   holdingText?: string;
   minimaText?: string;
+  /** Published glidepath / visual descent angle and its threshold crossing height, transcribed from the plate (data/sources/<slug>-plate-geometry.json). */
+  glidepath?: { kind: 'GS' | 'GP' | 'VDA'; angleDeg: number; tchFt: number };
+  /** Published missed approach climb altitudes, transcribed from the plate (structured form of `missedApproachText`). */
+  missedApproach?: { initialClimbFt?: number; finalAltitudeFt: number; plateText: string };
   /** Published altitudes at fixes on the plate profile view (human transcription). */
   fixAltitudes?: { fix: string; minAltitudeFt?: number; maxAltitudeFt?: number; mandatoryAltitudeFt?: number; note?: string }[];
   /** Published holding patterns read from the plate depiction (human transcription). */
@@ -180,6 +192,8 @@ export interface Airport {
   procedures: InstrumentProcedure[];
   hotSpots: HotSpot[];
   towerHours?: string;
+  /** Published traffic pattern altitude (ft MSL) when the dataset has one (NASR carries none for KACY / KMHT: the AIM 4-3-3 defaults apply). */
+  trafficPatternAltitudeFt?: number;
   airspaceClass?: 'B' | 'C' | 'D' | 'E' | 'G';
   /** Minimum vectoring altitude sectors from the FAA MVA/MIA digital product (polygons in local metres). */
   mvaSectors?: { id: string; polygon: Vec2[]; altitudeFt: number; provenance: DataProvenance }[];
@@ -216,6 +230,12 @@ export interface AircraftPerformance {
   takeoffDistanceFt: number;
   landingDistanceFt: number;
   lengthM: number;              // for ground spacing
+  /** Engine type: AIM 4-3-3 pattern altitude (propeller 1,000 ft AGL; large / turbine-powered 1,500 ft AGL). Unknown: derived from `category`. */
+  propulsion?: 'piston' | 'turboprop' | 'turbofan';
+  /** Cited maximum (demonstrated) crosswind component, kt. Undefined = no citable figure: the simulator applies no limit. */
+  maxCrosswindKt?: number;
+  /** Cited maximum tailwind component for takeoff / landing, kt. Undefined = no citable figure: no limit applied. */
+  maxTailwindKt?: number;
 }
 
 export type FlightRules = 'VFR' | 'IFR';

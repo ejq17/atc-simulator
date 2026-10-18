@@ -6,7 +6,7 @@
 import type { Airport, ParkingPosition, RunwayEnd, ScenarioAircraftSpawn, TaxiNode, Vec2 } from '../sim/types';
 import { holdingPositionsForRunway, runwayEntryNodes } from '../airport';
 import { findTaxiRoute } from '../sim/pathfinding';
-import { getPerformance } from '../sim/performance';
+import { getPerformance, patternAltitudeFt } from '../sim/performance';
 import { CARGO_TYPES, findNeighbour, pickFlight, profileFor } from './airportProfile';
 import type { PickFlightOptions } from './airportProfile';
 
@@ -104,7 +104,7 @@ export function onDownwind(
   endId: string,
   side: 'left' | 'right',
   alongNm: number,
-  o: { speedKt: number; altitudeFt?: number },
+  o: { speedKt: number; altitudeFt?: number; type?: string },
 ): Extract<ScenarioAircraftSpawn['start'], { kind: 'airborne' }> {
   const e = endOf(airport, endId);
   const h = rad(e.trueHeadingDeg);
@@ -114,7 +114,7 @@ export function onDownwind(
   const pos = { x: e.threshold.x + dir.x * alongNm * NM + right.x * lateral, y: e.threshold.y + dir.y * alongNm * NM + right.y * lateral };
   const elev = e.tdzeFt ?? airport.elevationFt;
   return {
-    kind: 'airborne', pos, altitudeFt: o.altitudeFt ?? Math.round((elev + 1000) / 100) * 100,
+    kind: 'airborne', pos, altitudeFt: o.altitudeFt ?? Math.round(patternAltitudeFt(getPerformance(o.type ?? 'C172'), elev, airport.trafficPatternAltitudeFt) / 100) * 100,
     headingDeg: norm360(e.trueHeadingDeg + 180), speedKt: o.speedKt, runwayEnd: endId,
   };
 }

@@ -34,6 +34,8 @@ export const C172: AircraftPerformance = {
   takeoffDistanceFt: 1630, // source: aircraft-performance.json C172.takeoffDistanceFt (Textron 1,630 ft over 50 ft; was 1600)
   landingDistanceFt: 1335, // source: aircraft-performance.json C172.landingDistanceFt (Textron 1,335 ft over 50 ft; was 1300)
   lengthM: 8.3,
+  propulsion: 'piston',
+  maxCrosswindKt: 15, // POH172S: maximum DEMONSTRATED crosswind component 15 kt (not a limitation); used as the simulator's refusal / go-around limit. Source: docs/REALISM-VERIFICATION.md section 8
 };
 
 export const A320: AircraftPerformance = {
@@ -59,6 +61,7 @@ export const A320: AircraftPerformance = {
   takeoffDistanceFt: 5000, // source: aircraft-performance.json A320.takeoffDistanceFt (Airbus AC Fig 3-3-1 ~5,000 ft at ~68 t; was 6500, which refused 4/22)
   landingDistanceFt: 4500,
   lengthM: 37.6,
+  propulsion: 'turbofan',
 };
 
 // ---------------------------------------------------------------------------------------------------------------------------------
@@ -74,7 +77,7 @@ export const B738: AircraftPerformance = {
   rotateSpeedKt: 145, climbSpeedKt: 180, cruiseSpeedKt: 250, approachSpeedKt: 140, touchdownSpeedKt: 135,
   climbRateFpm: 2500, descentRateFpm: 2000, turnRateDegPerSec: 2.5, groundTurnRateDegPerSec: 15,
   minSpeedKt: 125, maxSpeedKt: 340, serviceCeilingFt: 41000,
-  takeoffDistanceFt: 6000, landingDistanceFt: 4700, lengthM: 39.5, // ESTIMATE: typical weight; Boeing 737 airport planning document D6-58325-6
+  takeoffDistanceFt: 6000, landingDistanceFt: 4700, lengthM: 39.5, propulsion: 'turbofan', // ESTIMATE: typical weight; Boeing 737 airport planning document D6-58325-6
 };
 
 /** Airbus A220-300 (Breeze "Moxy"; ICAO type BCS3). */
@@ -84,7 +87,7 @@ export const BCS3: AircraftPerformance = {
   rotateSpeedKt: 135, climbSpeedKt: 175, cruiseSpeedKt: 250, approachSpeedKt: 133, touchdownSpeedKt: 128,
   climbRateFpm: 2800, descentRateFpm: 2000, turnRateDegPerSec: 2.5, groundTurnRateDegPerSec: 15,
   minSpeedKt: 115, maxSpeedKt: 340, serviceCeilingFt: 41000,
-  takeoffDistanceFt: 4900, landingDistanceFt: 4300, lengthM: 38.7, // ESTIMATE: A220-300 airport planning data, typical weight
+  takeoffDistanceFt: 4900, landingDistanceFt: 4300, lengthM: 38.7, propulsion: 'turbofan', // ESTIMATE: A220-300 airport planning data, typical weight
 };
 
 /** Embraer 175 (Piedmont, Republic "Brickyard", SkyWest). */
@@ -94,7 +97,7 @@ export const E175: AircraftPerformance = {
   rotateSpeedKt: 132, climbSpeedKt: 170, cruiseSpeedKt: 250, approachSpeedKt: 128, touchdownSpeedKt: 122,
   climbRateFpm: 2800, descentRateFpm: 2000, turnRateDegPerSec: 3, groundTurnRateDegPerSec: 16,
   minSpeedKt: 110, maxSpeedKt: 320, serviceCeilingFt: 41000,
-  takeoffDistanceFt: 5000, landingDistanceFt: 4000, lengthM: 31.7, // ESTIMATE: Embraer 175 airport planning data, typical weight
+  takeoffDistanceFt: 5000, landingDistanceFt: 4000, lengthM: 31.7, propulsion: 'turbofan', // ESTIMATE: Embraer 175 airport planning data, typical weight
 };
 
 /** Bombardier CRJ-900 (PSA "Blue Streak", GoJet "Lindbergh"). */
@@ -104,7 +107,7 @@ export const CRJ9: AircraftPerformance = {
   rotateSpeedKt: 138, climbSpeedKt: 180, cruiseSpeedKt: 250, approachSpeedKt: 135, touchdownSpeedKt: 128,
   climbRateFpm: 3000, descentRateFpm: 2000, turnRateDegPerSec: 3, groundTurnRateDegPerSec: 16,
   minSpeedKt: 115, maxSpeedKt: 320, serviceCeilingFt: 41000,
-  takeoffDistanceFt: 5500, landingDistanceFt: 4200, lengthM: 36.4, // ESTIMATE: CRJ900 airport planning data, typical weight
+  takeoffDistanceFt: 5500, landingDistanceFt: 4200, lengthM: 36.4, propulsion: 'turbofan', // ESTIMATE: CRJ900 airport planning data, typical weight
 };
 
 /** Boeing 757-200 (UPS, FedEx freighters). */
@@ -114,7 +117,7 @@ export const B752: AircraftPerformance = {
   rotateSpeedKt: 150, climbSpeedKt: 185, cruiseSpeedKt: 250, approachSpeedKt: 140, touchdownSpeedKt: 135,
   climbRateFpm: 2600, descentRateFpm: 2000, turnRateDegPerSec: 2.5, groundTurnRateDegPerSec: 12,
   minSpeedKt: 125, maxSpeedKt: 350, serviceCeilingFt: 42000,
-  takeoffDistanceFt: 6800, landingDistanceFt: 5000, lengthM: 47.3, // ESTIMATE: Boeing 757 airport planning document D6-58327, typical freighter weight
+  takeoffDistanceFt: 6800, landingDistanceFt: 5000, lengthM: 47.3, propulsion: 'turbofan', // ESTIMATE: Boeing 757 airport planning document D6-58327, typical freighter weight
 };
 
 /** Cessna 208 Caravan (Wiggins Airways feeder flights). Small single-engine turboprop: SRS I, RECAT I, parks on the GA ramp. */
@@ -124,7 +127,7 @@ export const C208: AircraftPerformance = {
   rotateSpeedKt: 75, climbSpeedKt: 95, cruiseSpeedKt: 175, approachSpeedKt: 85, touchdownSpeedKt: 70,
   climbRateFpm: 900, descentRateFpm: 1000, turnRateDegPerSec: 3, groundTurnRateDegPerSec: 25,
   minSpeedKt: 60, maxSpeedKt: 175, serviceCeilingFt: 25000,
-  takeoffDistanceFt: 2300, landingDistanceFt: 1900, lengthM: 11.5, // ESTIMATE: Textron 208B/208 specifications, POH Section 5, typical weight
+  takeoffDistanceFt: 2300, landingDistanceFt: 1900, lengthM: 11.5, propulsion: 'turbofan', // ESTIMATE: Textron 208B/208 specifications, POH Section 5, typical weight
 };
 
 import type { WakeCategory } from './wake';
@@ -177,3 +180,23 @@ export function getPerformance(type: string): AircraftPerformance {
 
 /** Airspeed limit below 10,000 ft MSL (14 CFR 91.117 style restriction) for jets. */
 export const SPEED_LIMIT_BELOW_10K_KT = 250;
+
+/** Standard pattern altitudes, FAA AIM 4-3-3 (fetched 2026-10-18): propeller-driven 1,000 ft AGL; large and turbine-powered not less than 1,500 ft AGL or 500 ft above the established pattern altitude. */
+export const AIM_PROPELLER_PATTERN_AGL_FT = 1000;
+export const AIM_TURBINE_PATTERN_AGL_FT = 1500;
+
+/** Large or turbine-powered (AIM 4-3-3): turboprops and turbofans, any aircraft of category large / heavy; unknown light types are propeller-driven. */
+export function isLargeOrTurbine(perf: AircraftPerformance): boolean {
+  return perf.propulsion ? perf.propulsion !== 'piston' : perf.category !== 'light';
+}
+
+/**
+ * Traffic pattern altitude (ft MSL) for an aircraft type at a field of `fieldElevFt`. `publishedTpaFt` is the published pattern altitude
+ * (Chart Supplement / NASR) when the dataset has one: propeller aircraft fly it, large / turbine aircraft fly 500 ft above it (AIM 4-3-3).
+ * Without one the AIM defaults apply (1,000 / 1,500 ft AGL). Neither KACY nor KMHT has a TPA in NASR, so the defaults apply there.
+ */
+export function patternAltitudeFt(perf: AircraftPerformance, fieldElevFt: number, publishedTpaFt?: number): number {
+  const turbine = isLargeOrTurbine(perf);
+  if (publishedTpaFt !== undefined) return turbine ? Math.max(publishedTpaFt + 500, fieldElevFt + AIM_TURBINE_PATTERN_AGL_FT) : publishedTpaFt;
+  return fieldElevFt + (turbine ? AIM_TURBINE_PATTERN_AGL_FT : AIM_PROPELLER_PATTERN_AGL_FT);
+}

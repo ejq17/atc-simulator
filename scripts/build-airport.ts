@@ -194,6 +194,9 @@ for (const src of facility.runways as J[]) {
       trueHeadingDeg: e.true_alignment_deg,
       magneticHeadingDeg: profile.chartedMagneticHeading(id, { procSrc, endSrc: e }),
       ...(e.displaced_threshold.present ? { displacedThresholdFt: e.displaced_threshold.length_ft } : {}),
+      ...(typeof e.threshold_crossing_height_ft === 'number' && typeof e.visual_glide_path_angle_deg === 'number'
+        ? { visualGlidepath: { angleDeg: e.visual_glide_path_angle_deg, tchFt: e.threshold_crossing_height_ft } }
+        : {}),
       tdzeFt: e.tdz_elev_ft,
       ils:
         ilsInfo && sys
@@ -992,6 +995,21 @@ const fixAltitudesOf = (pdfName: string): NonNullable<InstrumentProcedure['fixAl
     ...(f.mandatory_altitude_ft !== undefined ? { mandatoryAltitudeFt: f.mandatory_altitude_ft } : {}),
     note: `${f.note ?? ''}${f.note ? ' ' : ''}[${f.provenance as string}]`.trim(),
   }));
+const plateGeomSrc: J = readOptional(profile.plateGeometryFile) ?? { procedures: [] };
+const plateGeomByPdf = new Map<string, J>((plateGeomSrc.procedures as J[]).map((p: J) => [p.pdf_name as string, p]));
+const plateGeometryOf = (pdfName: string): Pick<InstrumentProcedure, 'glidepath' | 'missedApproach'> => {
+  const g = plateGeomByPdf.get(pdfName);
+  if (!g) return {};
+  const ma = g.missed_approach as J;
+  return {
+    glidepath: { kind: g.glidepath.kind, angleDeg: g.glidepath.angle_deg, tchFt: g.glidepath.tch_ft },
+    missedApproach: {
+      ...(typeof ma.initial_climb_altitude_ft === 'number' ? { initialClimbFt: ma.initial_climb_altitude_ft } : {}),
+      finalAltitudeFt: ma.final_altitude_ft,
+      plateText: ma.plate_text,
+    },
+  };
+};
 const procedures: InstrumentProcedure[] = [];
 for (const a of procSrc.instrument_approaches as J[]) {
   procedures.push({
@@ -1007,6 +1025,7 @@ for (const a of procSrc.instrument_approaches as J[]) {
     ...textField('minimaText', a.minima_summary),
     holdingPatterns: holdingPatternsOf(a.pdf_name),
     fixAltitudes: fixAltitudesOf(a.pdf_name),
+    ...plateGeometryOf(a.pdf_name),
     provenance: dtppProv(a.pdf.url, `${a.printed_amendment_on_plate as string}; HTTP ${a.pdf.http_status as number} ${a.pdf.content_type as string}; ${a.data_provenance as string}`),
   });
 }

@@ -34,6 +34,7 @@ export const kacyProfile: AirportProfile = {
   headingSourceNote: 'Charted magnetic headings from the ATLANTIC CITY THREE DP text (d-TPP 2610).',
   holdingPatternsFile: 'kacy-holding-patterns.json',
   fixAltitudesFile: 'kacy-fix-altitudes.json',
+  plateGeometryFile: 'kacy-plate-geometry.json',
   diagramLabels() {
     const f = loadDiagramLabels(path.join(SRC, 'raw/dtpp_2610_txt/00669AD_bbox.html'), path.join(HERE, '../data/kacy-diagram-labels.json'));
     return {

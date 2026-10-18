@@ -68,9 +68,12 @@ export function isOnCourse(dNm: number, crossNm: number): boolean {
  * so the lateral / approach logic can use `alongCross`, `centrelineHeading` etc. against a course that is not the runway heading.
  */
 export function courseGeom(g: RunwayEndGeom, courseTrue: number | undefined): RunwayEndGeom {
-  if (courseTrue === undefined || Math.abs(headingDiff(g.headingDeg, courseTrue)) < 1e-9) return g;
+  // A displaced threshold moves the origin of the approach frame to the LANDING threshold (distances on the plate, the glidepath and the
+  // decision point are measured to it); the pavement end stays the origin of everything else (takeoff, rollout, occupancy).
+  const base = g.displacedM > 0 ? { ...g, end: { ...g.end, threshold: g.landingThreshold } } : g;
+  if (courseTrue === undefined || Math.abs(headingDiff(g.headingDeg, courseTrue)) < 1e-9) return base;
   const dir = headingToVec(courseTrue);
-  return { ...g, dir, right: { x: dir.y, y: -dir.x }, headingDeg: courseTrue };
+  return { ...base, dir, right: { x: dir.y, y: -dir.x }, headingDeg: courseTrue };
 }
 
 /**

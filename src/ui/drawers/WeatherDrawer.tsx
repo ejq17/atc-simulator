@@ -6,6 +6,11 @@ import type { WeatherPresetId } from '../../weather/presets';
 import { windText, altimeterText } from '../lib/format';
 import { Btn, Field, LABEL, SELECT } from '../components/ui';
 import { Drawer } from './Drawer';
+import { runwayEndWinds } from '../../sim/wind';
+import type { WindComponents } from '../../sim/wind';
+
+const fmtHw = (c: WindComponents): string => (c.headwindKt >= 0 ? `H ${Math.round(c.headwindKt)}` : `T ${Math.round(c.tailwindKt)}`);
+const fmtXw = (c: WindComponents): string => (c.crosswindFrom === 'none' ? 'X 0' : `X ${Math.round(c.crosswindKt)} ${c.crosswindFrom === 'left' ? 'L' : 'R'}`);
 
 export function WeatherPanel() {
   const session = useSimStore((s) => s.session);
@@ -41,6 +46,14 @@ export function WeatherPanel() {
         <section className="flex flex-col gap-1">
           <span className={LABEL}>Current weather ({st.weather.source})</span>
           <div className="text-[13px] tabular-nums">Wind {windText(st.weather, st.airport.magneticVariationDeg)} · {altimeterText(st.weather.altimeterInHg)} · {st.weather.visibilitySm} SM · {st.weather.flightCategory}</div>
+          <table className="mt-1 w-full max-w-[22rem] text-[11px] tabular-nums" data-testid="runway-winds" aria-label="Wind components per runway end">
+            <thead><tr className="text-left text-atc-muted"><th className="font-normal">End</th><th className="font-normal">Head/tail (kt)</th><th className="font-normal">Crosswind (kt)</th><th className="font-normal">At gusts</th></tr></thead>
+            <tbody>
+              {runwayEndWinds(st.airport, st.weather).map((r) => (
+                <tr key={r.id} data-testid={`runway-wind-${r.id}`}><td>{r.id}</td><td>{fmtHw(r.steady)}</td><td>{fmtXw(r.steady)}</td><td>{st.weather.windGustKt ? `${fmtHw(r.gust)}, ${fmtXw(r.gust)}` : '-'}</td></tr>
+              ))}
+            </tbody>
+          </table>
           {st.weather.rawMetar && <code className="break-words text-[11px] text-atc-muted">{st.weather.rawMetar}</code>}
         </section>
         <section className="flex flex-col gap-2">

@@ -32,6 +32,7 @@ import { buildReadback, buildSayAgain, buildUnable } from '../radio/readback';
 import { spokenRunway } from '../radio/spoken';
 import { SPEED_LIMIT_BELOW_10K_KT, lineUpTimeSec } from './performance';
 import { findNavFix, indexOfFix } from './navigation';
+import { effectiveComponents, exceedsLimits } from './wind';
 import { startHold } from './holding';
 import { publishedHoldFor } from './missedApproach';
 import { assessApproach, ceilingFt } from './approach';
@@ -766,6 +767,8 @@ function planTakeoff(env: Env): PlanResult {
   const { ac, rt, ctx, now } = env;
   const g = env.g!;
   if (!ac.onGround) return unable(env, `${ac.callsign} is airborne.`, "we're airborne");
+  const windNo = windRefusal(env, g);
+  if (windNo) return windNo;
   // IFR departures need their clearance first: refused in training, otherwise accepted and flagged as a communication error.
   let flag: string | undefined;
   if (ac.flightPlan?.flightRules === 'IFR' && !ac.flightPlan.ifrClearance) {
@@ -821,9 +824,31 @@ function planTakeoff(env: Env): PlanResult {
   };
 }
 
+/**
+ * Wind limits of the type (`maxCrosswindKt` / `maxTailwindKt`, only where a source is cited): the pilot refuses a runway whose
+ * EFFECTIVE component, steady + 0.5 x (gust - steady) (DESIGN DECISION: the C172's 15 kt is demonstrated, not a limitation, so the full gust is not
+ * held against it), exceeds them and asks for the best other runway end within the limits (JO 7110.65 3-5-1: a pilot who prefers another
+ * runway advises ATC; the wording "unable, ..., request runway" is free text after PCG UNABLE, there is no prescribed phrase).
+ */
+function windRefusal(env: Env, g: RunwayEndGeom): { reject: Reject } | undefined {
+  const perf = perfOf(env.ac);
+  const w = env.ctx.state.weather;
+  const why = exceedsLimits(effectiveComponents(w, g.headingDeg), perf);
+  if (!why) return undefined;
+  const alts = env.airport.runways
+    .flatMap((r) => r.ends.map((e) => e.id))
+    .filter((id) => id !== g.end.id)
+    .map((id) => ({ id, c: effectiveComponents(w, findRunwayEnd(env.airport, id)!.headingDeg) }))
+    .filter((a) => !exceedsLimits(a.c, perf))
+    .sort((a, b) => b.c.headwindKt - a.c.headwindKt);
+  const ask = alts.length ? `request runway ${spokenRunway(alts[0].id)}` : 'request a different runway';
+  return unable(env, `runway ${g.end.id}: ${why} kt (limit of the ${env.ac.type}; effective component between the steady and the gust speed, ${w.windGustKt ?? w.windSpeedKt} kt gust); ${alts.length ? `runway ${alts[0].id} is within limits` : 'no runway is within limits'}.`, `runway ${spokenRunway(g.end.id)}, ${why.startsWith('crosswind') ? 'crosswind' : 'tailwind'} is above our limit, ${ask}`, false);
+}
+
 function runwayLengthCheck(env: Env, g: RunwayEndGeom, entry: TaxiNode): { reject: Reject } | undefined {
   const perf = perfOf(env.ac);
-  const avail = g.lengthM - Math.max(0, alongCross(g, entry.pos).along);
+  // TORA (NASR declared distance, the full pavement at KACY / KMHT) measured from the pavement end, minus where the aircraft enters
+  const avail = g.toraM - Math.max(0, alongCross(g, entry.pos).along);
   if (avail < ftToM(perf.takeoffDistanceFt)) {
     return unable(
       env,
@@ -940,6 +965,12 @@ function planLand(env: Env): PlanResult {
   // moment later ("unstable approach") would be a false clearance.
   const unstable = goAroundNotStabilised(env, g);
   if (unstable) return unable(env, `${ac.callsign} is on a missed approach and is not established for runway ${g.end.id}: ${unstable}.`, "unable, we're going around");
+  const windNo = windRefusal(env, g);
+  if (windNo) return windNo;
+  const ldaFt = g.ldaM / 0.3048;
+  if (perfOf(ac).landingDistanceFt > ldaFt) {
+    return unable(env, `${ac.type} needs about ${perfOf(ac).landingDistanceFt} ft to land; runway ${g.end.id} has ${Math.round(ldaFt)} ft landing distance available (declared LDA).`, `runway ${spokenRunway(g.end.id)} is too short to land`);
+  }
   const lahso = planLahso(env, g);
   if ('reject' in lahso) return lahso;
   return {

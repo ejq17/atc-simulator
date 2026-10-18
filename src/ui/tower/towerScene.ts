@@ -144,6 +144,7 @@ export function createTowerScene(canvas: HTMLCanvasElement, airport: Airport, si
   addFlat(markingsMesh(mk.flatMap((m) => m.threshold), 0.07), 0xf2f2f2, 6, 0x101010);
   addFlat(markingsMesh(mk.flatMap((m) => m.aiming), 0.07), 0xf2f2f2, 6, 0x101010);
   addFlat(markingsMesh(mk.flatMap((m) => m.edge), 0.07), 0xf2f2f2, 6, 0x101010);
+  addFlat(markingsMesh(mk.flatMap((m) => m.displaced), 0.07), 0xf2f2f2, 6, 0x101010);
 
   // Hold lines: from each holding_position node toward the runway entry node it serves.
   const holdRects = Object.values(g.nodes).flatMap((n) => {

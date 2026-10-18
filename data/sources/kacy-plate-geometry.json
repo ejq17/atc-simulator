@@ -1,0 +1,209 @@
+{
+ "_provenance": {
+  "source": "FAA d-TPP cycle 2610 instrument approach plates for KACY (the PDFs listed in kacy-procedures.json)",
+  "retrieved": "2026-10-18",
+  "method": "Glidepath angle / TCH and the missed approach climb altitudes were read from each plate: PDF text layer extracted with pdfjs-dist and the MISSED APPROACH box and TCH labels located by page position; the two USAF plates without a text layer (HI-ILS Y 13, HI-VOR or TACAN 31) were rendered to images and read visually. Every altitude and TCH below equals the figure already transcribed in kacy-procedures.json (plate_notes / missed_approach), except for plates that file lists as not transcribed (KMHT RNP Z 17, RNP Z 35, CAT II-III, SA CAT I), which are new and were read from the plate text layer. HUMAN TRANSCRIPTION - verify against the PDFs before any real use.",
+  "terms": "TCH = threshold crossing height above the runway threshold of the plate's glidepath (GS = ILS glideslope, GP = RNAV glidepath, VDA = visual descent angle of a non-precision approach). It is NOT the VGSI TCH printed in the '(VGSI Angle x/TCH y)' note, which belongs to the visual glide slope indicator (NASR threshold_crossing_height_ft in the facility file)."
+ },
+ "procedures": [
+  {
+   "chart_name": "HI-ILS Y OR LOC Y RWY 13",
+   "pdf_name": "00669HIYLY13.PDF",
+   "glidepath": {
+    "kind": "GS",
+    "angle_deg": 3.0,
+    "tch_ft": 58
+   },
+   "missed_approach": {
+    "initial_climb_altitude_ft": 600,
+    "final_altitude_ft": 2000,
+    "plate_text": "MISSED APPROACH: Climb to 600 then climbing left turn to 2000 on ACY R-090 to SMITS/ACY 11 DME and hold."
+   },
+   "read_by": "rendered page image of the d-TPP 2610 PDF (the PDF has no text layer), read visually"
+  },
+  {
+   "chart_name": "ILS OR LOC/DME RWY 31",
+   "pdf_name": "00669ILD31.PDF",
+   "glidepath": {
+    "kind": "GS",
+    "angle_deg": 3.0,
+    "tch_ft": 52
+   },
+   "missed_approach": {
+    "initial_climb_altitude_ft": 500,
+    "final_altitude_ft": 2000,
+    "plate_text": "MISSED APPROACH: Climb to 500 then climbing right turn to 2000 via heading 130 deg and via ACY R-090 to SMITS INT/ACY 11 DME and hold."
+   },
+   "read_by": "pdf text layer (pdfjs-dist) of the d-TPP 2610 PDF"
+  },
+  {
+   "chart_name": "ILS Z OR LOC Z RWY 13",
+   "pdf_name": "00669IZLZ13.PDF",
+   "glidepath": {
+    "kind": "GS",
+    "angle_deg": 3.0,
+    "tch_ft": 58
+   },
+   "missed_approach": {
+    "initial_climb_altitude_ft": 600,
+    "final_altitude_ft": 2000,
+    "plate_text": "MISSED APPROACH: Climb to 600 then climbing left turn to 2000 on ACY VORTAC R-090 to SMITS INT/ACY 11 DME and hold."
+   },
+   "read_by": "pdf text layer (pdfjs-dist) of the d-TPP 2610 PDF"
+  },
+  {
+   "chart_name": "RNAV (RNP) Z RWY 13",
+   "pdf_name": "00669RRZ13.PDF",
+   "glidepath": {
+    "kind": "GP",
+    "angle_deg": 3.0,
+    "tch_ft": 58
+   },
+   "missed_approach": {
+    "initial_climb_altitude_ft": null,
+    "final_altitude_ft": 2000,
+    "plate_text": "MISSED APPROACH: Climb to 2000 on track 128 deg to JURAD and on track 076 deg to RODDI and hold."
+   },
+   "read_by": "pdf text layer (pdfjs-dist) of the d-TPP 2610 PDF"
+  },
+  {
+   "chart_name": "RNAV (RNP) Z RWY 31",
+   "pdf_name": "00669RRZ31.PDF",
+   "glidepath": {
+    "kind": "GP",
+    "angle_deg": 3.0,
+    "tch_ft": 52
+   },
+   "missed_approach": {
+    "initial_climb_altitude_ft": null,
+    "final_altitude_ft": 2000,
+    "plate_text": "MISSED APPROACH: Climb to 2000 direct WEREK and on track 259 deg to KOVEC and hold."
+   },
+   "read_by": "pdf text layer (pdfjs-dist) of the d-TPP 2610 PDF"
+  },
+  {
+   "chart_name": "RNAV (GPS) RWY 04",
+   "pdf_name": "00669R4.PDF",
+   "glidepath": {
+    "kind": "GP",
+    "angle_deg": 3.0,
+    "tch_ft": 47
+   },
+   "missed_approach": {
+    "initial_climb_altitude_ft": 600,
+    "final_altitude_ft": 2000,
+    "plate_text": "MISSED APPROACH: Climb to 600 then climbing right turn to 2000 direct SMITS and hold."
+   },
+   "read_by": "pdf text layer (pdfjs-dist) of the d-TPP 2610 PDF"
+  },
+  {
+   "chart_name": "RNAV (GPS) RWY 22",
+   "pdf_name": "00669R22.PDF",
+   "glidepath": {
+    "kind": "GP",
+    "angle_deg": 3.0,
+    "tch_ft": 51
+   },
+   "missed_approach": {
+    "initial_climb_altitude_ft": 600,
+    "final_altitude_ft": 2000,
+    "plate_text": "MISSED APPROACH: Climb to 600 then climbing right turn to 2000 direct TUBER and hold."
+   },
+   "read_by": "pdf text layer (pdfjs-dist) of the d-TPP 2610 PDF"
+  },
+  {
+   "chart_name": "RNAV (GPS) Y RWY 13",
+   "pdf_name": "00669RY13.PDF",
+   "glidepath": {
+    "kind": "GP",
+    "angle_deg": 3.0,
+    "tch_ft": 58
+   },
+   "missed_approach": {
+    "initial_climb_altitude_ft": null,
+    "final_altitude_ft": 2000,
+    "plate_text": "MISSED APPROACH: Climb to 2000 direct JURAD and on track 076 deg to RODDI and hold."
+   },
+   "read_by": "pdf text layer (pdfjs-dist) of the d-TPP 2610 PDF"
+  },
+  {
+   "chart_name": "RNAV (GPS) Y RWY 31",
+   "pdf_name": "00669RY31.PDF",
+   "glidepath": {
+    "kind": "GP",
+    "angle_deg": 3.0,
+    "tch_ft": 52
+   },
+   "missed_approach": {
+    "initial_climb_altitude_ft": null,
+    "final_altitude_ft": 2000,
+    "plate_text": "MISSED APPROACH: Climb to 2000 direct WEREK and on track 259 deg to KOVEC and hold."
+   },
+   "read_by": "pdf text layer (pdfjs-dist) of the d-TPP 2610 PDF"
+  },
+  {
+   "chart_name": "VOR RWY 04",
+   "pdf_name": "00669V4.PDF",
+   "glidepath": {
+    "kind": "VDA",
+    "angle_deg": 3.05,
+    "tch_ft": 47
+   },
+   "missed_approach": {
+    "initial_climb_altitude_ft": null,
+    "final_altitude_ft": 2000,
+    "plate_text": "MISSED APPROACH: Climbing right turn to 2000 on ACY VORTAC R-090 to SMITS INT/11 DME and hold."
+   },
+   "read_by": "pdf text layer (pdfjs-dist) of the d-TPP 2610 PDF",
+   "note": "Non-precision: the plate prints a visual descent angle (VDA) and its TCH, not a glidepath."
+  },
+  {
+   "chart_name": "VOR RWY 31",
+   "pdf_name": "00669V31.PDF",
+   "glidepath": {
+    "kind": "VDA",
+    "angle_deg": 3.12,
+    "tch_ft": 52
+   },
+   "missed_approach": {
+    "initial_climb_altitude_ft": null,
+    "final_altitude_ft": 2000,
+    "plate_text": "MISSED APPROACH: Climbing right turn to 2000 via heading 120 deg and ACY R-090 to SMITS INT/ACY 11 DME and hold."
+   },
+   "read_by": "pdf text layer (pdfjs-dist) of the d-TPP 2610 PDF",
+   "note": "Non-precision: VDA and TCH printed on the profile."
+  },
+  {
+   "chart_name": "HI-VOR OR TACAN RWY 31",
+   "pdf_name": "00669HVT31.PDF",
+   "glidepath": {
+    "kind": "VDA",
+    "angle_deg": 3.12,
+    "tch_ft": 52
+   },
+   "missed_approach": {
+    "initial_climb_altitude_ft": null,
+    "final_altitude_ft": 2000,
+    "plate_text": "MISSED APPROACH: Climbing right turn to 2000 on heading 120 deg and on ACY R-090 to SMITS/ACY 11 DME and hold."
+   },
+   "read_by": "rendered page image of the d-TPP 2610 PDF (the PDF has no text layer), read visually",
+   "note": "Non-precision: VDA 3.12 / TCH 52 printed on the profile."
+  },
+  {
+   "chart_name": "COPTER ILS OR LOC/DME RWY 13",
+   "pdf_name": "00669COPTERILD13.PDF",
+   "glidepath": {
+    "kind": "GS",
+    "angle_deg": 3.0,
+    "tch_ft": 58
+   },
+   "missed_approach": {
+    "initial_climb_altitude_ft": 600,
+    "final_altitude_ft": 2000,
+    "plate_text": "MISSED APPROACH: Climb to 600 then climbing left turn to 2000 on ACY VORTAC R-090 to SMITS INT/ACY 11 DME and hold."
+   },
+   "read_by": "pdf text layer (pdfjs-dist) of the d-TPP 2610 PDF",
+   "note": "The plate prints HCH 58 (helicopter crossing height), not TCH; helicopters are not simulated, recorded for completeness."
+  }
+ ]
+}

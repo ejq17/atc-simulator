@@ -4,6 +4,13 @@ Honest status as of 2026-10-16. "Done" means it runs and is covered by tests.
 
 ## Done
 
+**Wind physics round (2026-10-18)** — `src/sim/wind.ts`, `docs/BEHAVIOUR-ACCURACY.md` section 10, `docs/REALISM-VERIFICATION.md` section 8
+- Seeded per-aircraft gust model (design values, no source): unsteady finals (A320 cross-track scatter 4-19 m, airspeed sigma 0.4-1.2 kt at 14G26), takeoff-roll airspeed excursions, flare float scatter (C172 955-1,394 ft touchdown spread). New preset "Gusty crosswind".
+- Crosswind / tailwind components per runway end in Weather and Runways; C172 15 kt (172S POH demonstrated, judged on steady + half the gust spread; go-around only 5 kt over) refused with "Unable, runway four, crosswind is above our limit, request runway three one" and a go-around with the reason when the gusted wind goes over the limit on final. The other types have no limit because no source was found.
+- Pattern altitude by type (AIM 4-3-3: 1,000 ft propeller, 1,500 ft large / turbine). The datasets carry no TPA.
+- Per-procedure glidepath angle and TCH and missed approach climb altitude transcribed from the d-TPP 2610 plates (24 procedures, `data/sources/*-plate-geometry.json`) and flown by the engine; the KMHT "VOR/DME" missed-approach texts are now interpreted.
+- KMHT displaced thresholds (442 / 336 / 850 ft) modelled: landing aims for the displaced threshold, takeoff uses the full pavement, LDA / TORA from NASR declared distances, Surface and Tower draw the arrows and bars.
+
 **Data (verified, with provenance)** — `data/sources/`, `src/airport/`
 - FAA NASR 2026-10-01 extracts for ACY: ARP, elevation 74.8 ft, variation 10°W, runways 13/31 (10,001×150) and 4/22 (6,145×150) with thresholds, true/magnetic headings, TDZE, lighting, ILS 13 (I-PVO 109.1) and 31 (I-ACY 109.1), no ILS on 4/22; frequencies; ACY VORTAC 117.15 (OPERATIONAL RESTRICTED); VCN/SIE/CYN; 36 fixes; tower 24 h; Class C; LAHSO; HS 1.
 - FAA d-TPP cycle 2610: airport diagram, 13 IAPs, ATLANTIC CITY THREE DP, hot-spot/LAHSO/minimums pages; every PDF URL verified HTTP 200.

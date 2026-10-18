@@ -48,7 +48,8 @@ export interface MissedApproachPlan {
 }
 
 function parseLeg(raw: string): MissedLeg | undefined {
-  let c = raw.trim().replace(/(?: INT)?\/.*$/, '').replace(/^(?:VIA|ON) /, '').trim();
+  // "CON VOR/DME R-154 to KHRIS/CON 21.3 DME": the navaid type word (VOR/DME) is not a distance-fix suffix; only "FIX INT/ACY 11 DME" style tails are cut
+  let c = raw.trim().replace(/\bVOR\/DME\b/g, 'VOR').replace(/(?: INT)?\/.*$/, '').replace(/^(?:VIA|ON) /, '').trim();
   let m = /^HEADING (\d{1,3}) DEG$/.exec(c);
   if (m) return { kind: 'heading', headingMag: Number(m[1]) };
   m = /^TRACK (\d{1,3}) DEG TO ([A-Z0-9]{3,5})$/.exec(c);
@@ -108,6 +109,15 @@ function missedProcedure(airport: Airport, approach: ApproachRuntime | undefined
   const end = g ? normalizeRunwayEndId(g.end.id) : undefined;
   const iaps = airport.procedures.filter((p) => p.type === 'IAP' && !!p.runwayEnd && normalizeRunwayEndId(p.runwayEnd) === end && !/\bCOPTER\b/i.test(p.name));
   return iaps.find((p) => parseMissedApproach(p.missedApproachText)) ?? iaps[0];
+}
+
+/**
+ * The published missed approach climb altitude (ft) of the cleared / applicable procedure: the structured plate transcription
+ * (`InstrumentProcedure.missedApproach`), else the altitude parsed from `missedApproachText`; undefined when the dataset has neither.
+ */
+export function publishedMissedAltitudeFt(airport: Airport, approach: ApproachRuntime | undefined, g: RunwayEndGeom | undefined): number | undefined {
+  const proc = missedProcedure(airport, approach, g);
+  return proc?.missedApproach?.finalAltitudeFt ?? parseMissedApproach(proc?.missedApproachText)?.finalAltitudeFt;
 }
 
 /** Magnetic inbound course of a fix that some procedure defines on a radial ("SMITS on ACY R-090" -> 270). */

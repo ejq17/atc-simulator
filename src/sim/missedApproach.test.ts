@@ -45,6 +45,17 @@ describe('missed approach interpreter', () => {
     expect(parseMissedApproach('Climbing right turn to 2000 on heading 120 deg and on ACY R-090 to SMITS/ACY 11 DME and hold.')?.legs).toHaveLength(2);
   });
 
+  it('interprets every transcribed KMHT missed approach text, including the "CON VOR/DME R-154 to KHRIS/CON 21.3 DME" form', async () => {
+    const kmhtPlates = (await import('../../data/sources/kmht-procedures.json')).default as unknown as { instrument_approaches: { missed_approach: string; chart_name: string }[] };
+    const texts = kmhtPlates.instrument_approaches.filter((p) => p.missed_approach && p.missed_approach !== '-');
+    expect(texts.length).toBe(7);
+    for (const p of texts) expect(parseMissedApproach(p.missed_approach), `${p.chart_name}: ${p.missed_approach}`).toBeDefined();
+    expect(parseMissedApproach('Climb to 700 then climbing right turn to 3000 on heading 087 deg and on CON VOR/DME R-154 to KHRIS/CON 21.3 DME and hold.')).toMatchObject({
+      initialAltitudeFt: 700, turn: 'right', finalAltitudeFt: 3000, holdFix: 'KHRIS',
+      legs: [{ kind: 'heading', headingMag: 87 }, { kind: 'radial', navaid: 'CON', radialMag: 154, toFix: 'KHRIS' }],
+    });
+  });
+
   it('is case/whitespace tolerant and rejects anything it does not understand', () => {
     expect(parseMissedApproach('  climb to 2000   direct smits and hold  ')?.holdFix).toBe('SMITS');
     for (const bad of [undefined, '', 'Climb to 2000 and hold.', 'Turn left and climb.', 'Climb to 2000 direct SMITS.', 'Climb to 600 then climbing left turn to 500 direct SMITS and hold.',

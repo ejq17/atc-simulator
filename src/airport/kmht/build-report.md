@@ -282,7 +282,7 @@ The airline gates are real mapped data: each OSM `gate` node (refs 1, 2, 3, 4, 5
 - Runway-to-taxiway connection nodes: OSM ways end on the runway centreline (within 1.5 m of it), which this build snaps exactly onto the centreline; real fillets/entrances are wider.
 - Vertices within 3 m of another way were merged / snapped; edges shorter than 1.5 m were contracted.
 - Taxiway names inferred for untagged ways by continuity (table above); no diagram label georeferencing for this airport.
-- Displaced thresholds (runway ends 6, 17 and 35 per NASR) are recorded in `displacedThresholdFt` but not modelled: the runway end node is the pavement end (NASR RWY_END_LAT/LONG) for takeoff, taxi and rollout, and landings aim from the same point.
+- Displaced thresholds (runway ends 6, 17 and 35 per NASR, 442 / 336 / 850 ft) are modelled by the simulator: `RunwayEnd.threshold` stays the pavement end (takeoff, taxi, rollout, occupancy, TORA), `displacedThresholdFt` moves the landing threshold (glidepath, decision point, LDA) along the runway.
 - No MVA sectors, holding patterns or fix altitudes are included for this airport (not transcribed; never invented).
 
 ## Comparison with the FAA airport diagram (00246AD.PDF, cycle 2610)

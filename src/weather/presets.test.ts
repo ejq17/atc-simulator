@@ -4,9 +4,9 @@ import { computeFlightCategory } from './metar';
 import { recommendRunways } from './runwaySelection';
 
 describe('weather presets (goal.md section 11 examples)', () => {
-  it('provides exactly the seven goal.md examples', () => {
+  it('provides the seven goal.md examples plus the gusty crosswind preset', () => {
     expect([...WEATHER_PRESET_IDS].sort()).toEqual(
-      ['clear', 'imc', 'light-crosswinds', 'low-visibility', 'rain', 'strong-winds', 'thunderstorms'].sort(),
+      ['clear', 'gusty-crosswind', 'imc', 'light-crosswinds', 'low-visibility', 'rain', 'strong-winds', 'thunderstorms'].sort(),
     );
   });
 

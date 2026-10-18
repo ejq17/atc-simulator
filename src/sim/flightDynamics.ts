@@ -5,27 +5,29 @@
  * Units: positions in metres, speeds converted to m/s for integration, altitudes in feet.
  * `ac.target.headingDeg` is a TRUE heading (the executor converts controller magnetic headings).
  */
-import type { Aircraft, AircraftPerformance, FlightPhase, Vec2, Weather } from './types';
+import type { Aircraft, AircraftPerformance, FlightPhase, Vec2 } from './types';
 import {
   clamp, deg2rad, dist, headingDiff, headingToVec, ktToMps, mpsToKt, mToFt, mToNm, nmToM, normHeading, pointInPolygon, rad2deg,
   vAdd, vDot, vScale, vSub, vecToHeading, bearingDeg,
 } from './geo';
+import { patternAltitudeFt } from './performance';
 import { activeClearance, completeClearances, emitEvent, getRuntime, perfOf, pilotSay, setPhase } from './context';
 import type { AircraftRuntime, SimContext } from './context';
 import { alongCross, crossingRunways, findRunwayEnd } from './runways';
 import type { RunwayEndGeom } from './runways';
 import { neighborIds, shortestDistances } from './pathfinding';
 import { goingAroundCall } from '../radio/readback';
+import { componentsOfVector, exceedsLimits, newGustState, stepGust, windVector } from './wind';
 import { advanceNav, fixPosition, turnLeadM } from './navigation';
 import { landedDistanceExceptionApplies, precedingArrivalBlockers } from './conflicts';
 import { holdGuidance } from './holding';
-import { missedGuidance, startPublishedMissed } from './missedApproach';
+import { missedGuidance, publishedMissedAltitudeFt, startPublishedMissed } from './missedApproach';
 import { resolveMinima, runwayInSight } from './minima';
 import { APPROACH_FINAL_NM, courseGeom, isOnCourse } from './approach';
 
+/** Fallback glidepath (a 3 degree path crossing the threshold at 50 ft) when neither the plate nor the runway end data has one. */
 export const GLIDEPATH_DEG = 3;
 export const TCH_FT = 50;
-const TAN_GP = Math.tan(deg2rad(GLIDEPATH_DEG));
 export const DECISION_POINT_M = nmToM(0.5);
 /** Inside this distance a cleared arrival that is still high goes around if the runway is occupied. */
 const LAST_CHANCE_M = nmToM(0.25);
@@ -37,12 +39,50 @@ const NAV_PHASES: readonly FlightPhase[] = ['INBOUND', 'APPROACH', 'INITIAL_CLIM
 /** IFR missed approach / go-around level-off: 2000 ft, but never lower than 1500 ft above the field. */
 export const IFR_MISSED_APPROACH_FT = 2000;
 
-/** Air mass motion vector (m/s) the wind imparts; VRB is treated as calm. */
-export function windVector(w: Weather): Vec2 {
-  if (w.windDirDeg === 'VRB' || w.windSpeedKt <= 0) return { x: 0, y: 0 };
-  const toward = headingToVec(w.windDirDeg + 180);
-  return vScale(toward, ktToMps(w.windSpeedKt));
+export { windVector };
+
+export interface GlidePath {
+  angleDeg: number;
+  tchFt: number;
+  /** plate = published glidepath / VDA of the cleared procedure; vgsi = the runway end's visual glide slope (NASR); default = the fallback 3 degrees / 50 ft. */
+  source: 'plate' | 'vgsi' | 'default';
 }
+const DEFAULT_GLIDEPATH: GlidePath = { angleDeg: GLIDEPATH_DEG, tchFt: TCH_FT, source: 'default' };
+
+/**
+ * The glidepath an arrival flies to runway end `g`: the cleared instrument procedure's published glidepath (angle and TCH from the plate)
+ * when the dataset has it; a visual approach / no approach: the runway end's VGSI angle and TCH (NASR); else the labelled fallback.
+ */
+export function glidePathFor(airport: SimContext['state']['airport'], rt: AircraftRuntime | undefined, g: RunwayEndGeom, perf?: AircraftPerformance): GlidePath {
+  const ap = rt?.approach;
+  if (ap && ap.type !== 'VISUAL') {
+    const proc = ap.procedureId ? airport.procedures.find((p) => p.id === ap.procedureId) : undefined;
+    if (proc?.glidepath) return { angleDeg: proc.glidepath.angleDeg, tchFt: proc.glidepath.tchFt, source: 'plate' };
+    return DEFAULT_GLIDEPATH;
+  }
+  const v = g.end.visualGlidepath;
+  // DESIGN SIMPLIFICATION: light aircraft keep the fallback 50 ft path on a visual approach. The VGSI TCH (67-71 ft at KACY / KMHT) is set for
+  // the most demanding aircraft using the runway; light aircraft fly lower and flare earlier (and a 71 ft path would put a C172 ~1,700 ft down).
+  if (perf?.category === 'light') return DEFAULT_GLIDEPATH;
+  return v ? { angleDeg: v.angleDeg, tchFt: v.tchFt, source: 'vgsi' } : DEFAULT_GLIDEPATH;
+}
+
+/** Effective (gusted) wind of this aircraft for this tick; adds the headwind change to the airspeed (ground speed is continuous through a gust). */
+function sampleWind(ctx: SimContext, ac: Aircraft, rt: AircraftRuntime, dirOfTravel: Vec2, dt: number): { wind: Vec2; airspeedDeltaKt: number } {
+  const w = ctx.state.weather;
+  rt.gust ??= newGustState(ctx.state.seed, ac.id, w);
+  const wind = stepGust(rt.gust, w, dt);
+  const dv = vSub(rt.gust.dev, rt.gust.prevDev);
+  // a headwind increase raises the airspeed by the same amount
+  return { wind, airspeedDeltaKt: -mpsToKt(vDot(dv, dirOfTravel)) };
+}
+
+/** Lift (ft/min) per knot of gust-added airspeed in the flare: balloon with extra airspeed, sink with less. Design value. */
+const GUST_LIFT_FPM_PER_KT = 25;
+/** The effective crosswind / tailwind must stay over the type's limit this long on final before the pilot goes around. Design value. */
+const WIND_LIMIT_GOAROUND_SEC = 2;
+/** ... and over the demonstrated value by at least this much (kt). Design value. */
+const WIND_GOAROUND_MARGIN_KT = 5;
 
 /** Distance (nm) before the threshold at which the final approach starts. */
 export function finalStartNm(perf: AircraftPerformance): number {
@@ -50,8 +90,8 @@ export function finalStartNm(perf: AircraftPerformance): number {
 }
 
 /** Glidepath altitude (ft MSL) at `dM` metres before the threshold. */
-export function glideAltitudeFt(elevFt: number, dM: number): number {
-  return elevFt + TCH_FT + mToFt(dM) * TAN_GP;
+export function glideAltitudeFt(elevFt: number, dM: number, gp: Pick<GlidePath, 'angleDeg' | 'tchFt'> = DEFAULT_GLIDEPATH): number {
+  return elevFt + gp.tchFt + mToFt(dM) * Math.tan(deg2rad(gp.angleDeg));
 }
 
 function departureAltitudeFt(ac: Aircraft, elevFt: number): number {
@@ -59,11 +99,13 @@ function departureAltitudeFt(ac: Aircraft, elevFt: number): number {
   return Math.round((elevFt + (perf.category === 'light' ? 2000 : 3000)) / 100) * 100;
 }
 
-function goAroundAltitudeFt(ac: Aircraft, elevFt: number): number {
+function goAroundAltitudeFt(ctx: SimContext, ac: Aircraft, elevFt: number, g: RunwayEndGeom | undefined, approach: AircraftRuntime['approach']): number {
   const perf = perfOf(ac);
   if (ac.flightPlan?.flightRules === 'IFR') {
-    // Missed approach: climb to 2000 ft (published missed approach altitudes are not in the dataset); never descend to it.
-    const floor = Math.max(IFR_MISSED_APPROACH_FT, Math.ceil((elevFt + 1500) / 100) * 100);
+    // Missed approach: the published climb altitude of the procedure (transcribed from the plate); only a procedure without one falls back
+    // to the labelled 2,000 ft default. Never descend to it.
+    const published = publishedMissedAltitudeFt(ctx.state.airport, approach, g);
+    const floor = published ?? Math.max(IFR_MISSED_APPROACH_FT, Math.ceil((elevFt + 1500) / 100) * 100);
     return Math.max(floor, Math.floor(ac.altitudeFt / 100) * 100);
   }
   return Math.round((elevFt + (perf.category === 'light' ? 1500 : 3000)) / 100) * 100;
@@ -89,9 +131,9 @@ function stepTakeoffRoll(ctx: SimContext, ac: Aircraft, dt: number): void {
   const rt = getRuntime(ctx, ac);
   const g = findRunwayEnd(ctx.state.airport, ac.assignedRunwayEnd);
   if (!g) return;
-  const wind = windVector(ctx.state.weather);
+  const { wind, airspeedDeltaKt } = sampleWind(ctx, ac, rt, g.dir, dt);
   const headwindKt = -mpsToKt(vDot(wind, g.dir));
-  ac.airspeedKt += perf.accelKtPerSec * dt;
+  ac.airspeedKt += perf.accelKtPerSec * dt + airspeedDeltaKt;
   const gsKt = Math.max(0, ac.airspeedKt - headwindKt);
   ac.groundSpeedKt = gsKt;
   ac.pos = vAdd(ac.pos, vScale(g.dir, ktToMps(gsKt) * dt));
@@ -246,9 +288,10 @@ export function predictRolloutPlan(state: SimContext['state'], type: string, g: 
 }
 
 function touchdown(ctx: SimContext, ac: Aircraft, rt: AircraftRuntime, g: RunwayEndGeom): void {
-  const wind = windVector(ctx.state.weather);
+  const wind = rt.gust?.wind ?? windVector(ctx.state.weather);
   const headwindKt = -mpsToKt(vDot(wind, g.dir));
   ac.onGround = true;
+  rt.gustAirKt = 0;
   ac.altitudeFt = g.elevationFt;
   ac.verticalSpeedFpm = 0;
   ac.groundSpeedKt = Math.max(20, ac.airspeedKt - headwindKt);
@@ -263,10 +306,12 @@ function touchdown(ctx: SimContext, ac: Aircraft, rt: AircraftRuntime, g: Runway
   setPhase(ctx, ac, 'ROLLOUT', 'touchdown');
   const { along } = alongCross(g, ac.pos);
   rt.rollout = chooseExit(ctx, ac, g, along, ktToMps(ac.groundSpeedKt), rt.lahso?.stopAlongM);
+  // distance from the LANDING threshold (the displaced one where there is one)
+  const fromThr = along - g.displacedM;
   emitEvent(ctx, {
     kind: 'INFO', aircraftId: ac.id, callsign: ac.callsign, severity: 'info', speaker: 'SYSTEM',
-    text: `${ac.callsign} touched down runway ${g.end.id} ${Math.round(along)} m from threshold`,
-    data: { runwayEnd: g.end.id, alongM: along },
+    text: `${ac.callsign} touched down runway ${g.end.id} ${Math.round(fromThr)} m from threshold`,
+    data: { runwayEnd: g.end.id, alongM: fromThr, alongPavementEndM: along, displacedM: g.displacedM, groundSpeedKt: ac.groundSpeedKt },
   });
 }
 
@@ -355,7 +400,7 @@ export function initiateGoAround(ctx: SimContext, ac: Aircraft, o: { reason: str
   rt.hold = undefined;
   ac.nav = undefined;
   completeClearances(ctx, ac, ['APPROACH']);
-  ac.target = { headingDeg: g ? g.headingDeg : ac.headingDeg, altitudeFt: goAroundAltitudeFt(ac, elev), speedKt: undefined };
+  ac.target = { headingDeg: g ? g.headingDeg : ac.headingDeg, altitudeFt: goAroundAltitudeFt(ctx, ac, elev, g, approachBefore), speedKt: undefined };
   const published = startPublishedMissed(ctx, ac, rt, g, approachBefore);
   rt.missedFlown = true;
   ac.pendingRequest = undefined;
@@ -490,6 +535,8 @@ function approachGuidance(ctx: SimContext, ac: Aircraft, rt: AircraftRuntime, g:
   const startM = finalStartM(rt, perf);
   const distThr = dist(ac.pos, g.end.threshold);
   const base = ac.target.speedKt ?? defaultSpeedKt(ac, perf, aglFt);
+  const gp = glidePathFor(ctx.state.airport, rt, g, perf);
+  const tanGp = Math.tan(deg2rad(gp.angleDeg));
 
   if (ac.phase === 'INBOUND' && distThr < nmToM(APPROACH_RANGE_NM)) setPhase(ctx, ac, 'APPROACH');
   maybeEstablishFinal(ctx, ac, rt, g, perf);
@@ -535,16 +582,29 @@ function approachGuidance(ctx: SimContext, ac: Aircraft, rt: AircraftRuntime, g:
         return { desiredHeading: g.headingDeg, altTargetFt: ac.target.altitudeFt, speedKt: perf.climbSpeedKt };
       }
     }
+    // Wind limits of the type (cited figures only). DESIGN DECISION: a demonstrated value is not a limitation, so the go-around needs the
+    // instantaneous gusted component to exceed it by WIND_GOAROUND_MARGIN_KT for WIND_LIMIT_GOAROUND_SEC.
+    if (rt.gust && d > 0 && d < nmToM(1) && aglFt > 50) {
+      const rg = findRunwayEnd(ctx.state.airport, ac.assignedRunwayEnd);
+      const why = rg ? exceedsLimits(componentsOfVector(rt.gust.wind, rg.headingDeg), perf, WIND_GOAROUND_MARGIN_KT) : undefined;
+      rt.windExceedSec = why ? (rt.windExceedSec ?? 0) + ctx.state.clock.dtSec : 0;
+      if (why && rt.windExceedSec >= WIND_LIMIT_GOAROUND_SEC) {
+        initiateGoAround(ctx, ac, { reason: why.startsWith('crosswind') ? 'crosswind exceeds our limit' : 'tailwind exceeds our limit', announce: true });
+        return { desiredHeading: g.headingDeg, altTargetFt: ac.target.altitudeFt, speedKt: perf.climbSpeedKt };
+      }
+    }
     // Lateral + glidepath.
     const gsMps = Math.max(ktToMps(ac.groundSpeedKt), ktToMps(perf.minSpeedKt * 0.8));
-    const vsGp = -mToFt(gsMps * TAN_GP) * 60;
-    const glide = glideAltitudeFt(g.elevationFt, d);
+    const vsGp = -mToFt(gsMps * tanGp) * 60;
+    const glide = glideAltitudeFt(g.elevationFt, d, gp);
     const err = glide - ac.altitudeFt;
     let vs = Math.min(0, vsGp + clamp(err * 5, -400, 400));
     vs = Math.max(vs, -perf.descentRateFpm * 1.3);
     // Cleared approach: intercept the glidepath from below (hold level until it arrives).
     if (rt.approach && err > 50 && d > nmToM(2)) vs = 0;
     if (aglFt < 30) vs = -(100 + (Math.abs(vsGp) - 100) * clamp(aglFt / 30, 0, 1));
+    // Gusts in the flare: airspeed the gust added balloons the aircraft (longer float), a lull sinks it (shorter float, firmer touchdown).
+    if (aglFt < 50 && rt.gustAirKt) vs = Math.min(-30, vs + clamp(GUST_LIFT_FPM_PER_KT * rt.gustAirKt, -150, 250));
     const rampSpeed = ac.target.speedKt ?? perf.approachSpeedKt;
     const speedKt = perf.touchdownSpeedKt + (rampSpeed - perf.touchdownSpeedKt) * clamp(aglFt / 150, 0, 1);
     return { desiredHeading: centrelineHeading(g, ac, perf, wind), vsFpm: vs, speedKt: Math.min(speedKt, rampSpeed) };
@@ -552,11 +612,11 @@ function approachGuidance(ctx: SimContext, ac: Aircraft, rt: AircraftRuntime, g:
 
   // INBOUND / APPROACH / PATTERN before the final: fly toward the intercept point, descend gradually.
   let desiredHeading: number;
-  let interceptAlt = Math.ceil(glideAltitudeFt(g.elevationFt, startM) / 100) * 100;
+  let interceptAlt = Math.ceil(glideAltitudeFt(g.elevationFt, startM, gp) / 100) * 100;
   const captured = inCaptureZone(g, ac, perf);
   if (ac.phase === 'PATTERN' && rt.pattern) {
     desiredHeading = patternHeading(g, ac, rt, wind);
-    interceptAlt = Math.round((g.elevationFt + 1000) / 100) * 100;
+    interceptAlt = Math.round(patternAltitudeFt(perf, g.elevationFt, ctx.state.airport.trafficPatternAltitudeFt) / 100) * 100;
   } else if (captured) {
     desiredHeading = centrelineHeading(g, ac, perf, wind);
   } else {
@@ -568,7 +628,7 @@ function approachGuidance(ctx: SimContext, ac: Aircraft, rt: AircraftRuntime, g:
     if (ac.phase === 'PATTERN') altTarget = interceptAlt;
     else if (ac.phase === 'INBOUND') altTarget = undefined;
     else {
-      const want = Math.max(interceptAlt, glideAltitudeFt(g.elevationFt, Math.max(distThr, startM)) + 100);
+      const want = Math.max(interceptAlt, glideAltitudeFt(g.elevationFt, Math.max(distThr, startM), gp) + 100);
       altTarget = Math.min(ac.altitudeFt, want);
     }
   }
@@ -595,10 +655,10 @@ function patternHeading(g: RunwayEndGeom, ac: Aircraft, rt: AircraftRuntime, win
 }
 
 /** Glidepath state at `dM` metres before the threshold: ideal vertical speed and altitude error (ft, + = aircraft below the path). */
-function glideState(ac: Aircraft, perf: AircraftPerformance, g: RunwayEndGeom, dM: number): { vs: number; err: number } {
+function glideState(ac: Aircraft, perf: AircraftPerformance, g: RunwayEndGeom, dM: number, gp: GlidePath): { vs: number; err: number } {
   const gsMps = Math.max(ktToMps(ac.groundSpeedKt), ktToMps(perf.minSpeedKt * 0.8));
-  const vsGp = -mToFt(gsMps * TAN_GP) * 60;
-  const err = glideAltitudeFt(g.elevationFt, dM) - ac.altitudeFt;
+  const vsGp = -mToFt(gsMps * Math.tan(deg2rad(gp.angleDeg))) * 60;
+  const err = glideAltitudeFt(g.elevationFt, dM, gp) - ac.altitudeFt;
   const vs = Math.max(Math.min(0, vsGp + clamp(err * 5, -400, 400)), -perf.descentRateFpm * 1.3);
   return { vs, err };
 }
@@ -753,7 +813,7 @@ function routeGuidance(ctx: SimContext, ac: Aircraft, rt: AircraftRuntime, g: Ru
     const ifM = rt.approach.ifDM ?? nmToM(12);
     const glideFrom = published && !rt.approach.precision ? (rt.approach.fafDM ?? nmToM(4.5)) + nmToM(0.3) : ifM + nmToM(1);
     if (d <= glideFrom && isOnCourse(mToNm(d), mToNm(cross))) {
-      const gs = glideState(ac, perf, g, d);
+      const gs = glideState(ac, perf, g, d, glidePathFor(airport, rt, g, perf));
       vsFpm = gs.err > 50 ? 0 : gs.vs;
     }
   }
@@ -768,7 +828,18 @@ function stepAirborne(ctx: SimContext, ac: Aircraft, dt: number): void {
   const g = findRunwayEnd(ctx.state.airport, ac.assignedRunwayEnd);
   const elev = g?.elevationFt ?? ctx.state.airport.elevationFt;
   const agl = ac.altitudeFt - elev;
-  const wind = windVector(ctx.state.weather);
+  const wind = windVector(ctx.state.weather); // the steady wind: what the pilot / FMS corrects for (gusts are not anticipated)
+  const gustSample = sampleWind(ctx, ac, rt, headingToVec(ac.headingDeg), dt);
+  if (gustSample.airspeedDeltaKt !== 0) {
+    ac.airspeedKt += gustSample.airspeedDeltaKt;
+    rt.gustAirKt = (rt.gustAirKt ?? 0) + gustSample.airspeedDeltaKt;
+  }
+  if (rt.gustAirKt) {
+    // the speed controller removes the added airspeed at its own accel / decel rate
+    const relax = rt.gustAirKt > 0 ? Math.min(rt.gustAirKt, (perf.category === 'light' ? 1.0 : 1.5) * dt) : Math.max(rt.gustAirKt, -0.5 * perf.accelKtPerSec * dt);
+    rt.gustAirKt -= relax;
+    if (Math.abs(rt.gustAirKt) < 1e-6) rt.gustAirKt = 0;
+  }
 
   // Lateral approach logic (capture, establishment, centreline) is flown against the procedure's final approach COURSE
   // (localizer course / FAF-to-threshold bearing), which can differ from the runway heading; touchdown uses the runway.
@@ -835,7 +906,7 @@ function stepAirborne(ctx: SimContext, ac: Aircraft, dt: number): void {
 
   // Kinematics with wind.
   const air = vScale(headingToVec(ac.headingDeg), ktToMps(ac.airspeedKt));
-  const gv = vAdd(air, wind);
+  const gv = vAdd(air, gustSample.wind);
   ac.pos = vAdd(ac.pos, vScale(gv, dt));
   ac.groundSpeedKt = mpsToKt(Math.hypot(gv.x, gv.y));
   ac.trackDeg = vecToHeading(gv);

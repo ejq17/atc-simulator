@@ -11,6 +11,7 @@ import { assertTransition, transitionPath } from './stateMachines';
 import type { MissedState } from './missedApproach';
 import type { HoldState } from './holding';
 import type { Minima } from './minima';
+import type { GustState } from './wind';
 
 export const EVENT_CAP = 2000;
 
@@ -108,6 +109,12 @@ export interface AircraftRuntime {
   passedFixes: Set<string>;
   /** An altitude / direct / resume instruction was issued after the handoff (IFR departure counts as handled). */
   depInstructed: boolean;
+  /** Seeded gust process of this aircraft (wind.ts); created at its first airborne or takeoff-roll tick. */
+  gust?: GustState;
+  /** Airspeed (kt) the gusts added to this aircraft and the speed controller has not yet removed (drives balloon / sink in the flare). */
+  gustAirKt?: number;
+  /** Seconds the effective (gusted) crosswind / tailwind has been over the type's limit on final. */
+  windExceedSec?: number;
 }
 
 export interface SimContext {

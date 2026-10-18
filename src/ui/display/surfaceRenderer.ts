@@ -2,7 +2,8 @@
  * Airport surface display renderer (Canvas 2D). Pure functions of (ctx, frame, view, layers): no React,
  * no globals, so they can be exercised with a stub context. World metres, y up (north).
  */
-import type { Aircraft, Airport, SimulationState, Vec2 } from '../../sim/types';
+import type { Aircraft, Airport, Runway, SimulationState, Vec2 } from '../../sim/types';
+import { displacedThresholds } from '../../sim/runways';
 import type { Frame } from './frame';
 import { C, FONT_MONO } from './palette';
 import { placeLabels } from './labels';
@@ -131,7 +132,54 @@ function drawRunways(ctx: CanvasRenderingContext2D, v: View, state: SimulationSt
     ctx.lineTo(s2.x, s2.y);
     ctx.stroke();
     ctx.setLineDash([]);
+    drawDisplacedThresholds(ctx, v, rw);
   }
+}
+
+/**
+ * Displaced thresholds (NASR): the threshold bar across the runway at the landing threshold and arrows along the centreline of the
+ * displaced area, pointing at it (FAA AC 150/5340-1 style, simplified). The pavement end stays where the runway polygon ends.
+ */
+function drawDisplacedThresholds(ctx: CanvasRenderingContext2D, v: View, rw: Runway): void {
+  const half = (rw.widthFt * 0.3048) / 2;
+  ctx.save();
+  ctx.strokeStyle = C.text;
+  ctx.fillStyle = C.text;
+  for (const d of displacedThresholds(rw)) {
+    const perp = { x: -d.dir.y, y: d.dir.x };
+    const a = worldToScreen(v, { x: d.threshold.x + perp.x * half, y: d.threshold.y + perp.y * half });
+    const b = worldToScreen(v, { x: d.threshold.x - perp.x * half, y: d.threshold.y - perp.y * half });
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(a.x, a.y);
+    ctx.lineTo(b.x, b.y);
+    ctx.stroke();
+    // arrows: one per 61 m of displaced area, shaft + head, pointing along the landing direction
+    ctx.lineWidth = 1.5;
+    const n = Math.max(1, Math.floor(d.displacedM / 61));
+    const pitch = d.displacedM / n;
+    for (let k = 0; k < n; k++) {
+      const tipAlong = (k + 1) * pitch - 6;
+      const tip = worldToScreen(v, { x: d.pavementEnd.x + d.dir.x * tipAlong, y: d.pavementEnd.y + d.dir.y * tipAlong });
+      const tail = worldToScreen(v, { x: d.pavementEnd.x + d.dir.x * (tipAlong - Math.min(36, pitch * 0.6)), y: d.pavementEnd.y + d.dir.y * (tipAlong - Math.min(36, pitch * 0.6)) });
+      ctx.beginPath();
+      ctx.moveTo(tail.x, tail.y);
+      ctx.lineTo(tip.x, tip.y);
+      ctx.stroke();
+      const ux = tip.x - tail.x;
+      const uy = tip.y - tail.y;
+      const ul = Math.hypot(ux, uy) || 1;
+      const hl = Math.min(8, Math.max(3, ul * 0.35));
+      for (const sgn of [-1, 1]) {
+        const ang = Math.atan2(uy, ux) + Math.PI + sgn * 0.5;
+        ctx.beginPath();
+        ctx.moveTo(tip.x, tip.y);
+        ctx.lineTo(tip.x + Math.cos(ang) * hl, tip.y + Math.sin(ang) * hl);
+        ctx.stroke();
+      }
+    }
+  }
+  ctx.restore();
 }
 
 function drawRunwayNumbers(ctx: CanvasRenderingContext2D, v: View, airport: Airport): void {

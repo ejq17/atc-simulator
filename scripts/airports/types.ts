@@ -106,6 +106,8 @@ export interface AirportProfile {
   /** Names of optional plate-transcription files (relative to data/sources); absent = that layer is empty. */
   holdingPatternsFile?: string;
   fixAltitudesFile?: string;
+  /** Per-approach glidepath angle / TCH and missed approach climb altitudes (data/sources/<slug>-plate-geometry.json). */
+  plateGeometryFile?: string;
   /** FAA airport-diagram label positions (taxiway identifier words georeferenced to lat/lon), when available. */
   diagramLabels?(): { labels: { id: string; lat: number; lon: number; ptX: number; ptY: number }[]; from: string; note: string };
   /** Parking stands, GA/FBO/cargo spots. Returns the OSM parking ways deliberately not used (for the report). */

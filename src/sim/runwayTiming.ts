@@ -118,11 +118,12 @@ export function projectArrival(state: SimulationState, o: Aircraft, g: RunwayEnd
     };
   }
   const gs = ktToMps(o.groundSpeedKt);
-  const dToThr = Math.max(0, -along0);
+  // distance to the LANDING threshold (the displaced one where there is one): 3-10-3 / 3-9-6 are about the landing threshold
+  const dToThr = Math.max(0, g.displacedM - along0);
   const v = Math.max(ktToMps(perf.minSpeedKt), dToThr > nmToM(2) ? Math.min(gs, ktToMps(1.15 * perf.approachSpeedKt)) : gs);
   const aglM = Math.max(0, (o.altitudeFt - g.elevationFt) / mToFt(1));
   const typical = perf.category === 'light' ? TYPICAL_TD_LIGHT_M : TYPICAL_TD_JET_M;
-  const tdAlongM = Math.max(typical, along0 + aglM / TAN_GP);
+  const tdAlongM = Math.max(g.displacedM + typical, along0 + aglM / TAN_GP);
   const tThr = dToThr / v;
   const tTd = Math.max(0, (tdAlongM - along0) / v);
   const rollout = projectRollout(state, o.type, g, tdAlongM, ktToMps(perf.touchdownSpeedKt));
@@ -136,7 +137,7 @@ export function projectArrival(state: SimulationState, o: Aircraft, g: RunwayEnd
 /** Time for the subject (airborne, on or toward the final of `g`) to cross the threshold, with the same speed model. */
 export function timeToThreshold(o: Aircraft, g: RunwayEndGeom): number {
   const perf = getPerformance(o.type);
-  const dToThr = Math.max(0, -alongCross(g, o.pos).along);
+  const dToThr = Math.max(0, g.displacedM - alongCross(g, o.pos).along); // to the landing threshold
   const gs = ktToMps(o.groundSpeedKt);
   const v = Math.max(ktToMps(perf.minSpeedKt), dToThr > nmToM(2) ? Math.min(gs, ktToMps(1.15 * perf.approachSpeedKt)) : gs);
   return dToThr / v;
