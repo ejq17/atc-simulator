@@ -18,12 +18,24 @@ export interface QueuedTransmission {
   volume?: number;
   /** Who is talking, for the UI's "speaking" lamp and the debug log: a pilot callsign or "TWR (AI)". */
   speaker?: string;
+  /** Callsign (pilots) or position (controllers) that seeds the voice and radio character. Defaults to `speaker`, then `voiceId`. */
+  callsign?: string;
+  speakerKind?: 'airline' | 'ga' | 'controller';
+  /** Distance of the transmitting aircraft from the airport, nautical miles. Far = weak and scratchy. Omitted = clear. */
+  distanceNm?: number;
 }
 
 export interface TransmissionSpeaker {
-  /** Speak and resolve when finished or cancelled. */
-  speak(item: QueuedTransmission): Promise<void>;
+  /**
+   * Speak and resolve when finished or cancelled. `keyUp` plays the PTT-open click; call it once, right before the first sound.
+   * Only speakers that return true from `keysItself` are expected to call it (the queue otherwise clicks when the call is dequeued).
+   */
+  speak(item: QueuedTransmission, keyUp?: () => void): Promise<void>;
+  /** True when the speaker keys the transmitter itself, e.g. once its first synthesised piece is ready. */
+  keysItself?(): boolean;
   cancel(): void;
+  /** Optional: called when a call is accepted into the queue, so a slow engine can prepare it before its turn. */
+  prepare?(item: QueuedTransmission): void;
 }
 
 export type TransmissionEvent =
@@ -144,7 +156,13 @@ export function createTransmissionQueue(opts: TransmissionQueueOptions): Transmi
     speaking = next;
     const myGen = ++generation;
     emit({ type: 'start', item: next.item });
-    opts.radio?.playPttOpen();
+    let keyed = false;
+    const keyUp = () => {
+      if (keyed || myGen !== generation) return;
+      keyed = true;
+      opts.radio?.playPttOpen();
+    };
+    if (!(opts.speaker.keysItself?.() ?? false)) keyUp();
     if (speakTimer) clearTimeout(speakTimer);
     speakTimer = setTimeout(() => {
       speakTimer = null;
@@ -159,7 +177,7 @@ export function createTransmissionQueue(opts: TransmissionQueueOptions): Transmi
       schedule(gapMs);
     }, maxSpeakMs);
     opts.speaker
-      .speak(next.item)
+      .speak(next.item, keyUp)
       .catch(() => undefined)
       .then(() => {
         if (myGen !== generation) return; // stepped on / cleared
@@ -218,6 +236,9 @@ export function createTransmissionQueue(opts: TransmissionQueueOptions): Transmi
         return false;
       }
       queue.push({ item, seq: seq++, notBefore: 0, steppedOn: 0 });
+      try {
+        opts.speaker.prepare?.(item);
+      } catch { /* preparing is an optimisation only */ }
       pump();
       return true;
     },

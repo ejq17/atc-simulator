@@ -1,12 +1,17 @@
 import type { PttMode } from './ptt.ts';
 import type { SttProviderId } from './stt/types.ts';
 import { WHISPER_DEVICE_CHOICES, WHISPER_MODEL_CHOICES } from './stt/whisperModels.ts';
+import { NEURAL_DEVICE_CHOICES } from './tts/kokoroSynth.ts';
+import type { NeuralDeviceChoice } from './tts/kokoroSynth.ts';
 import type { WhisperDeviceChoice, WhisperModelChoice } from './stt/whisperModels.ts';
 
 export const VOICE_SETTINGS_KEY = 'kacy.voice.settings';
 
 /** Volume multiplier for traffic heard only because "Monitor all frequencies" is on (frequencies the player does not work). */
 export const MONITOR_ALL_VOLUME = 0.45;
+
+export type TtsEngineId = 'browser' | 'neural';
+export const TTS_ENGINE_IDS: readonly TtsEngineId[] = ['browser', 'neural'];
 
 export interface VoiceSettings {
   providerId: SttProviderId;
@@ -16,6 +21,12 @@ export interface VoiceSettings {
   whisperDevice: WhisperDeviceChoice;
   pttKey: string;
   pttMode: PttMode;
+  /** "Pilot voice engine": the browser's own speech synthesis, or the on-device neural voice (Kokoro) played through the radio chain. */
+  ttsEngine: TtsEngineId;
+  /** The one-time "realistic radio voices available" notice was dismissed (or its Enable button used). */
+  neuralNoticeDismissed: boolean;
+  /** Where the neural voice runs ('auto' = WebGPU when the browser has it, else WebAssembly). Only used by the neural engine. */
+  neuralDevice: NeuralDeviceChoice;
   /** "Pilot audio": speak pilot (and monitored AI controller) transmissions. */
   ttsEnabled: boolean;
   /** Hear every frequency in the session, including AI-worked positions the player does not work (at reduced volume). Default: own frequencies only. */
@@ -35,6 +46,9 @@ export const DEFAULT_VOICE_SETTINGS: Readonly<VoiceSettings> = Object.freeze({
   whisperDevice: 'auto',
   pttKey: 'Space',
   pttMode: 'hold',
+  ttsEngine: 'browser',
+  neuralNoticeDismissed: false,
+  neuralDevice: 'auto',
   ttsEnabled: true,
   monitorAll: false,
   radioEffectsEnabled: true,
@@ -59,6 +73,9 @@ export function sanitizeVoiceSettings(raw: unknown): VoiceSettings {
     whisperDevice: WHISPER_DEVICE_CHOICES.includes(r.whisperDevice as WhisperDeviceChoice) ? (r.whisperDevice as WhisperDeviceChoice) : d.whisperDevice,
     pttKey: typeof r.pttKey === 'string' && r.pttKey.length > 0 && r.pttKey.length <= 32 ? r.pttKey : d.pttKey,
     pttMode: r.pttMode === 'toggle' || r.pttMode === 'hold' ? r.pttMode : d.pttMode,
+    ttsEngine: TTS_ENGINE_IDS.includes(r.ttsEngine as TtsEngineId) ? (r.ttsEngine as TtsEngineId) : d.ttsEngine,
+    neuralDevice: NEURAL_DEVICE_CHOICES.includes(r.neuralDevice as NeuralDeviceChoice) ? (r.neuralDevice as NeuralDeviceChoice) : d.neuralDevice,
+    neuralNoticeDismissed: typeof r.neuralNoticeDismissed === 'boolean' ? r.neuralNoticeDismissed : d.neuralNoticeDismissed,
     ttsEnabled: typeof r.ttsEnabled === 'boolean' ? r.ttsEnabled : d.ttsEnabled,
     monitorAll: typeof r.monitorAll === 'boolean' ? r.monitorAll : d.monitorAll,
     radioEffectsEnabled: typeof r.radioEffectsEnabled === 'boolean' ? r.radioEffectsEnabled : d.radioEffectsEnabled,

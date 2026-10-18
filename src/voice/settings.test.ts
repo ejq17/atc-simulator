@@ -26,6 +26,16 @@ describe('voice settings', () => {
     expect(VOICE_PRIVACY_NOTES.providers['whisper-local']).toMatch(/never uploaded/);
   });
 
+  it('defaults the pilot voice engine to the browser, persists the neural choice, and rejects unknown values', () => {
+    expect(DEFAULT_VOICE_SETTINGS.ttsEngine).toBe('browser');
+    expect(DEFAULT_VOICE_SETTINGS.neuralDevice).toBe('auto');
+    expect(sanitizeVoiceSettings({ ttsEngine: 'neural', neuralDevice: 'webgpu' })).toMatchObject({ ttsEngine: 'neural', neuralDevice: 'webgpu' });
+    expect(sanitizeVoiceSettings({ ttsEngine: 'cloud', neuralDevice: 'tpu' })).toMatchObject({ ttsEngine: 'browser', neuralDevice: 'auto' });
+    const store = createVoiceSettingsStore();
+    store.update({ ttsEngine: 'neural' });
+    expect(loadVoiceSettings().ttsEngine).toBe('neural');
+  });
+
   it('defaults the Whisper model and device to auto and rejects unknown values', () => {
     expect(DEFAULT_VOICE_SETTINGS.whisperModel).toBe('auto');
     expect(DEFAULT_VOICE_SETTINGS.whisperDevice).toBe('auto');

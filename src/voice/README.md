@@ -1,8 +1,8 @@
 # Voice subsystem (`src/voice`)
 
 Push-to-talk -> speech-to-text provider -> text for the command parser, plus
-pilot text-to-speech with radio clicks. Browser APIs only; the one npm dependency is
-`@huggingface/transformers`, loaded lazily and only by the on-device Whisper provider.
+pilot text-to-speech with radio clicks. Browser APIs only; the npm dependencies are
+`@huggingface/transformers` (on-device Whisper) and `kokoro-js` (on-device neural pilot voice), both loaded lazily inside Web Workers.
 
 ```
 src/voice/
@@ -11,8 +11,10 @@ src/voice/
               aviationVocab, providerNotes (STT_PROVIDER_NOTES)
   ptt.ts      createPushToTalk (hold/toggle, runtime key change, bindButton)
   voiceController.ts   PTT + provider orchestration, status events
-  tts/        browserTts (speechSynthesis), voiceAssignment, prepareForTts
-  audio/      radioEffects (WebAudio clicks + static)
+  tts/        browserTts (speechSynthesis), voiceAssignment, prepareForTts;
+              neuralTts (Kokoro provider: queueing, pre-synthesis, fallback, latency budget), kokoroSynth + kokoroWorker (Kokoro, WebGPU) + piperWorker (Piper, WebAssembly) + kokoroProtocol (model in a Worker),
+              radioVariation (per-callsign voice/rate/pitch/radio profile, distance quality), speechChunks, engineTts (engine selection, shared synthesiser)
+  audio/      radioEffects (WebAudio clicks + static + the shared 300-3000 Hz chain), transmissionGraph (per-transmission graph for neural speech)
   audio/unlock.ts   unlockAudio() (call from a click) + the page-wide AudioContext
   transmissionQueue.ts, pilotVoice.ts   one speaker at a time, several audible frequencies, stepped-on handling, stuck-key watchdog
   tts/ttsDebug.ts   window.__kacyTts (what the app asked Chrome to say and what Chrome did)
@@ -186,6 +188,102 @@ when the browser has it, otherwise on WebAssembly (CPU).
 * **Network.** First use needs huggingface.co (model files) and cdn.jsdelivr.net (ONNX runtime `.wasm`, chosen by transformers.js
   by default). Both are cached by the browser, after which it runs offline.
 
+## Local neural pilot voice (Kokoro-82M)
+
+Browser `speechSynthesis` cannot be routed into WebAudio, so it can never sound like a radio. **Settings > Pilot voice engine > Local neural** replaces it with Kokoro-82M
+(`kokoro-js` 1.2.1, Apache-2.0, ONNX, model `onnx-community/Kokoro-82M-v1.0-ONNX`) running in a module Web Worker. The text is turned into an `AudioBuffer`, and that buffer is played through
+the radio chain. Free, no key, no server: it works on the static GitHub Pages build (model and voice-style files from huggingface.co, ONNX runtime from cdn.jsdelivr.net, both cached by the
+browser; the text to speak never leaves the machine).
+
+```
+queue.enqueue(item)  ->  speaker.prepare(item)  ->  neuralTts.prepare(): plan (voice, speed, pieces) and synthesise ahead, results cached (single use, 6 entries)
+queue pump           ->  speaker.speak(item, keyUp) -> neuralTts.speak(): wait <= latency budget for piece 1  --(late/failed/not ready)-->  keyUp(), browser TTS for this call
+                                                     |
+                  piece 1 -> keyUp() (PTT click) + buildTransmissionGraph(...).start() at the same instant; later pieces -> graph.append() as they arrive; graph.finish() -> squelch tail
+   speech sources -> highpass -> lowpass -> drive -> soft clipper -> compressor -> fading flutter -> output -+-> RadioEffects.getInputNode()  (300-3000 Hz, waveshaper, compressor, master)
+   noise source   -> highpass -> lowpass -> noise gain (carrier hiss, tail) --------------------------------^   (or ctx.destination when "Radio effects" is off)
+```
+
+* **Pieces.** `speechChunks.splitSpeech` cuts a call at punctuation: the first piece has at least 3 words ("Runway one three,"), later pieces at most 14. The model works one piece at a time, in order; the
+  first piece starts playing while the rest is synthesised (the model is faster than speech on WebGPU), and the pieces are scheduled back to back. Near-silent lead-in/tail is trimmed (`trimSilence`).
+* **Pre-synthesis.** `TransmissionSpeaker.prepare(item)` is called when a call enters the queue, so the next call is already synthesised (or in progress) while the current one plays. `speak()` reuses that result
+  (cache key: voice, speed, text); an entry is removed when its playback starts, a cancelled call that never played stays cached for the stepped-on retry.
+* **Fallback and budget.** The browser provider speaks the call when the model is not ready (it keeps loading in the background), the synthesiser fails, piece 1 is not ready within `latencyBudgetMs` (3000 ms from the `speak()` call),
+  or there is no audio output. A later piece that fails or is late is spoken by the browser voice (the rest of the text only). Three consecutive failures or overruns switch the neural voice off for 60 s (`cooldownMs`). A WebGPU
+  load failure or a WebGPU error while synthesising drops to WebAssembly for the rest of the page session (same pattern as Whisper). Debug: `localStorage kacy.neural.budgetMs` (200 to 600000), `kacy.neural.dtype`.
+* **Device and model files** (Settings > Local neural voice; `neuralDevice` in `kacy.voice.settings`, default `auto` = WebGPU when `navigator.gpu` exists, else WebAssembly). Same worker protocol for both engines:
+
+  | Device | Engine | Files | Download | Why |
+  |---|---|---|---|---|
+  | WebGPU | Kokoro-82M `fp32` (`kokoroWorker.ts`) | `onnx/model.onnx` | 326 MB | the only WebGPU variant that was both intelligible and fast, see the table below |
+  | WebAssembly | Piper VITS, `en_US-libritts_r-medium` (`piperWorker.ts`) | `en_US-libritts_r-medium.onnx` + `.json` | 79 MB | faster than real time on one WASM thread, intelligible, under 100 MB; Kokoro q8 on WASM was 1.6 to 2.3x slower than real time |
+
+  Piper runs on `onnxruntime-web/wasm` (pinned to the version transformers.js uses) and phonemises with the `phonemizer` package (espeak-ng en-us), the same phonemiser kokoro-js uses; the model is fetched with progress
+  from `rhasspy/piper-voices` on huggingface.co and stored by us in the Cache API (`piper-voices`). Voice: libritts_r has 904 speakers; nine were picked (`PIPER_PILOT_SIDS`) and two for controllers by running a sample of every 25th speaker
+  through Whisper (clean transcription of "Cessna 723 Echo Juliet") plus a crude pitch estimate for a male/female mix. The voice data is LibriTTS-R, **CC BY 4.0** (attribution in the README); the code is MIT (onnxruntime-web) and Apache-2.0 (phonemizer).
+  The first WebGPU synthesis compiles shaders (5.7 s measured), so the Kokoro load ends with a throw-away synthesis ("Warming up the neural voice").
+* **Model caching (verified).** Kokoro files go through transformers.js into the Cache API (`transformers-cache`, voice styles in `kokoro-voices`), Piper files into `piper-voices`. `scripts/neural-cache-check.mjs` opens installed
+  Chrome with a persistent profile, prepares the model and lists every request to huggingface.co / jsDelivr: first run 10 responses incl. the 326 MB `model.onnx` (ready after 13.7 s, storage usage 326 MB); **second run: 2 responses, both
+  the 4 MB ONNX runtime from jsDelivr (immutable, one-year HTTP cache), no model request, ready after 5.0 s**. Piper: first run fetches `en_US-libritts_r-medium.onnx` (usage 79 MB), second run only the runtime (ready after 2.6 s).
+  The earlier `Cache.put` failure for the 326 MB file happened only in Playwright's ephemeral (incognito-style) context; with a persistent profile quota was 11 GB. `navigator.storage.persist()` is requested but Chrome answered `persisted=false`
+  (headless, no engagement), so the files are best-effort storage: the browser may evict them under disk pressure, and private windows or blocked storage download again. A custom OPFS/IndexedDB cache was therefore not needed.
+* **PTT click.** The transmission queue no longer clicks when it dequeues a call if the speaker `keysItself()` (the neural engine): it passes a `keyUp` callback and neuralTts calls it right before `graph.start()` (or before the browser fallback speaks),
+  so the PTT-open click, the carrier hiss and the first piece begin at the same instant and a slow model does not leave a click followed by silence. A call stepped on before its first piece makes no click at all.
+* **Discoverability.** On machines with WebGPU, while the engine is Browser and the notice was not dismissed, Settings and the setup screen show "Realistic radio voices available ... 326 MB" with **Enable and download** (switches the engine,
+  starts the download) and **Not now**; `neuralNoticeDismissed` in `kacy.voice.settings` remembers either.
+* **Pronunciation.** The sim's phraseology is US style ("niner", "three", "point", "zero"). The espeak-ng phonemes of every ICAO alphabet word, the digit words, "point", runway/taxiway/frequency/squawk/altimeter phrases, aircraft and airline names
+  were read as IPA strings (`phonemize(text, 'en-us')`): all correct (e.g. juliet `dʒˌuːlɪˈɛt`, niner `nˈaɪnɚ`, zero `zˈiəɹoʊ`, three `θɹˈiː`, point `pˈɔɪnt`, sierra `siːˈɛɹə`, hotel `hoʊtˈɛl`, xray `ˈɛksɹˈeɪ`, "fife" `fˈaɪf` and "tree" `tɹˈiː`
+  also fine if they ever appear) except three. `prepareForNeuralTts` respells them for the neural engines only: Quebec `kwᵻbˈɛk` ("kwi-BECK") -> "kuh beck" `kˈʌ bˈɛk`; ATIS `ˈæɾiz` ("AD-iz") -> "eightis" `ˈeɪɾiz`; TRACON `tɹˈækən` -> "traycon" `tɹˈeɪkən`.
+  This was checked on phoneme strings, not by listening.
+
+### Per-aircraft variation (`tts/radioVariation.ts`, deterministic from the callsign)
+
+All of it is the audio layer's own seeded randomness (`hashString` of the callsign into `mulberry32`); nothing touches the simulation. The ranges are design choices, not measurements of real radios.
+
+| Property | Airline crew (callsign not `N<digit>`) | GA pilot (`N<digit>...`) | AI controller (`speakerKind: 'controller'`, callsign = position) |
+|---|---|---|---|
+| Voice | one of 9 Kokoro voices (`PILOT_VOICES`) by hash | same pool | `am_michael` or `bm_george` by position hash (not in the pilot pool) |
+| Speed (model `speed`) | 1.04 to 1.18 | 0.92 to 1.08 | 1.06, fixed |
+| Pitch shift | within +-85 cents (about 5 %), applied as playback rate with the model speed corrected so the pace is unchanged | same | none |
+| Band inside the shared 300-3000 Hz chain | high-pass 300 to 410 Hz, low-pass 2600 to 3000 Hz | high-pass 300 to 520 Hz, low-pass 2200 to 3000 Hz | 300 to 3000 Hz |
+| Carrier noise (linear gain of white noise) | 0.003 to 0.007 | 0.003 to 0.011 | 0.0025 |
+| Compression | threshold -26 to -20 dB, ratio 3 to 6 | same | -22 dB, 4:1 |
+| Over-modulation | per call, chance 4 to 13 %, drive 1.1 to 1.35 then x1.45 | chance 4 to 22 %, drive 1.1 to 1.6 then x1.45 | never |
+| Squelch tail | 60 to 110 ms | 60 to 160 ms | 70 ms |
+
+**Distance** (`signalQuality`, `radioConditions`): the queue items carry `distanceNm` (aircraft position from the engine state, metres from the airport reference point). Quality is 1 within 10 nm and falls smoothly (smoothstep) to 0.08 at
+40 nm and beyond: the high-pass rises towards 420 Hz, the low-pass drops towards 2300 Hz (about 415 and 2320 Hz at 40 nm), noise rises towards 0.026, level drops to about 65 %, and a fading flutter (gain dips of up to 30 %, 22 steps per second) appears. These floors keep the
+words understandable; controllers are not degraded. An unknown distance counts as clear.
+
+### Engine comparison and measurements (Apple-silicon Mac, installed Google Chrome with WebGPU; headless Chromium for the WebAssembly runs; machine shared with other work)
+
+Measured through the real app with `kokoro-js` 1.2.1 (transformers.js 3.8.1 inside it). Whole-sentence times are for 73 to 109 characters (5.8 to 8.6 s of speech). "Intelligible" = a Whisper `base.en` transcription of the output
+read "Runway 13, cleared for takeoff. Cessna 723 Echo Juliet." (spelled "SESNA" by the recogniser, as for the unprocessed model output).
+
+| Engine | Download | Load (local network) | Whole sentence | Intelligible |
+|---|---|---|---|---|
+| Browser `speechSynthesis` | none | instant | n/a (system voices) | yes, but not radio-filterable |
+| Kokoro, WebGPU `fp32` | 326 MB | 9 to 19 s (+ shader warm-up) | 1.4 to 2.4 s warm (5.7 s the very first call) | **yes** |
+| Kokoro, WebGPU `fp16` | 163 MB | 6 s | 1.5 to 2.4 s | **no** (garbage: "1,3,3,3,3...") |
+| Kokoro, WebGPU `q4f16` | 155 MB | 7 s | 1.7 to 3.2 s | **no** ("One day they'll sleep.") |
+| Kokoro, WebGPU `q8` | 92 MB | 5 s | 16 to 31 s | not checked |
+| Kokoro, WebAssembly `q8` | 92 MB | 3.4 to 5.6 s | 9 to 20 s (about 1.6 to 2.3 times slower than real time, single-threaded: GitHub Pages cannot send the cross-origin-isolation headers WASM threads need) | yes |
+| **Piper libritts_r medium, WebAssembly** | 79 MB | 1.6 s session + download | 0.36 to 1.5 s for 1 to 4.6 s of speech, about 0.2 to 0.3 times real time | **yes** ("Cessna 723 Echo Juliet" heard correctly) |
+
+Short pieces on WebGPU `fp32`: "Cleared for takeoff." (2.0 s of speech) 0.7 s, "Runway one three, cleared for takeoff," (3.1 s) 0.9 s: roughly 0.4 to 0.5 s fixed plus 0.25 s per second of speech, which is why calls are streamed in pieces.
+
+**Time from enqueue to first audio** (`getStats().lastFirstAudioMs`, idle queue, WebGPU `fp32`, simulation running at 1x, readbacks 14 s apart, real app path): 529, 547, 476, 759 and 881 ms in the last run; an earlier run on a busier GPU gave 657, 1801 and 679 ms.
+So the 1.5 s target held in 8 of 9 idle-queue measurements; the miss coincided with the GPU also drawing the canvases. When another transmission is still playing, the figure includes that wait, because the clock starts at enqueue. Kokoro stays the WebGPU engine; Piper replaced it on the non-WebGPU device.
+
+**Radio-chain intelligibility check:** the unprocessed Kokoro sample was rendered through `buildTransmissionGraph` and the real `createRadioEffects` chain with an `OfflineAudioContext` for eight cases (dry, near GA, near GA over-modulated,
+airline at 12 nm, GA at 30 nm, GA at 45 nm clean / over-modulated / rough profile) and transcribed with Whisper `base.en`: all eight gave the same words as the unprocessed sample ("Cessna" spelled "SESNA" in seven, "Cessna" in one). That says the processing is subtle
+enough for a recogniser; nobody has listened to it on a headset yet, so levels and character are unverified by ear.
+
+**Piper on the non-WebGPU device** (WebGPU not used by the engine; installed Chrome and headless Chromium, real app path, idle queue): first audio 173 to 603 ms over 10 readbacks (506, 603, 466, 173, 234 ms in Chrome; 364, 560, 514, 430, 584 ms in Chromium); the remaining pieces of a call were done within 0.5 to 1.8 s of the request, i.e. before the first piece finished playing. Standalone, single-threaded `onnxruntime-web`: 1.06 s of speech in 0.27 to 0.36 s, 3.9 s of speech in 0.86 to 1.19 s, 4.6 s in 0.8 to 1.5 s.
+
+Automated test: `e2e/neural-tts.spec.ts` (project `chromium`): selects the engine, downloads the real Piper model on WebAssembly (latency budget 10 s there), starts a session, sends a takeoff clearance and asserts the readback was synthesised (peak > 0.05, RMS > 0.005, over 0.5 s) and scheduled
+on the AudioContext, the speaking lamp went on and off, and no fallback occurred. `getStats()` and `window.__kacyNeuralTts.events` are the observation points.
+
 ## Automated microphone test
 
 `npx playwright test --project=chromium-fake-mic` proves the whole chain without a person or a cloud key: Chrome's fake audio
@@ -269,7 +367,8 @@ default mode first, then `audioSource: 'track'`) to hear them and the aircraft t
 
 ## Limitations
 
-* **Pilot voice cannot be radio-filtered.** `speechSynthesis` output is not routable through WebAudio, so the 300-3000 Hz band-pass, distortion and compression apply only to the PTT open/close clicks and static. `RadioEffects.getInputNode()` exposes the chain for a future cloud TTS.
+* **Browser voices cannot be radio-filtered.** `speechSynthesis` output is not routable through WebAudio, so with the default **Browser voices** engine the 300-3000 Hz band-pass, distortion and compression apply only to the PTT open/close clicks and static. The **Local neural** engine routes the voices through `RadioEffects.getInputNode()`.
+* **Local neural voice:** Kokoro on WebGPU needs a 326 MB download (Piper on the CPU 79 MB); both are best-effort cached by the browser (see above), private windows download again. Piper has one voice family (libritts_r) and fewer clearly distinct speakers than Kokoro. Voice quality, levels and pronunciation were checked by transcription, phoneme strings, levels and timings only, never by ear on a headset. fp16 and 4-bit WebGPU variants are unusable (garbage output), so the WebGPU download cannot shrink below 326 MB.
 * Browser voices differ by OS/browser; with few voices pilots are told apart by rate/pitch only. Voice lists load asynchronously in Chrome.
 * Web Speech: Chrome ends recognition on pauses, so the provider restarts it while the key is held; accuracy on callsigns and numbers is lower than Deepgram. Firefox has no Web Speech recognition; Safari support is partial.
 * Browsers require a user gesture before audio plays (`unlockAudio()`, see above) and HTTPS (or localhost) for the microphone.

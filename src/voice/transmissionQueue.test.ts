@@ -144,3 +144,47 @@ describe('transmissionQueue', () => {
     expect(queue.pendingCount()).toBe(0);
   });
 });
+
+describe('deferred keying (speaker that keys itself)', () => {
+  beforeEach(() => { vi.useFakeTimers(); });
+  afterEach(() => { vi.useRealTimers(); });
+
+  it('does not click at dequeue time; the click happens when the speaker calls keyUp, once', async () => {
+    const clicks: string[] = [];
+    let keyUp: (() => void) | undefined;
+    let done: () => void = () => undefined;
+    const queue = createTransmissionQueue({
+      monitoredFrequencyMhz: 119.4,
+      radio: { playPttOpen: () => clicks.push('open'), playPttClose: () => clicks.push('close') },
+      speaker: {
+        keysItself: () => true,
+        speak(_item, k) { keyUp = k; return new Promise<void>((r) => { done = r; }); },
+        cancel() { /* nothing */ },
+      },
+    });
+    queue.enqueue(t('hello'));
+    await vi.advanceTimersByTimeAsync(0);
+    expect(clicks).toEqual([]); // dequeued, model still working
+    keyUp?.();
+    keyUp?.();
+    expect(clicks).toEqual(['open']);
+    done();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(clicks).toEqual(['open', 'close']);
+  });
+
+  it('a stepped-on call whose keyUp arrives late makes no click', async () => {
+    const clicks: string[] = [];
+    let keyUp: (() => void) | undefined;
+    const queue = createTransmissionQueue({
+      monitoredFrequencyMhz: 119.4,
+      radio: { playPttOpen: () => clicks.push('open'), playPttClose: () => clicks.push('close') },
+      speaker: { keysItself: () => true, speak(_i, k) { keyUp = k; return new Promise<void>(() => undefined); }, cancel() { /* nothing */ } },
+    });
+    queue.enqueue(t('hello'));
+    await vi.advanceTimersByTimeAsync(0);
+    queue.setControllerTransmitting(true);
+    keyUp?.();
+    expect(clicks).toEqual([]);
+  });
+});

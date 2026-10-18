@@ -3,10 +3,11 @@
  *
  * LIMITATION: browser `speechSynthesis` output cannot be routed through
  * WebAudio, so the pilot's voice itself is NOT band-passed when browser TTS is
- * used. Here the radio chain is applied only to what we synthesise ourselves:
- * the PTT open/close clicks and the low static bed. `getInputNode()` exposes the
- * filter chain so a future cloud TTS (decoded to an AudioBuffer / MediaElement)
- * can be piped through the same 300-3000 Hz, lightly distorted, compressed path.
+ * used. Here the radio chain is applied to what we synthesise ourselves: the PTT
+ * open/close clicks, the low static bed, and, with the "Local neural" pilot voice
+ * engine, the voices themselves: `getInputNode()` is the entry of the shared
+ * 300-3000 Hz, lightly distorted, compressed path, and tts/neuralTts.ts plays each
+ * transmission into it through its own per-aircraft graph (audio/transmissionGraph.ts).
  */
 
 import { getSharedAudioContext } from './unlock.ts';

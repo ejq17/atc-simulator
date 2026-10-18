@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { prepareForTts } from './prepareForTts.ts';
+import { prepareForNeuralTts, prepareForTts } from './prepareForTts.ts';
 import { assignVoice, eligibleVoices, VARIANTS } from './voiceAssignment.ts';
 import type { VoiceInfo } from './types.ts';
 
@@ -104,5 +104,16 @@ describe('prepareForTts', () => {
   it('leaves already-spoken text untouched', () => {
     const spoken = 'Spirit one two three, runway one three, cleared for takeoff, wind two niner zero at one zero';
     expect(prepareForTts(spoken)).toBe(spoken);
+  });
+});
+
+describe('neural respellings', () => {
+  it('fixes only the words whose espeak phonemes were wrong, and leaves the rest alone', () => {
+    expect(prepareForNeuralTts('Kilo Quebec Hotel')).toBe('Kilo kuh beck Hotel');
+    expect(prepareForNeuralTts('ATIS information alpha')).toBe('eightis information alpha');
+    expect(prepareForNeuralTts('contact Boston TRACON')).toBe('contact Boston traycon');
+    const same = 'runway one three, cleared for takeoff, squawk one two zero zero, ground point niner';
+    expect(prepareForNeuralTts(same)).toBe(prepareForTts(same));
+    expect(prepareForTts('Quebec')).toBe('Quebec'); // browser voices are untouched
   });
 });

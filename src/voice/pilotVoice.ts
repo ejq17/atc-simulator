@@ -28,25 +28,39 @@ export function createPilotVoice(options: PilotVoiceOptions): TransmissionQueue 
   const syncRadio = () => radio?.setEnabled(settings.get().radioEffectsEnabled);
   syncRadio();
 
+  const requestFor = (item: QueuedTransmission) => {
+    const s = settings.get();
+    return {
+      text: item.text,
+      voiceId: item.voiceId,
+      rate: s.ttsRate,
+      volume: Math.min(1, Math.max(0, s.ttsVolume * (item.volume ?? 1))),
+      callsign: item.callsign ?? item.speaker ?? item.voiceId,
+      speakerKind: item.speakerKind,
+      distanceNm: item.distanceNm,
+    };
+  };
+
   const queue = createTransmissionQueue({
     monitoredFrequencyMhz: options.monitoredFrequencyMhz,
     monitoredFrequenciesMhz: options.monitoredFrequenciesMhz,
     onEvent: options.onEvent,
     radio: radio ? { playPttOpen: () => radio.playPttOpen(), playPttClose: () => radio.playPttClose() } : undefined,
     speaker: {
-      speak(item) {
-        const s = settings.get();
-        if (!s.ttsEnabled) return Promise.resolve();
+      keysItself: () => tts.keysOnStart?.() ?? false,
+      speak(item, keyUp) {
+        if (!settings.get().ttsEnabled) return Promise.resolve();
         return tts.speak({
-          text: item.text,
-          voiceId: item.voiceId,
-          rate: s.ttsRate,
-          volume: Math.min(1, Math.max(0, s.ttsVolume * (item.volume ?? 1))),
+          ...requestFor(item),
+          onKeyUp: keyUp,
           onStart: () => options.onSpeaking?.(true, item),
           onEnd: () => options.onSpeaking?.(false, item),
         });
       },
       cancel: () => tts.cancel(),
+      prepare: (item) => {
+        if (settings.get().ttsEnabled) tts.prepare?.(requestFor(item));
+      },
     },
   });
   const unsubscribe = settings.subscribe((s) => {

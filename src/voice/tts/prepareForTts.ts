@@ -61,3 +61,23 @@ export function prepareForTts(text: string): string {
 
   return out.replace(/\s{2,}/g, ' ').trim();
 }
+
+/**
+ * Respellings for the neural voices only. The neural engines phonemise with espeak-ng (en-us). Every ICAO alphabet word, the digit
+ * words ("niner", "three", "zero"), "point", runway and frequency phrasing came out right (checked by reading the phoneme strings),
+ * except these three; the browser voices say them acceptably, so this is not applied to them.
+ *   Quebec  -> kwᵻbˈɛk ("kwi-BECK"); "kuh beck" -> kˈʌ bˈɛk, close to the ICAO "keh-BECK"
+ *   ATIS    -> ˈæɾiz ("AD-iz"); "eightis" -> ˈeɪɾiz ("AY-diz"), close to the FAA "AY-tis"
+ *   TRACON  -> tɹˈækən ("TRACK-en"); "traycon" -> tɹˈeɪkən ("TRAY-kun")
+ */
+const NEURAL_RESPELLINGS: ReadonlyArray<[RegExp, string]> = [
+  [/\bquebec\b/gi, 'kuh beck'],
+  [/\bATIS\b/gi, 'eightis'],
+  [/\bTRACON\b/gi, 'traycon'],
+];
+
+export function prepareForNeuralTts(text: string): string {
+  let out = prepareForTts(text);
+  for (const [re, rep] of NEURAL_RESPELLINGS) out = out.replace(re, rep);
+  return out;
+}

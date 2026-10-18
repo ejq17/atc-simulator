@@ -14,11 +14,12 @@ import { sameFrequency } from '../../radio/frequencies';
 import { altimeterText, windText } from '../lib/format';
 import { atisNeedsUpdate, generateAtis, nextAtisLetter } from '../../weather/atis';
 import { atisSlot, hourlyAtisAdvance } from '../../weather/atisCycle';
+import { M_PER_NM } from '../../sim/geo';
 import { createRealtimeClock } from './realtimeClock';
 import type { ClockStatus } from './realtimeClock';
 import type { SimulatedAtis } from '../../weather/atis';
 import {
-  MONITOR_ALL_VOLUME, createBrowserTts, createPilotVoice, createRadioEffects, createTranscriptLog, createVoiceController,
+  MONITOR_ALL_VOLUME, createBrowserTts, createEngineTts, createPilotVoice, createSessionNeuralTts, getSharedNeuralSynth, createRadioEffects, createTranscriptLog, createVoiceController,
 } from '../../voice';
 import { createAiControllers } from '../../ai';
 import type { AiControllers, AiTransmission } from '../../ai';
@@ -195,8 +196,27 @@ export function startSession(p: SessionParams): Session {
 
   // ----- voice -------------------------------------------------------------------------------------------------
   const enableVoice = p.enableVoice ?? typeof window !== 'undefined';
-  const tts: SpeechSynthesisProvider & { isSupported?(): boolean } = p.tts ?? createBrowserTts();
   const radio = enableVoice ? createRadioEffects({ enabled: voiceSettings.get().radioEffectsEnabled }) : undefined;
+  // Pilot voice engine (Settings): browser speech, or the on-device neural voice played through the radio chain. A provider
+  // passed in by a test is used as is. The neural voice falls back to the browser voice by itself.
+  let tts: SpeechSynthesisProvider & { isSupported?(): boolean };
+  let unsubTtsEngine: (() => void) | null = null;
+  if (p.tts) {
+    tts = p.tts;
+  } else {
+    const browser = createBrowserTts();
+    if (enableVoice) {
+      const neural = createSessionNeuralTts(browser, radio);
+      const warm = () => {
+        if (voiceSettings.get().ttsEngine === 'neural') void getSharedNeuralSynth().ensureLoaded().catch(() => undefined);
+      };
+      warm();
+      unsubTtsEngine = voiceSettings.subscribe(warm);
+      tts = { ...createEngineTts({ browser, neural, getEngine: () => voiceSettings.get().ttsEngine }), isSupported: () => browser.isSupported() };
+    } else {
+      tts = browser;
+    }
+  }
   const transcript = createTranscriptLog(voiceSettings);
   const pilots: TransmissionQueue = createPilotVoice({
     tts, settings: voiceSettings, radio,
@@ -229,6 +249,12 @@ export function startSession(p: SessionParams): Session {
   const unsubMonitor = voiceSettings.subscribe(() => syncMonitored());
   const volumeFor = (mhz: number) => (isPlayerFrequency(mhz) ? 1 : MONITOR_ALL_VOLUME);
 
+  /** How far the transmitting aircraft is from the airport reference point (local metres are relative to it), nautical miles. */
+  const aircraftDistanceNm = (aircraftId: string): number | undefined => {
+    const ac = engine.getState().aircraft[aircraftId];
+    return ac ? Math.hypot(ac.pos.x, ac.pos.y) / M_PER_NM : undefined;
+  };
+
   p.pilotSink.handler = (t) => {
     // Informational instructions (RADAR_CONTACT) have an empty readback: nothing is said, so nothing is queued or spoken.
     if (!t.text || !t.text.trim()) return;
@@ -236,7 +262,10 @@ export function startSession(p: SessionParams): Session {
     // Inaudible unless it is on a frequency the player works (or they chose to monitor everything); the engine already logged the text.
     if (!mine && !voiceSettings.get().monitorAll) return;
     transcript.add({ text: `${t.callsign}: ${t.text}`, source: 'pilot' });
-    pilots.enqueue({ text: t.text, voiceId: t.voiceId, frequencyMhz: t.frequencyMhz, volume: volumeFor(t.frequencyMhz), speaker: t.callsign });
+    pilots.enqueue({
+      text: t.text, voiceId: t.voiceId, frequencyMhz: t.frequencyMhz, volume: volumeFor(t.frequencyMhz), speaker: t.callsign,
+      callsign: t.callsign, distanceNm: aircraftDistanceNm(t.aircraftId),
+    });
   };
 
   // ----- AI controllers ------------------------------------------------------------------------------------------
@@ -249,7 +278,11 @@ export function startSession(p: SessionParams): Session {
     const mine = isPlayerFrequency(t.frequencyMhz);
     if (!mine && !voiceSettings.get().monitorAll) return;
     transcript.add({ text: `${t.position} (AI): ${t.text}`, source: 'ai' });
-    pilots.enqueue({ text: t.spokenText || t.text, voiceId: t.voiceId, frequencyMhz: t.frequencyMhz, volume: volumeFor(t.frequencyMhz), speaker: `${t.position} (AI)` });
+    // A controller's station is a strong, clean transmitter: one stable voice per position, no distance fading.
+    pilots.enqueue({
+      text: t.spokenText || t.text, voiceId: t.voiceId, frequencyMhz: t.frequencyMhz, volume: volumeFor(t.frequencyMhz), speaker: `${t.position} (AI)`,
+      callsign: t.position, speakerKind: 'controller',
+    });
   };
   const buildAi = () => {
     ai?.dispose();
@@ -474,6 +507,7 @@ export function startSession(p: SessionParams): Session {
       unsubEngine();
       unsubSettings?.();
       unsubMonitor();
+      unsubTtsEngine?.();
       voice?.dispose();
       ai?.dispose();
       ai = null;

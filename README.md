@@ -14,7 +14,7 @@ ADS-B, or live traffic.
 **Live demo:** https://ejq17.github.io/atc-simulator/ (static GitHub Pages build; no backend). On the demo, **Deepgram is unavailable** (it
 needs the local backend, `npm run server`), **live weather is unavailable** (aviationweather.gov sends no CORS headers, so a browser page
 cannot read it; sessions use the simulated presets and the top bar shows **WX SIMULATED**), and the **FAA charts are bundled at build time**
-from the public-domain d-TPP files. Speech input defaults to the browser's Web Speech API; **Local Whisper** also works there (the model comes from
+from the public-domain d-TPP files. Speech input defaults to the browser's Web Speech API; **Local Whisper** and the **Local neural** pilot voice also work there (models come from
 the Hugging Face CDN, the ONNX runtime from jsDelivr). For everything, run it locally (Quick start below).
 
 ## What is real
@@ -104,7 +104,14 @@ Speech recognition providers, all three exercised end to end in automation: **Lo
 Speech API** (zero setup; Chrome sends audio to Google; pause a beat after keying), or **Deepgram** streaming (set `DEEPGRAM_API_KEY` in `.env`,
 see `.env.example`; about $0.0048 per audio minute at the time of writing). The key never
 reaches the browser: the backend mints short-lived tokens. No recordings are stored.
-Pilot voices use the browser's speech synthesis with per-aircraft voice/pitch variation.
+Pilot voices: **Browser voices** (default, instant, clean) or **Local neural** (Settings > Pilot voice engine; machines with WebGPU see a one-time offer to enable it).
+The neural voice runs in your browser tab, no cloud and no key: **Kokoro-82M** (`kokoro-js`, Apache-2.0) on WebGPU, or **Piper** (VITS, voice `en_US-libritts_r-medium`)
+on WebAssembly when there is no WebGPU. One-time model download from the Hugging Face CDN: **326 MB on WebGPU, 79 MB on the CPU**, then kept in the browser's Cache API
+(verified in Chrome with a persistent profile: the second visit makes no model request) and usable offline. First audio on an Apple-silicon Mac: about 0.5 to 1.8 s with
+Kokoro on WebGPU, about 0.2 to 0.6 s with Piper on the CPU. It runs on the static GitHub Pages build too. Each aircraft gets its own voice, pace and pitch (from its callsign)
+and its voice goes through the 300 to 3000 Hz radio chain with its own noise, compression, occasional mild over-modulation and a squelch tail; the signal turns weaker and
+scratchier beyond about 30 nm. If the model is not ready, fails or is too slow, the call is spoken by the browser voice instead. Details and measurements: `src/voice/README.md`.
+The Piper voice was trained on LibriTTS-R (CC BY 4.0, Koizumi et al., https://www.openslr.org/141/), voices from `rhasspy/piper-voices`.
 
 ## Deploying (GitHub Pages)
 
