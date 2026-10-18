@@ -12,6 +12,13 @@ const NAMES: readonly (readonly [string, string])[] = [
   ['charlotte', 'KCLT'], ['atlanta', 'KATL'], ['orlando', 'KMCO'],
   ['fort lauderdale', 'KFLL'], ['myrtle beach', 'KMYR'],
   ['atlantic city', 'KACY'],
+  ['manchester', 'KMHT'], ['manchester boston', 'KMHT'],
+  ['nashville', 'KBNA'], ['chicago midway', 'KMDW'], ['midway', 'KMDW'],
+  ['chicago ohare', 'KORD'], ['chicago o\'hare', 'KORD'], ['o\'hare', 'KORD'], ['ohare', 'KORD'],
+  ['tampa', 'KTPA'], ['fort myers', 'KRSW'], ['charleston', 'KCHS'], ['raleigh durham', 'KRDU'], ['raleigh', 'KRDU'],
+  ['louisville', 'KSDF'], ['memphis', 'KMEM'],
+  ['nashua', 'KASH'], ['concord', 'KCON'], ['portsmouth', 'KPSM'], ['portland', 'KPWM'], ['keene', 'KEEN'], ['laconia', 'KLCI'],
+  ['bedford', 'KBED'], ['hanscom', 'KBED'], ['lawrence', 'KLWM'], ['beverly', 'KBVY'], ['fitchburg', 'KFIT'],
 ];
 
 export const AIRPORT_NAMES: readonly { words: readonly string[]; icao: string }[] = NAMES

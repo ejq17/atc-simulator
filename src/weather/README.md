@@ -9,7 +9,7 @@ Pure TypeScript, no DOM dependency (except `liveWeather.ts`, which uses `fetch`)
 | `presets.ts` | `WEATHER_PRESETS` (clear, light-crosswinds, strong-winds, low-visibility, rain, thunderstorms, imc), `getPresetWeather(id)`, `randomWeather(seed)` (inline mulberry32) |
 | `runwaySelection.ts` | `headwindComponent`, `crosswindComponent`, `crosswindSigned`, `recommendRunways` |
 | `atis.ts` | `generateAtis`, `nextAtisLetter`, `atisNeedsUpdate` / `atisUpdateReasons`, spoken-number helpers |
-| `liveWeather.ts` | `fetchLiveMetar(icao)` through the local backend, typed `LiveWeatherError` |
+| `liveWeather.ts` | `fetchLiveMetar(icao)`: local backend (AWC), else the NWS API from the browser; typed `LiveWeatherError` |
 
 ## Conventions
 
@@ -70,14 +70,29 @@ a thunderstorm appears/disappears (addition beyond the brief), or the runway set
 
 ## Live weather
 
-`fetchLiveMetar('KACY')` calls `http://localhost:8787/api/weather/metar?ids=KACY` (override with `VITE_API_BASE`).
-AWC has no CORS support, so it is never called from the browser. Failures throw `LiveWeatherError` with
-`code` in `BACKEND_UNREACHABLE | BACKEND_ERROR | NO_DATA | BAD_RESPONSE | TIMEOUT`; the unreachable/timeout
-messages tell the user to run `npm run server`. Live data is an input to the simulation, not a claim about real
-airport operations.
+`fetchLiveMetar(icao)` tries two sources and marks the result `source: 'awc-backend' | 'nws-direct'`:
+
+1. The local backend, `http://localhost:8787/api/weather/metar?ids=ICAO` (override with `VITE_API_BASE`), which proxies the
+   Aviation Weather Center. AWC has no CORS support, so it is never called from the browser. Skipped on the static
+   GitHub Pages build (`isStaticHosting()`).
+2. On `BACKEND_UNREACHABLE`, `TIMEOUT` or `BACKEND_ERROR` (and always on static hosting), the National Weather Service API
+   directly: `https://api.weather.gov/stations/ICAO/observations/latest` (CORS `*`), then `observations?limit=4` if the
+   latest one has no usable data. A non-empty `rawMessage` is parsed with `parseMetar`. KMHT's 5-minute observations have an
+   empty `rawMessage`, so the structured fields are converted: km/h -> kt (rounded), true wind direction, gust, visibility
+   m -> SM (capped at 10), Pa -> inHg (2 decimals), temperature/dewpoint rounded C, cloud bases m -> ft AGL rounded to 100,
+   phenomena from `presentWeather[].rawString`, flight category from `computeFlightCategory`. `raw` is synthesised in METAR
+   form, e.g. `KMHT 180040Z 35004KT 10SM CLR 03/M05 A3033 (NWS)`. NWS reports ASOS-limited clear skies as `CLR`.
+
+A backend `NO_DATA` / `BAD_RESPONSE` does not trigger the fallback. 404/204/empty/all-null NWS data is `NO_DATA`. When both sources
+fail the thrown `LiveWeatherError` message names both ("Local backend: ... NWS API: ..."). Codes:
+`BACKEND_UNREACHABLE | BACKEND_ERROR | NO_DATA | BAD_RESPONSE | TIMEOUT` (`STATIC_HOSTING` is retained in the type but no longer thrown).
+Test hooks on the options: `staticHosting`, `nwsFallback`, `nwsBaseUrl`, `fetchImpl`. `liveFeed.ts` polls `fetchLiveMetar` every 5 minutes, so it
+inherits the fallback; `LiveFeedStatus` carries `source`. Magnetic variation always comes from `airport.magneticVariationDeg`
+(KMHT -15, KACY -10); `KACY_MAGNETIC_VARIATION_DEG` is only a default parameter for `recommendRunways`. Live data is an input to
+the simulation, not a claim about real airport operations.
 
 ## Tests
 
 `npm test -- src/weather`: about 50 METARs (18 real ones fetched from AWC on 2026-10-17, KACY included, plus hand-built edge cases),
 category thresholds, wind maths, runway recommendation, presets/random weather, ATIS text and spoken rendering,
-`atisNeedsUpdate`, and the live client with a mocked `fetch`.
+`atisNeedsUpdate`, and the live client (backend, NWS conversion, fallback order) with a mocked `fetch`; tests never touch the network.

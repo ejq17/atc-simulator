@@ -1,5 +1,5 @@
 import {
-  AIRLINES, ALIASES, DISFLUENCIES, FACILITIES, FILLERS, FUZZY_KEYWORDS, FUZZ_PROTECTED, GA_PREFIXES, HOMOPHONE_DIGITS, KEEP_WORDS, N_PREFIX_WORDS,
+  AIRLINES, ALIASES, DISFLUENCIES, FACILITIES, FILLERS, FUZZY_KEYWORDS, FUZZ_PROTECTED, GA_PREFIXES, HOMOPHONE_DIGITS, FOXTROT_FUSED, FOXTROT_WORDS, KEEP_WORDS, N_PREFIX_WORDS,
   NATO, PHRASES, TAXIWAY_CONTEXT, TOWER_MISHEARD, VIA_ARTICLE,
 } from './lexicon';
 import { digitValue, evaluateNumberWords, numberWordClass } from './numbers';
@@ -10,6 +10,10 @@ export interface NormalizeOptions {
   extraAirlines?: Readonly<Record<string, string>>;
   /** Lower-case words the fuzzy corrector must leave alone (spoken callsigns, fix names ...). */
   protectedWords?: ReadonlySet<string>;
+  /** The airport's taxiway ids: enables the foxtrot-drift repair (only when F is one of them). */
+  taxiways?: readonly string[];
+  /** The airport's runway ends: a bare end after "cross" gets its "runway" word back. */
+  runwayEnds?: readonly string[];
 }
 
 interface Item { w: string; rawStart: number; rawEnd: number; pre?: TokenKind; /** raw word ended with , . ; : ! ? -> a spoken number cannot continue past it */ brk?: boolean }
@@ -38,9 +42,11 @@ export function normalize(raw: string, opts: NormalizeOptions = {}): NormalizedT
   items = applyAliases(items);
   items = dropViaArticle(items, rawWords);
   const lead = new Set<string>([...airlines.keys(), ...GA_PREFIXES.keys(), 'november', 'delta']);
+  items = foxtrotDrift(items, known, lead, opts);
   items = repairNato(items, known, lead);
   items = fuzzyCorrect(items, known, lead, opts.protectedWords);
   items = numberPass(items, lead);
+  items = crossCleanup(items, opts.runwayEnds);
   const tokens = resolveTokens(items, airlines);
   return { raw, rawWords, tokens, text: tokens.map((t) => t.text).join(' ') };
 }
@@ -77,6 +83,7 @@ function applyPhrases(items: Item[]): Item[] {
     const hit = PHRASES.find((ph) => ph.words.every((w, k) => items[i + k] !== undefined && !items[i + k].pre && items[i + k].w === w));
     if (!hit) { out.push(items[i]); continue; }
     const last = items[i + hit.words.length - 1];
+    if (hit.to.text === '') { i += hit.words.length - 1; continue; } // filler phrase: dropped
     if (hit.to.text.includes(' ') && !hit.to.kind) {
       for (const w of hit.to.text.split(' ')) out.push({ w, rawStart: items[i].rawStart, rawEnd: last.rawEnd, ...(last.brk ? { brk: true } : {}) });
       i += hit.words.length - 1;
@@ -153,8 +160,17 @@ function repairNato(items: Item[], known: (w: string) => boolean, lead: Readonly
   for (const it of items) {
     const prev = out[out.length - 1];
     const w = it.w;
-    const candidate = !it.pre && w.length >= 5 && /^[a-z]+$/.test(w) && !known(w) && !FILLERS.has(w)
-      && numberWordClass(w) === null && !HOMOPHONE_DIGITS.has(w) && context(prev);
+    const base = !it.pre && /^[a-z]+$/.test(w) && !known(w) && !FILLERS.has(w) && numberWordClass(w) === null && !HOMOPHONE_DIGITS.has(w);
+    const candidate = base && w.length >= 5 && context(prev);
+    // Callsign-letter repair: a 3-5 letter unknown word straight after a callsign digit run ("november 3619 kila", "n 12 xra")
+    const letterSlot = base && !candidate && w.length >= 3 && w.length <= 5 && !FUZZ_PROTECTED.has(w) && !TOWER_MISHEARD.has(w)
+      && !N_PREFIX_WORDS.has(w) && afterCallsignDigits(out, lead);
+    if (letterSlot) {
+      const near = nearestNato(w);
+      // 3 letters only as a clipped NATO word ("xra" -> xray): a prefix of it
+      if (near && editDistance(w, near) <= 1 && (w.length > 3 || near.startsWith(w))) out.push({ ...it, w: near }); else out.push(it);
+      continue;
+    }
     if (!candidate) { out.push(it); continue; }
     const one = nearestNato(w);
     if (one && editDistance(w, one) <= 1) { out.push({ ...it, w: one }); continue; }
@@ -173,6 +189,16 @@ function repairNato(items: Item[], known: (w: string) => boolean, lead: Readonly
     else out.push(it);
   }
   return out;
+}
+
+/** The items so far end in a run of digits that follows a callsign lead word ("november 3 6 19", "remember 3619"). */
+function afterCallsignDigits(out: readonly Item[], lead: ReadonlySet<string>): boolean {
+  let k = out.length - 1;
+  const digitLike = (x: Item): boolean => !x.pre && (/^\d+$/.test(x.w) || numberWordClass(x.w) !== null);
+  if (k < 0 || !digitLike(out[k])) return false;
+  while (k >= 0 && digitLike(out[k])) k--;
+  const before = out[k];
+  return before !== undefined && (before.pre === 'airline' || (!before.pre && (lead.has(before.w) || N_PREFIX_WORDS.has(before.w))));
 }
 
 const FUZZ_NATO = [...NATO.keys()].filter((w) => w.length >= 4 && NATO.get(w) !== 'n' && NATO.get(w) !== 'd');
@@ -249,7 +275,7 @@ function numberPass(items: Item[], lead: ReadonlySet<string>): Item[] {
     const prev = wordAt(i - 1);
     return (prev !== undefined && lead.has(prev)) || items[i - 1]?.pre === 'airline';
   };
-  const natoAt = (j: number): boolean => { const w = wordAt(j); return w !== undefined && NATO.has(w); };
+  const natoAt = (j: number): boolean => { const w = wordAt(j); return (w !== undefined && NATO.has(w)) || items[j]?.pre === 'letter'; };
   const isDigits = (j: number): boolean => /^\d+$/.test(wordAt(j) ?? '');
   const numeric = (j: number, inCallsign = false): boolean => {
     const w = wordAt(j);
@@ -281,6 +307,10 @@ function numberPass(items: Item[], lead: ReadonlySet<string>): Item[] {
         out.push({ w: it.w + String(HOMOPHONE_DIGITS.get(h)), pre: 'number', rawStart: it.rawStart, rawEnd: items[i + 1].rawEnd });
         i += 2;
         continue;
+      }
+      // "american 3.23" / "runway 1.7": STT dots inside a flight number or runway are not decimals
+      if (/^\d{1,2}\.\d{1,3}$/.test(it.w) && (afterLead(i) || wordAt(i - 1) === 'runway')) {
+        out.push({ ...it, w: it.w.replace('.', ''), pre: 'number' }); i++; continue;
       }
       out.push({ ...it, pre: 'number' }); i++; continue;
     }
@@ -346,4 +376,66 @@ function resolveTokens(items: Item[], airlines: ReadonlyMap<string, string>): To
     return push(w, 'word');
   });
   return tokens;
+}
+
+/**
+ * Foxtrot drift: Whisper hears "foxtrot" as "fox drive", "fucks truck", "foxdrought" ... In a taxiway context (after via, on,
+ * at, cross, and ..., or after a spelled letter) and only when F is one of the airport's taxiways, a fox word followed by one
+ * unknown short word (or a single fused fox-word) becomes the NATO word "foxtrot". A lone fox word in that context too.
+ */
+function foxtrotDrift(items: Item[], known: (w: string) => boolean, lead: ReadonlySet<string>, opts: NormalizeOptions): Item[] {
+  if (!opts.taxiways?.some((t) => t.toUpperCase() === 'F')) return items;
+  const junk = (it: Item | undefined): boolean => {
+    if (!it || it.pre) return false;
+    const w = it.w;
+    return /^[a-z]{3,14}$/.test(w) && !known(w) && !FILLERS.has(w) && !FUZZ_PROTECTED.has(w) && !TAXIWAY_CONTEXT.has(w)
+      && !FUZZY_KEYWORDS.includes(w) && numberWordClass(w) === null && !HOMOPHONE_DIGITS.has(w) && !FOXTROT_WORDS.has(w)
+      && !FACILITIES.has(w) && !N_PREFIX_WORDS.has(w) && !TOWER_MISHEARD.has(w) && !lead.has(w) && !opts.protectedWords?.has(w);
+  };
+  const letterish = (x: Item | undefined): boolean => x !== undefined && (x.pre === 'letter' || (!x.pre && (NATO.has(x.w) || /^[a-z]$/.test(x.w))));
+  const inRoute = (out: readonly Item[]): boolean => {
+    const prev = out[out.length - 1];
+    if (!prev) return false;
+    if (prev.pre) return prev.pre === 'letter';
+    if (TAXIWAY_CONTEXT.has(prev.w) || ROUTE_CONTEXT.has(prev.w) || letterish(prev)) return true;
+    return /^\d$/.test(prev.w) && letterish(out[out.length - 2]); // "alpha 2 fox drive"
+  };
+  const out: Item[] = [];
+  for (let k = 0; k < items.length; k++) {
+    const it = items[k];
+    const fox = !it.pre && inRoute(out);
+    const fused = fox && FOXTROT_FUSED.test(it.w) && junk(it);
+    const lone = fox && FOXTROT_WORDS.has(it.w);
+    if (fused || lone) {
+      const tail = lone && junk(items[k + 1]) ? items[k + 1] : null;
+      const last = tail ?? it;
+      out.push({ w: 'foxtrot', rawStart: it.rawStart, rawEnd: last.rawEnd, ...(last.brk ? { brk: true } : {}) });
+      if (tail) k++;
+      continue;
+    }
+    out.push(it);
+  }
+  return out;
+}
+
+/**
+ * After numbers are formed: (1) "cross <taxiway> cross <runway>" - the first cross-and-letter is noise (STT repeat) and is
+ * dropped; (2) "cross 3 5" with 35 a runway end of this airport regains its word "runway".
+ */
+function crossCleanup(items: Item[], runwayEnds?: readonly string[]): Item[] {
+  const isLetter = (x: Item | undefined): boolean => x !== undefined && (x.pre === 'letter' || (!x.pre && (NATO.has(x.w) || /^[a-z]$/.test(x.w))));
+  const isCross = (x: Item | undefined): boolean => x !== undefined && !x.pre && x.w === 'cross';
+  const strip = (e: string): string => e.replace(/^0+(?=\d)/, '').toUpperCase();
+  const ends = new Set((runwayEnds ?? []).map(strip));
+  const out: Item[] = [];
+  for (let k = 0; k < items.length; k++) {
+    const it = items[k];
+    if (isCross(it) && isLetter(items[k + 1]) && isCross(items[k + 2])) { k++; continue; }
+    out.push(it);
+    const next = items[k + 1];
+    if (isCross(it) && next?.pre === 'number' && /^\d{1,2}$/.test(next.w) && ends.has(strip(next.w))) {
+      out.push({ w: 'runway', rawStart: next.rawStart, rawEnd: next.rawEnd });
+    }
+  }
+  return out;
 }

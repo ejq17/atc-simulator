@@ -115,15 +115,15 @@ describe('taxiway destinations and via order', () => {
     expect(d1.phase).toBe('TAXIING');
     expect(d1.groundSpeedKt).toBeLessThan(0.1);
   });
-  it('"runway 31 via bravo kilo" (kilo only branches off at the hold) is flown via bravo, read back as flown and flagged', () => {
+  it('"runway 31 via bravo kilo" follows the short kilo loop that rejoins bravo before the hold, and reads it back', () => {
+    // The search cannot U-turn onto kilo any more; kilo is only usable as the loop it really is.
     const e = setup([a320('D1', 'GATE-2')]);
     const d1 = find(e, 'D1');
     const o = say(e, cmd('TAXI', 'D1', { runwayEnd: '31', route: ['B', 'K'] }), 'GND');
     expect(o.status).toBe('accepted');
-    expect(rb(o)).toMatch(/taxi via bravo, /);
-    expect(rb(o)).not.toMatch(/kilo/);
+    expect(rb(o)).toMatch(/taxi via bravo, kilo/);
     expect(d1.route!.nodeIds.at(-1)).toBe('HP13-31-B-2');
-    expect(e.getState().events.some((x) => x.data?.improper && /not usable in that order/.test(x.text))).toBe(true);
+    expect(new Set(d1.route!.nodeIds).size).toBe(d1.route!.nodeIds.length);
   });
   it('an aircraft holding short of runway 4 can be re-taxied to runway 31 (runway change) and goes back to TAXIING', () => {
     const e = setup([IFR_HOLDING('D2', 'HP4-22-D-1', '4', ['TVO'], 'GND')]);

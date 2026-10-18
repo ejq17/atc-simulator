@@ -142,9 +142,32 @@ function scoreMention(m: Mention, ac: AircraftRef): number {
 
 const round2 = (n: number) => Math.round(n * 100) / 100;
 
+/** `heard` is `full` with exactly one digit missing, the rest in order ("43" for "483"). */
+const missingOneDigit = (heard: string, full: string): boolean =>
+  heard.length >= 2 && full.length === heard.length + 1 && [...full].some((_, k) => full.slice(0, k) + full.slice(k + 1) === heard);
+
+/**
+ * Dropped-digit flight number: heard "Spirit 43" with exactly ONE active aircraft of that airline whose flight number is the
+ * heard digits plus one more (NKS483). Accepted at a reduced score (0.8). Refused when any other active aircraft of the airline
+ * is also a plausible reading (edit distance <= 2 from the heard digits, e.g. NKS487 for "43"): then it stays unrecognised.
+ */
+function droppedDigitMatch(m: Mention, aircraft: readonly AircraftRef[]): string | null {
+  if (!m.airline) return null;
+  const same = aircraft
+    .map((ac) => ({ cs: ac.callsign, flight: /^([A-Z]{3})(\d{1,4}[A-Z]?)$/.exec(ac.callsign.toUpperCase()) }))
+    .filter((x) => x.flight !== null && x.flight[1] === m.airline)
+    .map((x) => ({ cs: x.cs, id: (x.flight as RegExpExecArray)[2] }));
+  const hits = same.filter((x) => missingOneDigit(m.id, x.id));
+  if (hits.length !== 1) return null;
+  if (same.some((x) => x.cs !== hits[0].cs && editDistance(m.id, x.id) <= 2)) return null;
+  return hits[0].cs;
+}
+
 function rank(m: Mention, aircraft: readonly AircraftRef[]): CallsignCandidate[] {
+  const dropped = droppedDigitMatch(m, aircraft);
+  const positionPenalty = m.start === 0 ? 0 : 0.02;
   return aircraft
-    .map((ac) => ({ callsign: ac.callsign, score: round2(scoreMention(m, ac)) }))
+    .map((ac) => ({ callsign: ac.callsign, score: round2(ac.callsign === dropped ? 0.8 - positionPenalty : scoreMention(m, ac)) }))
     .filter((c) => c.score > 0.3)
     .sort((a, b) => b.score - a.score);
 }

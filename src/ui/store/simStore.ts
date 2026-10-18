@@ -86,9 +86,9 @@ export function recommendedRunways(weather: Weather, airport: Pick<Airport, 'ica
  * on every METAR it only proposes a change when the runway now in use is no longer among the best ends AND (the wind is not calm OR the
  * current runway has a tailwind).
  */
-export function runwayChangeForWind(weather: Weather, current: { landing: string[]; departing: string[] }, airport: Pick<Airport, 'runways' | 'magneticVariationDeg'> = loadKacy()): { departing: string[]; landing: string[]; summary: string } | undefined {
+export function runwayChangeForWind(weather: Weather, current: { landing: string[]; departing: string[] }, airport: Pick<Airport, 'icao' | 'runways' | 'magneticVariationDeg'> = loadKacy()): { departing: string[]; landing: string[]; summary: string } | undefined {
   const ends = airport.runways.flatMap((r) => r.ends.map((e) => ({ id: e.id, magneticHeadingDeg: e.magneticHeadingDeg })));
-  const rec = recommendRunways(weather, ends, { preferredOrder: ['31', '13', '22', '4'], variationDeg: airport.magneticVariationDeg });
+  const rec = recommendRunways(weather, ends, { preferredOrder: preferredEndOrder(airport, 'high'), variationDeg: airport.magneticVariationDeg });
   const inUse = current.landing[0] ?? current.departing[0];
   if (!inUse || rec.best.includes(inUse)) return undefined;
   const cur = rec.ranking.find((r) => r.id === inUse);
@@ -295,18 +295,18 @@ export const useSimStore = create<SimStore>((set, get) => ({
       if (wantLive) {
         const autoRunways = opts.runways === 'auto' && !opts.scenarioId;
         liveFeed = createLiveFeed({
-          fetchMetar: () => fetchLiveMetar('KACY'),
+          fetchMetar: () => fetchLiveMetar(airport.icao),
           initial: initialMetar,
           onStatus: (liveWeather) => {
             set({ liveWeather });
-            if (liveWeather.kind === 'stale') get().addNotice('warn', `Live weather refresh failed (${liveWeather.error}). Still using the KACY METAR observed ${liveWeather.observedAt.slice(11, 16)}Z; retrying every minute.`);
+            if (liveWeather.kind === 'stale') get().addNotice('warn', `Live weather refresh failed (${liveWeather.error}). Still using the ${airport.icao} METAR observed ${liveWeather.observedAt.slice(11, 16)}Z; retrying every minute.`);
             else if (liveWeather.kind === 'fallback') set({ weatherNote: 'Simulated weather: Clear (live weather unavailable)' });
           },
           onWeather: (w, m) => {
             if (get().session !== session) return;
             session.setWeather(w);
             set({ weatherNote: `Live METAR ${m.raw}` });
-            get().addNotice('info', `New KACY METAR (${m.observedAt.slice(11, 16)}Z): ${m.raw}`);
+            get().addNotice('info', `New ${airport.icao} METAR (${m.observedAt.slice(11, 16)}Z): ${m.raw}`);
             const change = autoRunways ? runwayChangeForWind(w, session.engine.getState().activeRunways, airport) : undefined;
             if (change) {
               session.setActiveRunways({ departing: change.departing, landing: change.landing });
@@ -319,7 +319,7 @@ export const useSimStore = create<SimStore>((set, get) => ({
       set({
         session,
         realTime,
-        liveWeather: wantLive ? (initialMetar ? { kind: 'live', observedAt: initialMetar.observedAt, raw: initialMetar.raw, checkedAtMs: Date.now() } : { kind: 'fallback', error: 'backend unreachable', failedAtMs: Date.now() }) : undefined,
+        liveWeather: wantLive ? (initialMetar ? { kind: 'live', observedAt: initialMetar.observedAt, raw: initialMetar.raw, checkedAtMs: Date.now(), source: initialMetar.source } : { kind: 'fallback', error: 'live weather unavailable', failedAtMs: Date.now() }) : undefined,
         screen: 'sim',
         starting: false,
         startStatus: '',

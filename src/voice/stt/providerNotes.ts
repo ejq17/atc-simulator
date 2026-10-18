@@ -36,10 +36,10 @@ export const STT_PROVIDER_NOTES: Record<SttProviderId, SttProviderNote> = {
     id: 'whisper-local',
     label: 'Local Whisper (on-device, no cloud)',
     summary:
-      'Runs OpenAI Whisper (tiny English model) inside your browser. No account, API key or internet needed after a one-time model download (about 40 MB). Transcribes when you release the key, so there is a short pause; first use is slower while the model loads.',
+      'Runs OpenAI Whisper (English models: tiny 40 MB, base 77 MB, small 250 MB) inside your browser, on the GPU when WebGPU is available. No account, API key or internet needed after a one-time model download. Transcribes when you release the key, so there is a short pause; first use is slower while the model loads.',
     audioGoesTo:
       'Nowhere. Your microphone audio stays in this browser tab: it is buffered in memory while you hold push-to-talk, transcribed on your own computer and then discarded. Only the model files are downloaded (from huggingface.co, once); no audio is uploaded.',
-    cost: 'Free (uses your CPU/GPU; about 40 MB of storage for the cached model).',
+    cost: 'Free (uses your CPU/GPU; 40 to 250 MB of storage for the cached model, more for the GPU variants).',
   },
   none: {
     id: 'none',

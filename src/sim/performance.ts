@@ -61,24 +61,91 @@ export const A320: AircraftPerformance = {
   lengthM: 37.6,
 };
 
+// ---------------------------------------------------------------------------------------------------------------------------------
+// Types added for KMHT traffic (airport traffic profile, src/game/airportProfile.ts). Figures are public-data approximations at typical
+// (not maximum) operating weight; each is documented, with its source or "ESTIMATE", in data/sources/aircraft-performance.json and
+// docs/REALISM-VERIFICATION.md section 7. Shared simplifications follow A320/C172: taxi speeds, turn rates and descent rates are gameplay values.
+// ---------------------------------------------------------------------------------------------------------------------------------
+
+/** Boeing 737-800 (Southwest 737-700/-800/MAX 8 and Sun Country are flown as B738). */
+export const B738: AircraftPerformance = {
+  type: 'B738', category: 'large', wakeCategory: 'medium',
+  taxiSpeedKt: 20, taxiTurnSpeedKt: 10, accelKtPerSec: 3.7, decelKtPerSec: 5.8,
+  rotateSpeedKt: 145, climbSpeedKt: 180, cruiseSpeedKt: 250, approachSpeedKt: 140, touchdownSpeedKt: 135,
+  climbRateFpm: 2500, descentRateFpm: 2000, turnRateDegPerSec: 2.5, groundTurnRateDegPerSec: 15,
+  minSpeedKt: 125, maxSpeedKt: 340, serviceCeilingFt: 41000,
+  takeoffDistanceFt: 6000, landingDistanceFt: 4700, lengthM: 39.5, // ESTIMATE: typical weight; Boeing 737 airport planning document D6-58325-6
+};
+
+/** Airbus A220-300 (Breeze "Moxy"; ICAO type BCS3). */
+export const BCS3: AircraftPerformance = {
+  type: 'BCS3', category: 'large', wakeCategory: 'medium',
+  taxiSpeedKt: 20, taxiTurnSpeedKt: 10, accelKtPerSec: 3.9, decelKtPerSec: 6.0,
+  rotateSpeedKt: 135, climbSpeedKt: 175, cruiseSpeedKt: 250, approachSpeedKt: 133, touchdownSpeedKt: 128,
+  climbRateFpm: 2800, descentRateFpm: 2000, turnRateDegPerSec: 2.5, groundTurnRateDegPerSec: 15,
+  minSpeedKt: 115, maxSpeedKt: 340, serviceCeilingFt: 41000,
+  takeoffDistanceFt: 4900, landingDistanceFt: 4300, lengthM: 38.7, // ESTIMATE: A220-300 airport planning data, typical weight
+};
+
+/** Embraer 175 (Piedmont, Republic "Brickyard", SkyWest). */
+export const E175: AircraftPerformance = {
+  type: 'E175', category: 'large', wakeCategory: 'medium',
+  taxiSpeedKt: 20, taxiTurnSpeedKt: 10, accelKtPerSec: 4.0, decelKtPerSec: 6.0,
+  rotateSpeedKt: 132, climbSpeedKt: 170, cruiseSpeedKt: 250, approachSpeedKt: 128, touchdownSpeedKt: 122,
+  climbRateFpm: 2800, descentRateFpm: 2000, turnRateDegPerSec: 3, groundTurnRateDegPerSec: 16,
+  minSpeedKt: 110, maxSpeedKt: 320, serviceCeilingFt: 41000,
+  takeoffDistanceFt: 5000, landingDistanceFt: 4000, lengthM: 31.7, // ESTIMATE: Embraer 175 airport planning data, typical weight
+};
+
+/** Bombardier CRJ-900 (PSA "Blue Streak", GoJet "Lindbergh"). */
+export const CRJ9: AircraftPerformance = {
+  type: 'CRJ9', category: 'large', wakeCategory: 'medium',
+  taxiSpeedKt: 20, taxiTurnSpeedKt: 10, accelKtPerSec: 4.0, decelKtPerSec: 6.0,
+  rotateSpeedKt: 138, climbSpeedKt: 180, cruiseSpeedKt: 250, approachSpeedKt: 135, touchdownSpeedKt: 128,
+  climbRateFpm: 3000, descentRateFpm: 2000, turnRateDegPerSec: 3, groundTurnRateDegPerSec: 16,
+  minSpeedKt: 115, maxSpeedKt: 320, serviceCeilingFt: 41000,
+  takeoffDistanceFt: 5500, landingDistanceFt: 4200, lengthM: 36.4, // ESTIMATE: CRJ900 airport planning data, typical weight
+};
+
+/** Boeing 757-200 (UPS, FedEx freighters). */
+export const B752: AircraftPerformance = {
+  type: 'B752', category: 'large', wakeCategory: 'medium',
+  taxiSpeedKt: 20, taxiTurnSpeedKt: 10, accelKtPerSec: 3.3, decelKtPerSec: 5.5,
+  rotateSpeedKt: 150, climbSpeedKt: 185, cruiseSpeedKt: 250, approachSpeedKt: 140, touchdownSpeedKt: 135,
+  climbRateFpm: 2600, descentRateFpm: 2000, turnRateDegPerSec: 2.5, groundTurnRateDegPerSec: 12,
+  minSpeedKt: 125, maxSpeedKt: 350, serviceCeilingFt: 42000,
+  takeoffDistanceFt: 6800, landingDistanceFt: 5000, lengthM: 47.3, // ESTIMATE: Boeing 757 airport planning document D6-58327, typical freighter weight
+};
+
+/** Cessna 208 Caravan (Wiggins Airways feeder flights). Small single-engine turboprop: SRS I, RECAT I, parks on the GA ramp. */
+export const C208: AircraftPerformance = {
+  type: 'C208', category: 'light', wakeCategory: 'light',
+  taxiSpeedKt: 15, taxiTurnSpeedKt: 8, accelKtPerSec: 3.0, decelKtPerSec: 4.0,
+  rotateSpeedKt: 75, climbSpeedKt: 95, cruiseSpeedKt: 175, approachSpeedKt: 85, touchdownSpeedKt: 70,
+  climbRateFpm: 900, descentRateFpm: 1000, turnRateDegPerSec: 3, groundTurnRateDegPerSec: 25,
+  minSpeedKt: 60, maxSpeedKt: 175, serviceCeilingFt: 25000,
+  takeoffDistanceFt: 2300, landingDistanceFt: 1900, lengthM: 11.5, // ESTIMATE: Textron 208B/208 specifications, POH Section 5, typical weight
+};
+
 import type { WakeCategory } from './wake';
-const registry: Record<string, AircraftPerformance> = { C172, A320 };
+const registry: Record<string, AircraftPerformance> = { C172, A320, B738, BCS3, E175, CRJ9, B752, C208 };
 
 /**
  * Same-runway-separation (SRS) category, FAA JO 7110.65 3-9-6 NOTE (aircraft types per JO 7360.1):
  * I = small single-engine propeller-driven <= 12,500 lb and all helicopters; II = small twin-engine propeller-driven <= 12,500 lb;
  * III = all other aircraft. Derived here from the type code; unknown types are I when `category === 'light'`, else III.
  */
-const SRS: Record<string, 1 | 2 | 3> = { C172: 1, C182: 1, C152: 1, C210: 1, PA28: 1, SR22: 1, BE36: 1, PA34: 2, BE58: 2, C310: 2, A320: 3 };
+const SRS: Record<string, 1 | 2 | 3> = { C172: 1, C182: 1, C152: 1, C210: 1, PA28: 1, SR22: 1, BE36: 1, PA34: 2, BE58: 2, C310: 2, C208: 1, A320: 3, B738: 3, BCS3: 3, E175: 3, CRJ9: 3, B752: 3 };
 export function srsCategory(type: string): 1 | 2 | 3 {
   return SRS[type] ?? (getPerformance(type).category === 'light' ? 1 : 3);
 }
 
 /**
  * Wake RECAT category, FAA JO 7110.126A Appendix A (verified by the accuracy review): A320 = F ("other aircraft over 41,000 lb"),
- * C172 = I ("41,000 lb and under"); B757 = E; heavies B / D. Types not listed: `wakeCategory` light -> I, medium -> F, heavy -> D.
+ * C172 = I ("41,000 lb and under"); B757 = E; heavies B / D. Added types follow the same convention: B738, BCS3, E175, CRJ9 = F (over 41,000 lb, not
+ * heavy); B752 = E (the file's B757 convention; the 7110.126A Appendix A listing of the 757 was not re-fetched when it was added); C208 = I (MTOW 8,750 lb). Types not listed: `wakeCategory` light -> I, medium -> F, heavy -> D.
  */
-const RECAT: Record<string, WakeCategory> = { C172: 'I', C182: 'I', C152: 'I', C210: 'I', PA28: 'I', SR22: 'I', BE36: 'I', PA34: 'I', BE58: 'I', C310: 'I', A320: 'F' };
+const RECAT: Record<string, WakeCategory> = { C172: 'I', C182: 'I', C152: 'I', C210: 'I', PA28: 'I', SR22: 'I', BE36: 'I', PA34: 'I', BE58: 'I', C310: 'I', C208: 'I', A320: 'F', B738: 'F', BCS3: 'F', E175: 'F', CRJ9: 'F', B752: 'E' };
 export function wakeRecatCategory(type: string): WakeCategory {
   const known = RECAT[type];
   if (known) return known;

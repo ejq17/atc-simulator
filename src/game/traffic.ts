@@ -9,8 +9,11 @@
  *  - at least `MIN_SPAWN_SPACING_SEC` (45 s) between generated spawns,
  *  - arrivals 10-12 nm out on the active landing runway's final or a base-leg offset, 2,500-3,000 ft, never within
  *    3 nm of another arrival (5 nm when a faster aircraft would sit behind a slower one on the same final),
- *  - departures on a free parking position (GA ramp / FBO for C172, gates for A320); A320 departures only when the
- *    active departure runway is long enough for it (not 4/22),
+ *  - the airline mix, equipment, destinations and VFR neighbours come from the airport's traffic profile (`airportProfile.ts`): KACY
+ *    Spirit/American A320s, KMHT Southwest B738, Breeze BCS3, American/United regionals (CRJ9, E175), UPS/FedEx B752 (night-weighted
+ *    in real-time mode), Wiggins C208 (day-weighted) and GA,
+ *  - departures on a free parking position (GA ramp / FBO for GA and the C208, gates for airliners, the cargo apron for freighters); an
+ *    airliner departs only when the active departure runway is long enough for its type (A320 not on KACY 4/22 from an intersection),
  *  - IFR flows (`resolveIfrFlows`, ifr.ts): airline arrivals appear over the fix of the procedure serving the landing runway (ILS 13 via
  *    CARYL, ILS 31 via STEVV, RNAV 22 via KOPCE, RNAV 4 via JEDOB; sometimes from the first feeder such as VCN) at 3,000-5,000 ft on the Approach
  *    frequency, never within 5 nm of another airborne aircraft and never less than 90 s after the previous arrival on the same procedure; airline
@@ -26,7 +29,11 @@ import type { SpawnSpec, TrafficGenerator } from '../sim/traffic';
 import { createNullTrafficGenerator } from '../sim/traffic';
 import { mulberry32 } from '../sim/rng';
 import type { Rng } from '../sim/rng';
-import { NM, callsignTail, randomAirlineCallsign, randomNNumber, runwayLongEnoughFor } from './world';
+import { NM, callsignTail, randomNNumber, runwayLongEnoughFor } from './world';
+import { pickFlight, pickGaType, pickLeg, profileFor, resolveTypeSelection, usableAirlines } from './airportProfile';
+import type { Flight } from './airportProfile';
+import { localHourAt } from './trafficDensity';
+import { simUtcMs } from '../sim/solar';
 import { pickArrivalStart, pickParking } from './placement';
 import type { AirbornePoint } from './placement';
 import type { Difficulty, GameScenario } from './types';
@@ -74,15 +81,17 @@ export function createTrafficGenerator(scenario: Scenario, airport: Airport, opt
   if (!cfg || !cfg.enabled) return createNullTrafficGenerator();
   const gs = scenario as GameScenario;
   const difficulty: Difficulty = gs.difficulty ?? 'normal';
-  const types = (gs.aircraftTypes?.length ? gs.aircraftTypes : ['C172', 'A320']).filter((t) => t === 'C172' || t === 'A320');
-  const allowGA = types.includes('C172');
-  const allowJet = types.includes('A320');
+  const icao = airport.icao;
+  const sel = resolveTypeSelection(icao, gs.aircraftTypes);
+  const allowGA = sel.ga;
+  const allowJet = sel.jets;
   const gaFraction = allowGA && allowJet ? cfg.gaFraction : allowGA ? 1 : 0;
   const towerOnly = !scenario.controllerPositions.includes('GND');
   const flows = resolveIfrFlows(gs);
   const arrivalFreq = scenario.controllerPositions.includes('TWR') || !scenario.controllerPositions.includes('APP') ? 'TWR' : 'APP';
   const departureFreq = towerOnly ? 'TWR' : 'GND';
 
+  const profile = profileFor(icao);
   let rng: Rng | undefined;
   let nextArr = Infinity;
   let nextDep = Infinity;
@@ -104,41 +113,61 @@ export function createTrafficGenerator(scenario: Scenario, airport: Airport, opt
     return exp(rng!, 3600 / (perHour * rampFactor(difficulty, now)));
   };
 
-  const callsignFor = (ga: boolean, state: Readonly<SimulationState>): string => {
+  /**
+   * Next flight (callsign + type), unique among callsigns used so far and not sounding like an active aircraft. Not marked as used until
+   * `commit`, so a spawn that is dropped (no parking, no spacing) wastes no callsign. `fits` restricts airliner types (runway length).
+   */
+  const nextFlight = (ga: boolean, state: Readonly<SimulationState>, fits?: (type: string) => boolean): Flight | undefined => {
     const tails = new Set(Object.values(state.aircraft).map((a) => callsignTail(a.callsign)));
+    let allowedTypes: ReadonlySet<string> | undefined = sel.allowed;
+    if (!ga && fits) {
+      const cand = new Set(usableAirlines(profile, sel.allowed).flatMap((e) => e.types).filter((t) => (!sel.allowed || sel.allowed.has(t)) && fits(t)));
+      if (!cand.size) return undefined;
+      allowedTypes = cand;
+    }
+    const localHour = options.densityAt ? localHourAt(simUtcMs(state)) : undefined;
+    let last: Flight | undefined;
     for (let i = 0; i < 80; i++) {
-      const cs = ga ? randomNNumber(rng!) : randomAirlineCallsign(rng!);
-      if (used.has(cs) || tails.has(callsignTail(cs))) continue;
-      used.add(cs);
-      return cs;
+      const f: Flight | undefined = ga ? { callsign: randomNNumber(rng!), type: pickGaType(rng!, icao) } : pickFlight(rng!, icao, { allowedTypes, localHour });
+      if (!f) return undefined;
+      last = f;
+      if (used.has(f.callsign) || tails.has(callsignTail(f.callsign))) continue;
+      return f;
     }
     let cs: string;
-    do cs = ga ? `N${100 + ++counter}ZZ` : `NKS${9000 + ++counter}`;
+    const prefix = last?.entry?.icao3 ?? profile.airlines[0].icao3;
+    do cs = ga ? `N${100 + ++counter}ZZ` : `${prefix}${9000 + ++counter}`;
     while (used.has(cs));
-    used.add(cs);
-    return cs;
+    return { ...last!, callsign: cs };
+  };
+  const commit = (f: Flight): string => {
+    used.add(f.callsign);
+    return f.callsign;
   };
 
   const trySpawnArrival = (state: Readonly<SimulationState>): SpawnSpec | undefined => {
     const ends = state.activeRunways.landing.length ? state.activeRunways.landing : state.activeRunways.departing;
     if (!ends.length) return undefined;
     const ga = rng!() < gaFraction;
-    const type = ga ? 'C172' : 'A320';
+    const flight = nextFlight(ga, state);
+    if (!flight) return undefined;
+    const type = flight.type;
     const endId = ends[Math.min(ends.length - 1, Math.floor(rng!() * ends.length))];
-    if (!ga && flows.arrivals && arrivalProcedure(airport, endId)) return trySpawnIfrArrival(state, type, endId);
+    if (!ga && flows.arrivals && arrivalProcedure(airport, endId)) return trySpawnIfrArrival(state, flight, endId);
     const others: AirbornePoint[] = Object.values(state.aircraft)
       .filter((a) => !a.onGround)
       .map((a) => ({ pos: a.pos, type: a.type, runwayEnd: a.isDeparture ? undefined : a.assignedRunwayEnd }));
     const start = pickArrivalStart(airport, endId, type, rng!, others);
     if (!start) return undefined;
+    const leg = pickLeg(rng!, icao, flight);
     return {
-      atSec: state.clock.timeSec, callsign: callsignFor(ga, state), type, flightRules: ga ? 'VFR' : 'IFR', start,
-      isDeparture: false, initialFrequencyId: arrivalFreq, initialRequest: 'LANDING',
+      atSec: state.clock.timeSec, callsign: commit(flight), type, flightRules: ga ? 'VFR' : 'IFR', start,
+      isDeparture: false, initialFrequencyId: arrivalFreq, initialRequest: 'LANDING', ...(leg.remoteAirport ? { remoteAirport: leg.remoteAirport } : {}),
     };
   };
 
   /** An airline arrival over the procedure fix, or undefined while spacing does not allow one (the caller retries). */
-  const trySpawnIfrArrival = (state: Readonly<SimulationState>, type: string, endId: string): SpawnSpec | undefined => {
+  const trySpawnIfrArrival = (state: Readonly<SimulationState>, flight: Flight, endId: string): SpawnSpec | undefined => {
     const proc = arrivalProcedure(airport, endId)!;
     const now = state.clock.timeSec;
     const last = lastIfrArrival.get(endId);
@@ -161,34 +190,44 @@ export function createTrafficGenerator(scenario: Scenario, airport: Airport, opt
     const options = [false, ...(proc.feederFix ? [true] : [])].filter(usable);
     if (!options.length) return undefined;
     const fromFeeder = options.length > 1 ? rng!() < IFR_FEEDER_START_SHARE : options[0];
-    const spec = ifrArrivalSpawn(airport, rng!, { callsign: callsignFor(false, state), type, runwayEnd: endId, atSec: now, fromFeeder });
+    const spec = ifrArrivalSpawn(airport, rng!, { callsign: flight.callsign, type: flight.type, runwayEnd: endId, atSec: now, fromFeeder });
     if (!spec) return undefined;
+    commit(flight);
     lastIfrArrival.set(endId, now);
-    return spec;
+    const leg = pickLeg(rng!, icao, flight);
+    return leg.remoteAirport ? { ...spec, remoteAirport: leg.remoteAirport } : spec;
   };
 
   const trySpawnDeparture = (state: Readonly<SimulationState>): SpawnSpec | undefined => {
     const depEnds = state.activeRunways.departing.length ? state.activeRunways.departing : state.activeRunways.landing;
     let ga = rng!() < gaFraction;
-    // A320 needs a long runway; fall back to a Cessna (if allowed) when the departure runway is short.
+    let flight: Flight | undefined;
+    // An airliner needs a runway long enough for its type; fall back to a GA aircraft (if allowed) when the departure runway is short.
     if (!ga) {
-      const longOk = depEnds.length === 0 || depEnds.some((e) => runwayLongEnoughFor(airport, 'A320', e));
-      if (!longOk) {
+      flight = nextFlight(false, state, (t) => depEnds.length === 0 || depEnds.some((e) => runwayLongEnoughFor(airport, t, e)));
+      if (!flight) {
         if (!allowGA) return undefined;
         ga = true;
       }
     }
-    const type = ga ? 'C172' : 'A320';
+    if (ga) flight = nextFlight(true, state);
+    if (!flight) return undefined;
+    const type = flight.type;
     const occupied = Object.values(state.aircraft).filter((a) => a.onGround).map((a) => a.pos);
     const parking = pickParking(airport, type, rng!, occupied, new Set(reserved.keys()));
     if (!parking) return undefined;
     reserved.set(parking.id, state.clock.timeSec);
+    const leg = pickLeg(rng!, icao, flight);
+    const remote = leg.remoteAirport ? { remoteAirport: leg.remoteAirport } : {};
     if (!ga && flows.departures) {
-      return ifrDepartureSpawn(airport, rng!, { callsign: callsignFor(false, state), type, parkingId: parking.id, atSec: state.clock.timeSec });
+      const spec = ifrDepartureSpawn(airport, rng!, {
+        callsign: commit(flight), type, parkingId: parking.id, atSec: state.clock.timeSec, destination: leg.destination, cruiseAltitudeFt: leg.cruiseAltitudeFt,
+      });
+      return { ...spec, ...remote };
     }
     return {
-      atSec: state.clock.timeSec, callsign: callsignFor(ga, state), type, flightRules: ga ? 'VFR' : 'IFR',
-      start: { kind: 'parked', parkingId: parking.id }, isDeparture: true, initialFrequencyId: departureFreq, initialRequest: 'TAXI',
+      atSec: state.clock.timeSec, callsign: commit(flight), type, flightRules: ga ? 'VFR' : 'IFR',
+      start: { kind: 'parked', parkingId: parking.id }, isDeparture: true, initialFrequencyId: departureFreq, initialRequest: 'TAXI', ...remote,
     };
   };
 

@@ -144,7 +144,8 @@ export function spawnFromSpec(ctx: SimContext, spec: SpawnSpec): Aircraft {
   const freq = resolveFrequency(ctx, spec.initialFrequencyId);
   const id = `ac-${++ctx.aircraftSeq}`;
   const origins = perf.category === 'light' ? GA_ORIGINS : JET_ORIGINS;
-  const other = rngPick(rng, origins);
+  const picked = rngPick(rng, origins); // always drawn so seeded runs stay identical
+  const other = spec.remoteAirport ?? picked;
   const ac: Aircraft = {
     id,
     callsign,
@@ -357,6 +358,7 @@ export function updatePilotRequests(ctx: SimContext): void {
       });
       rt.readbackError = undefined;
       ac.flags.readbackErrorPending = false;
+      ac.flags.readbackErrorClearanceId = undefined;
       if (ac.radioState === 'WAITING_FOR_READBACK') ac.radioState = 'IDLE';
     }
 

@@ -151,24 +151,30 @@ function search(graph: TaxiwayGraph, from: string, to: string, opts: RouteOption
   const viaSet = new Set(via.map(up));
   const adj = adjacency(graph);
   const penalty = opts.runwayPenaltyM ?? 300;
-  const key = (n: string, k: number) => `${n}#${k}`;
+  // Dijkstra state is (node, via progress k, node we arrived from). Tracking the arrival node
+  // forbids reversing straight back along the edge just used; otherwise the cheapest way to
+  // "touch" a via taxiway is a one-edge poke onto it followed by a U-turn.
+  const key = (n: string, k: number, p: string) => `${n}#${k}#${p}`;
+  const nodeOf = new Map<string, string>();
   const best = new Map<string, number>();
   const prev = new Map<string, { key: string; edge: TaxiEdge } | null>();
-  const heap = new MinHeap<{ n: string; k: number }>();
-  best.set(key(from, 0), 0);
-  prev.set(key(from, 0), null);
-  heap.push(0, { n: from, k: 0 });
+  const heap = new MinHeap<{ n: string; k: number; p: string }>();
+  const k0 = key(from, 0, '');
+  best.set(k0, 0);
+  prev.set(k0, null);
+  nodeOf.set(k0, from);
+  heap.push(0, { n: from, k: 0, p: '' });
   while (heap.size) {
     const top = heap.pop()!;
-    const { n, k } = top.v;
-    const ck = key(n, k);
+    const { n, k, p: from_ } = top.v;
+    const ck = key(n, k, from_);
     if (top.p > (best.get(ck) ?? Infinity)) continue;
     if (n === to && k === via.length) {
       const edges: TaxiEdge[] = [];
       const nodes: string[] = [];
       let cur: string | undefined = ck;
       while (cur) {
-        nodes.push(cur.slice(0, cur.lastIndexOf('#')));
+        nodes.push(nodeOf.get(cur)!);
         const p: { key: string; edge: TaxiEdge } | null | undefined = prev.get(cur);
         if (!p) break;
         edges.push(p.edge);
@@ -186,16 +192,20 @@ function search(graph: TaxiwayGraph, from: string, to: string, opts: RouteOption
     }
     for (const arc of adj.get(n) ?? []) {
       if (!edgeAllowed(arc.edge, opts, viaSet)) continue;
+      if (arc.to === from_) continue;
       const nk = k < via.length && up(arc.edge.taxiway) === up(via[k]) ? k + 1 : k;
       let cost = arc.edge.lengthM;
       if (via.length && !viaSet.has(up(arc.edge.taxiway))) cost *= 2;
-      if (arc.edge.onRunwayId) cost += penalty;
+      // Charge the runway penalty once per crossing (when stepping onto a runway), not per
+      // edge, so a long crossing built from many short edges is not mistaken for a detour.
+      if (arc.edge.onRunwayId && prev.get(ck)?.edge.onRunwayId !== arc.edge.onRunwayId) cost += penalty;
       const c = top.p + cost;
-      const nkey = key(arc.to, nk);
+      const nkey = key(arc.to, nk, n);
       if (c < (best.get(nkey) ?? Infinity) - 1e-9) {
         best.set(nkey, c);
         prev.set(nkey, { key: ck, edge: arc.edge });
-        heap.push(c, { n: arc.to, k: nk });
+        nodeOf.set(nkey, arc.to);
+        heap.push(c, { n: arc.to, k: nk, p: n });
       }
     }
   }

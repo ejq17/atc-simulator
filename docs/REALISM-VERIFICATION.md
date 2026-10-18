@@ -153,3 +153,27 @@ Caveats to carry into the airport build: (a) this is the *minimum design standar
 
 * `data/sources/aircraft-performance.json` - recommended values and `_sources`.
 * `data/sources/raw/realism/` - Textron page, EASA TCDS, 172S POH (two reproductions), EUROCONTROL ACD pages, Airbus AC PDF, FAA 7110.65 chapter pages (2-1, 3-9, 3-10, 4-5, 5-5), AIM 1-1, eCFR 91.117, AC 150/5300-13B Chg 1 PDF + errata + AC landing page.
+
+## 7. Types added for the KMHT traffic profile (B738, BCS3, E175, CRJ9, B752, C208)
+
+Added 2026-10-17 so Manchester-Boston Regional traffic (src/game/airportProfile.ts) looks like the real airport: Southwest (B738), Breeze "Moxy" (A220-300, ICAO BCS3), American Eagle regionals (PSA CRJ-900 "Blue Streak", Piedmont and Republic "Brickyard" E175), United Express (SkyWest E175, GoJet "Lindbergh" CRJ-900), UPS/FedEx B757-200 freighters, Wiggins Cessna 208 Caravan. Airline list from flymanchester.com "Airlines serving MHT" (checked 2026-10-17: Spirit, Delta and Avelo no longer serve MHT).
+
+**Status: ESTIMATE for every number.** The entries were written without network access to the manufacturer documents, from rounded public figures at *typical operating weight* (not maximum weight). They are recorded, with `_sources` blocks citing the documents to check, in `data/sources/aircraft-performance.json`; the engine values in `src/sim/performance.ts` equal that file (a test compares them). None of the cited PDFs was retrieved here, so none of the figures is "verified" in the sense of sections 1-2.
+
+| Type | takeoff ft | landing ft | Vapp kt | Vr kt | ceiling ft | Source to check |
+|---|---|---|---|---|---|---|
+| B738 | 6,000 | 4,700 | 140 | 145 | 41,000 | Boeing 737 Airplane Characteristics for Airport Planning D6-58325-6; EUROCONTROL ACD B738 |
+| BCS3 | 4,900 | 4,300 | 133 | 135 | 41,000 | Airbus A220 Aircraft Characteristics (airport planning); EUROCONTROL ACD BCS3 |
+| E175 | 5,000 | 4,000 | 128 | 132 | 41,000 | Embraer 170/175 airport planning manual; EUROCONTROL ACD E75L/E75S |
+| CRJ9 | 5,500 | 4,200 | 135 | 138 | 41,000 | Bombardier CRJ700/900 airport planning manual; EUROCONTROL ACD CRJ9 |
+| B752 | 6,800 | 5,000 | 140 | 150 | 42,000 | Boeing 757 Airplane Characteristics for Airport Planning D6-58327; EUROCONTROL ACD B752 |
+| C208 | 2,300 | 1,900 | 85 | 75 | 25,000 | Textron Caravan / Grand Caravan EX specifications; Cessna 208B POH section 5 |
+
+Conventions (all follow the existing file, not re-verified):
+
+* Cruise speed 250 kt for the jets is the 14 CFR 91.117(a) limit below 10,000 ft, as for the A320; taxi speeds, turn rates and descent rates are the same gameplay simplifications as C172/A320 (section 3).
+* SRS category (JO 7110.65 3-9-6): jets 3, C208 1 (single-engine propeller-driven turbine, 8,750 lb MTOW).
+* RECAT (JO 7110.126A Appendix A, as used in `wakeRecatCategory`): B738, BCS3, E175, CRJ9 = F; C208 = I; B752 = E, following the file's existing "B757 = E" convention. The 7110.126A listing of the 757 was not re-fetched, so that assignment is **UNVERIFIED** (to check: Appendix A, category of B757).
+* Runway fit: KMHT 17/35 is 9,250 ft and 6/24 is 7,651 ft; every added type's `takeoffDistanceFt` is below 7,651, so each can depart from the full length of every end (the generator also checks `runwayLongEnoughFor(type)` per active runway). On KACY's 6,145 ft runway 4/22 the B752 (6,800) and B738 (6,000, marginal) would be refused from an intersection exactly as the A320 is; KACY does not generate them.
+* The C208 is category `light`, so it parks on the GA ramp / FBO, uses light-aircraft holding and speed rules, and arrives at 110 kt in IFR flows; the freighters park at the cargo apron (CARGO-N/S) when the airport has one.
+* Wiggins' destination (Portland, KPWM) and the Sun Country charter legs are gameplay assumptions, not schedule data.

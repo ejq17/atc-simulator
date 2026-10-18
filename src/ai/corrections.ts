@@ -54,7 +54,8 @@ export const correctionAgent: Agent = (v) => {
   const plans: Plan[] = [];
   for (const ac of v.onFrequency) {
     if (!ac.flags.readbackErrorPending) continue;
-    const clr = [...ac.clearances].reverse().find((c) => c.byPosition === v.position);
+    const clr = (ac.flags.readbackErrorClearanceId ? ac.clearances.find((c) => c.id === ac.flags.readbackErrorClearanceId && c.byPosition === v.position) : undefined)
+      ?? [...ac.clearances].reverse().find((c) => c.byPosition === v.position);
     if (!clr) continue;
     const p = planFor(ac, clr, (id) => v.airport.parking.find((x) => x.id === id));
     if (!p) continue;

@@ -60,7 +60,7 @@ function maskCallsign(tokens: readonly Token[], cs: CallsignResolution): { toks:
 }
 
 export function parse(text: string, ctx: ParseContext): ParseResult {
-  const norm: NormalizedText = normalize(text, { extraAirlines: deriveAirlines(ctx.aircraft), protectedWords: protectedWords(ctx) });
+  const norm: NormalizedText = normalize(text, { extraAirlines: deriveAirlines(ctx.aircraft), protectedWords: protectedWords(ctx), taxiways: ctx.taxiways, runwayEnds: ctx.runwayEnds });
   const cs = resolveCallsign(norm.tokens, ctx.aircraft);
   const { toks, masked } = maskCallsign(norm.tokens, cs);
   const { drafts, consumed } = assemble(scan(toks, buildRules(ctx)), toks.length, masked);

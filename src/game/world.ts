@@ -7,6 +7,8 @@ import type { Airport, ParkingPosition, RunwayEnd, ScenarioAircraftSpawn, TaxiNo
 import { holdingPositionsForRunway, runwayEntryNodes } from '../airport';
 import { findTaxiRoute } from '../sim/pathfinding';
 import { getPerformance } from '../sim/performance';
+import { CARGO_TYPES, findNeighbour, pickFlight, profileFor } from './airportProfile';
+import type { PickFlightOptions } from './airportProfile';
 
 export const NM = 1852;
 const rad = (d: number): number => (d * Math.PI) / 180;
@@ -121,19 +123,15 @@ export function onDownwind(
 // Neighbouring airports (approximate coordinates, used only for inbound bearings)
 // ---------------------------------------------------------------------------
 
-/** Approximate reference coordinates (degrees); accuracy ~0.01 deg is plenty for choosing an inbound bearing. */
-export const NEIGHBOURS = {
-  KPHL: { name: 'Philadelphia', lat: 39.872, lon: -75.241, typical: ['NKS', 'AAL'] },
-  KTEB: { name: 'Teterboro', lat: 40.85, lon: -74.061, typical: ['GA'] },
-  KWWD: { name: 'Cape May', lat: 38.999, lon: -74.908, typical: ['GA'] },
-  KMIV: { name: 'Millville', lat: 39.368, lon: -75.073, typical: ['GA'] },
-  '26N': { name: 'Ocean City', lat: 39.266, lon: -74.6, typical: ['GA'] },
-} as const;
-export type NeighbourId = keyof typeof NEIGHBOURS;
+/** KACY's neighbours (approximate coordinates, degrees; ~0.01 deg is plenty for choosing an inbound bearing). Other airports: airportProfile.ts. */
+export const NEIGHBOURS = profileFor('KACY').neighbours;
+/** ICAO / FAA id of a neighbouring airfield (any airport's profile). */
+export type NeighbourId = string;
 
-/** True bearing from the KACY ARP to a neighbouring airport (initial great-circle course). */
+/** True bearing from the airport reference point to a neighbouring airfield (initial great-circle course). */
 export function bearingTo(airport: Airport, n: NeighbourId): number {
-  const p = NEIGHBOURS[n];
+  const p = findNeighbour(airport.icao, n);
+  if (!p) throw new Error(`Unknown neighbouring airport ${n}`);
   const f1 = rad(airport.arp.lat);
   const f2 = rad(p.lat);
   const dl = rad(p.lon - airport.arp.lon);
@@ -258,9 +256,13 @@ export const GA_RAMP_IDS = ['GA-1', 'GA-2', 'GA-3', 'GA-4', 'GA-5', 'GA-6', 'GA-
 export const FBO_IDS = ['FBO-1', 'FBO-2'] as const;
 export const GATE_IDS = ['GATE-1', 'GATE-2', 'GATE-3', 'GATE-4', 'GATE-5', 'GATE-6', 'GATE-7', 'GATE-8', 'GATE-9', 'GATE-10'] as const;
 
-/** Parking spots a generated departure of this type may use (GA ramp/FBO for light aircraft, gates for jets). */
+/** Parking spots a generated departure of this type may use (GA ramp/FBO for light aircraft incl. the C208, gates for airliners, the cargo apron for freighters when the airport has one). */
 export function parkingPoolFor(airport: Airport, type: string): ParkingPosition[] {
   const light = getPerformance(type).category === 'light';
+  if (!light && CARGO_TYPES.has(type)) {
+    const cargo = airport.parking.filter((p) => p.category === 'cargo');
+    if (cargo.length) return cargo;
+  }
   const cats = light ? ['ga', 'fbo'] : ['airline'];
   return airport.parking.filter((p) => cats.includes(p.category));
 }
@@ -282,11 +284,12 @@ export function randomNNumber(rng: () => number): string {
   return `N${first}${digit()}${digit()}${digit()}${pick(N_LETTERS)}`; // N1234Z
 }
 
-/** Airline callsign: Spirit dominates, American occasionally. Flight numbers are 3-4 digits. */
-export function randomAirlineCallsign(rng: () => number): string {
-  const spirit = rng() < 0.8;
-  const num = spirit ? 100 + Math.floor(rng() * 1400) : 100 + Math.floor(rng() * 2900);
-  return `${spirit ? 'NKS' : 'AAL'}${num}`;
+/**
+ * Airline callsign from the airport's traffic profile (`airportProfile.ts`). Without an airport: KACY's mix, Spirit 80 % / American 20 %.
+ * Flight numbers are 3-4 digits.
+ */
+export function randomAirlineCallsign(rng: () => number, icao?: string, o: PickFlightOptions = {}): string {
+  return pickFlight(rng, icao, o)!.callsign;
 }
 
 /** The part a controller hears last: used to avoid two active aircraft that sound alike. */

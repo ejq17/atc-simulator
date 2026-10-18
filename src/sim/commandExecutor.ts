@@ -197,6 +197,7 @@ function executeInner(ctx: SimContext, cmdIn: ParsedCommand, opts?: ExecOpts): C
       });
       rt.readbackError = undefined;
       ac.flags.readbackErrorPending = false;
+      ac.flags.readbackErrorClearanceId = undefined;
       pilotSay(ctx, ac, rb.text, { correction: true });
       ac.radioState = 'IDLE';
       emitEvent(ctx, { kind: 'COMMAND_ACCEPTED', aircraftId: ac.id, callsign: ac.callsign, text: `${ac.callsign}: ${cmd.kind} re-issued (correction)`, severity: 'info', speaker: 'SYSTEM', data: { kind: cmd.kind, scored: false, correction: true } });
@@ -253,10 +254,13 @@ function executeInner(ctx: SimContext, cmdIn: ParsedCommand, opts?: ExecOpts): C
   ac.activeClearanceId = clr.id;
   const waitSec = ac.pendingRequest ? now - ac.pendingRequest.sinceSec : undefined;
   ac.pendingRequest = undefined;
-  if (rt.readbackError) {
-    // A different instruction supersedes the earlier mistaken readback.
+  if (rt.readbackError && rt.readbackError.kind === (cmd.kind as string)) {
+    // A new instruction of the SAME kind supersedes the earlier mistaken readback. A companion command from the same transmission
+    // ("taxi to runway 35 via hotel, hold short of runway 35" parses as TAXI + HOLD_SHORT) must not wipe it: the misread TAXI stays
+    // pending so the controller can still correct it (or have it scored as missed).
     rt.readbackError = undefined;
     ac.flags.readbackErrorPending = false;
+    ac.flags.readbackErrorClearanceId = undefined;
   }
 
   const rb = buildReadback(ac, clr, { airport, rng: ctx.rng, errorRate: ctx.readbackErrorRate });
@@ -265,6 +269,7 @@ function executeInner(ctx: SimContext, cmdIn: ParsedCommand, opts?: ExecOpts): C
   if (rb.error) {
     rt.readbackError = { sinceSec: now, kind: cmd.kind as ReadbackErrorRecord['kind'], clearanceId: clr.id, correct: rb.error.correct, spoken: rb.error.spoken };
     ac.flags.readbackErrorPending = true;
+    ac.flags.readbackErrorClearanceId = clr.id;
     ac.radioState = 'WAITING_FOR_READBACK';
     emitEvent(ctx, { kind: 'INFO', aircraftId: ac.id, callsign: ac.callsign, text: `(hidden from pilot) ${ac.callsign} misread back: ${rb.error.spoken} instead of ${rb.error.correct}`, severity: 'info', speaker: 'SYSTEM', data: { readbackError: true } });
   }

@@ -33,6 +33,12 @@ async function load(req: Extract<WhisperWorkerRequest, { type: 'load' }>): Promi
     tf.env.useBrowserCache = true; // persist model files in the Cache API
   }
   try {
+    if (req.device === 'webgpu') {
+      // Fail fast and clearly (the page then falls back to WebAssembly) instead of letting onnxruntime guess.
+      const gpu = (self as unknown as { navigator?: { gpu?: { requestAdapter(): Promise<unknown> } } }).navigator?.gpu;
+      if (!gpu) throw new Error('WebGPU is not available in this worker.');
+      if (!(await gpu.requestAdapter())) throw new Error('No WebGPU adapter was found.');
+    }
     const pipe = await tf.pipeline('automatic-speech-recognition', req.model, {
       device: req.device,
       dtype: req.dtype,

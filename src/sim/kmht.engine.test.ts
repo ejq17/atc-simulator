@@ -93,3 +93,52 @@ describe('KMHT in the UI layer', () => {
     expect(atis.text).toMatch(/ILS runway 35 approach in use/i);
   });
 });
+
+describe('KMHT: "taxi to runway 35 via hotel" from the GA ramp', () => {
+  const taxi35H = cmd('TAXI', 'N12XS', { runwayEnd: '35', runwayId: '17/35', destination: 'RWY35', route: ['H'] });
+
+  it('plans a hold of runway 35 and reads back runway three five', () => {
+    const e = setup([GA_PARKED('N12XS', 'GA-2', 'GND')]);
+    const ac = find(e, 'N12XS');
+    expect(say(e, taxi35H, 'GND').status).toBe('accepted');
+    expect(say(e, cmd('HOLD_SHORT', 'N12XS', { holdShort: ['35'] }), 'GND').status).toBe('accepted');
+    expect(pilotTexts(e, 'N12XS')[0]).toMatch(/^Runway three five, taxi via hotel/);
+    expect(ac.route!.nodeIds.at(-1)).toMatch(/^HP17-35-/);
+  });
+
+  it('a wrong runway in the readback is the seeded readback error (hidden event + pending flag), not a planning fault', () => {
+    // With errorRate 1 the pilot garbles the runway; the plan itself still goes to runway 35 and the mistake is flagged for correction.
+    const e = createEngine({
+      airport: kmht,
+      readbackErrorRate: 1,
+      scenario: makeScenario({ activeRunways: { departing: ['35'], landing: ['35'] }, controllerPositions: ['TWR', 'GND'], spawns: [GA_PARKED('N12XS', 'GA-2', 'GND')] }),
+    });
+    const ac = find(e, 'N12XS');
+    expect(say(e, taxi35H, 'GND').status).toBe('accepted');
+    expect(ac.route!.nodeIds.at(-1)).toMatch(/^HP17-35-/);
+    expect(ac.assignedRunwayEnd).toBe('35');
+    expect(ac.flags.readbackErrorPending).toBe(true);
+    expect(e.getState().events.some((x) => x.data?.readbackError && /instead of runway 35/.test(x.text))).toBe(true);
+  });
+
+  it('a HOLD_SHORT from the same transmission keeps the misread TAXI pending; re-issuing the TAXI clears it', () => {
+    const e = createEngine({
+      airport: kmht,
+      readbackErrorRate: 1,
+      scenario: makeScenario({ activeRunways: { departing: ['35'], landing: ['35'] }, controllerPositions: ['TWR', 'GND'], spawns: [GA_PARKED('N12XS', 'GA-2', 'GND')] }),
+    });
+    const ac = find(e, 'N12XS');
+    expect(say(e, taxi35H, 'GND').status).toBe('accepted');
+    expect(ac.flags.readbackErrorPending).toBe(true);
+    const taxiClr = ac.flags.readbackErrorClearanceId;
+    expect(say(e, cmd('HOLD_SHORT', 'N12XS', { holdShort: ['35'] }), 'GND').status).toBe('accepted');
+    // HOLD_SHORT readbacks never garble the runway, so the pending error is still the TAXI's
+    expect(ac.flags.readbackErrorPending).toBe(true);
+    expect(ac.flags.readbackErrorClearanceId).toBe(taxiClr);
+    // re-issue the TAXI correctly (same params): the correction clears the pending error
+    const again = say(e, taxi35H, 'GND');
+    expect(again.status).toBe('accepted');
+    expect(ac.flags.readbackErrorPending).toBe(false);
+    expect(ac.flags.readbackErrorClearanceId).toBeUndefined();
+  });
+});

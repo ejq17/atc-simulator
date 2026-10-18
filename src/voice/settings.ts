@@ -1,5 +1,7 @@
 import type { PttMode } from './ptt.ts';
 import type { SttProviderId } from './stt/types.ts';
+import { WHISPER_DEVICE_CHOICES, WHISPER_MODEL_CHOICES } from './stt/whisperModels.ts';
+import type { WhisperDeviceChoice, WhisperModelChoice } from './stt/whisperModels.ts';
 
 export const VOICE_SETTINGS_KEY = 'kacy.voice.settings';
 
@@ -8,6 +10,10 @@ export const MONITOR_ALL_VOLUME = 0.45;
 
 export interface VoiceSettings {
   providerId: SttProviderId;
+  /** On-device Whisper checkpoint ('auto' = small.en on WebGPU, base.en on CPU). Only used by the Local Whisper provider. */
+  whisperModel: WhisperModelChoice;
+  /** On-device Whisper execution device ('auto' = WebGPU when the browser has it, else WebAssembly). */
+  whisperDevice: WhisperDeviceChoice;
   pttKey: string;
   pttMode: PttMode;
   /** "Pilot audio": speak pilot (and monitored AI controller) transmissions. */
@@ -25,6 +31,8 @@ export interface VoiceSettings {
 
 export const DEFAULT_VOICE_SETTINGS: Readonly<VoiceSettings> = Object.freeze({
   providerId: 'webspeech',
+  whisperModel: 'auto',
+  whisperDevice: 'auto',
   pttKey: 'Space',
   pttMode: 'hold',
   ttsEnabled: true,
@@ -47,6 +55,8 @@ export function sanitizeVoiceSettings(raw: unknown): VoiceSettings {
     r.providerId === 'webspeech' || r.providerId === 'deepgram' || r.providerId === 'whisper-local' || r.providerId === 'none' ? r.providerId : d.providerId;
   return {
     providerId: provider,
+    whisperModel: WHISPER_MODEL_CHOICES.includes(r.whisperModel as WhisperModelChoice) ? (r.whisperModel as WhisperModelChoice) : d.whisperModel,
+    whisperDevice: WHISPER_DEVICE_CHOICES.includes(r.whisperDevice as WhisperDeviceChoice) ? (r.whisperDevice as WhisperDeviceChoice) : d.whisperDevice,
     pttKey: typeof r.pttKey === 'string' && r.pttKey.length > 0 && r.pttKey.length <= 32 ? r.pttKey : d.pttKey,
     pttMode: r.pttMode === 'toggle' || r.pttMode === 'hold' ? r.pttMode : d.pttMode,
     ttsEnabled: typeof r.ttsEnabled === 'boolean' ? r.ttsEnabled : d.ttsEnabled,
@@ -111,6 +121,13 @@ export function createVoiceSettingsStore(storage?: Storage): VoiceSettingsStore 
   };
 }
 
+let sharedStore: VoiceSettingsStore | null = null;
+/** The one app-wide store (localStorage `kacy.voice.settings`); the UI and the shared Local Whisper provider both use it. */
+export function getSharedVoiceSettingsStore(): VoiceSettingsStore {
+  sharedStore ??= createVoiceSettingsStore();
+  return sharedStore;
+}
+
 /** Settings-screen privacy copy: what audio goes where, per provider. */
 export const VOICE_PRIVACY_NOTES = {
   headline: 'Your voice is only captured while you hold the push-to-talk key. Recordings are never saved.',
@@ -122,7 +139,7 @@ export const VOICE_PRIVACY_NOTES = {
     deepgram:
       'Deepgram: audio streams from your browser straight to Deepgram (api.deepgram.com) over an encrypted connection while you hold the key. Deepgram processes it under your own account and its terms; the simulator server only hands out short-lived tokens and never receives the audio.',
     'whisper-local':
-      'Local Whisper: the speech model runs inside this browser tab on your computer. Your voice is never uploaded or sent anywhere, not even to the simulator server. The only downloads are the model files (about 40 MB, once, from huggingface.co) and the WebAssembly runtime (from cdn.jsdelivr.net); no audio is part of either request. After that it works offline.',
+      'Local Whisper: the speech model runs inside this browser tab on your computer. Your voice is never uploaded or sent anywhere, not even to the simulator server. The only downloads are the model files (40, 77 or 250 MB depending on the model you choose, once, from huggingface.co; 120 to 590 MB for the GPU variants) and the WebAssembly runtime (from cdn.jsdelivr.net); no audio is part of either request. After that it works offline.',
     none: 'Off: the microphone is never opened. Type your transmissions.',
   },
   transcripts:

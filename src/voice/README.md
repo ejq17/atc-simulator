@@ -26,7 +26,7 @@ Browser speech works with no setup in Chrome/Edge (HTTPS or `localhost` is
 required for microphone access).
 
 Local Whisper (no cloud, no key): pick **Local Whisper (on-device, no cloud)** in Settings (also on the setup screen) and
-press **Download / prepare local model** once. It downloads about 40 MB (see below) and then works offline.
+press **Download / prepare local model** once. It downloads the chosen model once (40 to 250 MB on the CPU, see the table below) and then works offline.
 
 Deepgram (optional, better with callsigns and phonetics):
 
@@ -106,7 +106,7 @@ it, that AI Tower is silent by default and spoken at 45 % volume with Monitor al
 |---|---|---|
 | Browser (Web Speech) | **Chrome: Google servers; Edge: Microsoft.** Not processed on-device. | Free |
 | Deepgram | Direct browser -> `api.deepgram.com` WebSocket | Nova-3 streaming, pay-as-you-go: **$0.0048 per minute** (about $0.29/hour); new accounts get $200 credit. Source: https://deepgram.com/pricing (checked 2026-10-16; prices change). |
-| Local Whisper | **Nowhere.** Audio is buffered in memory in this tab, transcribed on your computer, then dropped. Only model files are downloaded (huggingface.co, once; ONNX runtime from cdn.jsdelivr.net). | Free. About 40 MB cached in the browser (`onnx-community/whisper-tiny.en`, q8). Uses your CPU; about 1.2 s to transcribe a 5 s call on an Apple-silicon laptop (WASM). |
+| Local Whisper | **Nowhere.** Audio is buffered in memory in this tab, transcribed on your computer, then dropped. Only model files are downloaded (huggingface.co, once; ONNX runtime from cdn.jsdelivr.net). | Free. 40 to 250 MB cached in the browser (model table below; 120 to 590 MB for the WebGPU variants). Uses your GPU when the browser has WebGPU, else your CPU. |
 | Off | Nothing captured | Free |
 
 Only the seconds the PTT key is held are streamed, so a typical session costs a few cents.
@@ -125,9 +125,33 @@ key** (it could not be exercised here).
 
 ## Local Whisper (`whisper-local`)
 
-`stt/localWhisperProvider.ts` runs Whisper in the browser with transformers.js (`@huggingface/transformers` 4.3.1, WASM;
-`device: 'webgpu'` is available through the provider options but is not the default because it is not deterministic in
-headless browsers).
+`stt/localWhisperProvider.ts` runs Whisper in the browser with transformers.js (`@huggingface/transformers` 4.3.1) on WebGPU
+when the browser has it, otherwise on WebAssembly (CPU).
+
+* **Model and device choice** (Settings > Speech input; `whisperModel` / `whisperDevice` in `kacy.voice.settings`, resolution in
+  `stt/whisperModels.ts`). Both default to `auto`. The shared provider (`getLocalWhisperProvider()`) follows the settings store:
+  changing either terminates the old worker, resets the status to "not prepared" and loads the new model on the next use.
+
+  | Choice | Hugging Face id | CPU download (q8) | WebGPU download (fp32 encoder + q4 decoder) | Notes |
+  |---|---|---|---|---|
+  | `tiny.en` | `onnx-community/whisper-tiny.en` | 40 MB | 120 MB | fastest, least accurate (the old default) |
+  | `base.en` | `onnx-community/whisper-base.en` | 77 MB | 206 MB | `auto` on a CPU; clearly better callsigns/numbers |
+  | `small.en` | `onnx-community/whisper-small.en` | 250 MB | 586 MB | `auto` on WebGPU; most accurate |
+
+  Device `auto` = `webgpu` when `navigator.gpu` exists, else `wasm`; the worker re-checks (`navigator.gpu` and `requestAdapter()`)
+  and errors if it cannot get a GPU. Model `auto` = `small.en` on WebGPU, `base.en` otherwise. dtype: `q8` on WASM; on WebGPU
+  `{ encoder_model: 'fp32', decoder_model_merged: 'q4' }` (the combination the transformers.js Whisper WebGPU demos use; q8 on
+  WebGPU is unreliable). Moonshine is handled by the 4.3.1 ASR pipeline but is not offered (not evaluated on aviation phrases).
+* **WebGPU fallback.** If loading on WebGPU fails (no adapter, shader/ORT error; a network failure is not treated as a GPU
+  problem) or the first transcription throws, the provider switches to WebAssembly with the *same model*, logs once with
+  `console.info`, shows it in the progress message ("...fell back to CPU") and remembers it for the page session
+  (`markWebGpuFailed()`), so later presses do not retry the GPU. Reload the page to try WebGPU again.
+* **Beam search.** `createLocalWhisperProvider({ numBeams: 3 })` passes `num_beams` to `generate()` (supported by 4.3.1 for
+  Whisper). Off by default: it is slower, especially on WASM.
+* **Measured** (Apple-silicon Mac, fake-mic fixture clips of 4 to 5 s, `e2e/voice.spec.ts`; key release to transcript, includes
+  about 1 s of test polling): `base.en` on WASM about 3.0 s; `small.en` on WASM 9.0 to 10 s; `small.en` on WebGPU (Google Chrome)
+  about 2.0 s. Run the spec with `E2E_WHISPER_MODEL=tiny.en|base.en|small.en|auto` and `E2E_WHISPER_DEVICE=wasm|webgpu|auto`
+  (default `base.en`/`wasm`); `E2E_CHANNEL=chrome` uses installed Chrome, which has WebGPU, unlike headless Chromium.
 
 * **Threading.** The transformers.js pipeline runs in a module Web Worker (`stt/whisperWorker.ts`, protocol in `stt/whisperProtocol.ts`):
   model start-up and decoding never block the UI thread. The page transfers (not copies) the Float32 PCM buffer and receives
@@ -143,10 +167,9 @@ headless browsers).
   `aviationPostProcess.ts`, then `onPartial(text)` and `onFinal(text, { durationMs })` (no confidence: Whisper reports none).
   The controller waits up to `provider.finalTimeoutMs` (180 s, covers a first-ever download) instead of the 2.5 s streaming
   default and never submits the placeholder as a transmission.
-* **Model.** `onnx-community/whisper-tiny.en` (quantised q8, English only). On the three fixture clips it heard the
-  call correctly except for spelling drift (`Sessna`, `clear to land`, digits), all handled by the parser or the post-processor, so
-  `whisper-base.en` was not needed. Pass `createLocalWhisperProvider({ model: 'onnx-community/whisper-base.en' })` for more accuracy
-  (about 3x the download and decode time). Multilingual checkpoints get `language: 'en', task: 'transcribe'`; **English-only
+* **Accuracy.** `tiny.en` drifts on callsigns and phonetics ("hotel Fox drive Alpha" for "hotel Foxtrot Alpha"); `base.en` and
+  `small.en` get the fixture clips right ("Cessna 723 Echo Juliet, runway 13, cleared for takeoff"). Tests can still pass an
+  explicit `model` id (and `device`) to `createLocalWhisperProvider`, which overrides the settings. Multilingual checkpoints get `language: 'en', task: 'transcribe'`; **English-only
   checkpoints must not receive them** (transformers.js 4.3.1 throws).
 * **Aviation prompt: not supported yet.** `prompt_ids` exists in the generation config type but `generate()` in 4.3.1 ignores it and the
   processor has no `get_prompt_ids()`. Vocabulary help therefore lives in `aviationPostProcess.ts` (Cessna spellings, silence
@@ -250,7 +273,7 @@ default mode first, then `audioSource: 'track'`) to hear them and the aircraft t
 * Browser voices differ by OS/browser; with few voices pilots are told apart by rate/pitch only. Voice lists load asynchronously in Chrome.
 * Web Speech: Chrome ends recognition on pauses, so the provider restarts it while the key is held; accuracy on callsigns and numbers is lower than Deepgram. Firefox has no Web Speech recognition; Safari support is partial.
 * Browsers require a user gesture before audio plays (`unlockAudio()`, see above) and HTTPS (or localhost) for the microphone.
-* Local Whisper: tiny.en is less accurate than Deepgram on callsigns. The model and ONNX runtime need the network once.
+* Local Whisper is less accurate than Deepgram on callsigns (tiny.en worst, small.en best). The model and ONNX runtime need the network once.
   **Build size:** by default `vite build` emits onnxruntime-web's 27 MB `ort-wasm-simd-threaded.asyncify.wasm` into `dist/assets` even though
   it is never loaded (transformers.js points the runtime at jsdelivr before use). There is no documented switch for this; `optimizeDeps.exclude`
   and `assetsInclude` do not affect it. A verified fix (dist 29 MB -> 3.8 MB, e2e still green against that build) is a small Vite plugin that

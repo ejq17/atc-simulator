@@ -56,7 +56,9 @@ export interface LaunchOptions {
 }
 
 export async function launchVoiceBrowser(clip: ClipName, opts: LaunchOptions = {}): Promise<VoiceBrowser> {
-  const { baseURL = DEFAULT_BASE_URL, channel, headless = true, profileDir = PROFILE_DIR } = opts;
+  // E2E_CHANNEL=chrome runs the fake-mic specs in installed Google Chrome (which has WebGPU, unlike headless Chromium) with its own profile.
+  const envChannel = process.env.E2E_CHANNEL === 'chrome' ? 'chrome' : undefined;
+  const { baseURL = DEFAULT_BASE_URL, channel = envChannel, headless = true, profileDir = envChannel ? `${PROFILE_DIR}-chrome` : PROFILE_DIR } = opts;
   const context = await chromium.launchPersistentContext(profileDir, {
     headless,
     channel,

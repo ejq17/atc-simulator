@@ -128,6 +128,15 @@ far from the spelling.
 * **Fuzzy correction** (`fuzzyCorrect` in `normalize.ts`, after `repairNato`): an unknown alphabetic word of 4+ letters within Levenshtein distance 1 (4-5 letters) or 2 (6+) of exactly one core keyword (taxi, runway, hold, short, via, contact, tower, ground, cleared, cross, continue, position, parking, ramp, terminal, gate, takeoff, land, line, wait) is replaced by it; ties change nothing. `via`+NATO fusions ("viaalpha") split. A NATO word is a target only right after a NATO word or a route-context word (via, taxiway, and, then, on, taxi ...), never right after a number or callsign lead word; november and delta are never targets.
 * **Never fuzzed**: digits, lexicon words, fillers, facility and callsign-prefix words, the grammar/common-English list `FUZZ_PROTECTED` (make, like, late ...), and the words of the active callsigns and fixes (`NormalizeOptions.protectedWords`, built in `parse.ts`). Raw word ranges are kept, so `rawSlice` still works.
 
+* **Foxtrot drift** (`foxtrotDrift`, normalize.ts; needs `ctx.taxiways` containing F): in a taxiway context (after via/on/at/cross/and/taxi or a spelled letter) `fox|fucks|fux|folks|fax` + one unknown short word ("fox drive", "fucks truck", "fox shot", "fox stop"), or one fused word starting fox/fux/fucks ("foxdrought", "fuckstrapped"), becomes `foxtrot` (F). Runs before NATO repair and fuzzing so "shot" is not turned into "short".
+* **Callsign letter repair** (`repairNato`): a 3-5 letter unknown word right after a callsign digit run (preceded by november/number/remember/an airline/cessna ...) within edit distance 1 of a NATO word is repaired ("kila" -> kilo, "xra" -> xray); 3-letter words only as a prefix of the NATO word.
+* **Homophone digit before a spelled letter**: "november 1 to x-ray sierra" -> 12 (the `to`/`for` digit rule also fires before a phrase-built letter like x-ray).
+* **Dotted digits**: "american 3.23" is flight 323 and "runway 1.7" is runway 17 (a dot after a callsign lead word or `runway` is not a decimal); dashes ("3-6-19", "1-7") already split into one digit run.
+* **Multi-word fixes** (`PHRASES`): "run away" -> runway, "tax it" -> taxi, "that was" is dropped as filler (an empty phrase target drops the phrase).
+* **Cross cleanup** (`crossCleanup`): "cross <taxiway> cross <runway>" drops the first cross and letter; "cross 35" with 35 in `ctx.runwayEnds` regains the word "runway".
+* **Taxiway + digit**: "alpha 2", "alpha alpha 2" (A, A2) was already handled by `parseTaxiways`; unchanged.
+* **Dropped-digit flight number** (`callsign.ts`): heard "Spirit 43" is accepted as NKS483 at score 0.8 only when exactly one active aircraft of that airline has the heard digits plus one more digit, in order, AND no other active aircraft of that airline is within edit distance 2 of the heard digits (NKS487 vs 43 -> stays "callsign not recognised").
+
 ### Numbers and punctuation
 
 A comma/period/semicolon after a raw word now ends a spoken-number run, so "Spirit four fifty one, four miles"

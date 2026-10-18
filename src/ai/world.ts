@@ -190,7 +190,7 @@ export function planParking(state: SimulationState, ac: Aircraft): ParkingPlan |
   const graph = airport.taxiwayGraph;
   const start = taxiStartNode(airport, ac);
   if (!start) return undefined;
-  const cands = freeParkingCandidates(state, ac, undefined, undefined).filter((p) => p.category !== 'military' || ac.type !== 'A320');
+  const cands = freeParkingCandidates(state, ac, undefined, undefined).filter((p) => p.category !== 'military' || getPerformance(ac.type).category === 'light');
   if (!cands.length) return undefined;
   const dmap = shortestDistances(graph, start.id, { allowedRunwayIds: allRunwayIds(airport) });
   let best: ParkingPosition | undefined;

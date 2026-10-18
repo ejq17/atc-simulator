@@ -33,6 +33,7 @@ export const AIRLINES = rec({
   jetblue: 'JBU', frontier: 'FFT', fedex: 'FDX', ups: 'UPS', allegiant: 'AAY',
   breeze: 'MXY', republic: 'RPA', envoy: 'ENY', skywest: 'SKW', piedmont: 'PDT',
   psa: 'JIA', endeavor: 'EDV', mesa: 'ASH',
+  moxy: 'MXY', brickyard: 'RPA', lindbergh: 'GJS', wiggins: 'WIG', streak: 'JIA',
 });
 
 /** General-aviation callsign prefixes ("Cessna 723EJ"), mapped to type-code regexes. */
@@ -56,7 +57,10 @@ export const PHRASES: readonly { words: readonly string[]; to: PhraseTarget }[] 
   { words: ['flight', 'level'], to: { text: 'fl' } },
   { words: ['take', 'off'], to: { text: 'takeoff' } },
   { words: ['run', 'way'], to: { text: 'runway' } },
+  { words: ['run', 'away'], to: { text: 'runway' } }, // "taxi to run away 3 5"
   { words: ['push', 'back'], to: { text: 'pushback' } },
+  // Empty target = the phrase is dropped as a filler ("that was taxi via hotel": a spoken self-correction lead-in)
+  { words: ['that', 'was'], to: { text: '' } },
   // Whisper tiny.en renderings heard in real sessions
   { words: ['tax', 'e'], to: { text: 'taxi' } },
   { words: ['park', 'yee'], to: { text: 'parking' } },
@@ -132,6 +136,14 @@ export const FUZZ_PROTECTED: ReadonlySet<string> = new Set([
 
 /** Words Whisper writes for the "November" of an N-number ("Number 678 mike victor", "Remember, 685 golf delta"). */
 export const N_PREFIX_WORDS: ReadonlySet<string> = new Set(['number', 'remember', 'novembre', 'nowember']);
+
+/**
+ * Words Whisper writes for the "fox" of "foxtrot" ("fox drive", "fucks truck", "foxdrought"). In a taxiway context
+ * (see `foxtrotDrift` in normalize.ts) one of these, optionally plus one unknown short word, is the letter F.
+ */
+export const FOXTROT_WORDS: ReadonlySet<string> = new Set(['fox', 'fucks', 'fux', 'folks', 'fax']);
+/** A single unknown word that fuses "fox" with the next syllable ("foxdrought", "fuxdrought", "fuckstrapped"). */
+export const FOXTROT_FUSED = /^(?:fox|fux|fucks)[a-z]{3,9}$/;
 
 /** Words Whisper writes for "tower" right after "contact" ("contact our", "contact hour"). Only honoured in that position. */
 export const TOWER_MISHEARD: ReadonlySet<string> = new Set(['our', 'hour', 'power', 'towers', 'tar', 'towel']);

@@ -1,6 +1,6 @@
 /**
  * Hosting mode. The GitHub Pages build (GITHUB_PAGES=1, or VITE_STATIC_HOSTING=1) has no local backend:
- * there is no /api, so live weather and Deepgram are unavailable and FAA charts come from files bundled at build time.
+ * there is no /api, so Deepgram is unavailable (live weather still works: it falls back to the NWS API, which allows browser calls) and FAA charts come from files bundled at build time.
  * `vite.config.ts` turns GITHUB_PAGES into VITE_STATIC_HOSTING.
  */
 export function isStaticHosting(): boolean {

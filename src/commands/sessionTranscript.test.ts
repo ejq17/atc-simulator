@@ -115,3 +115,82 @@ describe('real session transcript lines', () => {
     expect(r.commands[0].confidence).toBeGreaterThanOrEqual(0.6);
   });
 });
+
+/** Third session (KMHT): Whisper tiny.en lines refused before the foxtrot-drift / callsign-digit repairs. */
+const KMHT: ParseContext = {
+  aircraft: [
+    { callsign: 'N12XS', spokenCallsign: 'Cessna one two x-ray sierra', type: 'C172' },
+    { callsign: 'N3619K', spokenCallsign: 'Cessna three six one niner kilo', type: 'C172' },
+    { callsign: 'NKS483', spokenCallsign: 'Spirit four eighty three', type: 'A320' },
+    { callsign: 'AAL323', spokenCallsign: 'American three twenty three', type: 'A320' },
+    { callsign: 'N9569X', spokenCallsign: 'Cessna niner five six niner x-ray', type: 'C172' },
+    { callsign: 'NKS487', spokenCallsign: 'Spirit four eighty seven', type: 'A320' },
+  ],
+  taxiways: ['A', 'A1', 'A2', 'A3', 'B', 'D', 'E', 'F', 'G', 'H', 'J', 'J1', 'K', 'K1', 'L', 'M', 'M1', 'N', 'Z'],
+  runwayEnds: ['17', '35', '6', '24'],
+  frequencies: [{ id: 'GND', mhz: 121.9 }, { id: 'TWR', mhz: 121.3 }],
+};
+
+const kmht: { say: string; callsign: string; cmd: Record<string, unknown> }[] = [
+  { say: 'November 1 2 X-ray Sierra taxi to runway 3 5 via hotel Fox drive Alpha Alpha 2 Hold short of 3 5', callsign: 'N12XS',
+    cmd: { kind: 'TAXI', runwayEnd: '35', route: ['H', 'F', 'A', 'A2'], holdShort: ['RWY35'] } },
+  { say: 'November 1, 2, X-ray Sierra, that was taxi via hotel, Foxdrought, Alpha Alpha 2.', callsign: 'N12XS', cmd: { kind: 'TAXI', route: ['H', 'F', 'A', 'A2'] } },
+  { say: 'November 3 619 kilo taxi to runway 3 5 via hotel fucks truck alpha alpha 1', callsign: 'N3619K', cmd: { kind: 'TAXI', runwayEnd: '35', route: ['H', 'F', 'A', 'A1'] } },
+  { say: 'Remember, 3-6-19 Kila Hold Position.', callsign: 'N3619K', cmd: { kind: 'HOLD_POSITION' } },
+  { say: 'November 1 2 XRA Sierra Cross runway 17 on Fox truck.', callsign: 'N12XS', cmd: { kind: 'CROSS_RUNWAY', runwayEnd: '17', route: ['F'] } },
+  { say: 'or one-two X-ray Sierra cross runway 1-7 on Fox stop.', callsign: 'N12XS', cmd: { kind: 'CROSS_RUNWAY', runwayEnd: '17', route: ['F'] } },
+  { say: 'November 1 to X-ray Sierra cross runway 1 7 on Foxdrop', callsign: 'N12XS', cmd: { kind: 'CROSS_RUNWAY', runwayEnd: '17', route: ['F'] } },
+  { say: 'November 1 2 X-Ray Sierra, tax it to run away 3 5 via Fuxdrought and Alpha.', callsign: 'N12XS', cmd: { kind: 'TAXI', runwayEnd: '35', route: ['F', 'A'] } },
+  { say: 'November 3 6 1 9 kilo cross Fox draw cross 3 5 on Fox draw', callsign: 'N3619K', cmd: { kind: 'CROSS_RUNWAY', runwayEnd: '35', route: ['F'] } },
+  { say: 'American 3.23 Taxi to the terminal via hotel Fuckstrapped Alpha Echo November', callsign: 'AAL323',
+    cmd: { kind: 'TAXI_TO_PARKING', destination: 'TERMINAL', route: ['H', 'F', 'A', 'E', 'N'] } },
+  { say: 'American 323. Taxi to the terminal via hotel, Fox shot, Alpha, Echo, November.', callsign: 'AAL323',
+    cmd: { kind: 'TAXI_TO_PARKING', destination: 'TERMINAL', route: ['H', 'F', 'A', 'E', 'N'] } },
+];
+
+describe('KMHT session transcript lines', () => {
+  it.each(kmht)('$say', ({ say, callsign, cmd }) => {
+    const r = parse(say, KMHT);
+    expect(r.callsign).toBe(callsign);
+    expect(r.commands).toHaveLength(1);
+    expect(r.commands[0]).toMatchObject(cmd);
+    if (cmd.route) expect(r.commands[0].route).toEqual(cmd.route);
+    expect(r.commands[0].confidence).toBeGreaterThanOrEqual(0.7);
+  });
+
+  it('the stuttered "alpha alpha 2" is A then A2', () => {
+    expect(parse('November 3 619 kilo taxi via alpha alpha 2', KMHT).commands[0].route).toEqual(['A', 'A2']);
+  });
+
+  it('foxtrot drift needs a taxiway context and F on the airport', () => {
+    const noF = { ...KMHT, taxiways: KMHT.taxiways!.filter((t) => t !== 'F') };
+    expect(parse('November 1 2 X-ray Sierra cross runway 17 on Fox truck', noF).commands[0].route).toBeUndefined();
+    // outside a route context "fox" stays an ordinary word
+    const r = parse('November 1 2 X-ray Sierra the fox truck is ahead, hold position', KMHT);
+    expect(r.commands[0]).toMatchObject({ kind: 'HOLD_POSITION' });
+    expect(r.commands[0].normalizedText).toContain('fox truck');
+  });
+
+  it('"Spirit 43" with two plausible Spirits (483, 487) stays rejected', () => {
+    const r = parse('Spirit 43 Contact Hour.', KMHT);
+    expect(r.callsign).toBeNull();
+    expect(r.commands[0].issues.join(' ')).toContain('callsign not recognised');
+  });
+
+  it('"Spirit 43" with 483 the only plausible Spirit is accepted at reduced confidence', () => {
+    const only: ParseContext = { ...KMHT, aircraft: KMHT.aircraft.filter((a) => a.callsign !== 'NKS487') };
+    const dropped = parse('Spirit 43 Contact Tower', only);
+    expect(dropped.callsign).toBe('NKS483');
+    const exact = parse('Spirit 483 Contact Tower', only);
+    expect(dropped.commands[0].confidence).toBeLessThan(exact.commands[0].confidence);
+    // not a subsequence (digit changed): still rejected
+    expect(parse('Spirit 49 Contact Tower', only).callsign).toBeNull();
+    // two Spirits that both contain 4..3 as subsequence: ambiguous
+    const two: ParseContext = { ...only, aircraft: [...only.aircraft, { callsign: 'NKS453', spokenCallsign: 'Spirit four fifty three', type: 'A320' }] };
+    expect(parse('Spirit 43 Contact Tower', two).callsign).toBeNull();
+  });
+
+  it('"hold position" and "stop" elsewhere are unaffected', () => {
+    expect(parse('November 3 619 kilo stop', KMHT).commands[0].kind).toBe('HOLD_POSITION');
+  });
+});

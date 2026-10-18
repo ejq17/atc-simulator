@@ -5,7 +5,7 @@
  * (provider 'whisper-local') transcribes it; the real parser + engine act on the transcript.
  *
  * Run:  npx playwright test --project=chromium-fake-mic
- * The first run downloads the ~40 MB model from huggingface.co (and the ONNX runtime from jsdelivr) into the
+ * The first run downloads the model (base.en: ~77 MB; E2E_WHISPER_MODEL=small.en|tiny.en to change it) from huggingface.co (and the ONNX runtime from jsdelivr) into the
  * persistent profile at .cache/playwright-profile; later runs reuse it.
  */
 import { expect, test } from '@playwright/test';
@@ -26,15 +26,22 @@ test.afterEach(async () => {
   vb = null;
 });
 
-/** Seed voice settings once per profile (not on every reload) with TTS and radio effects off. */
+/**
+ * Which Whisper checkpoint the spec runs: E2E_WHISPER_MODEL = tiny.en | base.en (default) | small.en. Headless Chromium has
+ * no WebGPU, so the device is pinned to WebAssembly (the CPU path) to keep timings comparable.
+ */
+const WHISPER_MODEL = process.env.E2E_WHISPER_MODEL ?? 'base.en';
+const WHISPER_DEVICE = process.env.E2E_WHISPER_DEVICE ?? 'wasm';
+
+/** Seed voice settings (TTS and radio effects off, the Whisper model/device above); the provider is set when given. */
 async function seedSettings(page: Page, providerId?: string) {
-  await page.addInitScript((pid) => {
+  await page.addInitScript(([pid, model, device]) => {
     const key = 'kacy.voice.settings';
-    if (pid || !localStorage.getItem(key)) {
-      const base = pid ? { providerId: pid } : {};
-      localStorage.setItem(key, JSON.stringify({ ...base, ttsEnabled: false, radioEffectsEnabled: false }));
-    }
-  }, providerId);
+    let existing: Record<string, unknown> = {};
+    try { existing = JSON.parse(localStorage.getItem(key) ?? '{}') as Record<string, unknown>; } catch { /* start clean */ }
+    const base = pid ? { providerId: pid } : {};
+    localStorage.setItem(key, JSON.stringify({ ...existing, ...base, ttsEnabled: false, radioEffectsEnabled: false, whisperModel: model, whisperDevice: device }));
+  }, [providerId, WHISPER_MODEL, WHISPER_DEVICE] as const);
 }
 
 /**
@@ -125,6 +132,9 @@ test('Settings: select Local Whisper and download/prepare the on-device model', 
   await expect(panel).toBeVisible();
   await expect(page.getByText('Your microphone audio stays in this browser tab')).toBeVisible();
 
+  await expect(page.getByTestId('whisper-model-select')).toHaveValue(WHISPER_MODEL);
+  await expect(page.getByTestId('whisper-device-select')).toHaveValue(WHISPER_DEVICE);
+  if (WHISPER_MODEL !== 'auto') await expect(page.getByTestId('whisper-resolved')).toContainText(`Whisper ${WHISPER_MODEL}`);
   const t0 = Date.now();
   const warm = page.getByTestId('whisper-warmup');
   if (await warm.isEnabled()) await warm.click();
@@ -132,6 +142,7 @@ test('Settings: select Local Whisper and download/prepare the on-device model', 
   const ms = Date.now() - t0;
   console.log(`[voice] model ready in ${ms} ms: ${await page.getByTestId('whisper-message').textContent()}`);
   await expect(page.getByTestId('whisper-warmup')).toHaveText('Local model ready');
+  await expect(page.getByTestId('whisper-message')).toContainText(WHISPER_MODEL === 'auto' ? 'Ready: Whisper' : `Ready: Whisper ${WHISPER_MODEL} on ${WHISPER_DEVICE === 'webgpu' ? 'WebGPU' : 'WebAssembly'}`);
   expect(errors).toEqual([]);
 });
 

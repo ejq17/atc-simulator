@@ -367,7 +367,7 @@ export interface Aircraft {
   lastGoAroundSec?: number;
   history: Vec2[];                 // recent positions for trails
   voiceId: string;                 // which synthetic pilot voice
-  flags: { emergency?: boolean; holdingPosition?: boolean; readbackErrorPending?: boolean };
+  flags: { emergency?: boolean; holdingPosition?: boolean; readbackErrorPending?: boolean; /** The clearance that was misread back (so a correction re-issues it, not a later companion command). */ readbackErrorClearanceId?: string };
   seed: number;
 }
 
@@ -511,6 +511,8 @@ export interface ScenarioAircraftSpawn {
   initialRequest?: PendingRequest['kind'];
   /** IFR flight plan (destination, cruise, requested route). Departures without one are VFR. */
   flightPlan?: Omit<FlightPlan, 'ifrClearance'>;
+  /** Where a generated flight comes from (arrivals) / goes to (departures), ICAO. Unset: the engine picks from its own origin lists (KACY). */
+  remoteAirport?: string;
 }
 
 export interface Scenario {

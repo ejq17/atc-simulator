@@ -60,8 +60,10 @@ export function parkingOccupant(state: SimulationState, parking: ParkingPosition
 
 /** Category a type of aircraft normally parks in (airline callsign or large type -> airline). */
 export function naturalCategory(ac: Aircraft): ParkingCategory {
-  if (/^[A-Z]{3}\d/.test(ac.callsign) || perfOf(ac).category !== 'light') return 'airline';
-  return 'ga';
+  // Freighters (UPS, FedEx) use the cargo apron; a light aircraft with an airline-style callsign (Wiggins' Caravan) parks on the GA ramp.
+  if (perfOf(ac).category !== 'light' && /^(UPS|FDX)\d/.test(ac.callsign)) return 'cargo';
+  if (perfOf(ac).category === 'light') return 'ga';
+  return 'airline';
 }
 
 /**

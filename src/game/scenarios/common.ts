@@ -3,6 +3,7 @@ import type { Airport, ControllerPositionId, ScenarioAircraftSpawn, Weather } fr
 import type { FreePlayOptions, ScenarioSummary } from '../index';
 import { makeSimulatedWeather } from '../../weather/presets';
 import type { GameScenario } from '../types';
+import { getPerformance } from '../../sim/performance';
 import { bearingTo, fullLengthHold, holdOn, inboundFromBearing, onDownwind, onFinal } from '../world';
 import type { NeighbourId } from '../world';
 import { arrivalAtFix, arrivalProcedure, ifrFlightPlan } from '../ifr';
@@ -25,7 +26,7 @@ export const WX_RWY13 = (): Weather => vfrWeather(110, 8);
 /** Wind favouring runway 31 (true 298). */
 export const WX_RWY31 = (): Weather => vfrWeather(300, 14);
 
-const isLight = (type: string): boolean => type === 'C172';
+const isLight = (type: string): boolean => getPerformance(type).category === 'light';
 
 export function holdingShort(
   airport: Airport, callsign: string, type: string, endId: string, atSec: number,

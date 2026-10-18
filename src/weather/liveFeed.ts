@@ -1,17 +1,17 @@
 /**
- * Live METAR feed for a running session. Polls the backend proxy on the real METAR cadence (every 5 minutes: hourly routine
+ * Live METAR feed for a running session. Polls the live METAR source (local backend, else the NWS API; see liveWeather.ts) on the real METAR cadence (every 5 minutes: hourly routine
  * reports and specials both show up within one poll), applies a report only when its OBSERVATION TIME is new, and degrades
  * visibly: the last good METAR keeps being used while the backend is down ("stale"); with none at all the session keeps the
  * simulated weather it started with ("fallback"). Failed polls retry sooner (default 60 s).
  */
 import type { Weather } from '../sim/types';
-import type { LiveMetar } from './liveWeather';
+import type { LiveMetar, LiveMetarSource } from './liveWeather';
 import { LiveWeatherError } from './liveWeather';
 
 export type LiveFeedStatus =
-  | { kind: 'live'; observedAt: string; raw: string; checkedAtMs: number }
+  | { kind: 'live'; observedAt: string; raw: string; checkedAtMs: number; source?: LiveMetarSource }
   /** Backend unreachable now; the last good METAR (observed `observedAt`) is still in use. */
-  | { kind: 'stale'; observedAt: string; raw: string; error: string; failedAtMs: number }
+  | { kind: 'stale'; observedAt: string; raw: string; error: string; failedAtMs: number; source?: LiveMetarSource }
   /** Never had a live METAR: the simulated weather stays. */
   | { kind: 'fallback'; error: string; failedAtMs: number };
 
@@ -64,7 +64,7 @@ export function createLiveFeed(o: LiveFeedOptions): LiveFeed {
   const feed: LiveFeed = {
     start(firstDelayMs = poll) {
       stopped = false;
-      if (last) set({ kind: 'live', observedAt: last.observedAt, raw: last.raw, checkedAtMs: now() });
+      if (last) set({ kind: 'live', observedAt: last.observedAt, raw: last.raw, checkedAtMs: now(), source: last.source });
       schedule(firstDelayMs);
     },
     async refresh() {
@@ -81,14 +81,14 @@ export function createLiveFeed(o: LiveFeedOptions): LiveFeed {
           o.onWeather(m.weather, m);
         }
         failures = 0;
-        set({ kind: 'live', observedAt: last!.observedAt, raw: last!.raw, checkedAtMs: now() });
+        set({ kind: 'live', observedAt: last!.observedAt, raw: last!.raw, checkedAtMs: now(), source: last!.source });
         schedule(poll);
       } catch (err) {
         if (stopped) return;
         const error = err instanceof Error ? err.message : String(err);
-        set(last ? { kind: 'stale', observedAt: last.observedAt, raw: last.raw, error, failedAtMs: now() } : { kind: 'fallback', error, failedAtMs: now() });
+        set(last ? { kind: 'stale', observedAt: last.observedAt, raw: last.raw, error, failedAtMs: now(), source: last.source } : { kind: 'fallback', error, failedAtMs: now() });
         failures += 1;
-        // No backend on this hosting (static build): retrying cannot help, so only look again at the normal cadence.
+        // Legacy permanent-failure code (no longer thrown: static hosting uses the NWS API); kept so such an error never retries fast.
         const permanent = err instanceof LiveWeatherError && err.code === 'STATIC_HOSTING';
         schedule(permanent ? poll : Math.min(retry * 2 ** (failures - 1), poll));
       } finally {

@@ -4,7 +4,7 @@
  */
 import { SttError } from './types.ts';
 
-export interface WhisperLoadRequest { type: 'load'; model: string; device: string; dtype: string }
+export interface WhisperLoadRequest { type: 'load'; model: string; device: string; dtype: string | Record<string, string> }
 export interface WhisperTranscribeRequest {
   type: 'transcribe';
   id: number;

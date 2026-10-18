@@ -1,7 +1,7 @@
 import { addWindowListener } from '../layout/windows';
 import { useEffect, useState } from 'react';
-import { STT_PROVIDER_NOTES, VOICE_PRIVACY_NOTES, TRANSCRIPT_STORAGE_KEY, createBrowserTts, createWebSpeechProvider, getLocalWhisperProvider, unlockAudio } from '../../voice';
-import type { SttProviderId, WhisperProgress } from '../../voice';
+import { STT_PROVIDER_NOTES, VOICE_PRIVACY_NOTES, TRANSCRIPT_STORAGE_KEY, createBrowserTts, createWebSpeechProvider, deviceLabel, getLocalWhisperProvider, hasWebGpu, isWebGpuMarkedFailed, resolveWhisper, unlockAudio, WHISPER_MODELS } from '../../voice';
+import type { SttProviderId, WhisperDeviceChoice, WhisperModelChoice, WhisperProgress } from '../../voice';
 import { voiceSettings, useVoiceSettings } from '../store/voiceSettings';
 import { isStaticHosting } from '../../hosting';
 import { keyLabel } from '../lib/voiceStatus';
@@ -21,7 +21,7 @@ function useProviderAvailability(id: SttProviderId): { checking: boolean; availa
         }
         if (id === 'whisper-local') {
           const ok = await getLocalWhisperProvider().isAvailable();
-          return !cancelled && setState({ checking: false, available: ok, detail: ok ? 'Runs on this device (WebAssembly). Prepare the model once below; your voice never leaves this computer.' : 'This browser lacks WebAssembly or microphone support.' });
+          return !cancelled && setState({ checking: false, available: ok, detail: ok ? 'Runs on this device (GPU when available, else CPU). Prepare the model once below; your voice never leaves this computer.' : 'This browser lacks WebAssembly or microphone support.' });
         }
         if (isStaticHosting()) return !cancelled && setState({ checking: false, available: false, detail: 'Deepgram needs the local backend (npm run server). It is not available on this hosted site; use Web Speech or Local Whisper.' });
         const res = await fetch('/api/voice/deepgram-token', { headers: { Accept: 'application/json' } });
@@ -68,13 +68,41 @@ function PilotVoiceTest() {
   );
 }
 
+const MODEL_ORDER = ['small.en', 'base.en', 'tiny.en'] as const;
+const DEVICE_OPTIONS: Array<[WhisperDeviceChoice, string]> = [['auto', 'Auto'], ['wasm', 'CPU (WebAssembly)'], ['webgpu', 'GPU (WebGPU)']];
+
 function LocalModelControls() {
   const provider = getLocalWhisperProvider();
+  const s = useVoiceSettings();
+  const gpu = hasWebGpu();
+  const resolved = resolveWhisper(s.whisperModel, s.whisperDevice, { gpu, webGpuFailed: isWebGpuMarkedFailed() });
   const [p, setP] = useState<WhisperProgress>(provider.getProgress());
   useEffect(() => provider.onProgress(setP), [provider]);
   const busy = p.phase === 'downloading' || p.phase === 'loading';
   return (
     <div className="flex flex-col gap-1.5 border border-atc-border px-2 py-1.5" data-testid="whisper-model">
+      <div className="grid grid-cols-2 gap-3">
+        <Field label="Speech model">
+          <select className={SELECT} value={s.whisperModel} onChange={(e) => voiceSettings.update({ whisperModel: e.target.value as WhisperModelChoice })} aria-label="Speech model" data-testid="whisper-model-select">
+            <option value="auto">Auto (small.en on GPU, else base.en)</option>
+            {MODEL_ORDER.map((m) => (
+              <option key={m} value={m}>{`${m} - ${WHISPER_MODELS[m].mb[resolved.device]} MB${m === 'tiny.en' ? ' (fastest)' : m === 'small.en' ? ' (most accurate)' : ''}`}</option>
+            ))}
+          </select>
+        </Field>
+        <Field label="Run on">
+          <select className={SELECT} value={s.whisperDevice} onChange={(e) => voiceSettings.update({ whisperDevice: e.target.value as WhisperDeviceChoice })} aria-label="Speech device" data-testid="whisper-device-select">
+            {DEVICE_OPTIONS.map(([v, label]) => (
+              <option key={v} value={v}>{v === 'auto' ? `Auto (${gpu ? 'GPU' : 'CPU'})` : label}</option>
+            ))}
+          </select>
+        </Field>
+      </div>
+      <span className="text-atc-muted" data-testid="whisper-resolved">
+        Using Whisper {resolved.size} on {deviceLabel(resolved.device)}, about {resolved.mb} MB once. {WHISPER_MODELS[resolved.size].hint}
+        {s.whisperDevice === 'webgpu' && !gpu ? ' This browser has no WebGPU, so the CPU is used.' : ''}
+        {resolved.requestedDevice === 'webgpu' && resolved.device === 'wasm' && gpu ? ' WebGPU failed earlier in this session, so the CPU is used.' : ''}
+      </span>
       <div className="flex items-center gap-2">
         <Btn size="xs" onClick={() => { void provider.warmUp().catch(() => undefined); }} disabled={busy || p.phase === 'ready'} data-testid="whisper-warmup">
           {p.phase === 'ready' ? 'Local model ready' : busy ? 'Preparing…' : 'Download / prepare local model'}

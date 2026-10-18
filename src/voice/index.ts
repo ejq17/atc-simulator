@@ -5,6 +5,7 @@ export * from './stt/noneProvider.ts';
 export * from './stt/webSpeechProvider.ts';
 export * from './stt/deepgramProvider.ts';
 export * from './stt/localWhisperProvider.ts';
+export * from './stt/whisperModels.ts';
 export * from './stt/aviationPostProcess.ts';
 export * from './stt/mediaErrors.ts';
 export * from './stt/inputDevice.ts';

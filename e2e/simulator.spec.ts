@@ -146,9 +146,10 @@ test('ending the session shows the debrief and play again restarts', async ({ pa
   await expect(page.getByTestId('setup-screen')).toBeVisible();
 });
 
-test('live weather: falls back to a simulated preset with a visible notice when the backend is down', async ({ page }) => {
+test('live weather: falls back to a simulated preset with a visible notice when both the backend and the NWS API are down', async ({ page }) => {
   await page.route('**/api/weather/**', (route) => route.abort());
   await page.route('http://localhost:8787/**', (route) => route.abort());
+  await page.route('https://api.weather.gov/**', (route) => route.abort()); // the browser-side fallback source
   await page.goto('/');
   await expect(page.getByTestId('weather-select')).toHaveValue('live');
   await page.getByTestId('start-session').click(); // custom free play + live weather

@@ -16,7 +16,7 @@ function harness(fetchImpl: typeof fetch) {
   const weather: Weather[] = [];
   const statuses: LiveFeedStatus[] = [];
   const feed = createLiveFeed({
-    fetchMetar: () => fetchLiveMetar('KACY', { baseUrl: 'http://x', fetchImpl }),
+    fetchMetar: () => fetchLiveMetar('KACY', { baseUrl: 'http://x', nwsFallback: false, fetchImpl }),
     onWeather: (w) => weather.push(w),
     onStatus: (s) => statuses.push(s),
   });
@@ -94,8 +94,8 @@ describe('live METAR feed', () => {
   it('a METAR the session started with is not announced again; stop() ends polling', async () => {
     const f = ok(R1);
     const weather: Weather[] = [];
-    const initial = await fetchLiveMetar('KACY', { baseUrl: 'http://x', fetchImpl: f as unknown as typeof fetch });
-    const feed = createLiveFeed({ fetchMetar: () => fetchLiveMetar('KACY', { baseUrl: 'http://x', fetchImpl: f as unknown as typeof fetch }), initial, onWeather: (w) => weather.push(w), onStatus: () => {} });
+    const initial = await fetchLiveMetar('KACY', { baseUrl: 'http://x', nwsFallback: false, fetchImpl: f as unknown as typeof fetch });
+    const feed = createLiveFeed({ fetchMetar: () => fetchLiveMetar('KACY', { baseUrl: 'http://x', nwsFallback: false, fetchImpl: f as unknown as typeof fetch }), initial, onWeather: (w) => weather.push(w), onStatus: () => {} });
     feed.start();
     await vi.advanceTimersByTimeAsync(METAR_POLL_MS);
     expect(f).toHaveBeenCalledTimes(2);

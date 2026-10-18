@@ -21,7 +21,8 @@ engine.subscribe((s) => { runner.update(); training?.update(s); if (game.isScena
 | `index.ts` | The contract (do not change signatures). Re-exports `game`. |
 | `game.ts` | Assembles `game: GameApi`; re-exports the extras below. |
 | `types.ts` | `GameScenario` = `Scenario` + optional extension fields (`events`, `difficulty`, `aircraftTypes`, `careerStep`, `briefing`, richer `training.steps`). All plain JSON. |
-| `world.ts` | KACY helpers: runway-end geometry (TRUE heading, sin/cos from the threshold), holds, taxi-route planning that mirrors the engine, crossing detection, parking pools, callsign generators. |
+| `world.ts` | KACY helpers: runway-end geometry (TRUE heading, sin/cos from the threshold), holds, taxi-route planning that mirrors the engine, crossing detection, parking pools (GA ramp/FBO for light types incl. the C208, gates for airliners, the cargo apron for B752/B763/A306 when the airport has one), callsign generators (`randomAirlineCallsign(rng, icao?)` draws from the airport profile), `bearingTo` (neighbours of the session airport's profile). |
+| `airportProfile.ts` | Airport traffic profiles keyed by ICAO: weighted airline entries (`icao3`, telephony, types, weight, destinations with cruise altitudes, flight-number range, `hours` 'day'/'night'/'any'), VFR neighbour table (lat/lon + spoken name), GA type variants, reference jet. KACY = Spirit 80 / American 20, A320 only (unchanged); KMHT = Southwest B738, Breeze BCS3, American regionals (PSA CRJ9, Piedmont/Republic E175), American A320, United Express (SkyWest E175, GoJet CRJ9), UPS/FedEx B752 (night bank), Wiggins C208 (day bank), Sun Country, GA C172/PA28. `pickFlight`, `pickLeg`, `resolveTypeSelection`. |
 | `scenarios/career.ts` | The 12 career steps. |
 | `scenarios/training.ts` | 9 training lessons (8 and 9 are IFR). |
 | `ifr.ts` | IFR flows: `arrivalProcedure(airport, runwayEnd)` (ILS 13 -> CARYL/VCN, ILS 31 -> STEVV, RNAV 22 -> KOPCE, RNAV 4 -> JEDOB, read from the data), `ifrFlightPlan`, `ifrArrivalSpawn`, `ifrDepartureSpawn`, `resolveIfrFlows`. |
@@ -112,7 +113,7 @@ independent exponential clocks for arrivals and departures at the hourly rates t
 never above `maxAircraft`. Arrivals: 10-12 nm from the threshold of an active landing runway, half on the centreline and half on a base-leg offset of 20-50 degrees,
 2,500-3,000 ft, 100 kt (C172) / 170 kt (A320), >= 3 nm from any other airborne aircraft (5 nm for a faster aircraft behind a slower one on the same final), initial frequency
 `TWR` (or `APP` if the scenario has APP but not TWR). Departures: free parking (GA ramp/FBO for C172, gates for A320), initial frequency `GND`,
-request `TAXI`; A320 departures are replaced by C172 (or skipped) only when no active departure runway is long enough for the type (never at KACY now: an A320 can use 4/22 from full length; the generator only chooses the gate, the runway entry is the player's and the engine refuses < 5,000 ft remaining). Callsigns: N-numbers in three formats and Spirit (80 %) / American flight numbers,
+request `TAXI`; A320 departures are replaced by C172 (or skipped) only when no active departure runway is long enough for the type (never at KACY now: an A320 can use 4/22 from full length; the generator only chooses the gate, the runway entry is the player's and the engine refuses < 5,000 ft remaining). Callsigns: N-numbers in three formats and the airport profile's airline flight numbers (KACY Spirit 80 % / American 20 %; KMHT the mix in `airportProfile.ts`),
 unique for the whole session and never ending in the same three characters as an active aircraft.
 
 ### IFR flows (`ifr.ts`, applied by the generator and the free-play builder)
@@ -126,6 +127,18 @@ Active when `resolveIfrFlows(scenario)` says so (see `ifrFlows` above). GA C172 
   They call Clearance Delivery, then Ground by themselves after the clearance, and after takeoff Tower hands them to Departure.
 * **Engine limitation worked around**: `assessApproachSeparation` (src/sim/conflicts.ts) measures an aircraft on a route at its *next fix* (`joinDM`), not at its own position. A follower that has just appeared over CARYL is measured at MAYBN (4.6 nm), so clearing it
   while a leader is established 2-7 nm out is flagged `UNSAFE_CLEARANCE` although they are 4-6 nm apart. Fixing it in the engine (use the aircraft's own distance when it is already on the course) would let the generator drop the 3.5 nm rule.
+
+### Airport traffic profiles (`airportProfile.ts`)
+
+Airline callsign, aircraft type, filed destination and cruise altitude come from the session airport's profile (unknown airports use KACY's). `pickFlight` draws a weighted
+entry (then a flight number in the entry's range, then a type when the entry has several), `pickLeg` the destination/cruise (or a VFR neighbour for GA) and stamps it on the
+spawn as `remoteAirport` so the radio says "request IFR to Charlotte" / "VFR to Nashua" and the aircraft's origin/destination match; without a route (KACY) nothing is stamped and
+the engine keeps its legacy origin lists, so KACY seeded runs are unchanged. `hours` weights cargo ('night', 19:00-06:00 local, x0.1 outside) and the Caravan ('day') only in
+real-time mode, where the generator knows the local hour (`options.densityAt` is set); otherwise every entry has full weight. The setup screen's type list is filtered by `profileTypes(airport)`;
+`aircraftTypes` selects entries whose types are in the list ('C172' stands for GA); a selection that allows nothing at the airport means everything. An airliner departs only when
+an active departure runway is long enough for its type (`runwayLongEnoughFor(type)`), otherwise another type or a GA aircraft is chosen. To change the KMHT mix edit the rows in
+`airportProfile.ts` (weights are gameplay numbers, not statistics); a new type needs a performance entry (src/sim/performance.ts), an `AIRLINES` word in the parser lexicon,
+an entry in `radio/spoken.ts` and, for destinations, a name in `commands/airports.ts`.
 
 ## Scenario events (wind shifts, emergency)
 
@@ -182,7 +195,7 @@ every storage access is try/caught and falls back to an in-memory copy (Node, pr
 
 ## Tests
 
-`npm test -- src/game` - catalogue/spawn validation and a 120 s engine run of every scenario, 10-minute robustness run, scripted career steps 1 and 3 (and 2, 4, 5, 6, 12) through `parseTransmission` (`testkit.ts` passes `ctx.fixes` from `airport.navaids`),
+`npm test -- src/game` - `airportProfile.test.ts` (KACY unchanged, KMHT airlines/destinations/neighbour bearings, performance entries vs the JSON, cargo parking, generator at KMHT, parser callsigns), catalogue/spawn validation and a 120 s engine run of every scenario, 10-minute robustness run, scripted career steps 1 and 3 (and 2, 4, 5, 6, 12) through `parseTransmission` (`testkit.ts` passes `ctx.fixes` from `airport.navaids`),
 all 9 training lessons completed in the engine (`ifrCareer.test.ts`: lessons 8 and 9 use the example transmissions printed in their prompts, plus refusal paths), career step 8 played end to end (Approach, Tower, Ground), traffic generator rules over 30 simulated minutes,
 `ifrFlows.test.ts` (IFR flows for landing runways 13, 31, 22 and 4: fixes, altitudes, 90 s / 5 nm / 3.5 nm spacing, Cessnas stay VFR, determinism, positions-based defaults and `ifrFlows: false`, generated aircraft worked through the parser without unsafe approach clearances, free play with `ifrFlows`, career 7 IFR departure through Clearance Delivery, Ground, Tower and Departure to `handled:`, the new objective checks on fabricated logs, debrief advice for each IFR mistake), free play options, objectives, debrief, career persistence (fake `localStorage`), scenario events.
 Scripted tests pass `readbackErrorRate: 0`; with the default 8 % a pilot occasionally misreads a clearance and the controller has to correct it.

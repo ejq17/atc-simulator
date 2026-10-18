@@ -1,6 +1,7 @@
 {
   "_meta": {
-    "purpose": "Recommended values for src/sim/types.ts AircraftPerformance (C172, A320). Evidence and verdicts: docs/REALISM-VERIFICATION.md. NOT for flight planning.",
+    "added_2026-10-17": "B738, BCS3, E175, CRJ9, B752, C208 were added for the KMHT airport traffic profile (src/game/airportProfile.ts). The agent writing them had no network access to the manufacturer documents in that session, so every value below is a rounded public figure from memory at typical operating weight, status ESTIMATE; verify against the cited document before treating any as verified.",
+    "purpose": "Recommended values for src/sim/types.ts AircraftPerformance (C172, A320, and the KMHT traffic types B738, BCS3, E175, CRJ9, B752, C208). Evidence and verdicts: docs/REALISM-VERIFICATION.md. NOT for flight planning.",
     "retrieved": "2026-10-17",
     "shape": "Each type object contains exactly the 22 AircraftPerformance fields (type, category, wakeCategory, taxiSpeedKt, taxiTurnSpeedKt, accelKtPerSec, decelKtPerSec, rotateSpeedKt, climbSpeedKt, cruiseSpeedKt, approachSpeedKt, touchdownSpeedKt, climbRateFpm, descentRateFpm, turnRateDegPerSec, groundTurnRateDegPerSec, minSpeedKt, maxSpeedKt, serviceCeilingFt, takeoffDistanceFt, landingDistanceFt, lengthM) plus a _sources block. Strip _sources before loading into the engine.",
     "source_keys": {
@@ -12,7 +13,15 @@
       "AIRBUS_AC": "Airbus A320 Aircraft Characteristics - Airport and Maintenance Planning, Rev 44, Jun 01/24: https://aircraft.airbus.com/sites/g/files/jlcbta126/files/2024-06/AC_A320_0624.pdf (raw/realism/airbus_AC_A320_0624.pdf)",
       "SKYBRARY_A320": "https://skybrary.aero/aircraft/a320 (fetched via WebFetch summariser; secondary; raw not stored because skybrary.aero serves a JS challenge to curl)",
       "CFR91.117": "14 CFR 91.117 via eCFR: https://www.ecfr.gov/current/title-14/part-91/section-91.117 (raw/realism/ecfr_14cfr91_117.json)",
-      "DERIVED": "Computed by the verifier from other cited numbers (formula shown in the note)."
+      "DERIVED": "Computed by the verifier from other cited numbers (formula shown in the note).",
+      "BOEING_737_ACAPD": "Boeing 737 Airplane Characteristics for Airport Planning, D6-58325-6 (boeing.com/commercial/airports). Section 2 (dimensions), Section 5 (performance). NOT re-fetched when this entry was written; figures are remembered public values, marked ESTIMATE.",
+      "AIRBUS_A220_AC": "Airbus A220 Aircraft Characteristics - Airport and Maintenance Planning (aircraft.airbus.com). NOT re-fetched; figures marked ESTIMATE.",
+      "EMBRAER_175_APD": "Embraer 170/175 Airport Planning Manual (embraercommercialaviation.com). NOT re-fetched; figures marked ESTIMATE.",
+      "CRJ900_APD": "Bombardier CRJ700/900 Airport Planning Manual CSP B-021 / Aircraft Characteristics. NOT re-fetched; figures marked ESTIMATE.",
+      "BOEING_757_ACAPD": "Boeing 757 Airplane Characteristics for Airport Planning, D6-58327. NOT re-fetched; figures marked ESTIMATE.",
+      "TEXTRON_208": "Textron Aviation Cessna Caravan / Grand Caravan EX specifications and Cessna 208B POH Section 5 (Performance). NOT re-fetched; figures marked ESTIMATE.",
+      "EUROCONTROL_ACD": "EUROCONTROL Aircraft Performance Database (learningzone.eurocontrol.int/ilp/customs/ATCPFDB/details.aspx?ICAO=<type>) for B738, BCS3, E175, CRJ9, B752, C208: climb/cruise speeds and ceilings. NOT re-fetched; ESTIMATE.",
+      "FAA_JO_7110_126A": "FAA JO 7110.126A Consolidated Wake Turbulence (RECAT) Appendix A; B738/BCS3/E175/CRJ9 = F, C208 = I; B757 = E follows this file's existing convention (see src/sim/performance.ts), not re-fetched."
     }
   },
 
@@ -109,6 +118,318 @@
       "landingDistanceFt": {"value": 4500, "source": "AIRBUS_AC Fig 3-4-1 (CFM56, ISA, sea level): landing field length ~4,800 ft at MLW 66 t falling to ~4,300 ft at ~59 t (chart-read +/-300 ft); this is the factored length (actual / 0.6). ACD_A320 landing distance 1,440 m (4,724 ft)", "status": "match (as a factored required-runway length); actual demonstrated distance over 50 ft is ~2,900 ft"},
       "lengthM": {"value": 37.6, "source": "AIRBUS_AC 2-2-0 General Aircraft Dimensions: 37.57 m; ACD_A320 37.57 m", "status": "verified"},
       "_not_in_type_shape": {"wingspan_m": 34.1, "wingspan_source": "AIRBUS_AC 34.10 m (111.88 ft) without sharklets, 35.80 m with sharklets (A320-200 / A320neo drawings); ACD_A320 34.1 m; SKYBRARY_A320 35.80 m", "aerodrome_reference_code": "AIRBUS_AC 3-3-3: ICAO code 3C if MTOW <= 73,500 kg, else 4C; FAA ADG III (wingspan 79 ft to < 118 ft; AC 150/5300-13B Table G-9 'C/D/E-III' is the applicable runway matrix)", "wake_srs_category": "FAA JO 7110.65 same-runway-separation Category III ('all other aircraft')", "mtow_kg": 73500, "mlw_kg": 64500}
+    }
+  },
+
+  "B738": {
+    "type": "B738",
+    "category": "large",
+    "wakeCategory": "medium",
+    "taxiSpeedKt": 20,
+    "taxiTurnSpeedKt": 10,
+    "accelKtPerSec": 3.7,
+    "decelKtPerSec": 5.8,
+    "rotateSpeedKt": 145,
+    "climbSpeedKt": 180,
+    "cruiseSpeedKt": 250,
+    "approachSpeedKt": 140,
+    "touchdownSpeedKt": 135,
+    "climbRateFpm": 2500,
+    "descentRateFpm": 2000,
+    "turnRateDegPerSec": 2.5,
+    "groundTurnRateDegPerSec": 15,
+    "minSpeedKt": 125,
+    "maxSpeedKt": 340,
+    "serviceCeilingFt": 41000,
+    "takeoffDistanceFt": 6000,
+    "landingDistanceFt": 4700,
+    "lengthM": 39.5,
+    "_sources": {
+      "_summary": {
+        "value": "Boeing 737-800 (Southwest 737-700/-800/MAX 8, Sun Country charters)",
+        "source": "BOEING_737_ACAPD; EUROCONTROL_ACD; FAA_JO_7110_126A; CFR91.117",
+        "status": "ESTIMATE - see _meta.added_2026-10-17"
+      },
+      "category/wakeCategory": {
+        "value": "large / medium",
+        "source": "FAA JO 7110.126A (RECAT by type in src/sim/performance.ts wakeRecatCategory); FAA 'Large' (>12,500 lb) for the jets, light for the Caravan",
+        "status": "acceptable simplification"
+      },
+      "performance figures": {
+        "value": "takeoffDistanceFt 6000: ESTIMATE; the 737-800 balanced field at MTOW 79 t is ~7,500-8,000 ft, ~6,000 ft at a typical 65-70 t. landingDistanceFt 4700: ESTIMATE (FAR landing field length at MLW ~5,000+ ft = actual/0.6; the file's A320 uses a conservative 4,500). Vref ~140 kt at 61 t. 9,250 ft KMHT 17/35 and 7,651 ft 6/24 both exceed 6,000.",
+        "source": "BOEING_737_ACAPD",
+        "status": "ESTIMATE"
+      },
+      "cruiseSpeedKt/maxSpeedKt": {
+        "value": "250 / 340",
+        "source": "CFR91.117(a) 250 kt below 10,000 ft for the jets; maxSpeedKt is VMO/VNO order of magnitude",
+        "status": "ESTIMATE (cruise verified as the 250 kt limit for jets)"
+      },
+      "taxi/turn/descent rates": {
+        "value": "taxi 20 kt, turn 2.5 deg/s, ground turn 15 deg/s, descent 2000 fpm",
+        "source": "none authoritative; same gameplay simplifications as C172/A320",
+        "status": "UNVERIFIED simplification"
+      }
+    }
+  },
+
+  "BCS3": {
+    "type": "BCS3",
+    "category": "large",
+    "wakeCategory": "medium",
+    "taxiSpeedKt": 20,
+    "taxiTurnSpeedKt": 10,
+    "accelKtPerSec": 3.9,
+    "decelKtPerSec": 6.0,
+    "rotateSpeedKt": 135,
+    "climbSpeedKt": 175,
+    "cruiseSpeedKt": 250,
+    "approachSpeedKt": 133,
+    "touchdownSpeedKt": 128,
+    "climbRateFpm": 2800,
+    "descentRateFpm": 2000,
+    "turnRateDegPerSec": 2.5,
+    "groundTurnRateDegPerSec": 15,
+    "minSpeedKt": 115,
+    "maxSpeedKt": 340,
+    "serviceCeilingFt": 41000,
+    "takeoffDistanceFt": 4900,
+    "landingDistanceFt": 4300,
+    "lengthM": 38.7,
+    "_sources": {
+      "_summary": {
+        "value": "Airbus A220-300 (Breeze Airways, 'Moxy')",
+        "source": "AIRBUS_A220_AC; EUROCONTROL_ACD; FAA_JO_7110_126A; CFR91.117",
+        "status": "ESTIMATE - see _meta.added_2026-10-17"
+      },
+      "category/wakeCategory": {
+        "value": "large / medium",
+        "source": "FAA JO 7110.126A (RECAT by type in src/sim/performance.ts wakeRecatCategory); FAA 'Large' (>12,500 lb) for the jets, light for the Caravan",
+        "status": "acceptable simplification"
+      },
+      "performance figures": {
+        "value": "takeoffDistanceFt 4900: ESTIMATE (A220-300 field length ~4,900-5,500 ft at typical weights). Vapp ~133 kt, climb ~2,800 fpm initial: ESTIMATE. MTOW 70.9 t, length 38.7 m (the length also matches the 3D model table in src/ui/tower/aircraftModel.ts).",
+        "source": "AIRBUS_A220_AC",
+        "status": "ESTIMATE"
+      },
+      "cruiseSpeedKt/maxSpeedKt": {
+        "value": "250 / 340",
+        "source": "CFR91.117(a) 250 kt below 10,000 ft for the jets; maxSpeedKt is VMO/VNO order of magnitude",
+        "status": "ESTIMATE (cruise verified as the 250 kt limit for jets)"
+      },
+      "taxi/turn/descent rates": {
+        "value": "taxi 20 kt, turn 2.5 deg/s, ground turn 15 deg/s, descent 2000 fpm",
+        "source": "none authoritative; same gameplay simplifications as C172/A320",
+        "status": "UNVERIFIED simplification"
+      }
+    }
+  },
+
+  "E175": {
+    "type": "E175",
+    "category": "large",
+    "wakeCategory": "medium",
+    "taxiSpeedKt": 20,
+    "taxiTurnSpeedKt": 10,
+    "accelKtPerSec": 4.0,
+    "decelKtPerSec": 6.0,
+    "rotateSpeedKt": 132,
+    "climbSpeedKt": 170,
+    "cruiseSpeedKt": 250,
+    "approachSpeedKt": 128,
+    "touchdownSpeedKt": 122,
+    "climbRateFpm": 2800,
+    "descentRateFpm": 2000,
+    "turnRateDegPerSec": 3,
+    "groundTurnRateDegPerSec": 16,
+    "minSpeedKt": 110,
+    "maxSpeedKt": 320,
+    "serviceCeilingFt": 41000,
+    "takeoffDistanceFt": 5000,
+    "landingDistanceFt": 4000,
+    "lengthM": 31.7,
+    "_sources": {
+      "_summary": {
+        "value": "Embraer 175 (Piedmont, Republic 'Brickyard', SkyWest)",
+        "source": "EMBRAER_175_APD; EUROCONTROL_ACD; FAA_JO_7110_126A; CFR91.117",
+        "status": "ESTIMATE - see _meta.added_2026-10-17"
+      },
+      "category/wakeCategory": {
+        "value": "large / medium",
+        "source": "FAA JO 7110.126A (RECAT by type in src/sim/performance.ts wakeRecatCategory); FAA 'Large' (>12,500 lb) for the jets, light for the Caravan",
+        "status": "acceptable simplification"
+      },
+      "performance figures": {
+        "value": "takeoffDistanceFt 5000: ESTIMATE (E175 STD/LR ~4,000-6,000 ft by weight). Vref ~125-130 kt at 32-35 t: ESTIMATE. VMO 320 kt: ESTIMATE.",
+        "source": "EMBRAER_175_APD",
+        "status": "ESTIMATE"
+      },
+      "cruiseSpeedKt/maxSpeedKt": {
+        "value": "250 / 320",
+        "source": "CFR91.117(a) 250 kt below 10,000 ft for the jets; maxSpeedKt is VMO/VNO order of magnitude",
+        "status": "ESTIMATE (cruise verified as the 250 kt limit for jets)"
+      },
+      "taxi/turn/descent rates": {
+        "value": "taxi 20 kt, turn 3 deg/s, ground turn 16 deg/s, descent 2000 fpm",
+        "source": "none authoritative; same gameplay simplifications as C172/A320",
+        "status": "UNVERIFIED simplification"
+      }
+    }
+  },
+
+  "CRJ9": {
+    "type": "CRJ9",
+    "category": "large",
+    "wakeCategory": "medium",
+    "taxiSpeedKt": 20,
+    "taxiTurnSpeedKt": 10,
+    "accelKtPerSec": 4.0,
+    "decelKtPerSec": 6.0,
+    "rotateSpeedKt": 138,
+    "climbSpeedKt": 180,
+    "cruiseSpeedKt": 250,
+    "approachSpeedKt": 135,
+    "touchdownSpeedKt": 128,
+    "climbRateFpm": 3000,
+    "descentRateFpm": 2000,
+    "turnRateDegPerSec": 3,
+    "groundTurnRateDegPerSec": 16,
+    "minSpeedKt": 115,
+    "maxSpeedKt": 320,
+    "serviceCeilingFt": 41000,
+    "takeoffDistanceFt": 5500,
+    "landingDistanceFt": 4200,
+    "lengthM": 36.4,
+    "_sources": {
+      "_summary": {
+        "value": "Bombardier CRJ-900 (PSA 'Blue Streak', GoJet 'Lindbergh')",
+        "source": "CRJ900_APD; EUROCONTROL_ACD; FAA_JO_7110_126A; CFR91.117",
+        "status": "ESTIMATE - see _meta.added_2026-10-17"
+      },
+      "category/wakeCategory": {
+        "value": "large / medium",
+        "source": "FAA JO 7110.126A (RECAT by type in src/sim/performance.ts wakeRecatCategory); FAA 'Large' (>12,500 lb) for the jets, light for the Caravan",
+        "status": "acceptable simplification"
+      },
+      "performance figures": {
+        "value": "takeoffDistanceFt 5500: ESTIMATE (CRJ900 ER/LR balanced field ~5,400-6,300 ft). Vref ~135 kt, 3,000 fpm initial climb: ESTIMATE.",
+        "source": "CRJ900_APD",
+        "status": "ESTIMATE"
+      },
+      "cruiseSpeedKt/maxSpeedKt": {
+        "value": "250 / 320",
+        "source": "CFR91.117(a) 250 kt below 10,000 ft for the jets; maxSpeedKt is VMO/VNO order of magnitude",
+        "status": "ESTIMATE (cruise verified as the 250 kt limit for jets)"
+      },
+      "taxi/turn/descent rates": {
+        "value": "taxi 20 kt, turn 3 deg/s, ground turn 16 deg/s, descent 2000 fpm",
+        "source": "none authoritative; same gameplay simplifications as C172/A320",
+        "status": "UNVERIFIED simplification"
+      }
+    }
+  },
+
+  "B752": {
+    "type": "B752",
+    "category": "large",
+    "wakeCategory": "medium",
+    "taxiSpeedKt": 20,
+    "taxiTurnSpeedKt": 10,
+    "accelKtPerSec": 3.3,
+    "decelKtPerSec": 5.5,
+    "rotateSpeedKt": 150,
+    "climbSpeedKt": 185,
+    "cruiseSpeedKt": 250,
+    "approachSpeedKt": 140,
+    "touchdownSpeedKt": 135,
+    "climbRateFpm": 2600,
+    "descentRateFpm": 2000,
+    "turnRateDegPerSec": 2.5,
+    "groundTurnRateDegPerSec": 12,
+    "minSpeedKt": 125,
+    "maxSpeedKt": 350,
+    "serviceCeilingFt": 42000,
+    "takeoffDistanceFt": 6800,
+    "landingDistanceFt": 5000,
+    "lengthM": 47.3,
+    "_sources": {
+      "_summary": {
+        "value": "Boeing 757-200 (UPS, FedEx freighters)",
+        "source": "BOEING_757_ACAPD; EUROCONTROL_ACD; FAA_JO_7110_126A; CFR91.117",
+        "status": "ESTIMATE - see _meta.added_2026-10-17"
+      },
+      "category/wakeCategory": {
+        "value": "large / medium",
+        "source": "FAA JO 7110.126A (RECAT by type in src/sim/performance.ts wakeRecatCategory); FAA 'Large' (>12,500 lb) for the jets, light for the Caravan",
+        "status": "acceptable simplification"
+      },
+      "performance figures": {
+        "value": "takeoffDistanceFt 6800: ESTIMATE (757-200 field length ~6,500-9,000 ft by weight; lighter than max for the KMHT 7,651 ft runway 6/24; 17/35 is 9,250 ft). wakeCategory 'medium' (legacy 'Large', 757 wake rules differ but RECAT is by type in wakeRecatCategory).",
+        "source": "BOEING_757_ACAPD",
+        "status": "ESTIMATE"
+      },
+      "cruiseSpeedKt/maxSpeedKt": {
+        "value": "250 / 350",
+        "source": "CFR91.117(a) 250 kt below 10,000 ft for the jets; maxSpeedKt is VMO/VNO order of magnitude",
+        "status": "ESTIMATE (cruise verified as the 250 kt limit for jets)"
+      },
+      "taxi/turn/descent rates": {
+        "value": "taxi 20 kt, turn 2.5 deg/s, ground turn 12 deg/s, descent 2000 fpm",
+        "source": "none authoritative; same gameplay simplifications as C172/A320",
+        "status": "UNVERIFIED simplification"
+      }
+    }
+  },
+
+  "C208": {
+    "type": "C208",
+    "category": "light",
+    "wakeCategory": "light",
+    "taxiSpeedKt": 15,
+    "taxiTurnSpeedKt": 8,
+    "accelKtPerSec": 3.0,
+    "decelKtPerSec": 4.0,
+    "rotateSpeedKt": 75,
+    "climbSpeedKt": 95,
+    "cruiseSpeedKt": 175,
+    "approachSpeedKt": 85,
+    "touchdownSpeedKt": 70,
+    "climbRateFpm": 900,
+    "descentRateFpm": 1000,
+    "turnRateDegPerSec": 3,
+    "groundTurnRateDegPerSec": 25,
+    "minSpeedKt": 60,
+    "maxSpeedKt": 175,
+    "serviceCeilingFt": 25000,
+    "takeoffDistanceFt": 2300,
+    "landingDistanceFt": 1900,
+    "lengthM": 11.5,
+    "_sources": {
+      "_summary": {
+        "value": "Cessna 208 Caravan (Wiggins Airways feeder)",
+        "source": "TEXTRON_208; EUROCONTROL_ACD; FAA_JO_7110_126A; CFR91.117",
+        "status": "ESTIMATE - see _meta.added_2026-10-17"
+      },
+      "category/wakeCategory": {
+        "value": "light / light",
+        "source": "FAA JO 7110.126A (RECAT by type in src/sim/performance.ts wakeRecatCategory); FAA 'Large' (>12,500 lb) for the jets, light for the Caravan",
+        "status": "acceptable simplification"
+      },
+      "performance figures": {
+        "value": "takeoffDistanceFt 2300 over 50 ft: ESTIMATE at 8,000-8,750 lb (208B Grand Caravan ~2,000-2,500 ft). Cruise 175 kt: ESTIMATE (Textron max cruise ~185 kt TAS). Ceiling 25,000 ft. MTOW 8,750 lb -> SRS I, RECAT I (<= 41,000 lb), category light so it parks on the GA ramp.",
+        "source": "TEXTRON_208",
+        "status": "ESTIMATE"
+      },
+      "cruiseSpeedKt/maxSpeedKt": {
+        "value": "175 / 175",
+        "source": "CFR91.117(a) 250 kt below 10,000 ft for the jets; maxSpeedKt is VMO/VNO order of magnitude",
+        "status": "ESTIMATE (cruise verified as the 250 kt limit for jets)"
+      },
+      "taxi/turn/descent rates": {
+        "value": "taxi 15 kt, turn 3 deg/s, ground turn 25 deg/s, descent 1000 fpm",
+        "source": "none authoritative; same gameplay simplifications as C172/A320",
+        "status": "UNVERIFIED simplification"
+      }
     }
   }
 }

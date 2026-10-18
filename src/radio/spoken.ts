@@ -104,9 +104,20 @@ const AIRLINES: Record<string, string> = {
   NKS: 'Spirit', AAL: 'American', DAL: 'Delta', UAL: 'United', SWA: 'Southwest', JBU: 'JetBlue', FFT: 'Frontier',
   ASA: 'Alaska', AAY: 'Allegiant', SKW: 'SkyWest', ENY: 'Envoy', RPA: 'Brickyard', FDX: 'FedEx', UPS: 'U P S',
   EJA: 'Executive Jet', LXJ: 'Flexjet', EDV: 'Endeavor', JIA: 'Blue Streak', BAW: 'Speedbird', ACA: 'Air Canada',
+  MXY: 'Moxy', PDT: 'Piedmont', GJS: 'Lindbergh', WIG: 'Wiggins', SCX: 'Sun Country',
 };
 
-const GA_PREFIX: Record<string, string> = { C172: 'Cessna', C182: 'Cessna', C152: 'Cessna', C210: 'Cessna', PA28: 'Piper', SR22: 'Cirrus', BE36: 'Bonanza' };
+const GA_PREFIX: Record<string, string> = { C172: 'Cessna', C182: 'Cessna', C152: 'Cessna', C210: 'Cessna', C208: 'Cessna', PA28: 'Piper', SR22: 'Cirrus', BE36: 'Bonanza' };
+
+/** How a pilot names the aircraft type in a call ("Boeing 737", "Airbus A220", "Embraer 175"); unknown types are read out by their code. */
+const TYPE_NAMES: Record<string, string> = {
+  C172: 'Cessna', C182: 'Cessna', C152: 'Cessna', C210: 'Cessna', C208: 'Caravan', PA28: 'Piper', SR22: 'Cirrus', BE36: 'Bonanza',
+  A320: 'Airbus', A319: 'Airbus', A321: 'Airbus', BCS3: 'Airbus A220', BCS1: 'Airbus A220', B737: 'Boeing 737', B738: 'Boeing 737', B739: 'Boeing 737',
+  B38M: 'Boeing 737', B752: 'Boeing 757', B763: 'Boeing 767', E175: 'Embraer 175', E170: 'Embraer 170', E190: 'Embraer 190', CRJ9: 'CRJ-900', CRJ7: 'CRJ-700', CRJ2: 'CRJ-200',
+};
+export function spokenAircraftType(type: string): string {
+  return TYPE_NAMES[type.trim().toUpperCase()] ?? digitsSpoken(type);
+}
 
 /** Airline flight number in group form: 451 -> "four fifty one", 1234 -> "twelve thirty four", 100 -> "one hundred". */
 export function flightNumberSpoken(num: string): string {
@@ -142,6 +153,9 @@ const AIRPORT_CITIES: Record<string, string> = {
   KBWI: 'Baltimore', KORD: 'Chicago O\'Hare', KATL: 'Atlanta', KCLT: 'Charlotte', KMIA: 'Miami', KMCO: 'Orlando', KFLL: 'Fort Lauderdale',
   KPIT: 'Pittsburgh', KDTW: 'Detroit', KRDU: 'Raleigh Durham', KTPA: 'Tampa', KILG: 'Wilmington', KTTN: 'Trenton', KMIV: 'Millville',
   KWWD: 'Wildwood', KVAY: 'Mount Holly', KACY: 'Atlantic City', KMHT: 'Manchester', KPNE: 'Northeast Philadelphia', KABE: 'Allentown',
+  KASH: 'Nashua', KCON: 'Concord', KLCI: 'Laconia', KPSM: 'Portsmouth', KLWM: 'Lawrence', KBVY: 'Beverly', KEEN: 'Keene', KBED: 'Bedford',
+  KPWM: 'Portland', KFIT: 'Fitchburg', KBNA: 'Nashville', KMDW: 'Chicago Midway', KRSW: 'Fort Myers', KCHS: 'Charleston', KSDF: 'Louisville',
+  KMEM: 'Memphis', KMYR: 'Myrtle Beach',
 };
 
 /** Spoken name of an airport for clearances: "KPHL" -> "Philadelphia"; unknown ids are spelled in phonetics. */

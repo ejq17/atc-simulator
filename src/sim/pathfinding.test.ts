@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { createTestAirport } from './__fixtures__/testAirport';
+import { loadKmht } from '../airport';
 import {
   findTaxiRoute, holdingPositionsAlong, nearestNode, runwayCrossingsAlong, runwayNodesAlong, validateRoute,
 } from './pathfinding';
@@ -91,5 +92,38 @@ describe('airport data contract check', () => {
     expect(bad.errors.join('\n')).toMatch(/Runway 13\/31 has no polygon/);
     expect(bad.errors.join('\n')).toMatch(/No parking/);
     expect(bad.warnings.join('\n')).toMatch(/No GND frequency/);
+  });
+});
+
+describe('pathfinding on KMHT: via routes never U-turn onto the named taxiway', () => {
+  const kmht = loadKmht();
+  const kg = kmht.taxiwayGraph;
+  const kAll = kmht.runways.map((r) => r.id);
+  const gate = kmht.parking.find((p) => p.id === 'GATE-1')!.nodeId;
+  const edgeOf = (id: string) => kg.edges.find((e) => e.id === id)!;
+
+  for (const start of ['HP17-35-B-1', 'HP17-35-B-2']) {
+    it(`${start} to GATE-1 via H, E, N flies B, H, E ... N and never revisits a node`, () => {
+      const r = findTaxiRoute(kg, start, gate, { via: ['H', 'E', 'N'], avoidRunways: true, allowedRunwayIds: kAll });
+      expect(r.reason).toBeUndefined();
+      const t = r.route!.taxiways;
+      expect(t.slice(0, 2)).toEqual(['B', 'H']);
+      expect(t.indexOf('E')).toBeGreaterThan(t.indexOf('H'));
+      expect(t.indexOf('N')).toBeGreaterThan(t.indexOf('E'));
+      expect(new Set(r.route!.nodeIds).size).toBe(r.route!.nodeIds.length);
+    });
+    it(`${start} to GATE-1 via H alone really travels along H`, () => {
+      const r = findTaxiRoute(kg, start, gate, { via: ['H'], avoidRunways: true, allowedRunwayIds: kAll });
+      expect(r.reason).toBeUndefined();
+      expect(r.route!.taxiways.slice(0, 2)).toEqual(['B', 'H']);
+      expect(r.route!.edgeIds.filter((id) => edgeOf(id).taxiway === 'H').length).toBeGreaterThan(1);
+    });
+  }
+
+  it('a genuinely impossible via order is still rejected with a reason', () => {
+    // M is the apron road at the terminal end of the route; H lies behind us, so "M then H" cannot be flown without a U-turn.
+    const r = findTaxiRoute(kg, 'HP17-35-B-1', gate, { via: ['M', 'H'], avoidRunways: true, allowedRunwayIds: kAll });
+    expect(r.route).toBeNull();
+    expect(r.reason).toMatch(/.+/);
   });
 });

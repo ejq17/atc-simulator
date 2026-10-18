@@ -15,6 +15,7 @@ import { findRunwayEnd } from '../sim/runways';
 import { mToNm } from '../sim/geo';
 import { getPerformance } from '../sim/performance';
 import type { GameScenario } from './types';
+import { profileDestinations, profileFor } from './airportProfile';
 
 // ---------------------------------------------------------------------------
 // Which sessions run IFR flows
@@ -164,21 +165,16 @@ export const IFR_DESTINATIONS: readonly Destination[] = [
 ];
 
 /**
- * Gameplay destinations for airports other than KACY. Not aeronautical data: just airports the command parser knows (src/commands/airports.ts)
- * and that make sense as airline legs from the airport; no departure exit fix is named (the filed route is empty, the departure frequency
- * is the airport's first DEP frequency).
+ * Gameplay destinations for airports other than KACY: the union of the legs the airlines of the airport's traffic profile fly
+ * (`airportProfile.ts`; Southwest to Baltimore, American to Charlotte, ...). Not aeronautical data: just airports the command parser knows
+ * (src/commands/airports.ts); no departure exit fix is named (the filed route is empty, the departure frequency is the airport's first DEP
+ * frequency). The airline entries themselves choose destination and cruise altitude at generation time; this list serves the lookups.
  */
-const IFR_DESTINATIONS_KMHT: readonly Destination[] = [
-  { icao: 'KPHL', jet: [14000, 16000], exit: '' },
-  { icao: 'KBWI', jet: [16000, 18000], exit: '' },
-  { icao: 'KDCA', jet: [16000, 18000], exit: '' },
-  { icao: 'KEWR', jet: [12000, 14000], exit: '' },
-  { icao: 'KJFK', jet: [12000, 14000], exit: '' },
-];
+const KMHT_PROFILE_DESTINATIONS: readonly Destination[] = profileDestinations(profileFor('KMHT')).map((d) => ({ icao: d.icao, jet: [...d.altitudesFt], exit: '' }));
 
 /** The destination list for an airport (KACY: the short hops above). */
 export function ifrDestinationsFor(airport: Pick<Airport, 'icao'>): readonly Destination[] {
-  return airport.icao === 'KMHT' ? IFR_DESTINATIONS_KMHT : IFR_DESTINATIONS;
+  return airport.icao === 'KMHT' ? KMHT_PROFILE_DESTINATIONS : IFR_DESTINATIONS;
 }
 
 /** C172 IFR cruise: 4,000-6,000 ft. */

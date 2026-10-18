@@ -3,6 +3,7 @@ import { game } from '../../game';
 import type { FreePlayOptions, ScenarioSummary } from '../../game';
 import { DEFAULT_AIRPORT_ICAO, airportOrDefault, listAirports } from '../../airport';
 import { airportCallName } from '../../radio/frequencies';
+import { profileTypes } from '../../game/airportProfile';
 import type { ControllerPositionId, GameMode, Weather } from '../../sim/types';
 import { fetchLiveMetar } from '../../weather/liveWeather';
 import { WEATHER_PRESETS, WEATHER_PRESET_IDS, getPresetWeather } from '../../weather/presets';
@@ -18,7 +19,7 @@ import { VoiceSettingsForm } from '../components/VoiceSettingsForm';
 import { Btn, Field, INPUT, LABEL, SELECT, Segmented } from '../components/ui';
 
 const CUSTOM = '__custom__';
-type LiveState = { status: 'loading' } | { status: 'ok'; weather: Weather; raw: string } | { status: 'error'; message: string };
+type LiveState = { status: 'loading' } | { status: 'ok'; weather: Weather; raw: string; source?: 'awc-backend' | 'nws-direct' } | { status: 'error'; message: string };
 
 const DENSITY = {
   light: { label: 'Light', arrivalsPerHour: 5, departuresPerHour: 5 },
@@ -35,6 +36,12 @@ const STARTS: { value: NonNullable<FreePlayOptions['startingScenario']>; label: 
 const TYPES = [
   { id: 'C172', label: 'Cessna 172 (light GA)' },
   { id: 'A320', label: 'Airbus A320 (airline)' },
+  { id: 'B738', label: 'Boeing 737-800 (airline)' },
+  { id: 'BCS3', label: 'Airbus A220-300 (airline)' },
+  { id: 'E175', label: 'Embraer 175 (regional jet)' },
+  { id: 'CRJ9', label: 'CRJ-900 (regional jet)' },
+  { id: 'B752', label: 'Boeing 757-200 (cargo)' },
+  { id: 'C208', label: 'Cessna 208 Caravan (feeder)' },
 ];
 
 function Dots({ n, max = 5 }: { n: number; max?: number }) {
@@ -59,6 +66,8 @@ export function SetupScreen() {
   const [icao, setIcao] = useState<string>(prev?.icao ?? DEFAULT_AIRPORT_ICAO);
   const airport = useMemo(() => airportOrDefault(icao), [icao]);
   const callName = airportCallName(airport);
+  /** Aircraft types the airport's traffic profile can generate (KACY: C172, A320; KMHT adds B738, BCS3, E175, CRJ9, B752, C208). */
+  const offeredTypes = useMemo(() => profileTypes(airport.icao), [airport]);
   const starting = useSimStore((s) => s.starting);
   const startStatus = useSimStore((s) => s.startStatus);
   const startSession = useSimStore((s) => s.startSession);
@@ -100,7 +109,7 @@ export function SetupScreen() {
   const [density, setDensity] = useState<Density>('moderate');
   const [gaPct, setGaPct] = useState(Math.round((prev?.freePlay.gaFraction ?? 0.5) * 100));
   const [maxAircraft, setMaxAircraft] = useState(prev?.freePlay.maxAircraft ?? 8);
-  const [types, setTypes] = useState<string[]>(prev?.freePlay.aircraftTypes ?? ['C172', 'A320']);
+  const [types, setTypes] = useState<string[]>(prev?.freePlay.aircraftTypes ?? TYPES.map((t) => t.id));
   const [starting_, setStarting_] = useState<NonNullable<FreePlayOptions['startingScenario']>>(prev?.freePlay.startingScenario ?? 'mixed');
   const [difficulty, setDifficulty] = useState<NonNullable<FreePlayOptions['difficulty']>>(prev?.freePlay.difficulty ?? 'normal');
   const [seedText, setSeedText] = useState(prev?.seed !== undefined ? String(prev.seed) : '');
@@ -115,7 +124,7 @@ export function SetupScreen() {
   const refreshLive = () => {
     setLive({ status: 'loading' });
     fetchLiveMetar(icao)
-      .then((r) => setLive({ status: 'ok', weather: r.weather, raw: r.raw }))
+      .then((r) => setLive({ status: 'ok', weather: r.weather, raw: r.raw, source: r.source }))
       .catch((e: unknown) => setLive({ status: 'error', message: e instanceof Error ? e.message : String(e) }));
   };
   useEffect(refreshLive, [icao]);
@@ -194,7 +203,7 @@ export function SetupScreen() {
       departuresPerHour: DENSITY[density].departuresPerHour,
       gaFraction: gaPct / 100,
       maxAircraft,
-      aircraftTypes: types.length ? types : ['C172'],
+      aircraftTypes: offeredTypes.filter((t) => types.includes(t)).length ? offeredTypes.filter((t) => types.includes(t)) : ['C172'],
       startingScenario: starting_,
     };
     const opts: StartOptions = {
@@ -352,7 +361,7 @@ export function SetupScreen() {
                   <div className="col-span-2">
                     <span className={LABEL}>Aircraft types</span>
                     <div className="mt-1.5 flex flex-wrap gap-x-5 gap-y-1">
-                      {TYPES.map((t) => (
+                      {TYPES.filter((t) => offeredTypes.includes(t.id)).map((t) => (
                         <label key={t.id} className="flex cursor-pointer items-center gap-2 text-xs">
                           <input type="checkbox" className="accent-[#39c5e8]" checked={types.includes(t.id)} onChange={(e) => setTypes((cur) => (e.target.checked ? [...cur, t.id] : cur.filter((x) => x !== t.id)))} />
                           {t.label}
@@ -380,7 +389,7 @@ export function SetupScreen() {
                   </Field>
                   <div className="mt-2 text-[11.5px] leading-snug text-atc-muted" data-testid="weather-preview">
                     {weatherChoice.kind === 'live' && live.status === 'loading' && `Fetching the current ${icao} METAR…`}
-                    {weatherChoice.kind === 'live' && live.status === 'ok' && (<><b className="text-atc-green">Live</b> wind {windText(live.weather, airport.magneticVariationDeg)} (mag), {live.weather.visibilitySm} SM, {live.weather.flightCategory}<br /><code className="text-[10.5px]">{live.raw}</code></>)}
+                    {weatherChoice.kind === 'live' && live.status === 'ok' && (<><b className="text-atc-green">Live</b>{live.source ? ` (${live.source === 'nws-direct' ? 'National Weather Service' : 'Aviation Weather Center'})` : ''} wind {windText(live.weather, airport.magneticVariationDeg)} (mag), {live.weather.visibilitySm} SM, {live.weather.flightCategory}<br /><code className="text-[10.5px]">{live.raw}</code></>)}
                     {weatherChoice.kind === 'live' && live.status === 'error' && (<span className="text-atc-amber">Live weather unavailable ({live.message}) — the session will fall back to a simulated clear day and tell you so. <button type="button" className="underline" onClick={refreshLive}>Retry</button></span>)}
                     {weatherChoice.kind === 'preset' && <>{WEATHER_PRESETS[weatherChoice.id].description} Wind {windText(previewWx, airport.magneticVariationDeg)} (mag).</>}
                     {weatherChoice.kind === 'scenario' && 'The scenario sets its own weather.'}
@@ -494,7 +503,7 @@ export function SetupScreen() {
 
         <footer className="mt-4 border-t border-atc-border pt-3 text-[10.5px] leading-relaxed text-atc-muted" data-testid="provenance-footer">
           <div>{prov.footer}</div>
-          <div>Not for navigation or real-world ATC use. ATIS and radio traffic are simulated; live METARs come from the Aviation Weather Center through the local backend.</div>
+          <div>Not for navigation or real-world ATC use. ATIS and radio traffic are simulated; live METARs come from the Aviation Weather Center (local backend) or the National Weather Service API.</div>
         </footer>
       </div>
     </div>

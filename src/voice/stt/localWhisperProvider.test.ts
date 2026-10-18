@@ -1,9 +1,11 @@
 // @vitest-environment jsdom
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { createLocalWhisperProvider, LOCAL_WHISPER_ID, WHISPER_PLACEHOLDER } from './localWhisperProvider.ts';
+import { createLocalWhisperProvider, LOCAL_WHISPER_ID, resetLocalWhisperBackends, WHISPER_PLACEHOLDER } from './localWhisperProvider.ts';
 import type { TransformersModule, WorkerLike } from './localWhisperProvider.ts';
 import type { WhisperWorkerEvent, WhisperWorkerRequest } from './whisperProtocol.ts';
 import { createVoiceController } from '../voiceController.ts';
+import { createVoiceSettingsStore } from '../settings.ts';
+import { isWebGpuMarkedFailed, markWebGpuFailed } from './whisperModels.ts';
 import { STT_PROVIDER_NOTES } from './providerNotes.ts';
 import { SttError, sttErrorCode } from './types.ts';
 import type { SttStartOptions } from './types.ts';
@@ -439,5 +441,119 @@ describe('local whisper in a Web Worker', () => {
     await h.provider.stop();
     expect(FakeWorker.all).toHaveLength(2);
     expect(h.calls.final).toHaveLength(1);
+  });
+});
+
+describe('local whisper model/device from settings', () => {
+  beforeEach(() => {
+    resetLocalWhisperBackends();
+    markWebGpuFailed(false);
+    localStorage.clear();
+  });
+
+  function settingsHarness(gpu: boolean, configure?: (w: FakeWorker, index: number) => void) {
+    FakeWorker.all = [];
+    const store = createVoiceSettingsStore();
+    const main = harness();
+    const provider = createLocalWhisperProvider({
+      settings: store,
+      gpu,
+      createWorker: () => { const w = new FakeWorker(); configure?.(w, FakeWorker.all.length - 1); return w; },
+      loadTransformers: main.loadTransformers,
+      getUserMedia: main.getUserMedia,
+      startCapture: main.startCapture,
+    });
+    return { store, provider, main };
+  }
+
+  it('auto on a CPU-only browser loads base.en on wasm with q8, and says so', async () => {
+    const h = settingsHarness(false);
+    expect(h.provider.model).toBe('onnx-community/whisper-base.en');
+    const messages: string[] = [];
+    h.provider.onProgress((p) => messages.push(p.message));
+    await h.provider.warmUp();
+    expect(FakeWorker.all[0].sent[0].msg).toMatchObject({ type: 'load', model: 'onnx-community/whisper-base.en', device: 'wasm', dtype: 'q8' });
+    expect(messages).toContain('Downloading Whisper base.en (77 MB)…');
+    expect(h.provider.getProgress().message).toBe('Ready: Whisper base.en on WebAssembly (CPU)');
+  });
+
+  it('auto with WebGPU loads small.en on webgpu with the fp32/q4 dtype combination', async () => {
+    const h = settingsHarness(true);
+    await h.provider.warmUp();
+    expect(FakeWorker.all[0].sent[0].msg).toMatchObject({
+      model: 'onnx-community/whisper-small.en', device: 'webgpu', dtype: { encoder_model: 'fp32', decoder_model_merged: 'q4' },
+    });
+    expect(h.provider.getProgress().message).toBe('Ready: Whisper small.en on WebGPU');
+  });
+
+  it('switches backend when the settings change: new worker for the new model, old worker terminated, status reset', async () => {
+    const h = settingsHarness(false);
+    await h.provider.warmUp();
+    expect(h.provider.getProgress().phase).toBe('ready');
+    h.store.update({ whisperModel: 'tiny.en' });
+    await new Promise((r) => setTimeout(r, 0));
+    expect(FakeWorker.all[0].terminated).toBe(true);
+    expect(h.provider.getProgress().phase).toBe('idle');
+    expect(h.provider.getProgress().message).toMatch(/Whisper tiny\.en on WebAssembly/);
+    expect(h.provider.model).toBe('onnx-community/whisper-tiny.en');
+    await h.provider.start({ onPartial: () => undefined, onFinal: () => undefined, onError: (e) => { throw e; } });
+    await h.provider.stop();
+    expect(FakeWorker.all).toHaveLength(2);
+    expect(FakeWorker.all[1].sent[0].msg).toMatchObject({ model: 'onnx-community/whisper-tiny.en', device: 'wasm' });
+    expect(h.provider.getProgress().message).toBe('Ready: Whisper tiny.en on WebAssembly (CPU)');
+  });
+
+  it('an unrelated settings change does not reload the model', async () => {
+    const h = settingsHarness(false);
+    await h.provider.warmUp();
+    h.store.update({ ttsVolume: 0.5 });
+    expect(FakeWorker.all[0].terminated).toBe(false);
+    expect(h.provider.getProgress().phase).toBe('ready');
+  });
+
+  it('falls back to wasm with the same model when WebGPU fails to load, once, and remembers it for the session', async () => {
+    const info = vi.spyOn(console, 'info').mockImplementation(() => undefined);
+    const h = settingsHarness(true, (w, i) => {
+      if (i === 0) w.onLoad = (x) => x.emit({ type: 'error', stage: 'pipeline', message: 'No WebGPU adapter was found.' });
+    });
+    await h.provider.warmUp();
+    expect(FakeWorker.all[1].sent[0].msg).toMatchObject({ model: 'onnx-community/whisper-small.en', device: 'wasm', dtype: 'q8' });
+    expect(isWebGpuMarkedFailed()).toBe(true);
+    expect(h.provider.getProgress().message).toContain('Ready: Whisper small.en on WebAssembly (CPU)');
+    expect(h.provider.getProgress().message).toContain('fell back');
+    expect(info).toHaveBeenCalledTimes(1);
+    // The next preparation (or key press) reuses the wasm worker instead of trying WebGPU again.
+    await h.provider.warmUp();
+    expect(FakeWorker.all).toHaveLength(2);
+  });
+
+  it('falls back to wasm and retries the same audio when the first WebGPU transcription throws', async () => {
+    vi.spyOn(console, 'info').mockImplementation(() => undefined);
+    const h = settingsHarness(true, (w, i) => {
+      if (i === 0) w.onTranscribe = (x, id) => x.emit({ type: 'error', id, stage: 'transcribe', message: 'GPU device lost' });
+    });
+    const final: string[] = [];
+    const errors: Error[] = [];
+    await h.provider.start({ onPartial: () => undefined, onFinal: (t) => final.push(t), onError: (e) => errors.push(e) });
+    await h.provider.stop();
+    expect(errors).toEqual([]);
+    expect(final).toEqual(['Cessna 723 Echo Juliet Hold position']);
+    expect(FakeWorker.all[0].terminated).toBe(true);
+    expect(FakeWorker.all[1].sent[0].msg).toMatchObject({ device: 'wasm', model: 'onnx-community/whisper-small.en' });
+    const retry = FakeWorker.all[1].sent.find((m) => m.msg.type === 'transcribe')!.msg as Extract<WhisperWorkerRequest, { type: 'transcribe' }>;
+    expect(retry.audio.length).toBe(16000);
+    expect(isWebGpuMarkedFailed()).toBe(true);
+  });
+
+  it('passes num_beams only when numBeams is set above 1', async () => {
+    FakeWorker.all = [];
+    const main = harness();
+    const provider = createLocalWhisperProvider({
+      model: model(), numBeams: 3, createWorker: () => new FakeWorker(), getUserMedia: main.getUserMedia, startCapture: main.startCapture,
+    });
+    await provider.start(main.handlers);
+    await provider.stop();
+    const req = FakeWorker.all[0].sent.find((m) => m.msg.type === 'transcribe')!.msg as Extract<WhisperWorkerRequest, { type: 'transcribe' }>;
+    expect(req.call).toMatchObject({ num_beams: 3, chunk_length_s: 30, return_timestamps: false });
   });
 });

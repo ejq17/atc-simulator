@@ -21,23 +21,26 @@
  *  - The ONNX runtime's .wasm/.mjs are fetched from cdn.jsdelivr.net by default (see node_modules/.../backends/onnx.js).
  */
 import { postProcessTranscript } from './aviationPostProcess.ts';
+import { getSharedVoiceSettingsStore } from '../settings.ts';
+import type { VoiceSettings } from '../settings.ts';
 import { withPreferredInput } from './inputDevice.ts';
 import { mapMediaError } from './mediaErrors.ts';
 import { hasTrackProcessor, startPcmCapture, TARGET_SAMPLE_RATE, warmUpAudio } from './pcmCapture.ts';
 import type { PcmCapture, WarmAudio } from './pcmCapture.ts';
 import type { SpeechRecognitionProvider, SttStartOptions } from './types.ts';
-import { SttError } from './types.ts';
+import { SttError, sttErrorCode } from './types.ts';
+import { deviceLabel, hasWebGpu, isWebGpuMarkedFailed, markWebGpuFailed, resolveWhisper, WHISPER_MODELS, whisperDtype } from './whisperModels.ts';
+import type { WhisperDevice } from './whisperModels.ts';
 import { errorText, importError, isEnglishOnly, mapPipelineError } from './whisperProtocol.ts';
 import type { WhisperWorkerEvent, WhisperWorkerRequest } from './whisperProtocol.ts';
 
 export const LOCAL_WHISPER_ID = 'whisper-local' as const;
 export const LOCAL_WHISPER_LABEL = 'Local Whisper (on-device, no cloud)';
-/** English-only, ~40 MB quantised (q8). Works with transformers.js 4.3.1; see README for accuracy notes. */
-export const DEFAULT_WHISPER_MODEL = 'onnx-community/whisper-tiny.en';
+/** The CPU default when nothing else is chosen: English-only base, ~77 MB quantised (q8). See whisperModels.ts for the rest. */
+export const DEFAULT_WHISPER_MODEL = WHISPER_MODELS['base.en'].hfId;
 /** Shown through onPartial while the model decodes. Not part of the transcript. */
 export const WHISPER_PLACEHOLDER = 'Transcribing…';
 
-const READY_MESSAGE = 'Local speech model ready (runs on this device).';
 const MIN_SAMPLES = Math.round(TARGET_SAMPLE_RATE * 0.25);
 const MAX_SECONDS = 60;
 /** Mean absolute amplitude below which a capture is treated as silence (about -66 dBFS). */
@@ -80,16 +83,28 @@ class WorkerUnavailableError extends Error {}
 interface AsrBackend {
   readonly kind: 'worker' | 'main';
   alive(): boolean;
-  load(req: { model: string; device: string; dtype: string }, onProgress: (info: ProgressInfo) => void): Promise<void>;
+  /** Device the loaded model actually runs on ('' before load). */
+  readonly device: string;
+  load(req: { model: string; device: string; dtype: string | Record<string, string> }, onProgress: (info: ProgressInfo) => void): Promise<void>;
+  /** Release the model (terminates the worker). */
+  dispose(): void;
   transcribe(audio: Float32Array, call: Record<string, unknown>): Promise<string>;
 }
 
 function mainBackend(loadTransformers: () => Promise<TransformersModule>): AsrBackend {
   let asr: AsrCall | null = null;
+  let device = '';
   return {
     kind: 'main',
     alive: () => true,
+    get device() {
+      return device;
+    },
+    dispose() {
+      asr = null;
+    },
     async load(req, onProgress) {
+      device = req.device;
       let tf: TransformersModule;
       try {
         tf = await loadTransformers();
@@ -129,6 +144,7 @@ function workerBackend(createWorker: () => WorkerLike): AsrBackend {
   let loadSettle: { resolve(): void; reject(e: unknown): void } | null = null;
   const pending = new Map<number, { resolve(t: string): void; reject(e: unknown): void }>();
   let model = '';
+  let device = '';
 
   const die = (cause: unknown) => {
     if (dead) return;
@@ -175,8 +191,16 @@ function workerBackend(createWorker: () => WorkerLike): AsrBackend {
   return {
     kind: 'worker',
     alive: () => !dead,
+    get device() {
+      return device;
+    },
+    dispose() {
+      dead = true;
+      worker.terminate();
+    },
     load(req, progress) {
       model = req.model;
+      device = req.device;
       onProgress = progress;
       return new Promise<void>((resolve, reject) => {
         loadSettle = { resolve, reject };
@@ -199,11 +223,24 @@ function workerBackend(createWorker: () => WorkerLike): AsrBackend {
 }
 
 export interface LocalWhisperOptions {
+  /** Explicit Hugging Face model id. Overrides the settings-driven choice (tests, tooling). */
   model?: string;
-  /** 'wasm' (default, deterministic and works headless) or 'webgpu' (faster on a real GPU). */
-  device?: 'wasm' | 'webgpu';
-  /** Defaults to 'q8' (smallest download). */
-  dtype?: string;
+  /** Explicit device for an explicit `model`: 'wasm' (default) or 'webgpu'. Ignored when the model comes from settings. */
+  device?: WhisperDevice;
+  /** Overrides the per-device default dtype ('q8' on WASM; fp32 encoder + q4 decoder on WebGPU). */
+  dtype?: string | Record<string, string>;
+  /**
+   * Where the model/device choice comes from (the app uses the shared voice-settings store). The provider re-reads it
+   * on every use and switches backend (terminating the old worker) when it changes. Without it, 'auto'/'auto' applies.
+   */
+  settings?: { get(): Pick<VoiceSettings, 'whisperModel' | 'whisperDevice'>; subscribe(listener: () => void): () => void };
+  /** Test seam for WebGPU detection (default: `navigator.gpu` exists). */
+  gpu?: boolean;
+  /**
+   * Beam search width passed to generate() as `num_beams`. Off by default (greedy): beams are noticeably slower on WASM.
+   * Supported by transformers.js 4.3.1 Whisper generation; try 2 to 5 on a GPU if accuracy still falls short.
+   */
+  numBeams?: number;
   /**
    * Main-thread engine seam; defaults to `import('@huggingface/transformers')` (code-split, loaded only when used).
    * Supplying it (tests) selects the main-thread engine unless `createWorker` is also given.
@@ -249,6 +286,7 @@ export function captureStats(audio: Float32Array): CaptureStats {
 
 export interface LocalWhisperProvider extends SpeechRecognitionProvider {
   readonly id: typeof LOCAL_WHISPER_ID;
+  /** Hugging Face id currently selected (follows the settings). */
   readonly model: string;
   /** Download (first run only) and initialise the model without recording anything. Safe to call repeatedly. */
   warmUp(): Promise<void>;
@@ -282,10 +320,25 @@ function meanAbs(a: Float32Array): number {
 /** Loaded engines are expensive (tens of MB): share one per model+device across provider instances. */
 const backendCache = new Map<string, Promise<AsrBackend>>();
 
+/** Terminate and forget every loaded engine (tests; also a clean slate after changing environment). */
+export function resetLocalWhisperBackends(): void {
+  for (const p of backendCache.values()) void p.then((b) => b.dispose(), () => undefined);
+  backendCache.clear();
+}
+
+interface WhisperConfig {
+  model: string;
+  /** Short name for messages, e.g. "Whisper small.en". */
+  name: string;
+  device: WhisperDevice;
+  dtype: string | Record<string, string>;
+  /** Approximate download in MB (0 when unknown). */
+  mb: number;
+}
+
+const configKey = (c: WhisperConfig) => `${c.model}|${c.device}|${JSON.stringify(c.dtype)}`;
+
 export function createLocalWhisperProvider(options: LocalWhisperOptions = {}): LocalWhisperProvider {
-  const model = options.model ?? DEFAULT_WHISPER_MODEL;
-  const device = options.device ?? 'wasm';
-  const dtype = options.dtype ?? 'q8';
   const now = options.now ?? (() => Date.now());
   const finalTimeoutMs = options.finalTimeoutMs ?? 180_000;
   const getMedia = () =>
@@ -293,7 +346,21 @@ export function createLocalWhisperProvider(options: LocalWhisperOptions = {}): L
     (typeof navigator !== 'undefined' && navigator.mediaDevices?.getUserMedia
       ? (c: MediaStreamConstraints) => navigator.mediaDevices.getUserMedia(c)
       : undefined);
-  const cacheKey = `${model}|${device}|${dtype}`;
+
+  /** The model/device to use right now: explicit options, else the settings choice (auto = WebGPU + small.en, or CPU + base.en). */
+  function config(): WhisperConfig {
+    const gpu = options.gpu ?? hasWebGpu();
+    if (options.model !== undefined) {
+      const requested: WhisperDevice = options.device ?? 'wasm';
+      const device: WhisperDevice = requested === 'webgpu' && isWebGpuMarkedFailed() ? 'wasm' : requested;
+      return { model: options.model, name: `Whisper ${options.model.split('/').pop()!.replace(/^whisper-/, '')}`, device, dtype: options.dtype ?? whisperDtype(device), mb: 0 };
+    }
+    const s = options.settings?.get();
+    const r = resolveWhisper(s?.whisperModel ?? 'auto', s?.whisperDevice ?? 'auto', { gpu, webGpuFailed: isWebGpuMarkedFailed() });
+    return { model: r.hfId, name: `Whisper ${r.size}`, device: r.device, dtype: options.dtype ?? r.dtype, mb: r.mb };
+  }
+  const where = (c: WhisperConfig) => `${c.name} on ${deviceLabel(c.device)}`;
+  const downloadingText = (c: WhisperConfig) => `Downloading ${c.name}${c.mb ? ` (${c.mb} MB)` : ''}…`;
 
   let progress: WhisperProgress = { phase: 'idle', percent: 0, message: 'Local model not downloaded yet.' };
   const listeners = new Set<(p: WhisperProgress) => void>();
@@ -301,11 +368,13 @@ export function createLocalWhisperProvider(options: LocalWhisperOptions = {}): L
     progress = p;
     listeners.forEach((l) => l(p));
   };
+  /** Bumped whenever the selected backend changes, so a stale in-flight load cannot overwrite the current status. */
+  let epoch = 0;
 
   /** Aggregate per-file byte counts into one percentage. */
   const files = new Map<string, { loaded: number; total: number }>();
-  function onFileProgress(info: ProgressInfo) {
-    if (info.status === 'ready') return;
+  function fileProgress(info: ProgressInfo, c: WhisperConfig, myEpoch: number) {
+    if (myEpoch !== epoch || info.status === 'ready') return;
     if (info.file && typeof info.total === 'number' && info.total > 0 && typeof info.loaded === 'number') {
       files.set(info.file, { loaded: info.loaded, total: info.total });
     }
@@ -324,23 +393,78 @@ export function createLocalWhisperProvider(options: LocalWhisperOptions = {}): L
     emit({
       phase: 'downloading',
       percent,
-      message: total > 0 ? `Downloading local speech model: ${percent}% (${mb(loaded)} of ${mb(total)} MB)` : 'Preparing local speech model…',
+      message: total > 0 ? `Downloading ${c.name}: ${percent}% (${mb(loaded)} of ${mb(total)} MB)` : downloadingText(c),
     });
   }
 
   const useWorker = options.createWorker !== null && (options.createWorker !== undefined || (options.loadTransformers === undefined && typeof Worker !== 'undefined'));
   let engineKind: 'worker' | 'main' | 'none' = 'none';
+  let activeKey: string | null = null;
+
+  /** Drop the backend for `key` (terminating its worker) and forget it. */
+  function retire(key: string) {
+    const old = backendCache.get(key);
+    backendCache.delete(key);
+    void old?.then((b) => b.dispose(), () => undefined);
+  }
+
+  /** Load a backend for one concrete config (worker first, main thread if workers are unavailable). */
+  async function loadBackend(c: WhisperConfig, myEpoch: number): Promise<AsrBackend> {
+    const req = { model: c.model, device: c.device, dtype: c.dtype };
+    const onFile = (info: ProgressInfo) => fileProgress(info, c, myEpoch);
+    let backend: AsrBackend | null = null;
+    if (useWorker) {
+      try {
+        backend = workerBackend(options.createWorker ?? defaultCreateWorker);
+        await backend.load(req, onFile);
+      } catch (err) {
+        if (!(err instanceof WorkerUnavailableError)) throw err;
+        console.info('[whisper-local] Web Workers are unavailable here; decoding on the main thread, so the page may pause briefly.');
+        if (myEpoch === epoch) emit({ phase: 'downloading', percent: 0, message: 'Web Workers unavailable: decoding on the main thread (the page may pause briefly).' });
+        backend = null;
+      }
+    }
+    if (!backend) {
+      backend = mainBackend(options.loadTransformers ?? (() => import('@huggingface/transformers') as unknown as Promise<TransformersModule>));
+      await backend.load(req, onFile);
+    }
+    return backend;
+  }
+
+  /** Remember that WebGPU does not work here (for this page session) and say so once. */
+  function noteWebGpuFailure(why: unknown, c: WhisperConfig) {
+    if (!isWebGpuMarkedFailed()) console.info(`[whisper-local] WebGPU failed for ${c.name}; using WebAssembly (CPU) for the rest of this session. (${errorText(why)})`);
+    markWebGpuFailed();
+  }
+
+  /** Called when the selected model/device may have changed: release the old backend and reset the status. */
+  function syncConfig() {
+    const c = config();
+    const key = configKey(c);
+    if (activeKey === null || activeKey === key) return;
+    retire(activeKey);
+    activeKey = null;
+    engineKind = 'none';
+    epoch++;
+    files.clear();
+    emit({ phase: 'idle', percent: 0, message: `${where(c)} selected${c.mb ? ` (${c.mb} MB download the first time)` : ''}. Press the button to prepare it.` });
+  }
+  options.settings?.subscribe(syncConfig);
 
   function ensureBackend(): Promise<AsrBackend> {
-    const cached = backendCache.get(cacheKey);
+    syncConfig();
+    const c = config();
+    const key = configKey(c);
+    const cached = backendCache.get(key);
     if (cached) {
+      activeKey = key;
       return cached.then((b) => {
         if (b.alive()) {
           engineKind = b.kind;
-          if (progress.phase !== 'ready') emit({ phase: 'ready', percent: 100, message: READY_MESSAGE });
+          if (progress.phase !== 'ready' || !progress.message.includes(where(c))) emit({ phase: 'ready', percent: 100, message: `Ready: ${where(c)}` });
           return b;
         }
-        backendCache.delete(cacheKey); // the worker died after loading: rebuild
+        backendCache.delete(key); // the worker died after loading: rebuild
         return ensureBackend();
       });
     }
@@ -349,35 +473,41 @@ export function createLocalWhisperProvider(options: LocalWhisperOptions = {}): L
       emit({ phase: 'error', percent: 0, message: err.message, error: err });
       return Promise.reject(err);
     }
+    activeKey = key;
+    const myEpoch = ++epoch;
     files.clear();
-    emit({ phase: 'downloading', percent: 0, message: 'Preparing local speech model…' });
-    const req = { model, device, dtype };
+    emit({ phase: 'downloading', percent: 0, message: downloadingText(c) });
+    let used = c;
     const p = (async () => {
-      let backend: AsrBackend | null = null;
-      if (useWorker) {
-        try {
-          backend = workerBackend(options.createWorker ?? defaultCreateWorker);
-          await backend.load(req, onFileProgress);
-        } catch (err) {
-          if (!(err instanceof WorkerUnavailableError)) throw err;
-          console.info('[whisper-local] Web Workers are unavailable here; decoding on the main thread, so the page may pause briefly.');
-          emit({ phase: 'downloading', percent: 0, message: 'Web Workers unavailable: decoding on the main thread (the page may pause briefly).' });
-          backend = null;
-        }
+      let backend: AsrBackend;
+      try {
+        backend = await loadBackend(c, myEpoch);
+      } catch (err) {
+        if (c.device !== 'webgpu' || sttErrorCode(err) === 'network') throw err;
+        noteWebGpuFailure(err, c);
+        used = config(); // same model, now WebAssembly
+        files.clear();
+        activeKey = configKey(used);
+        if (myEpoch === epoch) emit({ phase: 'downloading', percent: 0, message: `WebGPU is not available here; using WebAssembly instead. ${downloadingText(used)}` });
+        backend = await loadBackend(used, myEpoch);
       }
-      if (!backend) {
-        backend = mainBackend(options.loadTransformers ?? (() => import('@huggingface/transformers') as unknown as Promise<TransformersModule>));
-        await backend.load(req, onFileProgress);
-      }
-      emit({ phase: 'loading', percent: 99, message: 'Starting local speech model…' });
+      if (myEpoch === epoch) emit({ phase: 'loading', percent: 99, message: `Starting ${used.name}…` });
       engineKind = backend.kind;
       return backend;
     })();
-    backendCache.set(cacheKey, p);
+    backendCache.set(key, p);
     p.then(
-      () => emit({ phase: 'ready', percent: 100, message: READY_MESSAGE }),
+      () => {
+        if (configKey(used) !== key) {
+          // WebGPU fell back to WebAssembly: file the backend under its real key so the next press finds it.
+          backendCache.delete(key);
+          backendCache.set(configKey(used), p);
+        }
+        if (myEpoch === epoch) emit({ phase: 'ready', percent: 100, message: `Ready: ${where(used)}${used.device !== c.device ? ' (WebGPU unavailable, fell back to CPU)' : ''}` });
+      },
       (err: unknown) => {
-        backendCache.delete(cacheKey); // allow a retry
+        backendCache.delete(key); // allow a retry
+        if (myEpoch !== epoch) return;
         const e = err instanceof Error ? err : new Error(String(err));
         emit({ phase: 'error', percent: 0, message: e.message, error: e });
       },
@@ -409,7 +539,9 @@ export function createLocalWhisperProvider(options: LocalWhisperOptions = {}): L
   return {
     id: LOCAL_WHISPER_ID,
     label: LOCAL_WHISPER_LABEL,
-    model,
+    get model() {
+      return config().model;
+    },
     finalTimeoutMs,
     placeholderPartial: WHISPER_PLACEHOLDER,
 
@@ -511,12 +643,26 @@ export function createLocalWhisperProvider(options: LocalWhisperOptions = {}): L
       }
       let text: string;
       try {
+        const cfg = config();
         const call: Record<string, unknown> = { chunk_length_s: 30, return_timestamps: false };
-        if (!isEnglishOnly(model)) {
+        if (options.numBeams && options.numBeams > 1) call.num_beams = options.numBeams;
+        if (!isEnglishOnly(cfg.model)) {
           call.language = 'en';
           call.task = 'transcribe';
         }
-        text = await backend.transcribe(audio, call);
+        try {
+          // The worker takes ownership of the buffer, so keep a copy while a WebGPU retry on the CPU is still possible.
+          text = await backend.transcribe(backend.device === 'webgpu' ? audio.slice() : audio, call);
+        } catch (cause) {
+          if (backend.device !== 'webgpu') throw cause;
+          noteWebGpuFailure(cause, cfg);
+          retire(configKey(cfg));
+          activeKey = null;
+          const wasm = config();
+          emit({ phase: 'downloading', percent: 0, message: `WebGPU failed while transcribing; switching to WebAssembly. ${downloadingText(wasm)}` });
+          backend = await ensureBackend();
+          text = await backend.transcribe(audio, call);
+        }
       } catch (cause) {
         c.opts.onError(cause instanceof SttError ? cause : new SttError('unknown', `Local speech recognition failed: ${errorText(cause)}`, { cause }));
         return;
@@ -536,7 +682,7 @@ let shared: LocalWhisperProvider | null = null;
 /** The app-wide instance: the voice controller and the Settings “prepare model” button share its loaded model. */
 export function getLocalWhisperProvider(): LocalWhisperProvider {
   if (!shared) {
-    shared = createLocalWhisperProvider();
+    shared = createLocalWhisperProvider({ settings: getSharedVoiceSettingsStore() });
     // Debug hook for e2e/realmic.spec.ts (reads getLastCapture() for the measured room noise).
     if (typeof window !== 'undefined') (globalThis as unknown as { __kacyLocalWhisper?: LocalWhisperProvider }).__kacyLocalWhisper = shared;
   }

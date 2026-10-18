@@ -26,6 +26,15 @@ describe('voice settings', () => {
     expect(VOICE_PRIVACY_NOTES.providers['whisper-local']).toMatch(/never uploaded/);
   });
 
+  it('defaults the Whisper model and device to auto and rejects unknown values', () => {
+    expect(DEFAULT_VOICE_SETTINGS.whisperModel).toBe('auto');
+    expect(DEFAULT_VOICE_SETTINGS.whisperDevice).toBe('auto');
+    expect(sanitizeVoiceSettings({ whisperModel: 'small.en', whisperDevice: 'webgpu' })).toMatchObject({ whisperModel: 'small.en', whisperDevice: 'webgpu' });
+    expect(sanitizeVoiceSettings({ whisperModel: 'tiny.en', whisperDevice: 'wasm' })).toMatchObject({ whisperModel: 'tiny.en', whisperDevice: 'wasm' });
+    expect(sanitizeVoiceSettings({ whisperModel: 'large-v3', whisperDevice: 'cuda' })).toMatchObject({ whisperModel: 'auto', whisperDevice: 'auto' });
+    expect(sanitizeVoiceSettings({ whisperModel: 7, whisperDevice: null })).toMatchObject({ whisperModel: 'auto', whisperDevice: 'auto' });
+  });
+
   it('persists updates under kacy.voice.settings and reloads them', () => {
     const store = createVoiceSettingsStore();
     store.update({ providerId: 'deepgram', pttKey: 'F2', pttMode: 'toggle', ttsVolume: 0.4 });

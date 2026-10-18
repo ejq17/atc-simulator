@@ -8,7 +8,8 @@
  *  aircraftCount    initial aircraft: parked departures + inbound arrivals that do not conflict at spawn.
  *  arrivalsPerHour / departuresPerHour / gaFraction / maxAircraft   continuous traffic (see ../traffic.ts).
  *  difficulty       easy | normal | hard: default rates, max aircraft and the intensity ramp over time.
- *  aircraftTypes    subset of ['C172', 'A320'].
+ *  aircraftTypes    subset of the airport's traffic types (airportProfile.ts; 'C172' stands for GA). Default: KACY ['C172', 'A320']; KMHT adds
+ *                   B738, BCS3, E175, CRJ9, B752 and C208. A selection that allows nothing at the airport means "everything".
  *  startingScenario quiet | busy_departures | busy_arrivals | mixed: initial mix and default rates.
  *  ifrFlows         true: airline arrivals start over the published approach fix on the Approach frequency (staggered 270 s apart; Cessna arrivals are left to the generator) and airline
  *                   departures are parked IFR departures calling Clearance Delivery; the scenario lists CLNC/APP/DEP positions. false/undefined:
@@ -23,7 +24,9 @@ import { getPresetWeather, randomWeather, WEATHER_PRESET_IDS } from '../../weath
 import type { WeatherPresetId } from '../../weather/presets';
 import { preferredEndOrder, recommendRunways } from '../../weather/runwaySelection';
 import type { GameScenario } from '../types';
-import { randomAirlineCallsign, randomNNumber, runwayIdOf, runwayLongEnoughFor, callsignTail } from '../world';
+import { randomNNumber, runwayIdOf, runwayLongEnoughFor, callsignTail } from '../world';
+import { pickFlight, pickGaType, pickLeg, profileFor, profileTypes, resolveTypeSelection, usableAirlines } from '../airportProfile';
+import type { Flight } from '../airportProfile';
 import { pickArrivalStart, pickParking } from '../placement';
 import type { AirbornePoint } from '../placement';
 import { arrivalProcedure, ifrArrivalSpawn, ifrDepartureSpawn } from '../ifr';
@@ -60,10 +63,10 @@ export function resolveWeather(w: FreePlayOptions['weather'], seed: number): Wea
   return getPresetWeather('clear');
 }
 
-/** Runway config for the weather. `jets` restricts the choice to ends an A320 can depart from (engine performance data vs the declared runway length). */
+/** Runway config for the weather. `jets` restricts the choice to ends the airport's reference airliner (KACY A320, KMHT B738) can depart from (engine performance data vs the declared runway length). */
 export function recommendConfig(airport: Airport, weather: Weather | 'live', jets: boolean): { departing: string[]; landing: string[] } {
   const ends = airport.runways.flatMap((r) => r.ends.map((e) => ({ id: e.id, magneticHeadingDeg: e.magneticHeadingDeg })));
-  const usable = jets ? ends.filter((e) => runwayLongEnoughFor(airport, 'A320', e.id)) : ends;
+  const usable = jets ? ends.filter((e) => runwayLongEnoughFor(airport, profileFor(airport.icao).referenceJet, e.id)) : ends;
   const pool = usable.length ? usable : ends;
   const w = weather === 'live' ? { windDirDeg: 0 as const, windSpeedKt: 0 } : weather;
   const rec = recommendRunways(w, pool, { preferredOrder: preferredEndOrder(airport, 'low'), variationDeg: airport.magneticVariationDeg });
@@ -85,10 +88,10 @@ export function buildFreePlay(airport: Airport, options: FreePlayOptions = {}, i
   const prof = START_PROFILE[start];
   const dprof = DIFF_PROFILE[difficulty];
 
-  const requested = (options.aircraftTypes ?? ['C172', 'A320']).filter((t) => t === 'C172' || t === 'A320');
-  const types = requested.length ? [...new Set(requested)] : ['C172', 'A320'];
-  const jets = types.includes('A320');
-  const ga = types.includes('C172');
+  const sel = resolveTypeSelection(airport.icao, options.aircraftTypes);
+  const types = sel.allowed ? [...new Set(options.aircraftTypes)] : profileTypes(airport.icao);
+  const jets = sel.jets;
+  const ga = sel.ga;
   const gaFraction = ga && jets ? Math.min(1, Math.max(0, options.gaFraction ?? 0.5)) : ga ? 1 : 0;
 
   const weather = resolveWeather(options.weather, seed);
@@ -101,7 +104,7 @@ export function buildFreePlay(airport: Airport, options: FreePlayOptions = {}, i
   const ifrArrivals = internal.ifrArrivals ?? options.ifrFlows === true;
   const ifrDepartures = internal.ifrDepartures ?? options.ifrFlows === true;
   const spawns = initialAircraft(airport, rng, {
-    count, depShare: prof.depShare, gaFraction, jets, ga, active, departureFreq: 'GND', arrivalFreq: 'TWR', ifrArrivals, ifrDepartures,
+    count, depShare: prof.depShare, gaFraction, jets, ga, allowedTypes: sel.allowed, active, departureFreq: 'GND', arrivalFreq: 'TWR', ifrArrivals, ifrDepartures,
   });
   const positions: ControllerPositionId[] = internal.controllerPositions ?? (options.ifrFlows === true ? ['TWR', 'GND', 'CLNC', 'APP', 'DEP'] : ['TWR', 'GND']);
 
@@ -131,6 +134,8 @@ export function buildFreePlay(airport: Airport, options: FreePlayOptions = {}, i
 interface InitialOpts {
   count: number; depShare: number; gaFraction: number; jets: boolean; ga: boolean;
   active: { departing: string[]; landing: string[] }; departureFreq: string; arrivalFreq: string;
+  /** The setup screen's type selection resolved against the airport profile (undefined = everything the profile offers). */
+  allowedTypes?: ReadonlySet<string>;
   /** IFR flows for the initial population (see ../ifr.ts). */
   ifrArrivals?: boolean; ifrDepartures?: boolean;
 }
@@ -149,23 +154,36 @@ export const INITIAL_IFR_ARRIVAL_STAGGER_SEC = 270;
 export function initialAircraft(airport: Airport, rng: Rng, o: InitialOpts): Scenario['spawns'] {
   const out: Scenario['spawns'] = [];
   const used = new Set<string>();
-  const callsign = (isGa: boolean): string => {
+  const icao = airport.icao;
+  const profile = profileFor(icao);
+  /** A unique flight (not used before, tail not sounding like one already in the scenario). Marked used by `commit`. */
+  const flight = (isGa: boolean, fits?: (type: string) => boolean): Flight | undefined => {
     const tails = new Set(out.map((s) => callsignTail(s.callsign)));
-    for (let i = 0; i < 100; i++) {
-      const cs = isGa ? randomNNumber(rng) : randomAirlineCallsign(rng);
-      if (!used.has(cs) && !tails.has(callsignTail(cs))) {
-        used.add(cs);
-        return cs;
-      }
+    let allowedTypes = o.allowedTypes;
+    if (!isGa && fits) {
+      const cand = new Set(usableAirlines(profile, o.allowedTypes).flatMap((e) => e.types).filter((t) => (!o.allowedTypes || o.allowedTypes.has(t)) && fits(t)));
+      if (!cand.size) return undefined;
+      allowedTypes = cand;
     }
-    const cs = isGa ? `N${100 + used.size}ZZ` : `NKS${9000 + used.size}`;
-    used.add(cs);
-    return cs;
+    let last: Flight | undefined;
+    for (let i = 0; i < 100; i++) {
+      const f: Flight | undefined = isGa ? { callsign: randomNNumber(rng), type: pickGaType(rng, icao) } : pickFlight(rng, icao, { allowedTypes });
+      if (!f) return undefined;
+      last = f;
+      if (!used.has(f.callsign) && !tails.has(callsignTail(f.callsign))) return f;
+    }
+    const cs = isGa ? `N${100 + used.size}ZZ` : `${last?.entry?.icao3 ?? profile.airlines[0].icao3}${9000 + used.size}`;
+    return { ...last!, callsign: cs };
   };
-  const chooseType = (): 'C172' | 'A320' => {
-    if (!o.jets) return 'C172';
-    if (!o.ga) return 'A320';
-    return rng() < o.gaFraction ? 'C172' : 'A320';
+  const commit = (f: Flight): string => {
+    used.add(f.callsign);
+    return f.callsign;
+  };
+  /** 'ga' or 'jet' (airline flight, which includes the C208 feeder). Draws one random number only when both are in play, as before. */
+  const chooseKind = (): 'ga' | 'jet' => {
+    if (!o.jets) return 'ga';
+    if (!o.ga) return 'jet';
+    return rng() < o.gaFraction ? 'ga' : 'jet';
   };
 
   const nDep = Math.round(o.count * o.depShare);
@@ -177,38 +195,56 @@ export function initialAircraft(airport: Airport, rng: Rng, o: InitialOpts): Sce
   const occupied: Vec2[] = [];
   const reserved = new Set<string>();
   for (let i = 0; i < nDep; i++) {
-    let type = chooseType();
-    if (type === 'A320' && depEnds.length && !depEnds.some((e) => runwayLongEnoughFor(airport, 'A320', e))) type = o.ga ? 'C172' : 'A320';
+    let kind = chooseKind();
+    let f: Flight | undefined;
+    if (kind === 'jet') {
+      const fits = (t: string): boolean => !depEnds.length || depEnds.some((e) => runwayLongEnoughFor(airport, t, e));
+      f = flight(false, fits);
+      if (!f) {
+        if (o.ga) kind = 'ga';
+        else f = flight(false); // jets only and no runway fits: proceed as before
+      }
+    }
+    if (kind === 'ga') f = flight(true);
+    if (!f) continue;
+    const type = f.type;
     const p = pickParking(airport, type, rng, occupied, reserved);
     if (!p) continue;
     reserved.add(p.id);
     occupied.push(p.pos);
-    if (type === 'A320' && o.ifrDepartures) {
-      out.push(ifrDepartureSpawn(airport, rng, { callsign: callsign(false), type, parkingId: p.id, atSec: 0 }));
+    const leg = pickLeg(rng, icao, f);
+    const remote = leg.remoteAirport ? { remoteAirport: leg.remoteAirport } : {};
+    if (kind === 'jet' && o.ifrDepartures) {
+      out.push({ ...ifrDepartureSpawn(airport, rng, { callsign: commit(f), type, parkingId: p.id, atSec: 0, destination: leg.destination, cruiseAltitudeFt: leg.cruiseAltitudeFt }), ...remote });
       continue;
     }
     out.push({
-      atSec: 0, callsign: callsign(type === 'C172'), type, flightRules: type === 'C172' ? 'VFR' : 'IFR',
-      start: { kind: 'parked', parkingId: p.id }, isDeparture: true, initialFrequencyId: o.departureFreq, initialRequest: 'TAXI',
+      atSec: 0, callsign: commit(f), type, flightRules: kind === 'ga' ? 'VFR' : 'IFR',
+      start: { kind: 'parked', parkingId: p.id }, isDeparture: true, initialFrequencyId: o.departureFreq, initialRequest: 'TAXI', ...remote,
     });
   }
 
-  // Arrivals: decide types, put jets nearest the field, then place outward.
-  const arrTypes = Array.from({ length: nArr }, chooseType).sort((a, b) => (a === b ? 0 : a === 'A320' ? -1 : 1));
+  // Arrivals: decide kinds, put airliners nearest the field, then place outward.
+  const arrKinds = Array.from({ length: nArr }, chooseKind).sort((a, b) => (a === b ? 0 : a === 'jet' ? -1 : 1));
   const placed: AirbornePoint[] = [];
   const ifrFixes: Vec2[] = [];
   const ifrCount = new Map<string, number>();
-  arrTypes.forEach((type, i) => {
+  arrKinds.forEach((kind, i) => {
     const endId = landingEnds[i % landingEnds.length];
-    if (type === 'A320' && o.ifrArrivals && arrivalProcedure(airport, endId)) {
+    const f = flight(kind === 'ga');
+    if (!f) return;
+    const type = f.type;
+    if (kind === 'jet' && o.ifrArrivals && arrivalProcedure(airport, endId)) {
       const k = ifrCount.get(endId) ?? 0;
-      const spec = ifrArrivalSpawn(airport, rng, { callsign: callsign(false), type, runwayEnd: endId, atSec: k * INITIAL_IFR_ARRIVAL_STAGGER_SEC });
+      const spec = ifrArrivalSpawn(airport, rng, { callsign: f.callsign, type, runwayEnd: endId, atSec: k * INITIAL_IFR_ARRIVAL_STAGGER_SEC });
       if (spec && spec.start.kind === 'at_fix') {
+        commit(f);
         ifrCount.set(endId, k + 1);
         const pos = findNavFix(airport, spec.start.fix)!.pos;
         ifrFixes.push(pos);
         placed.push({ pos, type, runwayEnd: endId });
-        out.push(spec);
+        const leg = pickLeg(rng, icao, f);
+        out.push(leg.remoteAirport ? { ...spec, remoteAirport: leg.remoteAirport } : spec);
       }
       return;
     }
@@ -219,9 +255,10 @@ export function initialAircraft(airport: Airport, rng: Rng, o: InitialOpts): Sce
     const st = pickArrivalStart(airport, endId, type, rng, placed, { minNm, maxNm: minNm + 2, tries: 60, forceFinal: i === 0 });
     if (!st) return;
     placed.push({ pos: st.pos, type, runwayEnd: endId });
+    const leg = pickLeg(rng, icao, f);
     out.push({
-      atSec: 0, callsign: callsign(type === 'C172'), type, flightRules: type === 'C172' ? 'VFR' : 'IFR',
-      start: st, isDeparture: false, initialFrequencyId: o.arrivalFreq, initialRequest: 'LANDING',
+      atSec: 0, callsign: commit(f), type, flightRules: kind === 'ga' ? 'VFR' : 'IFR',
+      start: st, isDeparture: false, initialFrequencyId: o.arrivalFreq, initialRequest: 'LANDING', ...(leg.remoteAirport ? { remoteAirport: leg.remoteAirport } : {}),
     });
   });
   // Sanity: every runway id must exist (config typos fail loudly).
