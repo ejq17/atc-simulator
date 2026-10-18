@@ -155,7 +155,9 @@ far from the spelling.
 
 * **Session lines (2026-10-18)**: "be on / be in / bee a / V a" -> `via` (phrases), "been" -> `via`, "limo" -> lima, "aplha" -> alpha, "tax in" -> `taxi to`; a lower-case raw "a" / "an" after via / on / at / onto before a NATO word is dropped ("on an Alpha"); "air national guard" and "national guard" -> ANG; "airport vehicle one" -> "airport one" (the vehicle word is dropped between `airport` and a number, so both word orders give APT1).
 * **Runway exit with a lead-in** (`ruleExitRunway`): "continue down [the] runway [22]" before an exit instruction is part of it (one `EXIT_RUNWAY`, non-standard: 3-10-9 has only "turn left/right (taxiway)"); alone it is the exit at the end (`destination: 'END'`); "turn right at the next taxiway" is `NEXT`. For an aircraft standing on a runway `transmit.ts` issues the exit before a preceding bare "cross runway N" so the crossing has a route.
+* **"fly runway heading" before "cleared for takeoff"** (`assemble.ts`) is part of the `TAKEOFF` (no separate `HEADING`, which the engine would refuse on the ground).
 * **One taxi, one hold short** (`assemble.ts`): a non-progressive TAXI directly followed by a HOLD_SHORT (the route words could not be read) takes the hold short, so the pilot reads back once.
+* **One transmission, one readback**: a progressive step ("turn left on Bravo, continue to Charlie, hold short of runway four") stays three commands (`EXIT_RUNWAY` / turn, `TAXI` segment, `HOLD_SHORT`, so each keeps its own engine effect); `ParsedCommand.groupSize` and the shared `transmissionId` let the engine join their readbacks into one pilot call (`sim/radioDiscipline.ts addReadbackFragment`). The readback of a segment is "Left on Bravo", "continue to Charlie" (`radio/readback.ts`).
 
 ### Numbers and punctuation
 

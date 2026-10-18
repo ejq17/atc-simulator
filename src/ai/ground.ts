@@ -64,7 +64,7 @@ function holdShortReadBack(state: SimulationState, ac: Aircraft, clr: Clearance)
   const evs = state.events;
   for (let i = evs.length - 1, n = 0; i >= 0 && n < 300; i--, n++) {
     const ev = evs[i];
-    if (ev.speaker !== 'PILOT' || ev.aircraftId !== ac.id || ev.data?.clearanceId !== clr.id) continue;
+    if (ev.speaker !== 'PILOT' || ev.aircraftId !== ac.id || ev.data?.clearanceId !== clr.id && !(ev.data?.clearanceIds as string[] | undefined)?.includes(clr.id)) continue;
     return /hold short/i.test(ev.text);
   }
   return undefined;

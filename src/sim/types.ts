@@ -399,6 +399,8 @@ export interface Clearance {
   destination?: string;          // parking id or "RWY13"
   headingDeg?: number;           // magnetic
   turnDirection?: 'left' | 'right';
+  /** TAXI segment: the taxiway the pilot is told to turn onto ("left on Bravo"), for the readback. */
+  turnTaxiway?: string;
   altitudeFt?: number;
   speedKt?: number;
   frequencyMhz?: number;

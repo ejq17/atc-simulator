@@ -301,6 +301,10 @@ export interface SimContext {
   /** Pilot calls waiting for their response delay / key-up window (radioDiscipline.ts). */
   scheduledSpeech: import('./radioDiscipline').ScheduledSpeech[];
   speechSeq: number;
+  /** The pilot readback fragments of the transmission being applied, to be spoken as ONE readback (radioDiscipline.ts `addReadbackFragment`). */
+  readbackGroup?: { tid: string; aircraftId: string; parts: { text: string; clearanceId: string }[]; delaySec: number };
+  /** Commands applied so far of the transmission being applied (`executeCommand`): the group is spoken when all of them have been. */
+  transmissionProgress?: { tid: string; applied: number };
   /** Frequency (3 decimals) -> sim time at which the call now on it ends. */
   frequencyUse: Map<string, number>;
   /** Frequency -> sim time from / until which pilots queued on the channel will be on the air; a pilot who keys up before `from` cannot know about them (radioDiscipline.ts). */

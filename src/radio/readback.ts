@@ -224,6 +224,15 @@ export function buildReadback(aircraft: Aircraft, c: Clearance, env: ReadbackEnv
         // Some pilots leave the hold-short out of the readback; the controller must obtain it (JO 7110.65 2-4-3, 3-7-2).
         const omit = !!c.holdShort?.some(isRunwayRef) && (env.holdShortOmitFraction ?? 0) > 0 && seeded01(aircraft.seed, `hs-omit:${env.drawKey ?? c.id}`) < (env.holdShortOmitFraction ?? 0);
         if (omit) omittedHoldShort = [...c.holdShort!];
+        // A progressive-taxi step (JO 7110.65 3-7-2 "continue taxiing via ..."; AIM 4-3-18) is read back as it was given: "Left on Bravo", "continue to
+        // Charlie". Several steps and a hold short of one transmission are joined into ONE readback by `addReadbackFragment` (sim/radioDiscipline.ts).
+        if (c.kind === 'TAXI' && c.segment) {
+          const twyDest = /^TWY\s*([A-Z]{1,2}\d{0,2})$/.exec((c.destination ?? '').toUpperCase())?.[1];
+          const turn = c.turnTaxiway ? `${c.turnDirection ? `${capitalize(c.turnDirection)} on` : 'Taxi via'} ${spokenTaxiway(c.turnTaxiway)}` : '';
+          const onward = twyDest ? `${turn ? 'continue' : 'Continue'}${route?.length ? ` via ${route.map(spokenTaxiway).join(', ')}` : ''} to ${spokenTaxiway(twyDest)}` : '';
+          const seg = [turn, onward].filter(Boolean).join(', ');
+          if (seg) return `${seg}${omit ? '' : holdShortPhrase(c.holdShort)}`;
+        }
         return `${head}${viaPhrase(route)}${omit ? '' : holdShortPhrase(c.holdShort)}`;
       }
       case 'HOLD_POSITION':

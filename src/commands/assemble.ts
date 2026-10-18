@@ -95,6 +95,13 @@ export function assemble(elements: Element[], tokenCount: number, preConsumed: r
       prev.end = p.end;
       continue;
     }
+    // "runway one three, fly runway heading, cleared for takeoff": the departure heading is part of the takeoff clearance (3-9-10 example, IFR
+    // departure); a separate HEADING would be refused on the ground. The takeoff keeps the words, so the pilot reads back once.
+    if (prev && prev.draft.kind === 'HEADING' && prev.draft.fields.destination === 'RUNWAY_HEADING' && p.draft.kind === 'TAKEOFF') {
+      merged.pop();
+      p.start = Math.min(p.start, prev.start);
+      p.draft.issues.push(...prev.draft.issues);
+    }
     merged.push(p);
   }
   return { drafts: merged, consumed };

@@ -11,7 +11,7 @@ import type {
 import { mulberry32 } from './rng';
 import { resolvePilotBehaviour } from './pilotBehaviour';
 import { emitEvent } from './context';
-import { flushScheduledSpeech } from './radioDiscipline';
+import { flushReadbackGroup, flushScheduledSpeech } from './radioDiscipline';
 import { setSimulationEpoch } from './solar';
 import type { SimContext } from './context';
 import { executeCommand, validateCommand } from './commandExecutor';
@@ -138,6 +138,7 @@ export function createEngine(opts: EngineOptionsExt): SimulationEngine & Simulat
     processScheduledSpawns(ctx);
     for (const spec of generator.update(state)) spawnFromSpec(ctx, spec);
     applyPendingFrequencyChanges(ctx);
+    flushReadbackGroup(ctx);
     flushScheduledSpeech(ctx);
     updatePilotRequests(ctx);
     enforceClosuresOnRoutes(ctx);

@@ -735,7 +735,13 @@ shift the rest of the simulation and the same seed replays the same log.
   `responseDelaySec` (crew class: airline / GA / student, base speed per aircraft + per-call share) plus `blockWindowSec` after keying. A call keyed while
   another is on the air waits for it (waiting pilots queue behind each other). Two calls keyed on one frequency inside the window are **blocked**: a
   `RADIO_BLOCKED` event, `onPilotTransmission({ blocked: true, text: '[blocked]' })` once, and each pilot retries after `blockRetryMinSec` + a seeded share
-  of `blockRetrySpreadSec`, at least `blockWindowSec` + 0.4 s apart (at most `MAX_BLOCK_RETRIES`). One aircraft never talks over itself. The voice layer only renders it.
+  of `blockRetrySpreadSec`, at least `blockWindowSec` + 0.4 s apart and not within `blockWindowSec` + 0.5 s of another queued call (`clearOfQueued`, at most `MAX_BLOCK_RETRIES`). One aircraft never talks over itself. The voice layer only renders it.
+  What keeps a busy frequency from blocking itself: a call a pilot starts himself is keyed after a seeded reaction time (`KEYUP_SPREAD_SEC` 12 s, 40 % the aircraft's own habit,
+  60 % per call; x4 for requests), is staggered `blockWindowSec` + 0.3 s from any call already queued (`staggered`; design values), waits for the end of a controller call's expected answer (`answerWindow`,
+  applied to every queued call before any is emitted: `deferForAnswerWindows`), and waits behind calls on the air. Answers to the controller are NOT staggered: two pilots who
+  answer calls given together still collide (that is the realistic remainder). The AI controllers need no hold-off of their own: a controller never keys over a queued pilot call (`anyTransmitting`).
+  `RADIO_BLOCKED.data` lists `answers`, `texts` and `keyedAtSec` per call. Measurement: `src/ai/blockedRate.test.ts` (`BLOCKED_RATE=1`).
+* **One readback per transmission** (`radioDiscipline.ts addReadbackFragment` / `flushReadbackGroup`): the instructions of one transmission (every clearance kind except `PUSHBACK`: ground, vectors, altitude, speed, direct, approach, landing, takeoff, line up, IFR clearance, frequency change; `ParsedCommand.groupSize` > 1 and a `transmissionId`) are executed one by one, each with its readback text and any readback error, and the texts are joined into one call with the callsign once at the end. Spoken after the last command of the transmission, else on the next tick. `data.clearanceIds` lists the clearances it answers.
 * **Missed calls and "say again"** (`pilotRealism.ts`, `commandExecutor.ts`): `delayedResponseRate` - the pilot did not hear: nothing is said or done, the
   outcome is `clarify`, the next call to the aircraft is heard. `sayAgainRate` for a transmission with more than `sayAgainMinCommands` instructions
   (`ParsedCommand.groupSize`, set by the parser and the AI): `clarify`, nothing executed. Safety instructions (go around, cancel takeoff, hold) are never missed.

@@ -105,7 +105,7 @@ run({
     { say: `${C} wind two one zero at eight, runway two two, cleared for takeoff`, cmds: [{ kind: 'TAKEOFF', ...N, runwayEnd: '22' }], clean: true },
     { say: `${S} wind calm runway 31 cleared for takeoff`, cmds: [{ kind: 'TAKEOFF', runwayEnd: '31' }], clean: true },
     { say: `${S} fly runway heading, cleared for takeoff runway 13`,
-      cmds: [{ kind: 'HEADING', destination: 'RUNWAY_HEADING' }, { kind: 'TAKEOFF', runwayEnd: '13' }], clean: true },
+      cmds: [{ kind: 'TAKEOFF', runwayEnd: '13' }], clean: true }, // "fly runway heading" is part of the takeoff clearance (assemble.ts)
     { say: `${S} fly heading one eight zero, runway one three, cleared for takeoff`,
       cmds: [{ kind: 'HEADING', headingDeg: 180 }, { kind: 'TAKEOFF', runwayEnd: '13' }], clean: true },
     { say: `${S} turn left heading 270, cleared for takeoff runway 13`,

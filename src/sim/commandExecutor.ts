@@ -36,7 +36,7 @@ import { crossingGate, releaseGate } from './coordination';
 import { frequencyById, frequencyByMhz, frequencyForPosition, hearsFrequency, formatMhz } from '../radio/frequencies';
 import { buildReadback, buildSayAgain, buildUnable, holdShortReadbackText, sayRouteCall } from '../radio/readback';
 import { asksSayAgain, givesNoReadback, missesCall, readbackRealism, wrongCallsignAnswerer } from './pilotRealism';
-import { reserveChannel, responseDelaySec } from './radioDiscipline';
+import { addReadbackFragment, flushReadbackGroup, reserveChannel, responseDelaySec } from './radioDiscipline';
 import { spokenRunway } from '../radio/spoken';
 import { SPEED_LIMIT_BELOW_10K_KT, lineUpTimeSec, patternAltitudeFt } from './performance';
 import { findNavFix, indexOfFix } from './navigation';
@@ -59,6 +59,12 @@ import {
 
 const DUPLICATE_WINDOW_SEC = 5;
 /** Kinds that cannot wait for the correction window: the pilot acts on what he read back. */
+/**
+ * Instructions of one transmission that are NOT joined into the single readback (`addReadbackFragment`): a pushback is approved on its own.
+ * Every other clearance (ground, vectors, altitude, speed, direct, approach, landing, takeoff, line up, IFR clearance elements, frequency change...)
+ * is joined when its transmission carries more than one command (AIM 4-4-7 b, 2-4-3 name the elements to read back, not the number of calls).
+ */
+const SEPARATE_READBACK_KINDS: ReadonlySet<ClearanceKind> = new Set<ClearanceKind>(['PUSHBACK']);
 const IMMEDIATE_KINDS: ReadonlySet<ClearanceKind> = new Set<ClearanceKind>(['TAKEOFF', 'LINE_UP_AND_WAIT', 'CROSS_RUNWAY', 'LAND']);
 
 /** A controller position covers all of its frequencies (KACY Departure: south 124.6 and north 134.25 are one position, DEP). */
@@ -109,10 +115,18 @@ export function executeCommand(ctx: SimContext, cmdIn: ParsedCommand, opts?: Exe
   const prevAi = ctx.currentAi;
   ctx.currentAi = opts?.aiPosition;
   if (opts?.aiPosition) ctx.aiSeen = true;
+  const tid = opts?.transmissionId;
+  if (ctx.readbackGroup && ctx.readbackGroup.tid !== tid) flushReadbackGroup(ctx);
   try {
     return executeInner(ctx, cmdIn, opts);
   } finally {
     ctx.currentAi = prevAi;
+    // the pilot answers a transmission once, after its last command
+    if (tid) {
+      const pr = ctx.transmissionProgress;
+      ctx.transmissionProgress = { tid, applied: pr && pr.tid === tid ? pr.applied + 1 : 1 };
+      if (ctx.readbackGroup?.tid === tid && ctx.transmissionProgress.applied >= (cmdIn.groupSize ?? 1)) flushReadbackGroup(ctx);
+    }
   }
 }
 
@@ -394,6 +408,7 @@ function executeInner(ctx: SimContext, cmdInput: ParsedCommand, opts?: ExecOpts)
 
   if (rb.text) {
     if (answerer) pilotSay(ctx, answerer, rb.text, { readback: true, clearanceId: clr.id, wrongCallsign: true, intendedCallsign: ac.callsign }, responseDelaySec(ctx, answerer));
+    else if (tid && !ctx.dryRun && (cmdIn.groupSize ?? 1) > 1 && !SEPARATE_READBACK_KINDS.has(clr.kind)) addReadbackFragment(ctx, ac, tid, rb.text, clr.id, delay);
     else pilotSay(ctx, ac, rb.text, { readback: true, clearanceId: clr.id }, delay);
   } else ac.radioState = rt.readbackError ? 'WAITING_FOR_READBACK' : 'IDLE'; // informational instruction (or no readback): nothing said
   if (rb.omittedHoldShort) markUnreadHoldShort(ctx, ac, rt, clr, rb.omittedHoldShort);
@@ -948,7 +963,7 @@ function planTaxi(env: Env): PlanResult {
 
   return {
     plan: {
-      patch: { route: usedVia, holdShort: cmd.holdShort, segment: cmd.segment || undefined, destination: dest?.id ?? (runwayEnd ? `RWY${runwayEnd}` : twyDest ? `TWY${twyDest}` : destRaw), runwayEnd },
+      patch: { route: usedVia, holdShort: cmd.holdShort, segment: cmd.segment || undefined, ...(cmd.segment && segTurn && cmd.route?.length ? { turnDirection: segTurn.dir, turnTaxiway: segTurn.taxiway } : {}), destination: dest?.id ?? (runwayEnd ? `RWY${runwayEnd}` : twyDest ? `TWY${twyDest}` : destRaw), runwayEnd },
       flag: flag ?? routelessFlag ?? tooShort,
       commit: () => {
         const stops = new Set(computeStopNodes(graph, route.nodeIds, ac.runwayAuthorizations));

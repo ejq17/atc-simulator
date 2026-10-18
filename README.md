@@ -222,7 +222,7 @@ Levels (design values):
 | Response delay s, airline / GA / student (`responseDelaySec`) | 0 | 0.4-1.2 / 0.8-2.2 / 1.5-3.5 | 0.5-1.8 / 1-3.2 / 2-5 | 0.6-2.4 / 1.2-4 / 2.5-6.5 |
 | Call missed, needs a second call (`delayedResponseRate`) | 0 | 1.5 % | 3 % | 5 % |
 | "Say again" on a transmission of more than N instructions (`sayAgainRate`, `sayAgainMinCommands`; students x1.5 / 2 / 2) | 0 | 15 %, N=3 | 25 %, N=3 | 35 %, N=2 |
-| Key-up window in which two calls block each other (`blockWindowSec`) | n/a | 0.8 s | 1.2 s | 1.6 s |
+| Key-up window in which two calls block each other (`blockWindowSec`) | n/a | 0.4 s | 0.5 s | 0.6 s |
 | GA pilots who open with "November" (`novemberInitialRate`) | 0 | 30 % | 40 % | 50 % |
 | Airline "with you" / "with Bravo" at check-in (`withYouRate`, `withBravoRate`) | 0 | 20 % / 20 % | 30 % / 30 % | 40 % / 40 % |
 | Light VFR aircraft flown by students (`studentShare`) | 0 | 10 % | 20 % | 30 % |

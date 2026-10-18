@@ -224,6 +224,17 @@ describe('blocked transmissions', () => {
     expect(heard).toHaveLength(2);
   });
 
+  it('aircraft with the same trigger make their own calls at different moments and are not garbled (stagger)', () => {
+    const { engine, heard } = make({ responseDelaySec: { airline: [0, 0], ga: [0, 0], student: [0, 0] } }, [
+      ARRIVING('N723EJ', '13', 11), ARRIVING('N991KB', '13', 11), ARRIVING('N428PL', '13', 11), ARRIVING('N556HW', '13', 11),
+    ], { seed: 3 }, 'heavy');
+    run(engine, 90);
+    expect(blockedEvents(engine)).toHaveLength(0);
+    const calls = heard.filter((h) => !h.blocked).map((h) => h.timeSec);
+    expect(calls.length).toBeGreaterThanOrEqual(4);
+    for (let i = 1; i < calls.length; i++) expect(calls[i] - calls[i - 1]).toBeGreaterThan(1);
+  });
+
   it('the squeal length matches the engine constant', () => {
     expect(BLOCKED_SQUEAL_SEC).toBeGreaterThan(0.5);
   });
