@@ -70,10 +70,10 @@ export function defaultPlayerPositions(id: string): ControllerPositionId[] | und
   return p ? [...p] : undefined;
 }
 
-/** Career: steps 1-4 light, 5-8 moderate, 9-12 heavy (the catalogue has 12 steps). */
+/** Career: steps 1-2 (introductory) off, 3-5 light, 6-9 moderate, 10-12 heavy (the catalogue has 12 steps). */
 export function careerRealism(step: number | undefined): PilotRealismLevel {
   const s = step ?? 1;
-  return s <= 4 ? 'light' : s <= 8 ? 'moderate' : 'heavy';
+  return s <= 2 ? 'off' : s <= 5 ? 'light' : s <= 9 ? 'moderate' : 'heavy';
 }
 
 /** Pilot realism of a catalogue scenario that does not set it: training lessons off, career by step, anything else from its Difficulty (easy light, normal moderate, hard heavy). */

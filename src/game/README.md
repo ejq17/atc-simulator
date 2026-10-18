@@ -242,8 +242,8 @@ Scripted tests pass `readbackErrorRate: 0`; with the default 8 % a pilot occasio
 
 ## Pilot realism by scenario
 
-`Scenario.pilotRealism` is set by the catalogue (`scenarios/index.ts buildCatalogueScenario`): training lessons `off` (a lesson that sets the field itself keeps it), career steps 1-4 light, 5-8 moderate,
-9-12 heavy (`careerRealism`; step 11 is built on the free-play builder but still follows the ramp), anything else from its `Difficulty` (`realismForDifficulty`: easy light, normal moderate, hard heavy).
+`Scenario.pilotRealism` is set by the catalogue (`scenarios/index.ts buildCatalogueScenario`): training lessons `off` (a lesson that sets the field itself keeps it), career steps 1-2 off (introductory), 3-5 light, 6-9 moderate,
+10-12 heavy (`careerRealism`; step 11 is built on the free-play builder but still follows the ramp), anything else from its `Difficulty` (`realismForDifficulty`: easy light, normal moderate, hard heavy).
 Free play takes `FreePlayOptions.pilotRealism` (setup-screen selector "Pilot realism", default moderate). The traffic generator (`traffic.ts`) occasionally creates a flight whose callsign sounds like one
 on the airport (`similarCallsignRate`), otherwise it avoids sound-alikes. Scripted flow tests build their scenarios with `pilotRealism: 'off'`.
 

@@ -160,37 +160,49 @@ describe('readback errors beyond digits', () => {
     expect(find(e, 'N723EJ').flags.readbackErrorKind).toBe('pattern');
   });
 
-  it('no readback: the pilot complies silently; "did you copy" gets the readback, which clears the error', () => {
+  it('no readback: the pilot has not received the clearance and does nothing with it; "did you copy" gets the readback and he acts', () => {
     const e = eng('moderate', only({ noReadbackRate: 1 }), air());
     const before = pilotTexts(e, 'N723EJ').length;
+    const was = find(e, 'N723EJ').target.altitudeFt;
     e.applyCommand(cmd('ALTITUDE', 'N723EJ', { altitudeFt: 3000 }), { position: 'TWR' });
     expect(pilotTexts(e, 'N723EJ').length).toBe(before);
     expect(find(e, 'N723EJ').flags.readbackErrorKind).toBe('no_readback');
-    expect(find(e, 'N723EJ').target.altitudeFt).toBe(3000); // it complied
+    expect(find(e, 'N723EJ').target.altitudeFt).toBe(was); // it did NOT comply
+    expect(e.getState().events.some((x) => x.kind === 'COMMAND_ACCEPTED' && x.callsign === 'N723EJ')).toBe(false); // nothing happened: nothing is scored
     e.applyCommand(cmd('DID_YOU_COPY', 'N723EJ'), { position: 'TWR' });
     expect(lastPilot(e, 'N723EJ')).toContain('three thousand');
     expect(find(e, 'N723EJ').flags.readbackErrorPending).toBe(false);
+    expect(find(e, 'N723EJ').target.altitudeFt).toBe(3000); // now it has the clearance
   });
 
-  it('no readback: re-issuing the instruction also gets the readback', () => {
-    const e = eng('moderate', only({ noReadbackRate: 1 }), air());
-    e.applyCommand(cmd('ALTITUDE', 'N723EJ', { altitudeFt: 3000 }), { position: 'TWR' });
-    e.applyCommand(cmd('ALTITUDE', 'N723EJ', { altitudeFt: 3000 }), { position: 'TWR' });
-    expect(lastPilot(e, 'N723EJ')).toContain('three thousand');
-    expect(find(e, 'N723EJ').flags.readbackErrorPending).toBe(false);
+  it('no readback: re-issuing the instruction gets the readback and the aircraft acts', () => {
+    // find a pilot who leaves the first call unacknowledged at a 50 % rate, then repeat the call until he answers
+    let done = false;
+    for (let seed = 1; seed <= 60 && !done; seed++) {
+      const e = eng('moderate', only({ noReadbackRate: 0.5 }), air(), { seed });
+      e.applyCommand(cmd('ALTITUDE', 'N723EJ', { altitudeFt: 3000 }), { position: 'TWR' });
+      if (find(e, 'N723EJ').flags.readbackErrorKind !== 'no_readback') continue;
+      expect(find(e, 'N723EJ').target.altitudeFt).not.toBe(3000);
+      for (let k = 0; k < 20 && find(e, 'N723EJ').target.altitudeFt !== 3000; k++) e.applyCommand(cmd('ALTITUDE', 'N723EJ', { altitudeFt: 3000 }), { position: 'TWR' });
+      expect(find(e, 'N723EJ').target.altitudeFt).toBe(3000);
+      expect(lastPilot(e, 'N723EJ')).toContain('three thousand');
+      done = true;
+    }
+    expect(done).toBe(true);
   });
 
-  it('wrong callsign: an aircraft with a similar callsign answers (JO 7110.65 2-4-20); the addressed pilot says nothing until the call is repeated', () => {
+  it('wrong callsign: an aircraft with a similar callsign answers (JO 7110.65 2-4-20); the addressed pilot says nothing and does nothing until the call is repeated', () => {
     const e = eng('moderate', only({ wrongCallsignRate: 1 }), [ARRIVING('N723EJ', '13', 10), ARRIVING('N455EJ', '13', 12)]);
+    const was = find(e, 'N723EJ').target.altitudeFt;
     e.applyCommand(cmd('ALTITUDE', 'N723EJ', { altitudeFt: 3000 }), { position: 'TWR' });
     expect(pilotTexts(e, 'N455EJ').at(-1)).toContain('three thousand');
     expect(pilotTexts(e, 'N723EJ')).toHaveLength(0);
     const a = find(e, 'N723EJ');
     expect(a.flags.readbackErrorPending).toBe(true);
     expect(a.flags.readbackErrorKind).toBe('callsign');
-    e.applyCommand(cmd('ALTITUDE', 'N723EJ', { altitudeFt: 3000 }), { position: 'TWR' });
-    expect(pilotTexts(e, 'N723EJ').at(-1)).toContain('three thousand');
-    expect(find(e, 'N723EJ').flags.readbackErrorPending).toBe(false);
+    expect(a.target.altitudeFt).toBe(was);
+    e.applyCommand(cmd('DID_YOU_COPY', 'N723EJ'), { position: 'TWR' });
+    expect(pilotTexts(e, 'N723EJ').at(-1)).toMatch(/say again/i); // he never heard it
   });
 
   it('wrong callsign needs a similar one: dissimilar aircraft never answer for each other', () => {

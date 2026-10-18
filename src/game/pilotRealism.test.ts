@@ -12,12 +12,13 @@ const airport = loadKacy();
 const build = (id: string, o?: Parameters<typeof game.buildScenario>[2]) => game.buildScenario(id, airport, { seed: 5, ...o }) as GameScenario;
 
 describe('pilot realism level of a scenario', () => {
-  it('career steps ramp from light to heavy across the catalogue', () => {
+  it('career steps ramp from off (introductory) through light and moderate to heavy', () => {
     const levels = Array.from({ length: 12 }, (_, i) => build(`${game.listScenarios().find((s) => s.careerStep === i + 1)!.id}`).pilotRealism);
-    expect(levels.slice(0, 4)).toEqual(['light', 'light', 'light', 'light']);
-    expect(levels.slice(4, 8)).toEqual(['moderate', 'moderate', 'moderate', 'moderate']);
-    expect(levels.slice(8)).toEqual(['heavy', 'heavy', 'heavy', 'heavy']);
-    expect(careerRealism(undefined)).toBe('light');
+    expect(levels.slice(0, 2)).toEqual(['off', 'off']); // introductory steps
+    expect(levels.slice(2, 5)).toEqual(['light', 'light', 'light']);
+    expect(levels.slice(5, 9)).toEqual(['moderate', 'moderate', 'moderate', 'moderate']);
+    expect(levels.slice(9)).toEqual(['heavy', 'heavy', 'heavy']);
+    expect(careerRealism(undefined)).toBe('off');
   });
   it('career step 11 is built on the free-play builder but still follows the career ramp', () => {
     expect(build('career-11-complex').pilotRealism).toBe('heavy');
@@ -35,7 +36,7 @@ describe('pilot realism level of a scenario', () => {
     expect((game.buildFreePlay(airport, { seed: 1, pilotRealism: 'heavy' }) as GameScenario).pilotRealism).toBe('heavy');
   });
   it('the selector does not change career or training levels', () => {
-    expect(build('career-01-first-radio', { pilotRealism: 'heavy' }).pilotRealism).toBe('light');
+    expect(build('career-01-first-radio', { pilotRealism: 'heavy' }).pilotRealism).toBe('off');
     expect(build('train-01-phraseology', { pilotRealism: 'heavy' }).pilotRealism).toBe('off');
   });
 });

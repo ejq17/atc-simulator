@@ -25,6 +25,8 @@ export interface ReadbackEnv {
   holdShortOmitFraction?: number;
   /** Probability of a wrong taxiway in the route read back, as a share of `errorRate`. Default 0. */
   taxiwayErrorShare?: number;
+  /** Key of the seeded per-clearance draws (default: the clearance id). The engine passes the aircraft's own command ordinal, so a given seed and command sequence always draws the same, whatever else happened on the airport or when the command was sent. */
+  drawKey?: string;
   /** Pilot realism (src/sim/pilotBehaviour.ts): more kinds of readback error, each with its own rate. Omitted = only the digit / taxiway / hold-short errors above. */
   realism?: ReadbackRealism;
 }
@@ -210,17 +212,17 @@ export function buildReadback(aircraft: Aircraft, c: Clearance, env: ReadbackEnv
         let route = c.route;
         // A wrong taxiway in the route read back (seeded from the aircraft, so the shared random stream is untouched).
         if (!error && route?.length && env.rng && (env.errorRate ?? 0) > 0 && (env.taxiwayErrorShare ?? 0) > 0
-          && seeded01(aircraft.seed, `twy-err:${c.id}`) < (env.errorRate ?? 0) * (env.taxiwayErrorShare ?? 0)) {
+          && seeded01(aircraft.seed, `twy-err:${env.drawKey ?? c.id}`) < (env.errorRate ?? 0) * (env.taxiwayErrorShare ?? 0)) {
           const pool = airportTaxiways(env.airport).filter((t) => !route!.some((x) => x.toUpperCase() === t));
           if (pool.length) {
-            const idx = Math.min(route.length - 1, Math.floor(seeded01(aircraft.seed, `twy-idx:${c.id}`) * route.length));
-            const wrong = pool[Math.min(pool.length - 1, Math.floor(seeded01(aircraft.seed, `twy-wrong:${c.id}`) * pool.length))];
+            const idx = Math.min(route.length - 1, Math.floor(seeded01(aircraft.seed, `twy-idx:${env.drawKey ?? c.id}`) * route.length));
+            const wrong = pool[Math.min(pool.length - 1, Math.floor(seeded01(aircraft.seed, `twy-wrong:${env.drawKey ?? c.id}`) * pool.length))];
             error = { kind: 'taxiway', correct: `via ${route.map(spokenTaxiway).join(', ')}`, spoken: `via ${route.map((t, k) => spokenTaxiway(k === idx ? wrong : t)).join(', ')}`, wrong: { route: route.map((t, k) => (k === idx ? wrong : t)) } };
             route = route.map((t, k) => (k === idx ? wrong : t));
           }
         }
         // Some pilots leave the hold-short out of the readback; the controller must obtain it (JO 7110.65 2-4-3, 3-7-2).
-        const omit = !!c.holdShort?.some(isRunwayRef) && (env.holdShortOmitFraction ?? 0) > 0 && seeded01(aircraft.seed, `hs-omit:${c.id}`) < (env.holdShortOmitFraction ?? 0);
+        const omit = !!c.holdShort?.some(isRunwayRef) && (env.holdShortOmitFraction ?? 0) > 0 && seeded01(aircraft.seed, `hs-omit:${env.drawKey ?? c.id}`) < (env.holdShortOmitFraction ?? 0);
         if (omit) omittedHoldShort = [...c.holdShort!];
         return `${head}${viaPhrase(route)}${omit ? '' : holdShortPhrase(c.holdShort)}`;
       }

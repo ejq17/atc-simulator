@@ -58,7 +58,7 @@ export function responseDelaySec(ctx: SimContext, ac: Aircraft): number {
   if (r[1] <= 0) return 0;
   const rt = getRuntime(ctx, ac);
   const base = seeded01(ac.seed, 'resp-base');
-  const jitter = seeded01(ac.seed, `resp:${rt.callSeq++}`);
+  const jitter = seeded01(ac.seed, `resp:${rt.cmdSeq}`);
   return r[0] + (r[1] - r[0]) * (0.6 * base + 0.4 * jitter);
 }
 

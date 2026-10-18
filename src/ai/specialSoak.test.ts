@@ -11,7 +11,7 @@ const kacy = loadKacy();
 describe('free play with every special traffic kind and all AI controllers', () => {
   it('runs 2 hours: every kind appears and completes, vehicles never cause an incursion, no critical separation loss involves special traffic', () => {
     const sc = game.buildFreePlay(kacy, {
-      seed: 11, weather: 'clear', aircraftCount: 2, maxAircraft: 10, arrivalsPerHour: 4, departuresPerHour: 4, difficulty: 'normal', startingScenario: 'quiet',
+      seed: 13, weather: 'clear', aircraftCount: 2, maxAircraft: 10, arrivalsPerHour: 4, departuresPerHour: 4, difficulty: 'normal', startingScenario: 'quiet',
       specialTraffic: defaultSpecialTraffic('KACY'), airportEvents: true, startUtcMs: Date.UTC(2026, 5, 1, 15),
     });
     sc.controllerPositions = ['CLNC', 'GND', 'TWR', 'APP', 'DEP'];

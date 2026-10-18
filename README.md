@@ -186,8 +186,8 @@ npx tsx scripts/build-kacy-airport.ts   # same as build-airport.ts KACY (kept)
 Real frequencies are messier than a clean readback. The pilots now make mistakes, answer late, miss calls, key up over each other, abbreviate
 their callsigns, say "student pilot" and ask for things. How much is the **pilot realism** level: `off` / `light` / `moderate` / `heavy`.
 
-* Training lessons: `off` (a lesson can opt in with `Scenario.pilotRealism`). Career steps ramp with the step: 1-4 light, 5-8 moderate,
-  9-12 heavy. Free play: a "Pilot realism" selector on the setup screen, default moderate. Anything else with a `Difficulty`: easy = light,
+* Training lessons: `off` (a lesson can opt in with `Scenario.pilotRealism`). Career steps ramp with the step: 1-2 (introductory) off, 3-5 light,
+  6-9 moderate, 10-12 heavy. Free play: a "Pilot realism" selector on the setup screen, default moderate. Anything else with a `Difficulty`: easy = light,
   normal = moderate, hard = heavy. A scenario without any level keeps the earlier behaviour (only the seeded runway / heading digit error, 8 %).
 * Everything is seeded from the aircraft seed (or the engine generator): the same seed gives the same mistakes, the same blocked calls, the
   same event log. All rates are **design values** (the FAA text says what is correct, not how often pilots deviate) and live in one object,

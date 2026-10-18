@@ -7,6 +7,7 @@
 import type { Aircraft, ClearanceKind, ParsedCommand } from './types';
 import type { SimContext, AircraftRuntime } from './context';
 import { seeded01 } from './rng';
+import { perfOf } from './context';
 import type { ReadbackRealism } from '../radio/readback';
 import { similarSounding } from '../radio/callsigns';
 import { hearsFrequency } from '../radio/frequencies';
@@ -19,11 +20,11 @@ export function realismActive(ctx: SimContext): boolean {
 }
 
 /** Rates of the readback errors for one clearance, with a seeded draw per label. Undefined at level off. */
-export function readbackRealism(ctx: SimContext, ac: Aircraft, clearanceId: string): ReadbackRealism | undefined {
+export function readbackRealism(ctx: SimContext, ac: Aircraft, rt: AircraftRuntime): ReadbackRealism | undefined {
   const R = ctx.pilotBehaviour.realism;
   if (R.level === 'off') return undefined;
   return {
-    rand: (label) => seeded01(ac.seed, `rb:${clearanceId}:${label}`),
+    rand: (label) => seeded01(ac.seed, `rb:${rt.cmdSeq}:${label}`),
     altitude: R.altitudeErrorRate,
     frequency: R.frequencyErrorRate,
     squawk: R.squawkErrorRate,
@@ -31,8 +32,8 @@ export function readbackRealism(ctx: SimContext, ac: Aircraft, clearanceId: stri
   };
 }
 
-function draw(ctx: SimContext, ac: Aircraft, rt: AircraftRuntime, label: string): number {
-  return seeded01(ac.seed, `${label}:${ctx.state.clock.tick}:${rt.callSeq++}`);
+function draw(_ctx: SimContext, ac: Aircraft, rt: AircraftRuntime, label: string): number {
+  return seeded01(ac.seed, `${label}:${rt.cmdSeq}`); // keyed on this aircraft's command ordinal, never on the sim clock
 }
 
 /** The pilot did not hear the call (delayed response): nothing is said or done until the controller calls again. */
@@ -52,7 +53,8 @@ export function asksSayAgain(ctx: SimContext, ac: Aircraft, rt: AircraftRuntime,
 /** The pilot complies but does not read back at all. */
 export function givesNoReadback(ctx: SimContext, ac: Aircraft, rt: AircraftRuntime, kind: ClearanceKind): boolean {
   const R = ctx.pilotBehaviour.realism;
-  if (R.noReadbackRate <= 0 || kind === 'RADAR_CONTACT') return false;
+  // airport vehicles always acknowledge (the AI vehicle agent cannot repeat a vehicle instruction); everything else can be left unacknowledged
+  if (R.noReadbackRate <= 0 || kind === 'RADAR_CONTACT' || perfOf(ac).craft === 'vehicle') return false;
   return draw(ctx, ac, rt, 'noreadback') < R.noReadbackRate;
 }
 
@@ -65,5 +67,5 @@ export function wrongCallsignAnswerer(ctx: SimContext, ac: Aircraft, rt: Aircraf
     .sort((a, b) => a.id.localeCompare(b.id));
   if (!others.length) return undefined;
   if (draw(ctx, ac, rt, 'wrongcs') >= R.wrongCallsignRate) return undefined;
-  return others[Math.min(others.length - 1, Math.floor(seeded01(ac.seed, `wrongcs-pick:${ctx.state.clock.tick}`) * others.length))];
+  return others[Math.min(others.length - 1, Math.floor(seeded01(ac.seed, `wrongcs-pick:${rt.cmdSeq}`) * others.length))];
 }

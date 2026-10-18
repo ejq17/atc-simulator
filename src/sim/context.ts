@@ -28,6 +28,8 @@ export interface ReadbackErrorRecord {
   clearanceId: string;
   /** What the pilot understood (`ReadbackError.wrong`): flown when the window ends without a correction, or at once for time-critical kinds (`flown`). */
   wrong?: Record<string, unknown>;
+  /** No readback / wrong-callsign answer: the addressed pilot never received the clearance and did nothing with it; it is dropped when the window ends. */
+  held?: boolean;
   /** The wrong version was already put into effect (takeoff, line up, crossing, landing); a correction then restores the right one. */
   flown?: boolean;
   /** The controller's clearance before the wrong version was put in (compared with the re-issued instruction). */
@@ -252,6 +254,8 @@ export interface AircraftRuntime {
   windExceedSec?: number;
   /** Calls made so far (seeds the per-call timing and style draws). */
   callSeq: number;
+  /** Commands this aircraft has been given so far: the key of every pilot-behaviour draw about a command (same seed + same command sequence = same behaviour, at any sim time). */
+  cmdSeq: number;
   /** Frequencies (3 decimals) on which the pilot has already spoken: the first pilot-initiated call on a new one is the initial contact. */
   contacted: Set<string>;
   /** The controller addressed this aircraft by an abbreviated callsign: its pilot may abbreviate too (AIM 4-2-4). */
@@ -356,6 +360,7 @@ export function newRuntime(firstCallAtSec: number): AircraftRuntime {
     passedFixes: new Set(),
     reports: [],
     callSeq: 0,
+    cmdSeq: 0,
     contacted: new Set(),
     requestsDone: new Set(),
   };

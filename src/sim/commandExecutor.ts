@@ -28,7 +28,7 @@ import { computeStopNodes } from './groundMovement';
 import { pushbackGeometry, pushbackStand, PUSH_DIRECTION_TOLERANCE_DEG } from './pushback';
 import { pilotUnfamiliar } from './pilotBehaviour';
 import { glideAltitudeFt, initiateGoAround } from './flightDynamics';
-import { seeded01 } from './rng';
+import { hashString, mulberry32, seeded01 } from './rng';
 import { freeParkingCandidates, parkingOccupant, resolveParkingQuery } from './parkingResolver';
 import { assessClearanceSafety, recordUnsafeClearance } from './conflicts';
 import { crossingGate, releaseGate } from './coordination';
@@ -219,6 +219,7 @@ function executeInner(ctx: SimContext, cmdInput: ParsedCommand, opts?: ExecOpts)
 
   // A pilot who missed the call (delayed response): nothing happens, the controller has to call again.
   if (!ctx.dryRun) {
+    rt.cmdSeq++;
     if (rt.unanswered) rt.unanswered = undefined; // this is the second call
     else if (missesCall(ctx, ac, rt, cmdIn)) {
       rt.unanswered = { sinceSec: now, kind: cmdIn.kind };
@@ -249,7 +250,7 @@ function executeInner(ctx: SimContext, cmdInput: ParsedCommand, opts?: ExecOpts)
   // --- readback-error correction -------------------------------------------
   if (!ctx.dryRun && rt.readbackError && rt.readbackError.kind === (cmd.kind as string)) {
     const original = ac.clearances.find((c) => c.id === rt.readbackError!.clearanceId);
-    if (original && sameParams(rt.readbackError.flown && rt.readbackError.correctClr ? rt.readbackError.correctClr : original, cmd, g)) {
+    if (original && !rt.readbackError.held && sameParams(rt.readbackError.flown && rt.readbackError.correctClr ? rt.readbackError.correctClr : original, cmd, g)) {
       const rec = rt.readbackError;
       if (rec.flown) {
         const fix = PLANNERS[cmd.kind as ClearanceKind]?.(env);
@@ -328,7 +329,7 @@ function executeInner(ctx: SimContext, cmdInput: ParsedCommand, opts?: ExecOpts)
   const gb = groundBehaviour(ctx);
   const delay = responseDelaySec(ctx, ac);
   let rb = buildReadback(ac, clr, {
-    airport, rng: ctx.rng, errorRate: ctx.readbackErrorRate, holdShortOmitFraction: gb.holdShortOmitFraction, taxiwayErrorShare: gb.taxiwayErrorShare, realism: readbackRealism(ctx, ac, clr.id),
+    airport, rng: ctx.pilotBehaviour.realism.level === 'off' ? ctx.rng : mulberry32((ac.seed ^ hashString(`rb:${rt.cmdSeq}`)) >>> 0), drawKey: ctx.pilotBehaviour.realism.level === 'off' ? undefined : String(rt.cmdSeq), errorRate: ctx.readbackErrorRate, holdShortOmitFraction: gb.holdShortOmitFraction, taxiwayErrorShare: gb.taxiwayErrorShare, realism: readbackRealism(ctx, ac, rt),
   });
   // Pilot realism: no readback at all, or another aircraft with a similar callsign answers (7110.65 2-4-20, AIM 4-2-4).
   let answerer: Aircraft | undefined;
@@ -357,16 +358,24 @@ function executeInner(ctx: SimContext, cmdInput: ParsedCommand, opts?: ExecOpts)
     Object.assign(clr, wp.plan.patch);
     flown = true;
   }
-  plan.commit(clr);
+  // No readback / another aircraft answered: the addressed pilot has not acknowledged the clearance, so he has not received it and does nothing with it
+  // until the controller re-issues it or asks "did you copy" (then he reads it back and acts). After the 20 s window the clearance is dropped.
+  const held = rb.error?.kind === 'no_readback' || rb.error?.kind === 'callsign';
+  if (held) {
+    clr.completedAtSec = now; // on record (so the controller can be told what is missing) but never active
+    ac.clearances.push(clr);
+  } else plan.commit(clr);
   if (!ctx.currentAi) rt.playerTouched = true;
-  const flagged = result.plan.flag;
+  const flagged = held ? undefined : result.plan.flag;
   if (flagged) {
     emitEvent(ctx, { kind: 'INFO', aircraftId: ac.id, callsign: ac.callsign, text: `Improper instruction accepted: ${flagged}`, severity: 'warning', speaker: 'SYSTEM', data: { improper: true, kind: cmd.kind } });
   }
-  ac.clearances.push(clr);
-  ac.activeClearanceId = clr.id;
+  if (!held) {
+    ac.clearances.push(clr);
+    ac.activeClearanceId = clr.id;
+  }
   const waitSec = ac.pendingRequest ? now - ac.pendingRequest.sinceSec : undefined;
-  ac.pendingRequest = undefined;
+  if (!held) ac.pendingRequest = undefined;
   // The numbers answer the pilot's request for wind and altimeter only, not the landing / departure request he made before it: he is still waiting for that
   // (otherwise a pilot who asked while a go-around was being worked would never be sequenced again).
   if (rt.requestBeforeNumbers) {
@@ -392,7 +401,7 @@ function executeInner(ctx: SimContext, cmdInput: ParsedCommand, opts?: ExecOpts)
       // no readback: the controller waits for the answer after his own call, so the window starts a few seconds after it ends
       sinceSec: rb.error.kind === 'no_readback' ? Math.max(now, ctx.frequencyUse.get(ctrlFreq.toFixed(3)) ?? now) + 3 : now,
       kind: cmd.kind as ReadbackErrorRecord['kind'], errorKind: rb.error.kind, clearanceId: clr.id, byPosition: position, correct: rb.error.correct, spoken: rb.error.spoken,
-      wrong: rb.error.wrong, flown, correctClr, answererId: answerer?.id,
+      wrong: rb.error.wrong, flown, correctClr, answererId: answerer?.id, held,
     };
     ac.flags.readbackErrorPending = true;
     ac.flags.readbackErrorClearanceId = clr.id;
@@ -400,8 +409,9 @@ function executeInner(ctx: SimContext, cmdInput: ParsedCommand, opts?: ExecOpts)
     ac.radioState = 'WAITING_FOR_READBACK';
     emitEvent(ctx, { kind: 'INFO', aircraftId: ac.id, callsign: ac.callsign, text: `(hidden from pilot) ${ac.callsign} misread back: ${rb.error.spoken} instead of ${rb.error.correct}`, severity: 'info', speaker: 'SYSTEM', data: { readbackError: true, errorKind: rb.error.kind } });
   }
-  if (cmd.kind === 'CONTACT_FREQUENCY' && rt.pendingFreq) rt.pendingFreq.atSec = now + speechDurationSec(rb.text) + 0.5;
+  if (cmd.kind === 'CONTACT_FREQUENCY' && rt.pendingFreq && !held) rt.pendingFreq.atSec = now + speechDurationSec(rb.text) + 0.5;
 
+  if (held) return { status: 'accepted', clearance: clr, readback: rb.text }; // nothing was done: no score, no duplicate guard
   ctx.recentCommands.set(key, now);
   emitEvent(ctx, {
     kind: 'COMMAND_ACCEPTED', aircraftId: ac.id, callsign: ac.callsign, severity: assessment.safe ? 'info' : 'critical', speaker: 'SYSTEM',
@@ -648,6 +658,17 @@ function conversation(ctx: SimContext, ac: Aircraft, rt: AircraftRuntime, kind: 
   } else if (rt.readbackError?.errorKind === 'no_readback') {
     const original = ac.clearances.find((c) => c.id === rt.readbackError!.clearanceId);
     text = original ? buildReadback(ac, original, { airport }).text : `Affirm, ${cs}`;
+    if (original && rt.readbackError.held) {
+      // he now has the clearance: he acts on it (planned again, the situation may have moved on)
+      const p = planMisread(ctx, ac, rt, original, {}, original.byPosition);
+      if ('plan' in p) {
+        original.completedAtSec = undefined;
+        Object.assign(original, p.plan.patch);
+        p.plan.commit(original);
+        ac.activeClearanceId = original.id;
+        ac.pendingRequest = undefined;
+      } else text = p.reject.pilot ?? `Unable, ${cs}`;
+    }
     emitEvent(ctx, { kind: 'READBACK_ERROR', aircraftId: ac.id, callsign: ac.callsign, severity: 'info', speaker: 'SYSTEM', text: `Missing readback from ${ac.callsign} obtained ("did you copy")`, data: { corrected: true, errorKind: 'no_readback' } });
     rt.readbackError = undefined;
     ac.flags.readbackErrorPending = false;
