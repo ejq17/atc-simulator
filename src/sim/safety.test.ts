@@ -4,6 +4,9 @@ import { ARRIVING, cmd, find, GA_PARKED, HOLDING, makeEngine, run, runUntil } fr
 import { assessClearanceSafety } from './conflicts';
 import { computeScore, SCORE_WEIGHTS } from './scoring';
 import { createTestAirport } from './__fixtures__/testAirport';
+import { createEngine } from './engine';
+import { loadKacy } from '../airport';
+import { dist } from './geo';
 
 const airport = createTestAirport();
 
@@ -203,5 +206,33 @@ describe('scoring formula', () => {
     expect(s.correctClearances).toBe(1);
     expect(s.communicationErrors).toBe(2);
     expect(s.score).toBe(98); // 100 - 2*2 + 2
+  });
+});
+
+describe('hold-short queue on the ground (real KACY, runway 31 from B)', () => {
+  it('an A320 taxiing up behind a stopped C172 at the hold line stops a following distance back and raises no GROUND_PROXIMITY alert', () => {
+    const e = createEngine({
+      airport: loadKacy(), readbackErrorRate: 0, utcStartMs: Date.UTC(2026, 9, 17, 16, 0, 0),
+      scenario: {
+        id: 'q', name: 'q', description: 'q', mode: 'training', seed: 5,
+        weather: { source: 'simulated', windDirDeg: 310, windSpeedKt: 6, visibilitySm: 10, clouds: [], temperatureC: 15, dewpointC: 5, altimeterInHg: 29.92, phenomena: [], flightCategory: 'VFR' },
+        activeRunways: { departing: ['31'], landing: ['31'] }, controllerPositions: ['TWR', 'GND'], playerPositions: ['GND'],
+        spawns: [
+          HOLDING('N451NL', 'HP13-31-B-2', '31', 'C172', 'TWR'),
+          { atSec: 0, callsign: 'AAL1727', type: 'A320', flightRules: 'IFR', isDeparture: true, initialFrequencyId: 'GND', start: { kind: 'parked', parkingId: 'GATE-1' } },
+        ],
+      },
+    });
+    run(e, 3);
+    const [a, c] = [find(e, 'AAL1727'), find(e, 'N451NL')];
+    expect(e.applyCommand(cmd('TAXI', 'AAL1727', { destination: 'RWY31', runwayEnd: '31', route: [] }), { position: 'GND' }).status).toBe('accepted');
+    let minGap = Infinity;
+    for (let i = 0; i < 400; i++) {
+      run(e, 1);
+      minGap = Math.min(minGap, dist(a.pos, c.pos));
+    }
+    expect(e.getState().conflicts.filter((x) => x.kind === 'GROUND_PROXIMITY')).toHaveLength(0);
+    expect(minGap).toBeGreaterThan(1.5 * 37.6 + 20 - 5); // the taxi model's following distance
+    expect(a.groundSpeedKt).toBeLessThan(1);
   });
 });

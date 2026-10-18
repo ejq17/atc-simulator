@@ -1,6 +1,6 @@
 import { applyRunway, cmdHit, makeDraft, type Draft, type Rule } from './draft';
-import { parseOneTaxiway, parseParking, parseRunway, parseTaxiways, runwayAfter } from './entities';
-import { isOneOf, seq, skipWords, txt, type Toks } from './match';
+import { makeRunwayRef, parseOneTaxiway, parseParking, parseRunway, parseTaxiways, runwayAfter, type RunwayParse } from './entities';
+import { intAt, isOneOf, seq, skipWords, txt, type Toks } from './match';
 
 const finishRunway = (d: Draft, t: Toks, at: number): number => {
   const r = runwayAfter(t, at);
@@ -33,21 +33,46 @@ export const ruleLineUp: Rule = (t, i) => {
   return cmdHit(finishRunway(d, t, j), d);
 };
 
-/** "hold short [of] runway N | taxiway X" */
-export const ruleHoldShort: Rule = (t, i) => {
+/** "hold short [of] runway N | N | taxiway X [on|at taxiway Y]" */
+export const makeHoldShortRule = (runwayEnds?: readonly string[]): Rule => (t, i) => {
   const j = seq(t, i, 'hold short|shorts of|at|on? the?');
   if (j < 0) return null;
   const d = makeDraft('HOLD_SHORT');
-  const end = holdShortTarget(d, t, j);
+  const end = holdShortTarget(d, t, j, runwayEnds);
   return cmdHit(end, d);
 };
+export const ruleHoldShort: Rule = makeHoldShortRule();
 
-/** Parse the object of a hold-short instruction into `d`. Returns the end index. */
-export function holdShortTarget(d: Draft, t: Toks, j: number): number {
-  const rw = parseRunway(t, j);
+const stripZero = (e: string): string => e.replace(/^0+(?=\d)/, '').toUpperCase();
+
+/**
+ * A runway named without the word "runway" inside a hold-short object ("hold short of 31 on Bravo"):
+ * a bare 1-2 digit number (optionally with left|right|center | L|R|C) that is an end of this airport.
+ * Needs the airport's runway ends, otherwise a bare number is never taken as a runway.
+ */
+function bareRunway(t: Toks, j: number, runwayEnds?: readonly string[]): RunwayParse | null {
+  const digits = intAt(t, j);
+  if (!runwayEnds || digits === null || digits.length > 2) return null;
+  const ends = new Set(runwayEnds.map(stripZero));
+  const w = txt(t, j + 1);
+  const spoken = w === 'left' || w === 'right' || w === 'center' ? w[0].toUpperCase()
+    : t[j + 1]?.kind === 'letter' && (w === 'l' || w === 'r' || w === 'c') && !isOneOf(t, j + 2, ['heading', 'turn']) ? w.toUpperCase() : '';
+  for (const suffix of spoken ? [spoken, ''] : ['']) {
+    const ref = makeRunwayRef(digits, suffix);
+    if (ref && ends.has(stripZero(ref.end))) return { ok: true, ref, next: j + 1 + (suffix ? 1 : 0) };
+  }
+  return null;
+}
+
+/** Parse the object of a hold-short instruction into `d`. Returns the end index (== j when no target was found). */
+export function holdShortTarget(d: Draft, t: Toks, j: number, runwayEnds?: readonly string[]): number {
+  const rw = parseRunway(t, j) ?? bareRunway(t, j, runwayEnds);
   if (rw) {
     if (rw.ok) applyRunway(d, rw.ref); else { d.issues.push(rw.reason); d.unknownIds++; }
-    return rw.next;
+    // "... runway 31 on Bravo": where to hold. No field carries it, so it is consumed (not an unrecognised word).
+    const q = seq(t, rw.next, 'on|at taxiway?');
+    const tw = q >= 0 ? parseOneTaxiway(t, q) : null;
+    return tw ? tw.next : rw.next;
   }
   const tw = parseOneTaxiway(t, skipWords(t, j, ['taxiway', 'on', 'of', 'the'] as const));
   if (tw) { d.fields.holdShort = [tw.id]; return tw.next; }
@@ -94,7 +119,7 @@ export const ruleCross: Rule = (t, i) => {
  * The body of a taxi instruction after its verb (at `i`): "[to] runway N | ramp | parking | <taxiway> ... [via A B] [hold short of ...]".
  * Returns the end index. `taxiways` (the airport's) decides whether a lone "v" is taxiway V or a misheard "via".
  */
-function parseTaxiBody(d: Draft, t: Toks, i: number, taxiways?: readonly string[]): number {
+function parseTaxiBody(d: Draft, t: Toks, i: number, taxiways?: readonly string[], runwayEnds?: readonly string[]): number {
   const route: string[] = [];
   const holds: string[] = [];
   let end = i;
@@ -113,8 +138,14 @@ function parseTaxiBody(d: Draft, t: Toks, i: number, taxiways?: readonly string[
     const hs = seq(t, j, 'hold short|shorts of|at|on? the?');
     if (hs >= 0) {
       const h = makeDraft('HOLD_SHORT');
-      const e = holdShortTarget(h, t, hs);
-      if (e === hs) break;
+      const e = holdShortTarget(h, t, hs, runwayEnds);
+      if (e === hs) {
+        // A hold-short clause whose point could not be read must not pass as a plain taxi: the clause is consumed
+        // and flagged, requirements.ts counts it as a missing entity, so the engine asks for a say-again.
+        d.holdShortUnparsed = true;
+        end = j = hs;
+        continue;
+      }
       holds.push(...(h.fields.holdShort ?? []));
       d.issues.push(...h.issues); d.unknownIds += h.unknownIds;
       end = j = e;
@@ -150,31 +181,31 @@ function parseTaxiBody(d: Draft, t: Toks, i: number, taxiways?: readonly string[
 }
 
 /** "taxi [to] runway N | ramp | parking | <taxiway> ... [via A B] [hold short of ...]" */
-export const makeTaxiRule = (taxiways?: readonly string[]): Rule => (t, i) => {
+export const makeTaxiRule = (taxiways?: readonly string[], runwayEnds?: readonly string[]): Rule => (t, i) => {
   if (txt(t, i) !== 'taxi') return null;
   const d = makeDraft('TAXI');
-  return cmdHit(parseTaxiBody(d, t, i + 1, taxiways), d);
+  return cmdHit(parseTaxiBody(d, t, i + 1, taxiways, runwayEnds), d);
 };
 export const ruleTaxi: Rule = makeTaxiRule();
 
 /** "continue taxiing [to runway N via ...]": the taxi clearance in force resumes from a hold short of a taxiway. */
-export const makeContinueTaxiRule = (taxiways?: readonly string[]): Rule => (t, i) => {
+export const makeContinueTaxiRule = (taxiways?: readonly string[], runwayEnds?: readonly string[]): Rule => (t, i) => {
   const j = seq(t, i, 'continue taxi|taxiing');
   if (j < 0) return null;
   const d = makeDraft('TAXI');
-  const end = parseTaxiBody(d, t, j, taxiways);
+  const end = parseTaxiBody(d, t, j, taxiways, runwayEnds);
   if (!d.fields.destination) d.fields.destination = 'CONTINUE';
   return cmdHit(end, d);
 };
 
 /** "cleared to the terminal via bravo": not taxi phraseology (7110.65 3-7-2 is "taxi to ..."), taken as a taxi to parking and marked non-standard. */
-export const makeClearedToParkingRule = (taxiways?: readonly string[]): Rule => (t, i) => {
+export const makeClearedToParkingRule = (taxiways?: readonly string[], runwayEnds?: readonly string[]): Rule => (t, i) => {
   const j = seq(t, i, 'cleared|clear to? the?');
   if (j < 0 || !parseParking(t, j)) return null;
   const d = makeDraft('TAXI');
   d.nonstandard++;
   d.issues.push('non-standard phraseology: "cleared to <parking>" taken as "taxi to <parking>"');
-  return cmdHit(parseTaxiBody(d, t, j, taxiways), d);
+  return cmdHit(parseTaxiBody(d, t, j, taxiways, runwayEnds), d);
 };
 
 /** "cancel [taxi]": there is no cancel instruction for ground traffic; taken as "hold position" (non-standard). */

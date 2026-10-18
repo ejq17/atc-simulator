@@ -1,23 +1,30 @@
 /**
  * Loads an FAA chart PDF into pdf.js.
  *
- * Order: (1) the local backend proxy `/api/charts/pdf?url=...` (the only way a
- * browser can get these files, see below); (2) a direct fetch of the official
- * aeronav.faa.gov URL as a fallback.
+ * Order: (1) a same-origin file bundled at build time, `${BASE_URL}charts/<ICAO>/<file>.pdf`
+ * (`scripts/fetch-charts.ts` downloads them; FAA d-TPP charts are US government public domain);
+ * (2) the local backend proxy `/api/charts/pdf?url=...` (skipped on the static build, which has no backend);
+ * (3) a direct fetch of the official aeronav.faa.gov URL.
  *
  * CORS finding (curl, 2026-10-16): aeronav.faa.gov answers GET/HEAD/OPTIONS with
- * HTTP 200 but sends NO Access-Control-Allow-Origin header, so (2) is blocked by
+ * HTTP 200 but sends NO Access-Control-Allow-Origin header, so (3) is blocked by
  * the browser unless the page runs somewhere CORS is not enforced. It is kept
- * as a fallback because it costs nothing and may work in a future hosting setup.
+ * as a last resort because it costs nothing.
  *
  * pdf.js is imported lazily so it stays out of the main bundle until a chart is
  * opened.
  */
 import type { PDFDocumentProxy } from 'pdfjs-dist';
+import { baseUrl, isStaticHosting } from '../hosting';
 
 export const DEFAULT_PROXY_BASE = '/api/charts/pdf';
 
-export type ChartLoadVia = 'proxy' | 'direct';
+export type ChartLoadVia = 'bundled' | 'proxy' | 'direct';
+
+/** Same-origin URL of a chart PDF downloaded at build time (honours the Vite base path, e.g. /atc-simulator/). */
+export function bundledChartUrl(icao: string, pdfName: string): string {
+  return `${baseUrl()}charts/${encodeURIComponent(icao.toUpperCase())}/${encodeURIComponent(pdfName)}`;
+}
 
 export interface LoadedChart {
   doc: PDFDocumentProxy;
@@ -29,12 +36,17 @@ export class ChartLoadError extends Error {
   readonly backendDown: boolean;
   readonly proxyDetail: string;
   readonly directDetail: string;
-  constructor(message: string, backendDown: boolean, proxyDetail: string, directDetail: string) {
+  readonly bundledDetail: string;
+  /** True on the static (GitHub Pages) build, where there is no backend to start. */
+  readonly staticHosting: boolean;
+  constructor(message: string, backendDown: boolean, proxyDetail: string, directDetail: string, bundledDetail = 'not attempted', staticHosting = false) {
     super(message);
     this.name = 'ChartLoadError';
     this.backendDown = backendDown;
     this.proxyDetail = proxyDetail;
     this.directDetail = directDetail;
+    this.bundledDetail = bundledDetail;
+    this.staticHosting = staticHosting;
   }
 }
 
@@ -110,22 +122,36 @@ export async function loadChartPdf(
   pdfUrl: string,
   signal: AbortSignal,
   proxyBase: string = DEFAULT_PROXY_BASE,
+  /** Same-origin bundled copy (see bundledChartUrl); omit to skip that step. */
+  bundledUrl?: string,
 ): Promise<LoadedChart> {
   const lib = await getPdfJs();
   if (signal.aborted) throw new DOMException('aborted', 'AbortError');
 
-  const viaProxy = await fetchPdfBytes(proxyUrlFor(pdfUrl, proxyBase), signal);
+  const staticHosting = isStaticHosting();
   let bytes: ArrayBuffer | null = null;
-  let via: ChartLoadVia = 'proxy';
-  let proxyDetail = '';
+  let via: ChartLoadVia = 'bundled';
+  let bundledDetail = 'not attempted';
+  let proxyDetail = staticHosting ? 'no backend on this hosting' : 'not attempted';
   let directDetail = 'not attempted';
   let backendDown = false;
 
-  if (viaProxy.ok) {
-    bytes = viaProxy.bytes;
-  } else {
-    proxyDetail = viaProxy.detail;
-    backendDown = viaProxy.down;
+  if (bundledUrl) {
+    const bundled = await fetchPdfBytes(bundledUrl, signal);
+    if (bundled.ok) bytes = bundled.bytes;
+    else bundledDetail = bundled.detail;
+  }
+  if (!bytes && !staticHosting) {
+    const viaProxy = await fetchPdfBytes(proxyUrlFor(pdfUrl, proxyBase), signal);
+    if (viaProxy.ok) {
+      bytes = viaProxy.bytes;
+      via = 'proxy';
+    } else {
+      proxyDetail = viaProxy.detail;
+      backendDown = viaProxy.down;
+    }
+  }
+  if (!bytes) {
     const direct = await fetchPdfBytes(pdfUrl, signal);
     if (direct.ok) {
       bytes = direct.bytes;
@@ -137,12 +163,16 @@ export async function loadChartPdf(
 
   if (!bytes) {
     throw new ChartLoadError(
-      backendDown
-        ? 'The chart proxy is not responding, and the browser cannot fetch the FAA PDF directly.'
-        : `The chart could not be downloaded: ${proxyDetail}`,
+      staticHosting
+        ? 'This chart is not bundled with this build, and the browser cannot fetch the FAA PDF directly.'
+        : backendDown
+          ? 'The chart proxy is not responding, and the browser cannot fetch the FAA PDF directly.'
+          : `The chart could not be downloaded: ${proxyDetail}`,
       backendDown,
       proxyDetail,
       directDetail,
+      bundledDetail,
+      staticHosting,
     );
   }
 
@@ -163,6 +193,8 @@ export async function loadChartPdf(
       false,
       proxyDetail,
       directDetail,
+      bundledDetail,
+      staticHosting,
     );
   } finally {
     signal.removeEventListener('abort', onAbort);

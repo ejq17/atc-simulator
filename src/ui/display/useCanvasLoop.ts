@@ -22,11 +22,13 @@ export function useCanvasLoop(draw: (ctx: CanvasRenderingContext2D, size: Canvas
     if (!canvas || !box) return;
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
+    // The canvas may live in a pop-out window: size against THAT window's pixel ratio and animate on its frame clock.
+    const win = box.ownerDocument.defaultView ?? window;
     let raf = 0;
     let alive = true;
 
     const fit = () => {
-      const dpr = Math.min(2, window.devicePixelRatio || 1);
+      const dpr = Math.min(2, win.devicePixelRatio || 1);
       const r = box.getBoundingClientRect();
       const width = Math.max(1, Math.floor(r.width));
       const height = Math.max(1, Math.floor(r.height));
@@ -40,11 +42,12 @@ export function useCanvasLoop(draw: (ctx: CanvasRenderingContext2D, size: Canvas
       }
     };
     fit();
-    const ro = new ResizeObserver(fit);
+    const ro = new (win.ResizeObserver ?? ResizeObserver)(fit);
     ro.observe(box);
 
     const loop = (t: number) => {
       if (!alive) return;
+      if (Math.min(2, win.devicePixelRatio || 1) !== sizeRef.current.dpr) fit(); // moved to a monitor with another pixel ratio
       const s = sizeRef.current;
       ctx.setTransform(s.dpr, 0, 0, s.dpr, 0, 0);
       try {
@@ -52,12 +55,12 @@ export function useCanvasLoop(draw: (ctx: CanvasRenderingContext2D, size: Canvas
       } catch (err) {
         console.error('[ui] canvas draw failed', err);
       }
-      raf = requestAnimationFrame(loop);
+      raf = win.requestAnimationFrame(loop);
     };
-    raf = requestAnimationFrame(loop);
+    raf = win.requestAnimationFrame(loop);
     return () => {
       alive = false;
-      cancelAnimationFrame(raf);
+      win.cancelAnimationFrame(raf);
       ro.disconnect();
     };
   }, []);

@@ -42,7 +42,7 @@ export function DebriefScreen() {
 
   return (
     <div className="atc-grid-bg h-full overflow-y-auto" data-testid="debrief-screen">
-      <div className="mx-auto flex max-w-[1180px] flex-col gap-6 px-6 py-8">
+      <div className="mx-auto flex max-w-[1180px] flex-col gap-6 px-4 py-6 sm:px-6 sm:py-8">
         <header className="flex flex-wrap items-end justify-between gap-4 border-b border-atc-border pb-5">
           <div>
             <div className="font-sans text-[11px] uppercase tracking-[0.3em] text-atc-cyan">Session debrief</div>

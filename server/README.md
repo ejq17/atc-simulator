@@ -1,5 +1,8 @@
 # Local backend (`server/`)
 
+Optional for local use only: the static GitHub Pages build does not have it (see the README, "Deploying"), so Deepgram and live weather
+are unavailable there, and charts come from files bundled by `npm run fetch-charts`.
+
 Tiny Node `http` server (no framework, no npm dependencies) used for two things only:
 proxying/caching Aviation Weather Center (AWC) data, and the Deepgram token endpoint.
 Secrets stay here; the browser never sees them.

@@ -1,5 +1,4 @@
 import { useEffect, useRef } from 'react';
-import type { PointerEvent as RPointerEvent } from 'react';
 import { OSM_ATTRIBUTION } from '../../airport';
 import { useSimStore } from '../store/simStore';
 import { useUiStore, viewBus } from '../store/uiStore';
@@ -10,6 +9,7 @@ import { buildSurfaceStatic } from './surfaceStatic';
 import { fitBounds, panBy, zoomAt } from './viewTransform';
 import type { View } from './viewTransform';
 import { hitTestAircraft } from './hitTest';
+import { attachGestures } from './pointerGestures';
 import type { Frame } from './frame';
 import { LayerMenu, OverlayBar, OVL_BTN } from './DisplayChrome';
 import { lerp } from '../lib/geom';
@@ -24,7 +24,6 @@ let saved: { session: unknown; view: View } | null = null;
 export function SurfaceDisplay() {
   const viewRef = useRef<View>({ cx: 0, cy: 0, scale: 0.3, width: 1, height: 1 });
   const fitted = useRef(false);
-  const drag = useRef<{ x: number; y: number; moved: number; id: number } | null>(null);
   const layers = useUiStore((s) => s.surfaceLayers);
   const toggle = useUiStore((s) => s.toggleSurfaceLayer);
   const follow = useUiStore((s) => s.follow);
@@ -104,35 +103,24 @@ export function SurfaceDisplay() {
     return () => el.removeEventListener('wheel', onWheel);
   }, [canvasRef]);
 
-  const onDown = (e: RPointerEvent<HTMLCanvasElement>) => {
-    (e.target as HTMLElement).setPointerCapture(e.pointerId);
-    drag.current = { x: e.clientX, y: e.clientY, moved: 0, id: e.pointerId };
-  };
-  const onMove = (e: RPointerEvent<HTMLCanvasElement>) => {
-    const d = drag.current;
-    if (!d) return;
-    const dx = e.clientX - d.x;
-    const dy = e.clientY - d.y;
-    d.moved += Math.abs(dx) + Math.abs(dy);
-    d.x = e.clientX;
-    d.y = e.clientY;
-    if (d.moved > 4) {
-      viewRef.current = panBy(viewRef.current, dx, dy);
-      if (followRef.current) setFollow(false);
-    }
-  };
-  const onUp = (e: RPointerEvent<HTMLCanvasElement>) => {
-    const d = drag.current;
-    drag.current = null;
-    if (!d || d.moved > 4) return;
-    const session = useSimStore.getState().session;
-    if (!session) return;
-    const r = (e.target as HTMLElement).getBoundingClientRect();
-    const state = session.engine.getState();
-    const now = performance.now();
-    const frame: Frame = { state, nowMs: now, pose: (ac) => session.buffer.sample(ac, now) };
-    useSimStore.getState().selectAircraft(hitTestAircraft(frame, viewRef.current, e.clientX - r.left, e.clientY - r.top));
-  };
+  // One finger / mouse drag pans, two fingers pinch-zoom, a tap selects (Pointer Events; works the same in a pop-out window).
+  useEffect(() => {
+    const el = canvasRef.current;
+    if (!el) return;
+    return attachGestures(el, {
+      pan: (dx, dy) => { viewRef.current = panBy(viewRef.current, dx, dy); },
+      zoom: (factor, anchor) => { viewRef.current = zoomAt(viewRef.current, factor, anchor); },
+      moved: () => { if (followRef.current) setFollow(false); },
+      tap: (x, y, pointerType) => {
+        const session = useSimStore.getState().session;
+        if (!session) return;
+        const state = session.engine.getState();
+        const now = performance.now();
+        const frame: Frame = { state, nowMs: now, pose: (ac) => session.buffer.sample(ac, now) };
+        useSimStore.getState().selectAircraft(hitTestAircraft(frame, viewRef.current, x, y, pointerType === 'touch' ? 28 : undefined));
+      },
+    });
+  }, [canvasRef, setFollow]);
 
   return (
     <div ref={containerRef} className="relative h-full w-full overflow-hidden bg-[#07090c]" data-testid="surface-display">
@@ -141,24 +129,20 @@ export function SurfaceDisplay() {
         data-testid="surface-canvas"
         aria-label="Airport surface display"
         className="absolute inset-0 block cursor-crosshair touch-none"
-        onPointerDown={onDown}
-        onPointerMove={onMove}
-        onPointerUp={onUp}
-        onPointerCancel={() => (drag.current = null)}
       />
-      <OverlayBar className="left-3 top-3">
+      <OverlayBar className="left-2 top-2 flex-wrap sm:left-3 sm:top-3">
         <LayerMenu layers={layers} labels={LAYER_LABELS} onToggle={toggle} />
         <button type="button" className={`${OVL_BTN} ${follow ? '!border-atc-cyan !text-atc-cyan' : ''}`} aria-pressed={follow} onClick={() => setFollow(!follow)} title="Keep the selected aircraft centred">
           Follow
         </button>
         <button type="button" className={OVL_BTN} onClick={() => doFit()} title="Fit the whole airport">Fit</button>
       </OverlayBar>
-      <OverlayBar className="bottom-3 right-3 flex-col items-end !gap-1.5">
+      <OverlayBar className="bottom-2 right-2 max-w-[calc(100%-1rem)] flex-col items-end !gap-1.5 sm:bottom-3 sm:right-3">
         <div className="flex gap-1">
           <button type="button" className={OVL_BTN} aria-label="Zoom in" onClick={() => viewBus.emit({ type: 'zoom', factor: 1.4 })}>+</button>
           <button type="button" className={OVL_BTN} aria-label="Zoom out" onClick={() => viewBus.emit({ type: 'zoom', factor: 1 / 1.4 })}>−</button>
         </div>
-        <span className="bg-atc-bg/70 px-1.5 py-0.5 text-[9.5px] text-atc-muted">{OSM_ATTRIBUTION}</span>
+        <span className="max-w-full truncate bg-atc-bg/70 px-1.5 py-0.5 text-[9.5px] text-atc-muted">{OSM_ATTRIBUTION}</span>
       </OverlayBar>
     </div>
   );

@@ -11,6 +11,12 @@ This is entertainment and learning software. It is **not** ATC training and must
 be used for real-world operations. Nothing here connects to real radio frequencies,
 ADS-B, or live traffic.
 
+**Live demo:** https://ejq17.github.io/atc-simulator/ (static GitHub Pages build; no backend). On the demo, **Deepgram is unavailable** (it
+needs the local backend, `npm run server`), **live weather is unavailable** (aviationweather.gov sends no CORS headers, so a browser page
+cannot read it; sessions use the simulated presets and the top bar shows **WX SIMULATED**), and the **FAA charts are bundled at build time**
+from the public-domain d-TPP files. Speech input defaults to the browser's Web Speech API; **Local Whisper** also works there (the model comes from
+the Hugging Face CDN, the ONNX runtime from jsDelivr). For everything, run it locally (Quick start below).
+
 ## What is real
 
 Each airport is built from its own verified source files by one script (`scripts/build-airport.ts <ICAO>`); the table
@@ -51,7 +57,8 @@ spots other than the ten OSM gate stands are synthetic positions inside the real
 aircraft performance is a simplified model (C172 and A320 only), and 32 short OSM apron
 lanes could not be matched to a charted identifier. See `data/sources/README.md` and
 `src/airport/kacy/build-report.md`. The OSM-derived layer is © OpenStreetMap
-contributors, ODbL 1.0.
+contributors, ODbL 1.0. FAA data (NASR, d-TPP charts, MVA) is a US government work in the public domain. The simulator code is MIT
+licensed (`LICENSE`); see `CONTRIBUTING.md` to help out.
 
 ## Quick start
 
@@ -89,11 +96,43 @@ see `.env.example`; about $0.0048 per audio minute at the time of writing). The 
 reaches the browser: the backend mints short-lived tokens. No recordings are stored.
 Pilot voices use the browser's speech synthesis with per-aircraft voice/pitch variation.
 
+## Deploying (GitHub Pages)
+
+`.github/workflows/deploy.yml` runs on every push to `main`: `npm ci`, typecheck, tests, `npm run fetch-charts`, then
+`GITHUB_PAGES=1 npm run build`, and publishes `dist/` with `actions/deploy-pages`. In the repository settings set
+**Pages > Source: GitHub Actions** once.
+
+* `GITHUB_PAGES=1` makes `vite.config.ts` use the base path `/atc-simulator/` (override with `VITE_BASE`, e.g. `VITE_BASE=/` for a custom domain)
+  and sets `VITE_STATIC_HOSTING=1`, which tells the app there is no backend: it skips `/api` and the localhost backend, shows "needs the local
+  backend (npm run server)" for Deepgram and live weather, and loads charts from the bundled files. The build also writes `dist/404.html`
+  (a copy of `index.html`) so deep links open the app.
+* `npm run fetch-charts` (`scripts/fetch-charts.ts`) downloads every d-TPP PDF the chart viewer references (about 8 MB for KACY and KMHT)
+  into `public/charts/<ICAO>/`. The files are git-ignored and fetched fresh in CI. Chart loading order: bundled file, then the local `/api` proxy
+  (not on Pages), then the direct FAA URL. d-TPP cycles last 28 days: after a new cycle the chart index (`data/sources/*-procedures.json`) must be
+  refreshed or the bundled charts go out of date.
+* Try the Pages build locally: `GITHUB_PAGES=1 npm run build && npm run fetch-charts && node scripts/serve-pages.mjs` then open
+  http://localhost:4173/atc-simulator/ (`npm run preview:pages` serves an existing `dist/`).
+
+## Panels, pop-out windows and multiple monitors
+
+The simulator screen is built from panels (Surface, Radar, Tower, Aircraft, Strips, Details, Comms, Alerts, Radio, Charts, Navaids,
+ATIS, Weather, Settings) arranged in three regions: the main display, a right column and a bottom row. The **Layout** menu in the
+top bar has presets (**Tower cab**, **Ground**, **TRACON**, **Everything**), a show / hide and region choice per panel, and
+**Reset**; the column and row splitters drag. Every panel (and every drawer) has a **pop-out** button that opens it in its own
+browser window, so the radar can sit on one monitor, the tower view on another and the strips and radio on a third. Pop-outs share
+the one running simulation (same page, no copying), keyboard shortcuts and push-to-talk work while a pop-out has focus, and a panel
+returns to the main window when its window is closed. The layout and the open windows are remembered; after a reload, **Reopen
+windows** brings them back (browsers only open windows from a click, so press it once per window). Keep the main window visible:
+browsers throttle hidden windows and the clock runs there.
+
+Below 1024 px (tablets and phones) the shell collapses to a full-screen display with a bottom tab bar (Display, Aircraft, Comms,
+Radio), a large push-to-talk bar, and pinch / drag / tap on the canvases. See `src/ui/README.md` for the details.
+
 ## Tower view
 
 The **Tower 3** tab is a 3D view from the control tower cab (three.js, loaded only when first opened, so Surface and Radar start-up is
 unchanged). Runways with markings and numbers, taxiways with centrelines, hold lines, taxiway letters, aprons and buildings are all
-built from the airport data; aircraft are low-poly models scaled from `src/sim/performance.ts`, with callsign tags that stay readable out to
+built from the airport data; aircraft are procedural 3D models per type family (narrowbody, regional jet, bizjet, turboprop, GA high/low wing) sized from `src/sim/performance.ts`, with airline liveries by callsign, retracting gear, attitude and nav/strobe/beacon/landing lights (see `src/ui/tower/README.md`), and callsign tags that stay readable out to
 the radar range. The sky follows the simulated UTC (day, dusk, night with runway, taxiway and aircraft lights), fog follows visibility, and a low
 BKN/OVC ceiling draws an overcast deck. KACY has no tower in the OSM extract, so the cab is placed at the centroid of the terminal building
 (eye height 30 m, an assumption); the view says so in its corner label.
@@ -118,6 +157,7 @@ npm test          # vitest: engine, parser, airport data, weather, charts, voice
 npm run test:e2e  # playwright: 24 browser flows incl. Whisper, Web Speech (real Chrome) and Deepgram-protocol voice tests
 npm run typecheck
 npm run lint
+npm run fetch-charts                    # download the FAA chart PDFs into public/charts (used by the static build)
 npm run build:airport -- KMHT           # regenerate an airport dataset from data/sources (KACY or KMHT); also: npx tsx scripts/build-airport.ts KACY
 npx tsx scripts/build-kacy-airport.ts   # same as build-airport.ts KACY (kept)
 ```

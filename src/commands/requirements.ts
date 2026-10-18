@@ -1,11 +1,17 @@
 import type { Draft } from './draft';
 
+/** A taxi whose hold-short clause has no readable point is incomplete (never executed as a plain taxi). */
+const unreadHoldShort = (d: Draft): string[] => (d.holdShortUnparsed ? ['missing hold short point (runway or taxiway)'] : []);
+
 /** Entities each instruction needs before the engine can act on it. Returns issue strings. */
 export function missingRequired(d: Draft): string[] {
   const f = d.fields;
   switch (d.kind) {
-    case 'TAXI': return f.destination || f.route?.length ? [] : ['missing taxi destination or route'];
-    case 'TAXI_TO_PARKING': return f.destination ? [] : ['missing parking destination'];
+    case 'TAXI': return [
+      ...(f.destination || f.route?.length ? [] : ['missing taxi destination or route']),
+      ...unreadHoldShort(d),
+    ];
+    case 'TAXI_TO_PARKING': return [...(f.destination ? [] : ['missing parking destination']), ...unreadHoldShort(d)];
     case 'HOLD_SHORT': return f.holdShort?.length ? [] : ['missing hold short point (runway or taxiway)'];
     case 'CROSS_RUNWAY': return f.crossRunwayId ? [] : ['missing runway'];
     case 'LINE_UP_AND_WAIT':

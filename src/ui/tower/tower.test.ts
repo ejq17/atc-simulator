@@ -6,7 +6,12 @@ import {
   samplePolyline, taxiwaySigns, toScene,
 } from './geometry';
 import type { MeshData } from './geometry';
-import { aircraftDims, aircraftParts, billboardWorldHeight, classifyAircraft, pitchFromVerticalSpeed, placeAircraft, withinRange } from './aircraftModel';
+import {
+  aircraftDims, bankFromTurnRate, billboardWorldHeight, classifyAircraft, familyOf, gearDown, lightState, modelPitchRad, pitchFromVerticalSpeed, placeAircraft, withinRange,
+} from './aircraftModel';
+import type { ModelFamily } from './aircraftModel';
+import { buildGeometry, countTriangles, createAircraftFactory } from './aircraftMeshes';
+import { LIVERIES, airlinePrefix, finPaint, fuselagePaint, liveryFor } from './liveries';
 import {
   FOV_BINOCULARS, FOV_MAX, FOV_MIN, angleDiff, applyDrag, applyZoom, bearingAndElevation, compassTicks, followStep, horizontalFov, initialCam, lookAtPoint,
   lookDirection, snapToPoint, toMagnetic, toggleBinoculars,
@@ -206,10 +211,6 @@ describe('aircraft', () => {
     expect(c.lengthM).toBeCloseTo(8.3, 6);
     expect(a.wingspanM).toBeGreaterThan(30);
     expect(c.wingspanM).toBeGreaterThan(c.lengthM); // GA wings out-span the fuselage
-    expect(aircraftParts('A320').length).toBeGreaterThan(aircraftParts('C172').length - 3);
-    for (const p of aircraftParts('A320')) for (const v of p.pos) expect(Number.isFinite(v)).toBe(true);
-    const maxZ = Math.max(...aircraftParts('A320').map((p) => Math.abs(p.pos[2]) + (p.shape === 'box' ? p.size[2] : p.size[1]) / 2));
-    expect(maxZ).toBeLessThanOrEqual(a.lengthM * 0.6);
   });
   it('orients by heading: nose (-z) points along the heading', () => {
     const base = { onGround: true, verticalSpeedFpm: 0 };
@@ -418,5 +419,157 @@ describe('tower position', () => {
     const withTower = { ...kacy, buildings: [...(kacy as unknown as { buildings: unknown[] }).buildings, { id: 't', kind: 'hangar', name: 'ATCT Tower', polygon: [{ x: 0, y: 0 }, { x: 10, y: 0 }, { x: 10, y: 10 }] }] };
     expect(resolveTowerSite(withTower as never).source).toBe('named-building');
     expect(resolveTowerSite({ ...kacy, buildings: [] } as never).source).toBe('arp-fallback');
+  });
+});
+
+describe('aircraft families and models', () => {
+  const TYPES: [string, ModelFamily][] = [
+    ['A320', 'narrowbody'], ['B738', 'narrowbody'], ['E175', 'narrowbody'], ['CRJ9', 'regionalJet'], ['DH8D', 'turboprop'], ['C208', 'turbopropSingle'],
+    ['C25B', 'bizjet'], ['GLF4', 'bizjet'], ['C172', 'gaHigh'], ['PA28', 'gaLow'], ['SR22', 'gaLow'],
+  ];
+  it('maps types to families and keeps the sim class', () => {
+    for (const [t, f] of TYPES) expect(familyOf(t)).toBe(f);
+    expect(classifyAircraft('CRJ9')).toBe('airliner');
+    expect(classifyAircraft('DH8D')).toBe('airliner');
+    expect(classifyAircraft('C208')).toBe('ga');
+    expect(familyOf('ZZZZ')).toBe('gaHigh'); // unknown types fall back to the C172 performance entry
+  });
+  it('uses the real wingspan/length ratio of each type', () => {
+    const b738 = aircraftDims('B738'); // not in the performance table: real length 39.5 m
+    expect(b738.lengthM).toBeCloseTo(39.5, 6);
+    expect(b738.wingspanM).toBeCloseTo(35.8, 6);
+    expect(b738.heightM).toBeCloseTo(12.5, 6);
+    const crj = aircraftDims('CRJ9');
+    expect(crj.wingspanM / crj.lengthM).toBeCloseTo(24.9 / 36.4, 6);
+    expect(aircraftDims('A320').wingspanM).toBeCloseTo((37.6 * 35.8) / 37.57, 6);
+    expect(aircraftDims('C172').heightM).toBeCloseTo((8.3 * 2.72) / 8.28, 6);
+  });
+  it('builds every family without throwing, finite, within the triangle budget and the right size', () => {
+    const factory = createAircraftFactory();
+    for (const [t] of TYPES) {
+      const livery = liveryFor(t === 'C172' || t === 'PA28' || t === 'SR22' || t === 'C208' ? 'N123AB' : 'NKS123');
+      const built = buildGeometry(t, livery);
+      for (const g of [built.fuselage, built.airframe, built.gear]) {
+        const arr = g.getAttribute('position').array as Float32Array;
+        for (let i = 0; i < arr.length; i++) expect(Number.isFinite(arr[i])).toBe(true);
+      }
+      const m = factory.build(t, 'NKS123');
+      expect(m.triangles).toBeGreaterThan(300);
+      expect(m.triangles).toBeLessThan(3000);
+      expect(countTriangles(m.root)).toBe(m.triangles);
+      const d = aircraftDims(t);
+      built.fuselage.computeBoundingBox();
+      const box = built.fuselage.boundingBox!;
+      expect(box.max.z - box.min.z).toBeCloseTo(d.lengthM, 3);
+      built.airframe.computeBoundingBox();
+      expect(built.airframe.boundingBox!.max.x - built.airframe.boundingBox!.min.x).toBeGreaterThan(d.wingspanM * 0.95);
+      expect(built.airframe.boundingBox!.max.y).toBeLessThanOrEqual(d.heightM * 1.01);
+      expect(built.airframe.boundingBox!.min.y).toBeGreaterThanOrEqual(-0.01); // nothing below the ground
+      built.gear.computeBoundingBox();
+      expect(built.gear.boundingBox!.min.y).toBeGreaterThanOrEqual(-0.01);
+      expect(m.props.length).toBe(familyOf(t) === 'turboprop' ? 2 : ['gaHigh', 'gaLow', 'turbopropSingle'].includes(familyOf(t)) ? 1 : 0);
+    }
+    factory.dispose();
+  });
+  it('shares geometry between aircraft of one type and livery', () => {
+    const factory = createAircraftFactory();
+    const a = factory.build('A320', 'NKS100');
+    const b = factory.build('A320', 'NKS200');
+    const c = factory.build('A320', 'AAL300');
+    const geoOf = (m: typeof a) => (m.root.children[1] as unknown as { geometry: unknown }).geometry;
+    expect(geoOf(a)).toBe(geoOf(b));
+    expect(geoOf(a)).not.toBe(geoOf(c));
+    expect(a.root).not.toBe(b.root);
+    factory.dispose();
+  });
+  it('looks up liveries by airline prefix, registration and unknown prefix', () => {
+    expect(airlinePrefix('NKS451')).toBe('NKS');
+    expect(airlinePrefix('N723EJ')).toBeUndefined();
+    expect(liveryFor('NKS451')).toBe(LIVERIES.NKS);
+    expect(liveryFor('nks451').top).toBe(0xffd400); // Spirit yellow
+    expect(liveryFor('AAL1234')).toBe(LIVERIES.AAL);
+    expect(liveryFor('AAL1234').metalness).toBeGreaterThan(liveryFor('JBU12').metalness); // bare metal
+    for (const k of ['DAL', 'UAL', 'JBU', 'SWA', 'FFT', 'RPA', 'ENY', 'SKW']) expect(liveryFor(`${k}12`).id).toBe(k);
+    const generic = liveryFor('XYZ123');
+    expect(generic.top).toBe(0xf3f5f7);
+    expect(liveryFor('XYZ999').id).toBe(generic.id); // seeded by the prefix only
+    const ga = liveryFor('N723EJ');
+    expect(ga.id.startsWith('GA-')).toBe(true);
+    expect(liveryFor('N723EJ')).toEqual(ga); // deterministic by registration
+    const stripes = new Set(Array.from({ length: 60 }, (_, i) => liveryFor(`N${100 + i}AB`).id));
+    expect(stripes.size).toBeGreaterThan(3); // several cheat-line variants
+  });
+  it('paints the fuselage: Spirit yellow, window row, cockpit glass, red/white/blue American fin', () => {
+    const p = { style: 'airliner' as const, windows: 50 };
+    expect(fuselagePaint(LIVERIES.NKS, p, 0.5, 0.0)).toBe(0xffd400);
+    expect(fuselagePaint(LIVERIES.NKS, p, 0.5, -0.8)).toBe(0xffd400);
+    expect(fuselagePaint(LIVERIES.DAL, p, 0.6, -0.8)).toBe(0x12295a); // blue belly
+    expect(fuselagePaint(LIVERIES.NKS, p, 0.07, 0.4)).toBe(0x151a22); // cockpit glass
+    const win = new Set<number>();
+    for (let i = 0; i < 100; i++) win.add(fuselagePaint(LIVERIES.NKS, p, 0.3 + i * 0.0004, 0.33));
+    expect(win.has(0x151a22)).toBe(true);
+    expect(finPaint(LIVERIES.AAL, 0.1)).toBe(0x0d3b7a);
+    expect(finPaint(LIVERIES.AAL, 0.5)).toBe(0xf2f4f6);
+    expect(finPaint(LIVERIES.AAL, 0.95)).toBe(0xc4162e);
+    expect(finPaint(LIVERIES.JBU, 0.5)).toBe(0x0b2f78);
+  });
+  it('retracts the gear of airliners and bizjets above 200 ft AGL, never on fixed-gear types, and lowers it on final', () => {
+    const climb = { onGround: false, aglFt: 500, verticalSpeedFpm: 2000, phase: 'INITIAL_CLIMB' as const };
+    expect(gearDown('narrowbody', { ...climb, aglFt: 100 })).toBe(true);
+    expect(gearDown('narrowbody', climb)).toBe(false);
+    expect(gearDown('bizjet', climb)).toBe(false);
+    expect(gearDown('regionalJet', climb)).toBe(false);
+    expect(gearDown('turboprop', climb)).toBe(false);
+    expect(gearDown('gaHigh', climb)).toBe(true);
+    expect(gearDown('gaLow', climb)).toBe(true);
+    expect(gearDown('turbopropSingle', climb)).toBe(true);
+    expect(gearDown('narrowbody', { onGround: true, aglFt: 0, verticalSpeedFpm: 0, phase: 'TAXIING' })).toBe(true);
+    expect(gearDown('narrowbody', { onGround: false, aglFt: 1200, verticalSpeedFpm: -700, phase: 'FINAL' })).toBe(true);
+    expect(gearDown('narrowbody', { onGround: false, aglFt: 6000, verticalSpeedFpm: -700, phase: 'APPROACH' })).toBe(false);
+    expect(gearDown('narrowbody', { onGround: false, aglFt: 5000, verticalSpeedFpm: 0, phase: 'DEPARTURE' })).toBe(false);
+  });
+  it('pitches 3 degrees on final, 6 to 8 degrees climbing, and rotates on the roll', () => {
+    const deg = (r: number) => (r * 180) / Math.PI;
+    const base = { onGround: false, aglFt: 1000, groundSpeedKt: 140 };
+    expect(deg(modelPitchRad('A320', { ...base, verticalSpeedFpm: -700, phase: 'FINAL' }))).toBeCloseTo(3, 6);
+    const climb = deg(modelPitchRad('A320', { ...base, verticalSpeedFpm: 2500, phase: 'INITIAL_CLIMB' }));
+    expect(climb).toBeGreaterThanOrEqual(6);
+    expect(climb).toBeLessThanOrEqual(8);
+    const gaClimb = deg(modelPitchRad('C172', { ...base, groundSpeedKt: 75, verticalSpeedFpm: 700, phase: 'INITIAL_CLIMB' }));
+    expect(gaClimb).toBeGreaterThanOrEqual(6);
+    expect(gaClimb).toBeLessThanOrEqual(8);
+    expect(modelPitchRad('A320', { onGround: true, aglFt: 0, groundSpeedKt: 20, verticalSpeedFpm: 0, phase: 'TAXIING' })).toBe(0);
+    expect(modelPitchRad('A320', { onGround: true, aglFt: 0, groundSpeedKt: 100, verticalSpeedFpm: 0, phase: 'TAKEOFF_ROLL' })).toBe(0);
+    expect(deg(modelPitchRad('A320', { onGround: true, aglFt: 0, groundSpeedKt: 145, verticalSpeedFpm: 0, phase: 'TAKEOFF_ROLL' }))).toBeCloseTo(6, 6);
+  });
+  it('banks into a coordinated turn from the turn rate and caps the bank', () => {
+    expect(bankFromTurnRate(0, 140)).toBe(0);
+    const right = bankFromTurnRate(3, 140);
+    expect((right * 180) / Math.PI).toBeGreaterThan(10);
+    expect((right * 180) / Math.PI).toBeLessThan(30);
+    expect(bankFromTurnRate(-3, 140)).toBeCloseTo(-right, 9);
+    expect((bankFromTurnRate(60, 250) * 180) / Math.PI).toBeCloseTo(30, 6);
+    expect(bankFromTurnRate(3, 60)).toBeLessThan(right); // slower aircraft bank less at the same rate
+  });
+  it('drives the lights: dark in daylight, nav + beacon at night, strobes and landing lights by phase', () => {
+    const base = { onGround: true, aglFt: 0, phase: 'TAXIING' as const, seed: 0 };
+    const sample = (over: Partial<Parameters<typeof lightState>[0]>) => {
+      let nav = false, beacon = false, strobe = false, landing = false;
+      for (let ms = 0; ms < 1200; ms += 20) {
+        const s = lightState({ ...base, lightsOn: true, nowMs: ms, ...over });
+        nav = nav || s.nav; beacon = beacon || s.beacon; strobe = strobe || s.strobe; landing = landing || s.landing;
+      }
+      return { nav, beacon, strobe, landing };
+    };
+    expect(lightState({ ...base, lightsOn: false, nowMs: 0 })).toEqual({ nav: false, strobe: false, beacon: false, landing: false });
+    expect(sample({})).toEqual({ nav: true, beacon: true, strobe: false, landing: false }); // taxiing
+    expect(sample({ phase: 'PARKED' }).beacon).toBe(false);
+    expect(sample({ phase: 'TAKEOFF_ROLL' })).toEqual({ nav: true, beacon: true, strobe: true, landing: true });
+    expect(sample({ onGround: false, aglFt: 800, phase: 'FINAL' })).toEqual({ nav: true, beacon: true, strobe: true, landing: true });
+    expect(sample({ onGround: false, aglFt: 15000, phase: 'DEPARTURE' }).landing).toBe(false);
+    // the beacon flashes: on for part of the cycle only
+    const on = Array.from({ length: 60 }, (_, i) => lightState({ ...base, lightsOn: true, nowMs: i * 20 }).beacon);
+    expect(on.some((x) => x)).toBe(true);
+    expect(on.some((x) => !x)).toBe(true);
   });
 });

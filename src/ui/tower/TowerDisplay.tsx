@@ -8,6 +8,8 @@ import { OSM_ATTRIBUTION } from '../../airport';
 import { useSimStore } from '../store/simStore';
 import { useUiStore, viewBus } from '../store/uiStore';
 import { OverlayBar, OVL_BTN } from '../display/DisplayChrome';
+import { attachGestures } from '../display/pointerGestures';
+import { addWindowListener } from '../layout/windows';
 import { createTowerScene } from './towerScene';
 import type { TowerScene } from './towerScene';
 import { resolveTowerSite, CAB_EYE_HEIGHT_M } from './towerPosition';
@@ -35,7 +37,6 @@ export default function TowerDisplay() {
   const [follow, setFollowState] = useState(false);
   const [binoc, setBinoc] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const drag = useRef<{ x: number; y: number; moved: number } | null>(null);
   const sceneRef = useRef<TowerScene | null>(null);
   const radarRange = useUiStore((s) => s.radarRangeNm);
   const rangeRef = useRef(radarRange);
@@ -64,7 +65,9 @@ export default function TowerDisplay() {
     if (!overlay || !box || !sess || !site) return;
     // The GL canvas is created here, not by React: a canvas whose context was released on unmount (forceContextLoss) cannot get a new
     // context, and StrictMode runs mount, unmount, mount on the same element.
-    const canvas = document.createElement('canvas');
+    // The view may be popped out into its own window: use THAT window's document, pixel ratio and frame clock.
+    const win = box.ownerDocument.defaultView ?? window;
+    const canvas = box.ownerDocument.createElement('canvas');
     canvas.setAttribute('data-testid', 'tower-canvas');
     canvas.setAttribute('aria-label', 'Control tower 3D view');
     canvas.className = 'absolute inset-0 block cursor-grab touch-none active:cursor-grabbing';
@@ -99,7 +102,7 @@ export default function TowerDisplay() {
       const r = box.getBoundingClientRect();
       const nw = Math.max(1, Math.floor(r.width));
       const nh = Math.max(1, Math.floor(r.height));
-      const nr = Math.min(2, window.devicePixelRatio || 1);
+      const nr = Math.min(2, win.devicePixelRatio || 1);
       if (nw === w && nh === h && nr === ratio) return;
       w = nw; h = nh; ratio = nr;
       scene.resize(w, h, ratio);
@@ -111,7 +114,7 @@ export default function TowerDisplay() {
       overlay.style.height = `${h}px`;
     };
     fit();
-    const ro = new ResizeObserver(fit);
+    const ro = new (win.ResizeObserver ?? ResizeObserver)(fit);
     ro.observe(box);
     const ctx = overlay.getContext('2d');
 
@@ -158,7 +161,7 @@ export default function TowerDisplay() {
 
     const loop = (nowMs: number) => {
       if (!alive) return;
-      raf = requestAnimationFrame(loop);
+      raf = win.requestAnimationFrame(loop);
       const cur = useSimStore.getState().session;
       if (!cur || cur !== sess) return;
       try {
@@ -183,7 +186,7 @@ export default function TowerDisplay() {
         alive = false;
       }
     };
-    raf = requestAnimationFrame(loop);
+    raf = win.requestAnimationFrame(loop);
 
     const onWheel = (e: WheelEvent) => {
       e.preventDefault();
@@ -209,48 +212,23 @@ export default function TowerDisplay() {
         default:
       }
     };
-    window.addEventListener('keydown', onKey);
+    const offKeys = addWindowListener('keydown', onKey);
 
-    const onDown = (e: PointerEvent) => {
-      canvas.setPointerCapture(e.pointerId);
-      drag.current = { x: e.clientX, y: e.clientY, moved: 0 };
-    };
-    const onMove = (e: PointerEvent) => {
-      const d = drag.current;
-      if (!d) return;
-      const dx = e.clientX - d.x;
-      const dy = e.clientY - d.y;
-      d.moved += Math.abs(dx) + Math.abs(dy);
-      d.x = e.clientX;
-      d.y = e.clientY;
-      if (d.moved > 4) {
-        if (followRef.current) setFollow(false);
-        setCam(applyDrag(camRef.current, dx, dy, canvas.clientHeight || 600));
-      }
-    };
-    const onUp = (e: PointerEvent) => {
-      const d = drag.current;
-      drag.current = null;
-      if (!d || d.moved > 4) return;
-      const r = canvas.getBoundingClientRect();
-      useSimStore.getState().selectAircraft(scene.pick(e.clientX - r.left, e.clientY - r.top));
-    };
-    const onCancel = () => { drag.current = null; };
-    canvas.addEventListener('pointerdown', onDown);
-    canvas.addEventListener('pointermove', onMove);
-    canvas.addEventListener('pointerup', onUp);
-    canvas.addEventListener('pointercancel', onCancel);
+    // One finger / mouse drag looks around, a pinch zooms the field of view, a tap selects an aircraft.
+    const offGestures = attachGestures(canvas, {
+      pan: (dx, dy) => setCam(applyDrag(camRef.current, dx, dy, canvas.clientHeight || 600)),
+      zoom: (factor) => setCam(applyZoom(camRef.current, factor)),
+      moved: () => { if (followRef.current) setFollow(false); },
+      tap: (x, y) => useSimStore.getState().selectAircraft(scene.pick(x, y)),
+    });
 
     return () => {
       alive = false;
-      cancelAnimationFrame(raf);
+      win.cancelAnimationFrame(raf);
       ro.disconnect();
       canvas.removeEventListener('wheel', onWheel);
-      canvas.removeEventListener('pointerdown', onDown);
-      canvas.removeEventListener('pointermove', onMove);
-      canvas.removeEventListener('pointerup', onUp);
-      canvas.removeEventListener('pointercancel', onCancel);
-      window.removeEventListener('keydown', onKey);
+      offGestures();
+      offKeys();
       unsub();
       saved = { session: sess, cam: { ...camRef.current }, follow: followRef.current };
       sceneRef.current = null;
@@ -266,7 +244,7 @@ export default function TowerDisplay() {
       {error && (
         <div role="alert" className="absolute inset-0 z-20 flex items-center justify-center bg-atc-bg/90 p-6 text-center text-sm text-atc-amber" data-testid="tower-error">{error}</div>
       )}
-      <OverlayBar className="left-3 top-11">
+      <OverlayBar className="left-2 top-9 max-w-[calc(100%-1rem)] flex-wrap sm:left-3 sm:top-11">
         <button type="button" data-testid="tower-follow" className={`${OVL_BTN} ${follow ? '!border-atc-cyan !text-atc-cyan' : ''}`} aria-pressed={follow} onClick={() => setFollow(!follow)} title="Keep the selected aircraft in view (F)">
           Follow
         </button>
@@ -279,7 +257,7 @@ export default function TowerDisplay() {
           </button>
         ))}
       </OverlayBar>
-      <OverlayBar className="bottom-3 right-3 flex-col items-end !gap-1.5">
+      <OverlayBar className="bottom-2 right-2 max-w-[calc(100%-1rem)] flex-col items-end !gap-1.5 sm:bottom-3 sm:right-3">
         <span className="bg-atc-bg/70 px-1.5 py-0.5 text-[9.5px] text-atc-muted" data-testid="tower-site">
           Cab at {site?.note ?? 'airport'} · eye {CAB_EYE_HEIGHT_M} m AGL
         </span>

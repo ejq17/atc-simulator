@@ -23,6 +23,7 @@ import type { SpeechRecognitionProvider, SttStartOptions } from './types.ts';
 import { withPreferredInput } from './inputDevice.ts';
 import { mapMediaError } from './mediaErrors.ts';
 import { SttError } from './types.ts';
+import { isStaticHosting } from '../../hosting.ts';
 
 export const DEEPGRAM_WS_BASE = 'wss://api.deepgram.com';
 export const DEEPGRAM_LISTEN_PATH = '/v1/listen';
@@ -136,6 +137,10 @@ export function createDeepgramProvider(options: DeepgramProviderOptions = {}): S
       : undefined);
 
   async function fetchToken(): Promise<string> {
+    // The hosted (GitHub Pages) build has no backend to mint tokens: say so instead of failing on a dead /api.
+    if (!options.fetchFn && isStaticHosting()) {
+      throw new SttError('unavailable', 'Deepgram needs the local backend (npm run server). It is not available on this hosted site; choose Web Speech or Local Whisper.');
+    }
     let res: Response;
     try {
       res = await doFetch(tokenUrl, { method: 'POST', headers: { Accept: 'application/json' } });

@@ -2,7 +2,7 @@ import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useSta
 import type { KeyboardEvent as ReactKeyboardEvent, PointerEvent as ReactPointerEvent } from 'react';
 import type { PDFDocumentProxy, PDFPageProxy, RenderTask } from 'pdfjs-dist';
 import { CYCLE, isCycleCurrent, listChartGroups, type ChartEntry } from './chartIndex';
-import { ChartLoadError, DEFAULT_PROXY_BASE, destroyDoc, loadChartPdf, type ChartLoadVia } from './pdfLoader';
+import { bundledChartUrl, ChartLoadError, DEFAULT_PROXY_BASE, destroyDoc, loadChartPdf, type ChartLoadVia } from './pdfLoader';
 import { MAX_SCALE, MIN_SCALE, ZOOM_STEP, clampScale, fitScale, formatPercent, renderScaleFor, type FitMode } from './viewMath';
 
 export interface ChartViewerProps {
@@ -79,7 +79,7 @@ export function ChartViewer({ icao = 'KACY', initialChartId, onChartChange, prox
     setNumPages(0);
     setPageNum(1);
     setPageSize({ w: 0, h: 0 });
-    loadChartPdf(chart.pdfUrl, ctrl.signal, proxyBase)
+    loadChartPdf(chart.pdfUrl, ctrl.signal, proxyBase, bundledChartUrl(icao, chart.pdfName))
       .then(({ doc: d, via }) => {
         if (ctrl.signal.aborted) {
           destroyDoc(d);
@@ -98,7 +98,7 @@ export function ChartViewer({ icao = 'KACY', initialChartId, onChartChange, prox
       ctrl.abort();
       if (loaded) destroyDoc(loaded);
     };
-  }, [chart.pdfUrl, proxyBase, reloadKey]);
+  }, [chart.pdfUrl, chart.pdfName, icao, proxyBase, reloadKey]);
 
   // ---- resolve the current page proxy and its base size ----
   useEffect(() => {
@@ -460,7 +460,7 @@ export function ChartViewer({ icao = 'KACY', initialChartId, onChartChange, prox
           )}
           {load.status === 'ready' && (
             <div className="pointer-events-none absolute bottom-2 right-3 text-[10px] text-atc-muted">
-              {load.via === 'proxy' ? 'via local proxy' : 'direct from aeronav.faa.gov'}
+              {load.via === 'bundled' ? 'bundled FAA chart' : load.via === 'proxy' ? 'via local proxy' : 'direct from aeronav.faa.gov'}
             </div>
           )}
           {load.status === 'error' && (
@@ -479,15 +479,26 @@ function ErrorPanel({ error, chart, onRetry }: { error: ChartLoadError | Error; 
       <div className="max-w-xl border border-atc-red/60 bg-atc-panel p-5 text-xs leading-relaxed">
         <h3 className="text-sm font-semibold text-atc-red">Chart could not be loaded</h3>
         <p className="mt-2 text-atc-text">{error.message}</p>
-        {loadErr?.backendDown && (
+        {loadErr?.staticHosting ? (
           <p className="mt-2 text-atc-text">
-            The viewer reads FAA charts through the simulator's local backend, because aeronav.faa.gov does not allow browser pages to
-            download its PDFs directly (no CORS header). Start the backend with <code className="text-atc-cyan">npm run server</code> (port 8787)
-            and retry.
+            This site is hosted without a backend, and aeronav.faa.gov does not allow browser pages to download its PDFs directly (no CORS
+            header). Charts are normally bundled at build time; use the link below to open the official FAA PDF.
           </p>
+        ) : (
+          loadErr?.backendDown && (
+            <p className="mt-2 text-atc-text">
+              No bundled copy of this chart was found, and the simulator's local backend is not running. aeronav.faa.gov does not allow browser
+              pages to download its PDFs directly (no CORS header). Run <code className="text-atc-cyan">npm run fetch-charts</code> once, or start the
+              backend with <code className="text-atc-cyan">npm run server</code> (port 8787), then retry. You can also open the official PDF with the link below.
+            </p>
+          )
         )}
         {loadErr && (
           <dl className="mt-3 space-y-1 border-t border-atc-border pt-2 text-[11px] text-atc-muted">
+            <div>
+              <dt className="inline">Bundled copy: </dt>
+              <dd className="inline">{loadErr.bundledDetail}</dd>
+            </div>
             <div>
               <dt className="inline">Backend proxy: </dt>
               <dd className="inline">{loadErr.proxyDetail || 'ok'}</dd>
@@ -503,7 +514,7 @@ function ErrorPanel({ error, chart, onRetry }: { error: ChartLoadError | Error; 
             Retry
           </button>
           <a href={chart.pdfUrl} target="_blank" rel="noopener noreferrer" className="text-atc-cyan hover:underline">
-            Open the official PDF in a new tab {'↗'}
+            Open the official FAA PDF in a new tab {'↗'}
           </a>
         </div>
       </div>

@@ -5,14 +5,18 @@ import type { SurfaceLayers } from '../display/surfaceRenderer';
 import { DEFAULT_RADAR_LAYERS } from '../display/radarRenderer';
 import type { RadarLayers, RadarRangeNm } from '../display/radarRenderer';
 
+import type { PanelId } from '../layout/layoutModel';
+import type { MobileSection } from '../layout/panelMeta';
+
 export type DisplayView = 'surface' | 'radar' | 'tower';
-export type SideTab = 'list' | 'strips';
 export type DrawerId = 'charts' | 'navaids' | 'settings' | 'atis' | 'weather' | null;
 
 interface UiState {
-  view: DisplayView;
-  sideTab: SideTab;
-  setSideTab(t: SideTab): void;
+  /** Phone layout (below 1024 px): which bottom-bar section shows, and which tab is active inside each section. */
+  mobileSection: MobileSection;
+  setMobileSection(s: MobileSection): void;
+  mobileActive: Partial<Record<MobileSection, PanelId>>;
+  setMobileActive(section: MobileSection, id: PanelId): void;
   /** Aircraft details under the strip board: collapsed by default there, so the board gets the column. */
   stripDetailsOpen: boolean;
   setStripDetailsOpen(open: boolean): void;
@@ -24,7 +28,6 @@ interface UiState {
   /** Text in the typed-command box (shared so other panels can pre-fill a callsign). */
   draft: string;
   setDraft(t: string): void;
-  setView(v: DisplayView): void;
   setDrawer(d: DrawerId): void;
   toggleDrawer(d: Exclude<DrawerId, null>): void;
   toggleSurfaceLayer(k: keyof SurfaceLayers): void;
@@ -34,9 +37,10 @@ interface UiState {
 }
 
 export const useUiStore = create<UiState>((set) => ({
-  view: 'surface',
-  sideTab: 'list',
-  setSideTab: (sideTab) => set({ sideTab }),
+  mobileSection: 'display',
+  setMobileSection: (mobileSection) => set({ mobileSection }),
+  mobileActive: {},
+  setMobileActive: (section, id) => set((s) => ({ mobileActive: { ...s.mobileActive, [section]: id } })),
   stripDetailsOpen: false,
   setStripDetailsOpen: (stripDetailsOpen) => set({ stripDetailsOpen }),
   drawer: null,
@@ -46,7 +50,6 @@ export const useUiStore = create<UiState>((set) => ({
   follow: false,
   draft: '',
   setDraft: (draft) => set({ draft }),
-  setView: (view) => set({ view }),
   setDrawer: (drawer) => set({ drawer }),
   toggleDrawer: (d) => set((s) => ({ drawer: s.drawer === d ? null : d })),
   toggleSurfaceLayer: (k) => set((s) => ({ surfaceLayers: { ...s.surfaceLayers, [k]: !s.surfaceLayers[k] } })),

@@ -29,7 +29,7 @@ function place(e: SimulationEngine, airport: Airport, cs: string, end: string, a
 }
 
 /** Gap (ft) the TAKEOFF test uses: the preceding aircraft is `gapFt` ahead of the succeeding one's start of roll. */
-function takeoffCase(opts: { airport?: Airport; hold?: string; end?: string; succ: string; prec: string; gapFt: number; mode?: 'training' | 'free_play' }) {
+function takeoffCase(opts: { airport?: Airport; hold?: string; end?: string; succ: string; prec: string; gapFt: number; mode?: 'training' | 'free_play'; leaderTurnDeg?: number }) {
   const airport = opts.airport ?? fixture;
   const end = opts.end ?? '13';
   const spawns = [HOLDING('SUCC', opts.hold ?? 'H13', end, opts.succ), DEP('PREC', opts.prec, end)];
@@ -38,6 +38,7 @@ function takeoffCase(opts: { airport?: Airport; hold?: string; end?: string; suc
   run(e, 2);
   const startAlong = mToFt(alongCross(findRunwayEnd(airport, end)!, find(e, 'SUCC').pos).along);
   place(e, airport, 'PREC', end, startAlong + opts.gapFt);
+  if (opts.leaderTurnDeg) find(e, 'PREC').trackDeg += opts.leaderTurnDeg;
   return { e, airport, result: e.applyCommand(cmd('TAKEOFF', 'SUCC', { runwayEnd: end })) };
 }
 
@@ -75,7 +76,8 @@ describe('takeoff behind an airborne departure (fixture runway 13)', () => {
     const bad = takeoffCase({ succ: 'A320', prec: 'C172', gapFt: 4000 }).result;
     expect(bad.status).toBe('rejected');
     if (bad.status === 'rejected') expect(bad.reason).toMatch(/3-9-6 needs 6000 ft/);
-    expect(takeoffCase({ succ: 'A320', prec: 'C172', gapFt: 6200 }).result.status).toBe('accepted');
+    // (a faster follower on the leader's own track is judged separately, see the 3-9-6 / 5-8-3 trail tests below: here the leader has turned away)
+    expect(takeoffCase({ succ: 'A320', prec: 'C172', gapFt: 6200, leaderTurnDeg: 20 }).result.status).toBe('accepted');
   });
 
   it('A320 behind A320: allowed at 6,500 ft airborne, refused at 5,500; C172 behind A320 also needs 6,000', () => {
@@ -221,5 +223,28 @@ describe('same-runway separation on real KACY (10,001 ft runway 13)', () => {
     expect(takeoffCase({ airport: kacy, hold: 'HP13-31-C-1', succ: 'A320', prec: 'C172', gapFt: 4000 }).result.status).toBe('rejected');
     expect(takeoffCase({ airport: kacy, hold: 'HP13-31-C-1', succ: 'A320', prec: 'A320', gapFt: 6500 }).result.status).toBe('accepted');
     expect(takeoffCase({ airport: kacy, hold: 'HP13-31-C-1', succ: 'C172', prec: 'C172', gapFt: 3200 }).result.status).toBe('accepted');
+  });
+});
+
+describe('takeoff behind a slower departure on the same track (3-9-6 / 5-8-3 closure)', () => {
+  it('A320 released behind a C172 that is 2 nm out on the same track: refused, citing 3-9-6', () => {
+    const r = takeoffCase({ succ: 'A320', prec: 'C172', gapFt: 12000 }).result;
+    expect(r.status).toBe('rejected');
+    if (r.status === 'rejected') {
+      expect(r.unsafe).toBe(true);
+      expect(r.reason).toMatch(/behind slower PREC/);
+      expect(r.reason).toMatch(/7110\.65 3-9-6/);
+    }
+  });
+  it('flagged, not refused, outside training mode', () => {
+    expect(takeoffCase({ succ: 'A320', prec: 'C172', gapFt: 12000, mode: 'free_play' }).result.status).toBe('accepted');
+  });
+  it('the C172 far enough out (7 nm) or turned 15 degrees away no longer holds the A320', () => {
+    expect(takeoffCase({ succ: 'A320', prec: 'C172', gapFt: 7 * 6076 }).result.status).toBe('accepted');
+    expect(takeoffCase({ succ: 'A320', prec: 'C172', gapFt: 12000, leaderTurnDeg: 15 }).result.status).toBe('accepted');
+  });
+  it('A320 then C172, and two C172s: the plain 3-9-6 distances only', () => {
+    expect(takeoffCase({ succ: 'C172', prec: 'A320', gapFt: 7000 }).result.status).toBe('accepted');
+    expect(takeoffCase({ succ: 'C172', prec: 'C172', gapFt: 3200 }).result.status).toBe('accepted');
   });
 });

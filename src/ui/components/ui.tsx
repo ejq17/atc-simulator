@@ -1,13 +1,17 @@
+import { createContext, useContext } from 'react';
 import type { ButtonHTMLAttributes, ReactNode } from 'react';
+
+/** True inside a docked or popped-out panel: the surrounding frame already shows the title and border. */
+export const PanelFrameContext = createContext(false);
 
 export const LABEL = 'font-sans text-[10px] uppercase tracking-[0.16em] text-atc-muted';
 
 export function PanelHeader({ title, right, count }: { title: string; right?: ReactNode; count?: number | string }) {
   return (
-    <div className="flex h-7 shrink-0 items-center justify-between gap-2 border-b border-atc-border bg-atc-panel-2 px-3">
-      <div className="flex items-center gap-2">
-        <span className="font-sans text-[10.5px] font-semibold uppercase tracking-[0.18em] text-atc-text">{title}</span>
-        {count !== undefined && <span className="border border-atc-border px-1 text-[10px] leading-4 text-atc-muted">{count}</span>}
+    <div className="atc-titlebar flex h-7 shrink-0 items-center justify-between gap-2 px-3">
+      <div className="flex min-w-0 items-center gap-2">
+        <span className="atc-title truncate">{title}</span>
+        {count !== undefined && <span className="atc-count">{count}</span>}
       </div>
       {right}
     </div>
@@ -15,6 +19,21 @@ export function PanelHeader({ title, right, count }: { title: string; right?: Re
 }
 
 export function Panel({ title, right, count, children, className = '' }: { title: string; right?: ReactNode; count?: number | string; children: ReactNode; className?: string }) {
+  const framed = useContext(PanelFrameContext);
+  if (framed) {
+    // The frame (tab bar) carries the title; keep only a slim readout row when the panel has controls of its own.
+    return (
+      <section className={`flex min-h-0 min-w-0 flex-col bg-atc-panel ${className}`}>
+        {(right || count !== undefined) && (
+          <div className="flex min-h-6 shrink-0 flex-wrap items-center justify-between gap-x-2 border-b border-atc-border/70 bg-atc-bg/40 px-2.5 py-0.5">
+            {count !== undefined ? <span className="atc-count">{count} {title.toLowerCase()}</span> : <span />}
+            {right}
+          </div>
+        )}
+        {children}
+      </section>
+    );
+  }
   return (
     <section className={`flex min-h-0 flex-col border border-atc-border bg-atc-panel ${className}`}>
       <PanelHeader title={title} right={right} count={count} />
@@ -88,7 +107,7 @@ export function Dot({ color }: { color: string }) {
 
 export function Segmented<T extends string | number>({ value, options, onChange, size = 'sm' }: { value: T; options: { value: T; label: ReactNode; title?: string; disabled?: boolean }[]; onChange: (v: T) => void; size?: 'xs' | 'sm' }) {
   return (
-    <div className="inline-flex border border-atc-border" role="group">
+    <div className="inline-flex max-w-full border border-atc-border" role="group">
       {options.map((o) => (
         <button
           key={String(o.value)}
@@ -97,7 +116,7 @@ export function Segmented<T extends string | number>({ value, options, onChange,
           disabled={o.disabled}
           aria-pressed={o.value === value}
           onClick={() => onChange(o.value)}
-          className={`${size === 'xs' ? 'h-6 px-2 text-[10px]' : 'h-7 px-3 text-[11px]'} border-r border-atc-border font-sans font-medium uppercase tracking-wider last:border-r-0 disabled:opacity-35 ${o.value === value ? 'bg-atc-cyan/15 text-atc-cyan' : 'bg-atc-bg text-atc-muted hover:text-atc-text'}`}
+          className={`${size === 'xs' ? 'h-6 px-2 text-[10px]' : 'h-7 px-2 text-[11px] sm:px-3'} min-w-0 border-r border-atc-border font-sans font-medium uppercase tracking-wider last:border-r-0 disabled:opacity-35 ${o.value === value ? 'bg-atc-cyan/15 text-atc-cyan' : 'bg-atc-bg text-atc-muted hover:text-atc-text'}`}
         >
           {o.label}
         </button>

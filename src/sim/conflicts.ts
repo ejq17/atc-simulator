@@ -152,6 +152,57 @@ function airborneBlockers(state: SimulationState, ac: Aircraft, g: RunwayEndGeom
 }
 
 /**
+ * Departure behind a SLOWER departure on the same runway and the same initial track (JO 7110.65 3-9-6 same runway separation; 5-8-3
+ * successive departures: the follower must not overtake the leader inside radar separation unless courses diverge by 15 degrees or more).
+ * The engine alerts at 1.5 nm / 500 ft, the controller keeps 3 nm. Estimated at the clearance: the leader flies on at its climb speed on the
+ * runway track, the follower rolls (line-up delay + acceleration), lifts off and climbs at its own climb speed (it does not turn: a direct-to
+ * instruction comes only after radar contact). The gap is linear in time once the follower is airborne, so its minimum over the time the
+ * leader stays inside `DEPARTURE_TRAIL_RANGE_NM` of the field is at that time's end. A leader that has turned `DEPARTURE_DIVERGE_DEG` or more
+ * away from the runway heading no longer counts. Only a follower that closes by `DEPARTURE_CLOSURE_KT` or more is judged (equal types and
+ * slower followers keep the plain airborne-distance rule of `airborneBlockers`).
+ */
+export const DEPARTURE_TRAIL_NM = 3;
+export const DEPARTURE_TRAIL_RANGE_NM = 10;
+export const DEPARTURE_DIVERGE_DEG = 15;
+const DEPARTURE_CLOSURE_KT = 10;
+const DEPARTURE_LINE_UP_DELAY_SEC = 20;
+
+export interface DepartureTrailConflict {
+  leader: Aircraft;
+  /** Smallest projected gap (nm) before the leader is 10 nm out. */
+  minGapNm: number;
+  /** Leader's distance along the runway track now, nm. */
+  leaderAlongNm: number;
+}
+
+export function departureTrailConflict(state: SimulationState, ac: Aircraft, g: RunwayEndGeom): DepartureTrailConflict | undefined {
+  const pF = getPerformance(ac.type);
+  const vF = pF.climbSpeedKt;
+  const startAlong = Math.max(0, alongCross(g, ac.pos).along);
+  const tRoll = pF.rotateSpeedKt / pF.accelKtPerSec;
+  const dRollNm = mToNm(0.5 * pF.accelKtPerSec * 0.514444 * tRoll * tRoll);
+  const tf = (ac.phase === 'LINE_UP_AND_WAIT' ? 0 : DEPARTURE_LINE_UP_DELAY_SEC) + 2.5 + tRoll;
+  let worst: DepartureTrailConflict | undefined;
+  for (const o of Object.values(state.aircraft)) {
+    if (o.id === ac.id || o.onGround || !o.isDeparture) continue;
+    if (o.phase !== 'INITIAL_CLIMB' && o.phase !== 'DEPARTURE') continue;
+    const og = findRunwayEnd(state.airport, o.assignedRunwayEnd);
+    if (!og || og.end.id !== g.end.id) continue;
+    const { along, cross } = alongCross(g, o.pos);
+    if (along <= startAlong || Math.abs(cross) > FINAL_LATERAL_M) continue;
+    if (Math.abs(headingDiff(o.trackDeg, g.headingDeg)) >= DEPARTURE_DIVERGE_DEG) continue; // diverging courses
+    const vL = Math.max(getPerformance(o.type).climbSpeedKt, o.groundSpeedKt);
+    if (vF - vL < DEPARTURE_CLOSURE_KT) continue;
+    const leaderNm = mToNm(along);
+    const tEnd = ((DEPARTURE_TRAIL_RANGE_NM - leaderNm) / vL) * 3600;
+    if (tEnd <= tf) continue; // the leader is out of the area before the follower is airborne
+    const gapNm = leaderNm - mToNm(startAlong) + (vL / 3600) * tEnd - dRollNm - (vF / 3600) * (tEnd - tf);
+    if (gapNm < DEPARTURE_TRAIL_NM && (!worst || gapNm < worst.minGapNm)) worst = { leader: o, minGapNm: gapNm, leaderAlongNm: leaderNm };
+  }
+  return worst;
+}
+
+/**
  * Intersecting runway operations, JO 7110.65 3-9-8 (departing aircraft) and 3-10-4 (arriving aircraft), judged at the clearance:
  *
  *  - A DEPARTURE must not begin its roll until a preceding departure on the other runway "has departed and passed the intersection"
@@ -361,6 +412,12 @@ export function assessClearanceSafety(state: SimulationState, cmd: ParsedCommand
     if (dep.length) push(`${verb} for ${ac.callsign} while ${cs(state, dep)} is cleared for takeoff / rolling on runway ${runwayId}`, REF_SAME_RUNWAY, dep);
     const gEnd = findRunwayEnd(airport, cmd.runwayEnd ?? cmd.runwayId ?? ac.assignedRunwayEnd);
     if (gEnd) issues.push(...airborneBlockers(state, ac, gEnd, alongCross(gEnd, ac.pos).along, verb, REF_SAME_RUNWAY));
+    if (cmd.kind === 'TAKEOFF' && gEnd) {
+      const trail = departureTrailConflict(state, ac, gEnd);
+      if (trail) {
+        push(`Takeoff clearance for ${ac.callsign} (${ac.type}) behind slower ${trail.leader.callsign} (${trail.leader.type}), ${trail.leaderAlongNm.toFixed(1)} nm out on the same track: it would close to ${Math.max(0, trail.minGapNm).toFixed(1)} nm before the leader is ${DEPARTURE_TRAIL_RANGE_NM} nm out; 3-9-6 / 5-8-3 need ${DEPARTURE_TRAIL_NM} nm, a departure interval or diverging courses`, REF_SAME_RUNWAY, [trail.leader.id]);
+      }
+    }
     const lu = others(act.lineUp).filter((i) => !occ.includes(i));
     if (lu.length) push(`${verb} for ${ac.callsign} while ${cs(state, lu)} is in position on runway ${runwayId}`, REF_SAME_RUNWAY, lu);
     const crossing = others(act.crossing).filter((i) => !occ.includes(i));
@@ -681,9 +738,13 @@ export const groundProximityM = (a: Aircraft, b: Aircraft): number => Math.min(G
 /** Two aircraft standing still one behind the other in the same queue (holding short / waiting to taxi): not a proximity event. */
 function sameQueue(state: SimulationState, a: Aircraft, b: Aircraft): boolean {
   const q = (x: Aircraft) => x.groundSpeedKt < 1 && (x.phase === 'TAXIING' || x.phase === 'HOLDING_SHORT' || x.phase === 'READY') && x.occupyingRunways.length === 0;
+  // A follower still rolling into its place in the queue (slower than QUEUE_CREEP_KT) behind a stopped leader is queueing, not a proximity event.
+  const creeping = (x: Aircraft) => x.groundSpeedKt < QUEUE_CREEP_KT && (x.phase === 'TAXIING' || x.phase === 'HOLDING_SHORT') && x.occupyingRunways.length === 0;
   void state;
-  return q(a) && q(b) && Math.abs(headingDiff(a.headingDeg, b.headingDeg)) < 60;
+  if (Math.abs(headingDiff(a.headingDeg, b.headingDeg)) >= 60) return false;
+  return (q(a) && q(b)) || (q(a) && creeping(b)) || (creeping(a) && q(b));
 }
+const QUEUE_CREEP_KT = 8;
 
 /** Parked, shut down, or standing still on a parking position (stands can be closer than 30 m). */
 function parkedLike(state: SimulationState, ac: Aircraft): boolean {

@@ -46,6 +46,7 @@ export const GA_PREFIXES = rec<RegExp>({
 
 /** Multi-word phrases collapsed to one token. kind 'word' means plain word. */
 export interface PhraseTarget { text: string; kind?: 'airline' | 'letter' }
+// A target `text` with spaces ("hold short") expands to several plain words that share the phrase's raw range.
 export const PHRASES: readonly { words: readonly string[]; to: PhraseTarget }[] = [
   { words: ['x', 'ray'], to: { text: 'x', kind: 'letter' } },
   { words: ['sun', 'country'], to: { text: 'SCX', kind: 'airline' } },
@@ -61,6 +62,13 @@ export const PHRASES: readonly { words: readonly string[]; to: PhraseTarget }[] 
   { words: ['park', 'yee'], to: { text: 'parking' } },
   { words: ['park', 'ee'], to: { text: 'parking' } },
   { words: ['be', 'a'], to: { text: 'via' } },
+  // Whisper / Web Speech renderings of ground instructions heard in real sessions
+  { words: ['hold', 'shore'], to: { text: 'hold short' } },
+  { words: ['whole', 'chore'], to: { text: 'hold short' } },
+  { words: ['whole', 'shore'], to: { text: 'hold short' } },
+  { words: ['hole', 'short'], to: { text: 'hold short' } },
+  { words: ['tax', 'it'], to: { text: 'taxi' } },
+  { words: ['around', 'way'], to: { text: 'to runway' } },
   // STT renderings of approach names
   { words: ['i', 'l', 's'], to: { text: 'ils' } },
   { words: ['eye', 'el', 'es'], to: { text: 'ils' } },
@@ -83,7 +91,44 @@ export const ALIASES = rec<readonly string[]>({
   // Whisper tiny.en renderings heard in real sessions
   tackty: ['taxi'], taxie: ['taxi'], taxity: ['taxi'], taxituary: ['taxi', 'to', 'runway'], vietnam: ['via', 'november'],
   taxitu: ['taxi', 'to'], tax: ['taxi'], access: ['taxi'], mic: ['mike'], alima: ['via', 'lima'], holdshore: ['hold', 'short'],
+  taxa: ['taxi'], chaxi: ['taxi'], taxee: ['taxi'], vialima: ['via', 'lima'], aravo: ['bravo'], baravo: ['bravo'],
 });
+
+/**
+ * "via a Lima": STT writes the article "a" for the second half of "via". Only a lower-case raw "a" between "via" and a
+ * spelled NATO word is dropped (a typed taxiway "via A C" or "via a l" is untouched).
+ */
+export const VIA_ARTICLE = 'a';
+
+/** Core instruction words an unknown, near-miss word may be corrected to (see `fuzzyCorrect` in normalize.ts). */
+export const FUZZY_KEYWORDS: readonly string[] = [
+  'taxi', 'runway', 'hold', 'short', 'via', 'contact', 'tower', 'ground', 'cleared', 'cross', 'continue', 'position',
+  'parking', 'ramp', 'terminal', 'gate', 'takeoff', 'land', 'line', 'wait',
+];
+
+/**
+ * Words the grammar or the callsign logic gives a meaning to, plus common English words that sit one letter from a
+ * keyword or NATO word ("make"~mike, "like"~line, "late"~gate). Never fuzz-corrected.
+ */
+export const FUZZ_PROTECTED: ReadonlySet<string> = new Set([
+  'able', 'above', 'after', 'again', 'airport', 'along', 'also', 'altitude', 'approach', 'approved', 'apron', 'area',
+  'around', 'aviation', 'band', 'base', 'below', 'call', 'cancel', 'cargo', 'center', 'change', 'clear', 'clearance',
+  'climb', 'come', 'control', 'course', 'crossing', 'degrees', 'delivery', 'depart', 'departing', 'departure', 'descend',
+  'direct', 'down', 'downwind', 'early', 'east', 'enter', 'established', 'execute', 'expect', 'expedite', 'fbo', 'field',
+  'filed', 'final', 'follow', 'frequency', 'from', 'further', 'general', 'ground', 'gust', 'gusting', 'gusts', 'hand',
+  'hangar', 'heading', 'holding', 'hundred', 'ident', 'immediately', 'initial', 'into', 'join', 'knots', 'landing', 'late',
+  'left', 'legs', 'liftoff', 'localizer', 'low', 'maintain', 'make', 'mile', 'miles', 'minute', 'minutes', 'missed',
+  'monitor', 'navigation', 'next', 'normal', 'north', 'northeast', 'northwest', 'number', 'option', 'own', 'park', 'passing',
+  'pattern', 'please', 'point', 'present', 'proceed', 'published', 'push', 'pushback', 'radar', 'radial', 'reduce', 'repeat',
+  'report', 'resume', 'right', 'route', 'runways', 'say', 'shorts', 'slow', 'south', 'southeast', 'southwest', 'speed',
+  'squawk', 'standard', 'start', 'straight', 'switch', 'taxiing', 'taxiway', 'taxiways', 'than', 'that', 'then', 'there',
+  'thousand', 'time', 'touch', 'traffic', 'turn', 'turns', 'until', 'using', 'vectors', 'visual', 'west', 'when', 'will',
+  'wind', 'winds', 'with', 'within', 'your', 'ils', 'rnav', 'vor', 'loc', 'fix', 'flight', 'level', 'ready', 'copy', 'wilco',
+  'like', 'fine', 'lane', 'date', 'rate', 'mate', 'wine', 'came', 'same', 'name', 'game', 'gave', 'have', 'take',
+  'give', 'just', 'this', 'them', 'they', 'what', 'were', 'been', 'here', 'well', 'very', 'some', 'more', 'most', 'much',
+  'such', 'want', 'need', 'know', 'look', 'back', 'last', 'long', 'good', 'over', 'onto', 'told', 'hole',
+  'cross', 'gross', 'rump', 'camp', 'tell', 'hello', 'light', 'right', 'night', 'tight', 'sight', 'might',
+]);
 
 /** Words Whisper writes for the "November" of an N-number ("Number 678 mike victor", "Remember, 685 golf delta"). */
 export const N_PREFIX_WORDS: ReadonlySet<string> = new Set(['number', 'remember', 'novembre', 'nowember']);

@@ -10,7 +10,7 @@ import type { LabelRequest } from './labels';
 import { buildSurfaceStatic } from './surfaceStatic';
 import { worldToScreen, visibleBounds } from './viewTransform';
 import type { View } from './viewTransform';
-import { glyphPath, symbolSize } from './symbols';
+import { drawGlyphDetail, glyphPath, symbolSize } from './symbols';
 import { niceLength, deg2rad } from '../lib/geom';
 import { TONE_COLOR, statusTone, phaseShort } from '../lib/format';
 
@@ -471,12 +471,30 @@ function drawAircraft(ctx: CanvasRenderingContext2D, v: View, frame: Frame, laye
     ctx.save();
     ctx.translate(d.x, d.y);
     ctx.rotate(deg2rad(d.hdg));
-    glyphPath(ctx, size.halfLenPx);
+    const close = size.halfLenPx >= 24; // zoomed in far enough to see the planform: shadow and fuselage detail
+    if (close) {
+      // Soft drop shadow, offset down-right in screen space (undo the heading rotation for the offset).
+      ctx.save();
+      ctx.rotate(-deg2rad(d.hdg));
+      ctx.translate(size.halfLenPx * 0.07 + 1.5, size.halfLenPx * 0.09 + 2);
+      ctx.rotate(deg2rad(d.hdg));
+      glyphPath(ctx, size.halfLenPx, ac.type);
+      ctx.fillStyle = 'rgba(0,0,0,0.38)';
+      ctx.fill();
+      ctx.restore();
+    }
+    glyphPath(ctx, size.halfLenPx, ac.type);
+    // A light halo under the dark outline keeps the shape readable on pale pavement as well as dark.
+    ctx.strokeStyle = 'rgba(255,255,255,0.35)';
+    ctx.lineWidth = 3;
+    ctx.lineJoin = 'round';
+    ctx.stroke();
     ctx.fillStyle = color;
     ctx.strokeStyle = '#05070a';
     ctx.lineWidth = 1.25;
     ctx.fill();
     ctx.stroke();
+    if (close) drawGlyphDetail(ctx, size.halfLenPx, ac.type);
     ctx.restore();
 
     if (ac.pendingRequest) {

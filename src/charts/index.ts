@@ -15,4 +15,4 @@ export {
 export type { ChartCategory, ChartEntry, ChartGroup, CycleInfo } from './chartIndex';
 export { NAVAIDS, KEY_FIX_IDS, distanceBearing, formatLatLon, navaidsFor } from './navaidData';
 export type { ApproachFix, IlsSystem, NavaidDataset, NearbyNavaid, Vortac } from './navaidData';
-export { ChartLoadError, DEFAULT_PROXY_BASE, loadChartPdf, proxyUrlFor } from './pdfLoader';
+export { bundledChartUrl, ChartLoadError, DEFAULT_PROXY_BASE, loadChartPdf, proxyUrlFor } from './pdfLoader';

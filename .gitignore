@@ -30,5 +30,6 @@ test-results/
 playwright-report/
 .cache/
 
-# agent worktrees
-.claude/worktrees/
+
+# FAA chart PDFs downloaded by scripts/fetch-charts.ts (public domain, bundled at build time)
+public/charts/

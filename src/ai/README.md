@@ -55,6 +55,13 @@ transmit: the player's position covers them (`status()` says so). The AI never t
 | **APP** | Arrivals: `RADAR_CONTACT` + descent to the lowest MVA-safe altitude (engine MVA check) at or above the published altitude of the initial fix of the preferred procedure (ILS, else RNAV, else VOR from `airport.procedures`/`fixAltitudes`); `DIRECT_FIX` to the nearest IAF/IF when the aircraft is not on a route that joins it; `APPROACH` when the engine's `assessApproach` finds it proper and the aircraft ahead is >= 5 nm ahead; otherwise `HOLD_AT_FIX ... as published` at the procedure's hold-in-lieu fix (gap < 3.5 nm) or `SPEED` 140 (3.5-5 nm). Established on final: "contact tower". A missed approach is climbed, sent direct to the initial fix and cleared again. When nobody works DEP, Approach also takes the departures. |
 | **DEP** | Departures: `RADAR_CONTACT`, `ALTITUDE` to the filed cruise, `DIRECT_FIX` to the first fix of the route (IFR; VFR just get radar contact). |
 
+Added after a real session (tests in `safetyGaps.test.ts`): Tower withholds a takeoff clearance to a faster departure behind a slower one
+on the same track (`conflicts.departureTrailConflict`: the follower must not close inside 3 nm before the leader is 10 nm out, unless the
+leader has turned 15 degrees or more; 7110.65 3-9-6 / 5-8-3), Approach judges spacing at the leader's threshold crossing
+(`world.projectedGapNm`; needs max(5 nm, 80 s at the follower's approach speed) and never less than 3 nm, tries speed 160 then 140, then the
+published hold), Tower sends a follower on final around at 3-4 nm when the in-trail gap is lost (`earlyGoAroundReason`), and an aircraft that
+went around (`Aircraft.lastGoAroundSec`) gets no landing clearance until its approach is cleared again (`awaitingResequence`).
+
 Faulty readbacks (`flags.readbackErrorPending`) are corrected by the issuing position: "negative, Spirit four fifty one, runway one three,
 fly runway heading, cleared for takeoff".
 

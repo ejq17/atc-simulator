@@ -520,6 +520,19 @@ after touchdown on the fixture; A320 ~30 s.
    exit chosen for 4 / 22 / 13 / 31, both types and touchdown points of 250-800 m already has such a route (test); with Bravo cut
    off from parking the C172 on 22 skips Bravo for the next exit.
 
+## Departure trail, go-around re-clearance and queue spacing (session fixes)
+
+* `conflicts.departureTrailConflict` (TAKEOFF, citing 7110.65 3-9-6 / 5-8-3): an airborne departure ahead on the same runway end and track
+  (within 15 degrees of the runway heading) that the follower out-climbs by 10 kt or more is judged at the clearance. The follower (line-up
+  delay, roll, then its climb speed) must not be within 3 nm of the leader at the time the leader is 10 nm out. Equal or slower followers
+  keep the plain airborne-distance rule. Refused in training, flagged otherwise.
+* `Aircraft.lastGoAroundSec` is set by `initiateGoAround`. `LAND` for an aircraft on a missed approach (phase `GO_AROUND`, or `APPROACH` /
+  `INBOUND` within 5 minutes of the go-around before a new approach clearance) is refused with "unable, we're going around" unless it is
+  aligned within 15 degrees, no more than 300 ft above the 3 degree path and at least 2 nm out.
+* `groundMovement.findLeader` also sees a STOPPED aircraft that lies on the follower's remaining route (12 m, next 250 m) whatever its heading,
+  so a follower turning into a hold-short queue stops its following distance back instead of 13 m behind. `conflicts.sameQueue` also treats a
+  follower creeping below 8 kt behind a stopped leader as queueing.
+
 ## Landing rollout and runway exit
 
 Braking follows the sourced landing distances (A320 6 kt/s, C172 4.4 kt/s; maximum braking = 1.4x). At touchdown `chooseExit` takes the

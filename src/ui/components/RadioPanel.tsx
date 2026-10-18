@@ -141,7 +141,7 @@ export function RadioPanel() {
       title="Radio"
       className="h-full min-h-0"
       right={
-        <div className="flex items-center gap-3 font-sans text-[10px] uppercase tracking-wider text-atc-muted">
+        <div className="flex flex-wrap items-center justify-end gap-x-3 font-sans text-[10px] uppercase tracking-wider text-atc-muted">
           <span>Dep <b className="text-atc-text">{state.activeRunways.departing.join('/')}</b> Arr <b className="text-atc-text">{state.activeRunways.landing.join('/')}</b></span>
           <button type="button" onClick={() => toggleDrawer('atis')} className="text-atc-cyan hover:underline">ATIS {atis?.letter ?? '-'}</button>
           <button type="button" onClick={() => toggleDrawer('settings')} className="hover:text-atc-cyan" title={provider.summary}>{providerShort}</button>
@@ -194,7 +194,7 @@ export function RadioPanel() {
             disabled={pttDisabled}
             data-testid="ptt"
             aria-label="Push to talk"
-            className={`flex h-9 flex-1 select-none items-center justify-center gap-2 border font-sans text-[11px] font-semibold uppercase tracking-[0.14em] transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${voice.transmitting ? 'atc-tx border-atc-red bg-atc-red/20 text-atc-red' : 'border-atc-green-dim bg-atc-bg text-atc-green hover:bg-atc-green/10'}`}
+            className={`atc-ptt flex h-12 flex-1 select-none lg:h-9 items-center justify-center gap-2 border font-sans text-[11px] font-semibold uppercase tracking-[0.14em] transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${voice.transmitting ? 'atc-tx border-atc-red bg-atc-red/20 text-atc-red' : 'border-atc-green-dim bg-atc-bg text-atc-green hover:bg-atc-green/10'}`}
           >
             <span className={`inline-block h-2.5 w-2.5 ${voice.transmitting ? 'bg-atc-red' : 'bg-atc-green-dim'}`} />
             {voice.transmitting ? 'Transmitting' : 'Push to talk'}

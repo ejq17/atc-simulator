@@ -30,3 +30,51 @@ input, select { font-family: inherit; }
 .strip-print { animation: strip-print 1.4s ease-out; }
 .strip-move { animation: strip-move 1.4s ease-out; }
 @media (prefers-reduced-motion: reduce) { .strip-print, .strip-move { animation: none; } }
+
+/* ---- Console chrome: title bars like a STARS / ASDE-X bezel, thin borders, subtle inset ------------------------------ */
+body { font-variant-numeric: tabular-nums; overscroll-behavior: none; }
+.atc-app { height: 100%; min-height: 0; width: 100%; }
+.atc-titlebar {
+  background: linear-gradient(#1d232b, #161b21);
+  border-bottom: 1px solid var(--color-atc-border);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.045), inset 0 -1px 0 rgba(0, 0, 0, 0.5);
+}
+.atc-title { font-family: var(--font-sans, ui-sans-serif, system-ui, sans-serif); font-size: 10.5px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.18em; color: var(--color-atc-text); }
+.atc-count { border: 1px solid var(--color-atc-border); padding: 0 4px; font-size: 10px; line-height: 16px; color: var(--color-atc-muted); background: rgba(0, 0, 0, 0.25); }
+.atc-frame { background: var(--color-atc-panel); box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.35); }
+.atc-tab {
+  display: inline-flex; align-items: center; white-space: nowrap; padding: 0 12px;
+  font-family: var(--font-sans, ui-sans-serif, system-ui, sans-serif); font-size: 10.5px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.16em;
+  color: var(--color-atc-muted); border-right: 1px solid var(--color-atc-border); background: transparent;
+}
+.atc-tab:hover { color: var(--color-atc-text); }
+.atc-tab-on { color: var(--color-atc-cyan); background: var(--color-atc-panel); box-shadow: inset 0 -2px 0 var(--color-atc-cyan), inset 0 1px 0 rgba(255, 255, 255, 0.04); }
+.atc-iconbtn {
+  display: inline-flex; align-items: center; justify-content: center; height: 22px; min-width: 22px; padding: 0 4px;
+  border: 1px solid var(--color-atc-border); background: var(--color-atc-bg); color: var(--color-atc-muted);
+  font-family: var(--font-sans, ui-sans-serif, system-ui, sans-serif); font-size: 11px; line-height: 1; text-transform: uppercase; letter-spacing: 0.08em;
+}
+.atc-iconbtn:hover { color: var(--color-atc-cyan); border-color: var(--color-atc-cyan); }
+.atc-splitter { flex: none; background: var(--color-atc-border); box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.5); }
+.atc-splitter:hover, .atc-splitter:active { background: var(--color-atc-cyan); }
+.atc-topbar { box-shadow: inset 0 -1px 0 rgba(0, 0, 0, 0.5); }
+.atc-statusstrip { background: #0e1216; }
+.atc-readout > span:last-child { text-shadow: 0 0 8px rgba(57, 211, 83, 0.18); }
+.no-scrollbar { scrollbar-width: none; }
+.no-scrollbar::-webkit-scrollbar { display: none; }
+/* Phone-width page chrome never scrolls sideways. */
+html, body, #root { max-width: 100vw; overflow-x: hidden; }
+
+/* ---- Touch: bigger targets on coarse pointers, 16 px inputs so iOS does not zoom the page --------------------------- */
+@media (pointer: coarse) {
+  .ovl-btn { height: 36px; min-width: 36px; }
+  .atc-iconbtn { height: 32px; min-width: 32px; }
+  .atc-tab { min-height: 40px; padding: 0 14px; }
+  input:not([type="checkbox"]):not([type="radio"]), select, textarea { font-size: 16px; min-height: 40px; }
+}
+
+/* ---- Reduced motion: no blinking, sweeping or sliding ---------------------------------------------------------------- */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.001ms !important; animation-iteration-count: 1 !important; transition-duration: 0.001ms !important; scroll-behavior: auto !important; }
+}
+@media (pointer: coarse) { .atc-ptt { height: 56px; } }

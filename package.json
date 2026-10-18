@@ -1,6 +1,9 @@
 {
-  "name": "kacy-atc-sim",
+  "name": "atc-simulator",
   "private": true,
+  "homepage": "https://ejq17.github.io/atc-simulator/",
+  "repository": { "type": "git", "url": "git+https://github.com/ejq17/atc-simulator.git" },
+  "license": "MIT",
   "version": "0.0.0",
   "type": "module",
   "scripts": {
@@ -9,6 +12,9 @@
     "build": "tsc -b && vite build",
     "lint": "oxlint",
     "preview": "vite preview",
+    "fetch-charts": "tsx scripts/fetch-charts.ts",
+    "build:pages": "GITHUB_PAGES=1 npm run build",
+    "preview:pages": "node scripts/serve-pages.mjs",
     "build:airport": "tsx scripts/build-airport.ts",
     "test": "vitest run",
     "typecheck": "tsc -b --noEmit",

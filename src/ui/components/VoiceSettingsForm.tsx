@@ -1,7 +1,9 @@
+import { addWindowListener } from '../layout/windows';
 import { useEffect, useState } from 'react';
 import { STT_PROVIDER_NOTES, VOICE_PRIVACY_NOTES, TRANSCRIPT_STORAGE_KEY, createBrowserTts, createWebSpeechProvider, getLocalWhisperProvider, unlockAudio } from '../../voice';
 import type { SttProviderId, WhisperProgress } from '../../voice';
 import { voiceSettings, useVoiceSettings } from '../store/voiceSettings';
+import { isStaticHosting } from '../../hosting';
 import { keyLabel } from '../lib/voiceStatus';
 import { Btn, Field, Kbd, SELECT, Toggle } from './ui';
 
@@ -21,6 +23,7 @@ function useProviderAvailability(id: SttProviderId): { checking: boolean; availa
           const ok = await getLocalWhisperProvider().isAvailable();
           return !cancelled && setState({ checking: false, available: ok, detail: ok ? 'Runs on this device (WebAssembly). Prepare the model once below; your voice never leaves this computer.' : 'This browser lacks WebAssembly or microphone support.' });
         }
+        if (isStaticHosting()) return !cancelled && setState({ checking: false, available: false, detail: 'Deepgram needs the local backend (npm run server). It is not available on this hosted site; use Web Speech or Local Whisper.' });
         const res = await fetch('/api/voice/deepgram-token', { headers: { Accept: 'application/json' } });
         const body = (await res.json().catch(() => ({}))) as { configured?: boolean };
         if (cancelled) return;
@@ -99,8 +102,7 @@ export function VoiceSettingsForm({ compact = false }: { compact?: boolean }) {
       voiceSettings.update({ pttKey: e.code && e.code !== 'Unidentified' ? e.code : e.key });
       setCapturing(false);
     };
-    window.addEventListener('keydown', onKey, true);
-    return () => window.removeEventListener('keydown', onKey, true);
+    return addWindowListener('keydown', onKey, true);
   }, [capturing]);
 
   return (

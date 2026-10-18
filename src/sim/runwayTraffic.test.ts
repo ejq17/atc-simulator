@@ -375,8 +375,8 @@ describe('8. line-up time of a takeoff from the hold', () => {
 
   it('the intersecting-runway estimate includes the line-up: a 13 arrival 25 s from the threshold blocks a takeoff from the hold on 22 (real KACY)', () => {
     const e = kacyEngine([HOLDING('D1', 'HP4-22-A-2', '22', 'C172', 'TWR'), ARRIVING('ARR', '13', 0.45, 'C172', 'TWR')], { dep: ['22'], land: ['13'] });
-    run(e, 1);
     expect(say(e, cmd('LAND', 'ARR', { runwayEnd: '13' }), 'TWR').status).toBe('accepted');
+    run(e, 1);
     const r = say(e, cmd('TAKEOFF', 'D1', { runwayEnd: '22' }), 'TWR');
     expect(r.status).toBe('rejected');
     if (r.status === 'rejected') expect(r.reason).toMatch(/ARR would cross the threshold of runway 13\/31/);

@@ -7,7 +7,8 @@ src/App.tsx             routes setup -> sim -> debrief from the store
 src/ui/store/
   simStore.ts           zustand store; startSession / endSession / playAgain; owns ONE Session; strip actions (strike / drop)
   session.ts            framework-free Session: engine + rAF loop + render buffer + voice + AI controllers + strip board + ATIS + scenario-event runner
-  uiStore.ts            view, drawer, layers, radar range, follow, typed-command draft, viewBus (zoom shortcuts)
+  uiStore.ts            drawer, layers, radar range, follow, typed-command draft, phone section / tab, viewBus (zoom shortcuts)
+  layoutStore.ts        panel layout (persisted) + pop-out windows; see "Panels, layout and pop-out windows"
   voiceSettings.ts      the persisted voice settings store + hook
 src/ui/commands/transmit.ts   text -> parseTransmission -> engine.applyCommand (voice AND typed)
 src/ui/display/
@@ -16,6 +17,9 @@ src/ui/display/
   viewTransform.ts      world<->screen, zoom/pan/fit; labels.ts placement + hit tests; renderBuffer.ts interpolation
   SurfaceDisplay.tsx / RadarDisplay.tsx   canvases + overlay controls; useCanvasLoop.ts
 src/ui/strips/stripModel.ts   pure strip board model (bays, print / move on handoff, marks from accepted clearances, sequence, strike, drop, notes)
+src/ui/layout/         panel system: layoutModel.ts (pure model, presets, persistence format), panelMeta.ts (ids, titles, minimum sizes), panelRegistry.tsx
+                        (id -> component), Workspace.tsx (desktop regions), GroupView.tsx (tabbed frame), MobileShell.tsx (phone), LayoutMenu.tsx,
+                        PopoutHost.tsx / popupWindow.ts (pop-out windows), windows.ts (window registry), PopupNotices.tsx
 src/ui/components/      TopBar, AircraftPanel, AircraftDetails, FlightStrips (the board), RadioPanel, CommsLog, AlertsStrip, Banners, VoiceSettingsForm, SpeakerIcon
 src/ui/drawers/         Charts (ChartViewer), Navaids (NavaidPanel), Settings, ATIS, Weather and runways
 src/ui/screens/         SetupScreen, SimScreen, DebriefScreen
@@ -24,6 +28,55 @@ src/ui/lib/             format.ts (data-block and heading/time formatting), geom
                         procedures.ts (instrument-procedure geometry for the radar)
 src/ui/references.ts    verified JO 7110.65 paragraph table (mirror of docs/FAA-REFERENCES.md)
 ```
+
+## Panels, layout and pop-out windows (`ui/layout/`)
+
+**Registry.** `PANEL_IDS` = `surface radar tower list strips details comms alerts radio charts navaids atis weather settings`. `panelMeta.ts` gives each an id, title, minimum
+size, default pop-out size, home region and phone section; `panelRegistry.tsx` maps the id to its component. Every panel component reads the shared zustand stores (or the
+session's engine) directly, so it renders identically in a docked tab, a pop-out window and a drawer. Inside a frame a `Panel` drops its own title (`PanelFrameContext`) and keeps only a slim readout row.
+
+**Regions.** The main window below the top bar (which keeps the title, speed controls, status strip, **Layout** menu, Charts / Navaids / Settings, ATIS and Runways) has three regions:
+a **main display** area, a **right column** and a **bottom row**. A region holds *groups*; a group is a set of tabs (`PanelGroup { tabs, active }`). In the right column groups stack
+top to bottom (Aircraft / Strips, then Details, which stays collapsed under the strip board exactly as before: `details-toggle`); in the bottom row they sit side by side (Comms / Alerts, Radio).
+Charts, Navaids, ATIS, Weather and Settings are hidden by default and open as drawers from the top bar; the same drawer has a pop-out button, and the Layout menu can dock them as tabs.
+An alert count chip in the status strip (and a badge on the Alerts tab) keeps conflicts visible when the Alerts tab is not showing. The right column width and bottom row height are drag handles
+(double-click resets).
+
+**Layout menu** (`layout-menu`): presets **Tower cab** (Tower view + strips + radio), **Ground** (Surface + aircraft list + comms + radio), **TRACON** (Radar + strips + radio), **Everything**
+(the original layout), a row per panel (checkbox = shown / hidden, region select, pop-out), Reopen windows, Dock all windows, Reset layout. Each frame also has a pop-out button and a "..." menu (move to
+another region, pop out, hide). Keys **1 / 2 / 3** reveal Surface / Radar / Tower wherever they are (activate the tab, raise the window, or on a phone switch the bottom-bar section).
+
+**Persistence.** The layout (`regions`, `sizes`, `popouts`) is saved to localStorage `kacy.layout.v1` on every change and validated on load (`parseLayout`: unknown panels dropped, duplicates removed,
+sizes clamped, wrong version or bad JSON -> the default layout, at least one display always present). Bump `LAYOUT_VERSION` and the key suffix together when the format changes.
+
+**Pop-out windows.** `layoutStore.popOut(id)` calls `window.open('', 'kacy-atc-<id>', 'popup,width=..,height=..,left=..,top=..')` from the click, writes a dark, full-height `#root` into the empty document, copies
+every `<style>` and `<link rel=stylesheet>` from the main head and keeps them in sync with a MutationObserver (new nodes, changed text: Vite HMR and Tailwind's injected styles), and `PopoutHost` renders the panel into
+that root with `createPortal`. The popup therefore shares the React tree, zustand stores and the single simulation of the main window: nothing is serialised or sent between windows. A popped-out panel disappears from
+the main layout and returns to the region it came from when the window closes (`beforeunload` / `unload` / `pagehide`, with a `closed` poll as a Safari fallback) or when "Dock" is pressed. All pop-outs close when the
+main window unloads and when the session ends.
+
+* **Keyboard and push-to-talk in a popup.** `windows.ts` is a registry of every simulator window; `addWindowListener` / `onEachWindow` attach a handler to the main window and to each popup. The 1/2/3, +/-, Esc, P, Enter, S/X
+  shortcuts, Esc in drawers, the PTT-key capture in Settings and the tower camera keys all use it. `PushToTalk.attachTarget(win)` (src/voice/ptt.ts) adds the same hold/toggle key handlers and blur release to a popup, wired in `SimScreen`.
+* **Canvases in a popup.** `useCanvasLoop` and the tower view size the canvas against the *container's own window* (`ownerDocument.defaultView`): that window's `devicePixelRatio`, its `ResizeObserver` and its
+  `requestAnimationFrame`. Pointer and wheel listeners are attached to the canvas element itself, so they work on any document. Limitation: the simulation clock and the render buffer run on the main window's frame loop, so keep the
+  main window visible (not minimised or fully covered) while the popups are in use; browsers throttle timers in hidden windows.
+* **Reopen windows.** The geometry (`x, y, w, h`) and home region of each open pop-out is saved. After a reload (or a new session) the panels are docked as usual and a notice offers **Reopen windows** (also in the Layout
+  menu), because browsers refuse to open windows without a click. Browsers usually allow about one pop-up per click, so with several windows press it again for the rest.
+* **Popup blocker.** `window.open` returning null shows the `popup-blocked` notice (allow pop-ups for this site and try again); the panel stays where it was.
+
+## Responsive shell
+
+Below **1024 px** (`COMPACT_QUERY`, `useCompact`) the right column and bottom row collapse: the display fills the screen and a bottom tab bar switches one section at a time: **Display** (Surface / Radar / Tower tabs),
+**Aircraft** (Aircraft / Strips / Details), **Comms** (Comms / Alerts), **Radio** (radio, PTT, command box). Test ids `mobile-shell`, `mtab-display|aircraft|comms|radio`. A large push-to-talk bar (`ptt-dock-button`, 56 px) and a
+"Type" shortcut sit above the tab bar on every section except Radio; the Radio panel's own PTT is 48 px tall. The top bar becomes a title row plus a wrapping status strip, with Charts / Navaids / Settings / End session
+in a Menu. The app root is as tall as `visualViewport.height` (CSS variable `--app-h`, falling back to `100dvh`), so the typed-command box stays above the on-screen keyboard; inputs are 16 px on coarse pointers so iOS does not zoom.
+Setup and Debrief use 16 px gutters, single columns and no fixed widths below `sm`. At 1024 px and above the desktop regions are used; the layout was checked at 360, 390, 768, 1024, 1440 and 2560 px with no horizontal overflow.
+
+**Touch.** Surface, Radar and Tower share `display/pointerGestures.ts` (Pointer Events only): one pointer drags (pan / look), two pointers pinch (Surface zoom about the midpoint, Radar steps the range, Tower field of view),
+a short press selects (larger hit radius for touch); the mouse wheel and +/- keys are unchanged. Canvases use `touch-action: none`.
+
+**Look.** Console chrome rather than web cards: gradient title bars with inset highlights (`.atc-titlebar`, `.atc-tab`, `.atc-iconbtn` in ui.css), square borders, uppercase small labels, tabular numerals, a status strip
+under the title row, phosphor green / amber accents from the existing palette. `prefers-reduced-motion` stops blinking, pulsing and sliding.
 
 ## One authoritative state
 
@@ -189,12 +242,12 @@ Status (`unsupported`, `permission_denied`, `listening`, `processing`, `error`, 
 
 ## Keyboard
 
-PTT key (default Space, configurable) · Enter focus command box · Esc deselect / close drawer · 1 / 2 Surface / Radar · + / - zoom (radar: range) · P pause · **S** strike / **X** drop the selected strip (Strips tab).
+PTT key (default Space, configurable) · Enter focus command box · Esc deselect / close drawer · 1 / 2 / 3 Surface / Radar / Tower (all of these also work while a pop-out window has focus) · + / - zoom (radar: range) · P pause · **S** strike / **X** drop the selected strip (Strips tab showing).
 
 ## Tests
 
-`npm test -- src/ui src/game src/voice` (unit: strip model, transmit AI refusal, session AI wiring and audio routing with a fake AI and a fake speech provider, comms-log AI tags,
-positions, queue / TTS audibility) and `npx playwright test --project=chromium` (e2e; starts `npm run dev` and `npm run server` unless already running).
+`npm test -- src/ui src/game src/voice` (unit: layout model / store / pop-out helper, strip model, transmit AI refusal, session AI wiring and audio routing with a fake AI and a fake speech provider, comms-log AI tags,
+positions, queue / TTS audibility) and `npx playwright test --project=chromium` (e2e, including `e2e/layout.spec.ts`: pop-out window, presets / moves, 390 px phone layout, touch gestures, overflow at 360 / 768 / 1024 / 1440 / 2560 px; starts `npm run dev` and `npm run server` unless already running).
 When another session is editing `src/` the dev server hot-reloads and resets a running simulator; run against a production build instead (the live-weather calls then go through the preview
 server's `/api` proxy because the backend allows only the 5173 origin):
 
@@ -211,6 +264,6 @@ refused, the AI clears it to land and hands it off, the strip moves to the Groun
 
 ## Limitations
 
-See "Not yet implemented" in docs/PROGRESS.md: no real-microphone automation, no mobile layout, pilot voice not radio-filtered, no weather/airspace overlays on the radar.
+See "Not yet implemented" in docs/PROGRESS.md: no real-microphone automation, phone layout is a tab bar (one panel at a time), pilot voice not radio-filtered, no weather/airspace overlays on the radar.
 IFR display: the radar draws only on-course fixes of one procedure per runway end (no feeders, holds, missed approaches or altitude restrictions); the final course
 equals the runway heading (as the engine flies it); "established" is inferred by the UI from geometry; `nav.index` fixes behind the aircraft are not drawn.

@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import type { ParsedCommand } from '../sim/types';
 import { parseTransmission } from './index';
 import { AIRCRAFT, CTX, N993EJ, type Case } from './testkit';
 
@@ -273,6 +274,69 @@ run({
     { say: 'blah blah blah', cmds: [{ kind: 'UNKNOWN' }], issue: 'no recognised instruction', conf: [0, 0.1] },
     { say: 'N723EJ', cmds: [{ kind: 'UNKNOWN', callsign: 'N723EJ' }], issue: 'no recognised instruction' },
     { say: 'thanks good day', cmds: [{ kind: 'UNKNOWN' }], issue: 'no recognised instruction' },
+  ],
+});
+
+/** Real voice-session transmissions (Whisper / Web Speech text) at KACY: taxiways incl. L M N P, runway ends 13/31 and 4/22. */
+const VOICE_CTX = {
+  ...CTX,
+  aircraft: [
+    { callsign: 'N451NL', spokenCallsign: 'November four five one november lima', type: 'C172' },
+    { callsign: 'NKS1290', spokenCallsign: 'Spirit twelve ninety', type: 'A320' },
+    { callsign: 'AAL1727', spokenCallsign: 'American seventeen twenty seven', type: 'B738' },
+    { callsign: 'N935HP', spokenCallsign: 'November nine three five hotel papa', type: 'C172' },
+    { callsign: 'N409MM', spokenCallsign: 'November four zero nine mike mike', type: 'C172' },
+    { callsign: 'AAL615', spokenCallsign: 'American six fifteen', type: 'B738' },
+    { callsign: 'NKS999', spokenCallsign: 'Spirit nine ninety nine', type: 'A320' },
+  ],
+  taxiways: ['A', 'B', 'C', 'D', 'G', 'H', 'J', 'K', 'L', 'M', 'N', 'P'],
+};
+const RWY31_VIA_LB: Partial<ParsedCommand> = { kind: 'TAXI', destination: 'RWY31', runwayEnd: '31', runwayId: '13/31', holdShort: ['RWY31'] };
+
+run({
+  'voice session: hold short without the word runway, STT slips': [
+    { say: 'Good evening, November 4, 5, 1, November Lima. Taxi to runway 31 via Lima, Mike, Papa, Bravo, hold short of 31 on Bravo.', ctx: VOICE_CTX,
+      cmds: [{ ...RWY31_VIA_LB, callsign: 'N451NL', route: ['L', 'M', 'P', 'B'] }], clean: true, conf: [0.9, 1] },
+    { say: 'Good evening, November 4, 5, 1, November Lima. Taxi to runway 31 via Lima, Mike, Papa, Bravo, hold short of runway 31 on Bravo.', ctx: VOICE_CTX,
+      cmds: [{ ...RWY31_VIA_LB, callsign: 'N451NL', route: ['L', 'M', 'P', 'B'] }], clean: true, conf: [0.9, 1] },
+    { say: 'Spirit 1290, good evening. Taxi to runway 31 via Lima, Aravo. Hold shore 31 on Bravo.', ctx: VOICE_CTX,
+      cmds: [{ ...RWY31_VIA_LB, callsign: 'NKS1290', route: ['L', 'B'] }], clean: true, conf: [0.9, 1] },
+    { say: 'American 1727 taxi to runway 31 via Lima Mike Papa Baravo hold short of runway 31 on Bravo', ctx: VOICE_CTX,
+      cmds: [{ ...RWY31_VIA_LB, callsign: 'AAL1727', route: ['L', 'M', 'P', 'B'] }], clean: true, conf: [0.9, 1] },
+    { say: 'November 935 hotel papa taxa to the ramp via a Lima', ctx: VOICE_CTX,
+      cmds: [{ kind: 'TAXI_TO_PARKING', callsign: 'N935HP', destination: 'RAMP', route: ['L'] }], clean: true, conf: [0.9, 1] },
+    { say: 'November 4, 09, Mike Mike. Tax it around way 31, Vialima, Baravo, whole chore of 31 on Baravo.', ctx: VOICE_CTX,
+      cmds: [{ ...RWY31_VIA_LB, callsign: 'N409MM', route: ['L', 'B'] }], clean: true, conf: [0.9, 1] },
+    { say: 'November 409 Mike Mike, taxi to runway 31 via Lima Baravo, hold short of 31 on Baravo.', ctx: VOICE_CTX,
+      cmds: [{ ...RWY31_VIA_LB, callsign: 'N409MM', route: ['L', 'B'] }], clean: true, conf: [0.9, 1] },
+    { say: 'American 615, Chaxi to the Terminal via Alpha, Baravo, Papa, Mike, Lima.', ctx: VOICE_CTX,
+      cmds: [{ kind: 'TAXI_TO_PARKING', callsign: 'AAL615', destination: 'TERMINAL', route: ['A', 'B', 'P', 'M', 'L'] }], clean: true, conf: [0.9, 1] },
+    { say: 'Spirit 999. Hello taxi to the terminal via Alpha Bravo Papa Mike', ctx: VOICE_CTX,
+      cmds: [{ kind: 'TAXI_TO_PARKING', callsign: 'NKS999', destination: 'TERMINAL', route: ['A', 'B', 'P', 'M'] }], clean: true, conf: [0.9, 1] },
+  ],
+
+  'hold short: bare runway number, qualifier, safety': [
+    { say: `${S} hold short of 13`, cmds: [{ kind: 'HOLD_SHORT', ...NKS, holdShort: ['RWY13'], runwayEnd: '13' }], clean: true },
+    { say: `${S} hold short of 4`, cmds: [{ kind: 'HOLD_SHORT', holdShort: ['RWY4'], runwayEnd: '4' }], clean: true },
+    { say: `${S} hold short of 22 at bravo`, cmds: [{ kind: 'HOLD_SHORT', holdShort: ['RWY22'] }], clean: true },
+    { say: `${S} hold short of 27`, cmds: [{ kind: 'HOLD_SHORT' }], issue: 'missing hold short point', conf: [0, 0.6] },
+    { say: `${S} taxi via alpha, hold short of 13 on bravo`, cmds: [{ kind: 'TAXI', route: ['A'], holdShort: ['RWY13'] }], clean: true },
+    // a taxi whose hold-short point cannot be read is never a plain taxi: one command, flagged, below the execute threshold
+    { say: `${S} taxi to runway 13 via alpha, hold short`, cmds: [{ kind: 'TAXI', destination: 'RWY13', route: ['A'] }],
+      issue: 'missing hold short point', conf: [0, 0.6] },
+    { say: `${S} taxi to the ramp via charlie, hold short of the`, cmds: [{ kind: 'TAXI_TO_PARKING', destination: 'RAMP' }],
+      issue: 'missing hold short point', conf: [0, 0.6] },
+  ],
+
+  'fuzzy keyword correction': [
+    { say: `${S} taxa to runway 13 via alpha`, cmds: [{ kind: 'TAXI', route: ['A'], destination: 'RWY13' }], clean: true },
+    { say: `${S} taxi to runway 13 via alpha, hold shord of runway 22`, cmds: [{ kind: 'TAXI', holdShort: ['RWY22'] }], clean: true },
+    { say: `${S} taxi to runway 13 viaalpha bravo`, cmds: [{ kind: 'TAXI', route: ['A', 'B'] }], clean: true },
+    { say: `${S} taxi to runway 13 via alpha branvo`, cmds: [{ kind: 'TAXI', route: ['A', 'B'] }], clean: true },
+    // words with a meaning of their own are not rewritten ("make" is not mike, "like" is not line)
+    { say: `${S} make left traffic runway 13`, cmds: [{ kind: 'ENTER_PATTERN', runwayEnd: '13' }] },
+    // typed single-letter taxiways after "via a" are untouched
+    { say: 'N723EJ taxi to runway 13 via a b', cmds: [{ kind: 'TAXI', route: ['A', 'B'] }], clean: true },
   ],
 });
 

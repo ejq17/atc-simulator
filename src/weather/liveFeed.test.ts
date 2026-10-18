@@ -70,6 +70,8 @@ describe('live METAR feed', () => {
     expect(weather).toHaveLength(1); // nothing applied: the sim keeps the last good METAR
     await vi.advanceTimersByTimeAsync(METAR_RETRY_MS); // 2nd failure
     expect(statuses.at(-1)?.kind).toBe('stale');
+    await vi.advanceTimersByTimeAsync(METAR_RETRY_MS); // backing off: the 3rd attempt is 2 x the retry interval after the 2nd failure
+    expect(f).toHaveBeenCalledTimes(3);
     await vi.advanceTimersByTimeAsync(METAR_RETRY_MS); // recovered
     expect(statuses.at(-1)).toMatchObject({ kind: 'live', observedAt: '2026-10-17T01:54:00.000Z' });
     expect(weather).toHaveLength(2);

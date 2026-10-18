@@ -33,6 +33,11 @@ export interface PushToTalk {
   release(): void;
   /** Bind pointer (mouse/touch/pen) events on an element. Returns an unbind function. */
   bindButton(el: HTMLElement): () => void;
+  /**
+   * Also listen for the key on another event target (a pop-out window). Same handlers, same state, so holding the key
+   * in a popup transmits exactly like holding it in the main window. Returns a detach function; `destroy()` detaches all.
+   */
+  attachTarget(target: Pick<EventTarget, 'addEventListener' | 'removeEventListener'>): () => void;
   destroy(): void;
 }
 
@@ -107,9 +112,23 @@ export function createPushToTalk(options: PushToTalkOptions): PushToTalk {
     if (mode === 'hold') end();
   };
 
-  target?.addEventListener('keydown', onKeyDown);
-  target?.addEventListener('keyup', onKeyUp);
-  target?.addEventListener('blur', onBlur);
+  type Target = Pick<EventTarget, 'addEventListener' | 'removeEventListener'>;
+  const attached = new Set<Target>();
+  function attach(t: Target): () => void {
+    if (attached.has(t)) return () => detach(t);
+    attached.add(t);
+    t.addEventListener('keydown', onKeyDown);
+    t.addEventListener('keyup', onKeyUp);
+    t.addEventListener('blur', onBlur);
+    return () => detach(t);
+  }
+  function detach(t: Target) {
+    if (!attached.delete(t)) return;
+    t.removeEventListener('keydown', onKeyDown);
+    t.removeEventListener('keyup', onKeyUp);
+    t.removeEventListener('blur', onBlur);
+  }
+  if (target) attach(target);
 
   const api: PushToTalk = {
     isTransmitting: () => transmitting,
@@ -166,10 +185,9 @@ export function createPushToTalk(options: PushToTalkOptions): PushToTalk {
         el.removeEventListener('contextmenu', ctx);
       };
     },
+    attachTarget: attach,
     destroy() {
-      target?.removeEventListener('keydown', onKeyDown);
-      target?.removeEventListener('keyup', onKeyUp);
-      target?.removeEventListener('blur', onBlur);
+      for (const t of [...attached]) detach(t);
       end();
     },
   };

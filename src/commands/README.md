@@ -44,7 +44,7 @@ const r = parseTransmission('Spirit four fifty one, runway one three, cleared fo
 |---|---|
 | taxi [to] runway N / ramp / parking / general aviation / FBO / gate N [via A B] [hold short of X] | `TAXI` (`destination: RWY<end>`, `route`, `holdShort`) or `TAXI_TO_PARKING` (`destination`: RAMP, PARKING, GA, FBO, TERMINAL, CARGO, HANGAR, APRON, GATE<n>) |
 | hold position / hold your position / stop | `HOLD_POSITION` (bare "hold" accepted, flagged non-standard) |
-| hold short [of] runway N / taxiway X | `HOLD_SHORT` (`holdShort: ['RWY13']` or `['A']`, plus `runwayEnd`/`runwayId`) |
+| hold short [of] runway N / N / taxiway X [on\|at taxiway Y] | `HOLD_SHORT` (`holdShort: ['RWY13']` or `['A']`, plus `runwayEnd`/`runwayId`). Inside a hold-short object the word "runway" may be left out: a bare 1-2 digit number (optional left\|right\|center or L\|R\|C) that is in `ctx.runwayEnds` is the runway ("hold short of 31 on Bravo"); without `runwayEnds` a bare number is never a runway. A trailing "on\|at <taxiway>" after a runway names where to hold; it is consumed (no field stores it, no unrecognised-words penalty) |
 | cross runway N [at/via taxiway X] | `CROSS_RUNWAY` (`crossRunwayId: '13/31'`, `runwayEnd`, crossing taxiway in `route`) |
 | line up and wait / position and hold / taxi into position | `LINE_UP_AND_WAIT` ("line up" alone is accepted but flagged) |
 | cleared for takeoff (STT: take off, clear for) | `TAKEOFF`; "fly heading/runway heading" and "turn left heading" are separate `HEADING` commands |
@@ -69,6 +69,8 @@ const r = parseTransmission('Spirit four fifty one, runway one three, cleared fo
 | execute [the] [published] missed approach, fly the published missed approach, go missed, "go around, fly the published missed approach" | `MISSED_APPROACH` (the go-around prefix is absorbed, no separate `GO_AROUND`) |
 | standalone squawk, ident, other "cleared ... approach" (NDB, TACAN), ambiguous `maintain 180` | `UNKNOWN` with an explanatory issue |
 | anything else / empty | one `UNKNOWN` with `no recognised instruction` / `empty transmission` |
+
+**Hold-short safety.** A taxi (`TAXI` / `TAXI_TO_PARKING`) whose hold-short clause is spoken but whose point cannot be read is not a plain taxi: the clause is consumed (no separate `HOLD_SHORT`), the command carries the issue `missing hold short point (runway or taxiway)` and counts as a missing required entity (`requirements.ts`), so confidence falls to about 0.5, below the 0.70 execute threshold, and the engine asks for a say-again.
 
 Runway numbers: `runway four` and `runway zero four` both give end `4`; ids are
 derived from the end (`4/22`, `13/31`). Taxiways: `alpha` -> `A`, `alpha one` -> `A1`.
@@ -119,6 +121,12 @@ equal distance -> `ambiguous fix: A or B` (no `fix`, counts as a conflict). Noth
 token goes in `fix` with issue `unknown fix X` (counts as an unknown id). Without `ctx.fixes`, one spoken
 word is accepted as the fix with no validation. Pass `spoken` hints for 5-letter fixes whose pronunciation is
 far from the spelling.
+
+### STT repair in normalisation
+
+* **Phrases and aliases** (`lexicon.ts`): "hold shore", "whole chore", "whole shore", "hole short" -> `hold short`; "tax it" -> `taxi`; "around way" -> `to runway`; taxa, chaxi, taxee -> `taxi`; vialima -> `via lima`; aravo, baravo -> `bravo`. A phrase target with spaces expands to several words sharing the raw range. "via a Lima": a lower-case raw "a" between `via` and a spelled NATO word is dropped (typed "via a b" is untouched).
+* **Fuzzy correction** (`fuzzyCorrect` in `normalize.ts`, after `repairNato`): an unknown alphabetic word of 4+ letters within Levenshtein distance 1 (4-5 letters) or 2 (6+) of exactly one core keyword (taxi, runway, hold, short, via, contact, tower, ground, cleared, cross, continue, position, parking, ramp, terminal, gate, takeoff, land, line, wait) is replaced by it; ties change nothing. `via`+NATO fusions ("viaalpha") split. A NATO word is a target only right after a NATO word or a route-context word (via, taxiway, and, then, on, taxi ...), never right after a number or callsign lead word; november and delta are never targets.
+* **Never fuzzed**: digits, lexicon words, fillers, facility and callsign-prefix words, the grammar/common-English list `FUZZ_PROTECTED` (make, like, late ...), and the words of the active callsigns and fixes (`NormalizeOptions.protectedWords`, built in `parse.ts`). Raw word ranges are kept, so `rawSlice` still works.
 
 ### Numbers and punctuation
 

@@ -409,9 +409,11 @@ describe('go-around', () => {
     run(e, 60);
     expect(ac.altitudeFt).toBeGreaterThan(alt0 + 500);
     expect(ac.onGround).toBe(false);
-    // and a fresh landing clearance resumes the approach
-    expect(e.applyCommand(cmd('LAND', 'NKS451', { runwayEnd: '13' })).status).toBe('accepted');
-    expect(ac.phase).toBe('APPROACH');
+    // a landing clearance is refused while it is still climbing out on the missed approach (not established on final), not accepted and flagged unstable a moment later
+    const again = e.applyCommand(cmd('LAND', 'NKS451', { runwayEnd: '13' }));
+    expect(again.status).toBe('rejected');
+    if (again.status === 'rejected') expect(again.reason).toMatch(/missed approach/);
+    expect(ac.phase).toBe('GO_AROUND');
   });
 
   it('goes around when the runway is occupied at the decision point even if cleared', () => {

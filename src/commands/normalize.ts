@@ -1,5 +1,6 @@
 import {
-  AIRLINES, ALIASES, DISFLUENCIES, FILLERS, GA_PREFIXES, HOMOPHONE_DIGITS, KEEP_WORDS, NATO, PHRASES, TAXIWAY_CONTEXT,
+  AIRLINES, ALIASES, DISFLUENCIES, FACILITIES, FILLERS, FUZZY_KEYWORDS, FUZZ_PROTECTED, GA_PREFIXES, HOMOPHONE_DIGITS, KEEP_WORDS, N_PREFIX_WORDS,
+  NATO, PHRASES, TAXIWAY_CONTEXT, TOWER_MISHEARD, VIA_ARTICLE,
 } from './lexicon';
 import { digitValue, evaluateNumberWords, numberWordClass } from './numbers';
 import type { NormalizedText, Token, TokenKind } from './tokens';
@@ -7,6 +8,8 @@ import type { NormalizedText, Token, TokenKind } from './tokens';
 export interface NormalizeOptions {
   /** Extra spoken-name -> ICAO prefix pairs (e.g. derived from the active aircraft list). */
   extraAirlines?: Readonly<Record<string, string>>;
+  /** Lower-case words the fuzzy corrector must leave alone (spoken callsigns, fix names ...). */
+  protectedWords?: ReadonlySet<string>;
 }
 
 interface Item { w: string; rawStart: number; rawEnd: number; pre?: TokenKind; /** raw word ended with , . ; : ! ? -> a spoken number cannot continue past it */ brk?: boolean }
@@ -33,8 +36,10 @@ export function normalize(raw: string, opts: NormalizeOptions = {}): NormalizedT
   });
   items = applyPhrases(items);
   items = applyAliases(items);
+  items = dropViaArticle(items, rawWords);
   const lead = new Set<string>([...airlines.keys(), ...GA_PREFIXES.keys(), 'november', 'delta']);
   items = repairNato(items, known, lead);
+  items = fuzzyCorrect(items, known, lead, opts.protectedWords);
   items = numberPass(items, lead);
   const tokens = resolveTokens(items, airlines);
   return { raw, rawWords, tokens, text: tokens.map((t) => t.text).join(' ') };
@@ -72,6 +77,11 @@ function applyPhrases(items: Item[]): Item[] {
     const hit = PHRASES.find((ph) => ph.words.every((w, k) => items[i + k] !== undefined && !items[i + k].pre && items[i + k].w === w));
     if (!hit) { out.push(items[i]); continue; }
     const last = items[i + hit.words.length - 1];
+    if (hit.to.text.includes(' ') && !hit.to.kind) {
+      for (const w of hit.to.text.split(' ')) out.push({ w, rawStart: items[i].rawStart, rawEnd: last.rawEnd, ...(last.brk ? { brk: true } : {}) });
+      i += hit.words.length - 1;
+      continue;
+    }
     out.push({ w: hit.to.text, pre: hit.to.kind ?? 'word', rawStart: items[i].rawStart, rawEnd: last.rawEnd, ...(last.brk ? { brk: true } : {}) });
     i += hit.words.length - 1;
   }
@@ -83,6 +93,22 @@ function applyAliases(items: Item[]): Item[] {
     const alias = it.pre ? undefined : ALIASES.get(it.w);
     return alias ? alias.map((w) => ({ ...it, w })) : [it];
   });
+}
+
+/** "via a Lima" -> "via Lima": the STT article "a" (lower-case in the raw text) before a spelled NATO word is part of "via". */
+function dropViaArticle(items: Item[], rawWords: readonly string[]): Item[] {
+  const out: Item[] = [];
+  items.forEach((it, k) => {
+    const prev = out[out.length - 1];
+    const next = items[k + 1];
+    if (!it.pre && it.w === VIA_ARTICLE && rawWords[it.rawStart] === VIA_ARTICLE && prev && !prev.pre && prev.w === 'via'
+      && next && !next.pre && NATO.has(next.w)) {
+      out[out.length - 1] = { ...prev, rawEnd: it.rawEnd, ...(it.brk ? { brk: true } : {}) };
+      return;
+    }
+    out.push(it);
+  });
+  return out;
 }
 
 /** Levenshtein edit distance. */
@@ -144,6 +170,63 @@ function repairNato(items: Item[], known: (w: string) => boolean, lead: Readonly
       }
     }
     if (split) out.push({ ...it, w: split[0] }, { ...it, w: split[1] });
+    else out.push(it);
+  }
+  return out;
+}
+
+const FUZZ_NATO = [...NATO.keys()].filter((w) => w.length >= 4 && NATO.get(w) !== 'n' && NATO.get(w) !== 'd');
+/** NATO words after which a spelled letter is expected (a taxiway list): the only place a NATO word is fuzz-corrected. */
+const ROUTE_CONTEXT: ReadonlySet<string> = new Set([...TAXIWAY_CONTEXT, 'taxi', 'taxiing']);
+
+/** Allowed edit distance for an unknown word of length n: 1 for 4-5 letters, 2 from 6, none below 4. */
+const fuzzLimit = (n: number): number => (n >= 6 ? 2 : n >= 4 ? 1 : -1);
+
+/**
+ * The single replacement within the fuzz distance of `w` among `candidates` (mapped through `out`), or null when none
+ * is close enough or two different replacements tie.
+ */
+function uniqueNear(w: string, candidates: readonly string[], out: (c: string) => string): string | null {
+  const limit = fuzzLimit(w.length);
+  let best: string | null = null;
+  let bestD = Infinity;
+  let tie = false;
+  for (const c of candidates) {
+    if (Math.abs(c.length - w.length) > limit) continue;
+    const d = editDistance(w, c);
+    if (d > limit) continue;
+    if (d < bestD) { best = out(c); bestD = d; tie = false; } else if (d === bestD && out(c) !== best) tie = true;
+  }
+  return tie ? null : best;
+}
+
+/**
+ * General STT repair: an unknown word within Levenshtein distance 1 (4-5 letters) or 2 (6+) of exactly one core
+ * instruction keyword ("taxa" -> taxi, "shore" -> short) or, in a taxiway list, one NATO word ("branvo" -> bravo) is
+ * replaced by it. "viaLima" style fusions become "via lima". Left alone: digits, anything the lexicon, grammar or the
+ * active aircraft/fixes give a meaning to, callsign lead words, and NATO corrections right after a number or callsign
+ * lead (those are callsign letters; `repairNato` owns them). The raw word range is kept for `rawSlice`.
+ */
+function fuzzyCorrect(items: Item[], known: (w: string) => boolean, lead: ReadonlySet<string>, protectedWords?: ReadonlySet<string>): Item[] {
+  const out: Item[] = [];
+  for (const it of items) {
+    const prev = out[out.length - 1];
+    const w = it.w;
+    const unknown = !it.pre && /^[a-z]{4,}$/.test(w) && !known(w) && !FILLERS.has(w) && !FUZZ_PROTECTED.has(w)
+      && !protectedWords?.has(w) && numberWordClass(w) === null && !HOMOPHONE_DIGITS.has(w) && !FACILITIES.has(w)
+      && !N_PREFIX_WORDS.has(w) && !TOWER_MISHEARD.has(w) && !TAXIWAY_CONTEXT.has(w) && !lead.has(w)
+      && !FUZZY_KEYWORDS.includes(w);
+    if (!unknown) { out.push(it); continue; }
+    if (w.startsWith('via') && w.length >= 7) {
+      const rest = nearestNato(w.slice(3));
+      if (rest && editDistance(w.slice(3), rest) <= 1) { out.push({ ...it, w: 'via' }, { ...it, w: rest }); continue; }
+    }
+    const keyword = uniqueNear(w, FUZZY_KEYWORDS, (c) => c);
+    if (keyword) { out.push({ ...it, w: keyword }); continue; }
+    const afterCallsign = prev !== undefined && (prev.pre === 'number' || /^\d+$/.test(prev.w) || numberWordClass(prev.w) !== null || lead.has(prev.w));
+    const routeish = prev !== undefined && !prev.pre && (NATO.has(prev.w) || ROUTE_CONTEXT.has(prev.w));
+    const letter = !afterCallsign && routeish ? uniqueNear(w, FUZZ_NATO, (c) => NATO.get(c) as string) : null;
+    if (letter) out.push({ ...it, w: [...NATO.entries()].find(([k, v]) => v === letter && k.length >= 4)?.[0] ?? w });
     else out.push(it);
   }
   return out;

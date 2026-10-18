@@ -23,6 +23,15 @@ function deriveAirlines(aircraft: readonly AircraftRef[]): Record<string, string
   return out;
 }
 
+/** Words of the active callsigns and fixes: never fuzz-corrected into instruction words. */
+function protectedWords(ctx: ParseContext): ReadonlySet<string> {
+  const words = new Set<string>();
+  const add = (s: string | undefined) => { for (const w of (s ?? '').toLowerCase().match(/[a-z]+/g) ?? []) words.add(w); };
+  for (const ac of ctx.aircraft) add(ac.spokenCallsign);
+  for (const f of ctx.fixes ?? []) { add(f.id); add(f.name); add(f.spoken); }
+  return words;
+}
+
 /** Contiguous runs of unconsumed tokens: [start, end). */
 function leftoverRuns(consumed: readonly boolean[]): [number, number][] {
   const runs: [number, number][] = [];
@@ -51,7 +60,7 @@ function maskCallsign(tokens: readonly Token[], cs: CallsignResolution): { toks:
 }
 
 export function parse(text: string, ctx: ParseContext): ParseResult {
-  const norm: NormalizedText = normalize(text, { extraAirlines: deriveAirlines(ctx.aircraft) });
+  const norm: NormalizedText = normalize(text, { extraAirlines: deriveAirlines(ctx.aircraft), protectedWords: protectedWords(ctx) });
   const cs = resolveCallsign(norm.tokens, ctx.aircraft);
   const { toks, masked } = maskCallsign(norm.tokens, cs);
   const { drafts, consumed } = assemble(scan(toks, buildRules(ctx)), toks.length, masked);

@@ -46,11 +46,9 @@ describe('<ChartViewer />', () => {
     expect(link).toHaveAttribute('href', 'https://aeronav.faa.gov/d-tpp/2610/00669AD.PDF');
     expect(link).toHaveAttribute('rel', expect.stringContaining('noopener'));
 
-    // proxy first
+    // the bundled same-origin copy first
     await waitFor(() => expect(getDocument).toHaveBeenCalled());
-    expect((fetch as unknown as ReturnType<typeof vi.fn>).mock.calls[0][0]).toBe(
-      `/api/charts/pdf?url=${encodeURIComponent('https://aeronav.faa.gov/d-tpp/2610/00669AD.PDF')}`,
-    );
+    expect((fetch as unknown as ReturnType<typeof vi.fn>).mock.calls[0][0]).toBe('/charts/KACY/00669AD.PDF');
     await waitFor(() => expect(screen.getByTestId('page-indicator')).toHaveTextContent('Page 1 / 2'));
   });
 
@@ -77,7 +75,7 @@ describe('<ChartViewer />', () => {
     expect(zout).toBeDisabled();
   });
 
-  it('shows the proxy-down explanation when neither proxy nor direct fetch works', async () => {
+  it('shows the proxy-down explanation when the bundled copy, the proxy and the direct fetch all fail', async () => {
     vi.stubGlobal('fetch', vi.fn(async () => {
       throw new TypeError('Failed to fetch');
     }));
@@ -90,12 +88,21 @@ describe('<ChartViewer />', () => {
     expect(getDocument).not.toHaveBeenCalled();
   });
 
-  it('falls back to the direct URL when the proxy fails', async () => {
-    const f = vi.fn(async (url: string) => (url.startsWith('/api/charts') ? new Response('bad gateway', { status: 502 }) : pdfBytes()));
+  it('falls back to the proxy when no bundled copy exists', async () => {
+    const f = vi.fn(async (url: string) => (url.startsWith('/charts/') ? new Response('nope', { status: 404 }) : pdfBytes()));
+    vi.stubGlobal('fetch', f);
+    render(<ChartViewer />);
+    await waitFor(() => expect(getDocument).toHaveBeenCalled());
+    expect(f.mock.calls.map((c) => c[0])).toEqual(['/charts/KACY/00669AD.PDF', expect.stringContaining('/api/charts/pdf')]);
+  });
+
+  it('falls back to the direct URL when the bundled copy and the proxy both fail', async () => {
+    const f = vi.fn(async (url: string) => (url.startsWith('/charts/') || url.startsWith('/api/charts') ? new Response('bad gateway', { status: 502 }) : pdfBytes()));
     vi.stubGlobal('fetch', f);
     render(<ChartViewer />);
     await waitFor(() => expect(getDocument).toHaveBeenCalled());
     expect(f.mock.calls.map((c) => c[0])).toEqual([
+      '/charts/KACY/00669AD.PDF',
       expect.stringContaining('/api/charts/pdf'),
       'https://aeronav.faa.gov/d-tpp/2610/00669AD.PDF',
     ]);

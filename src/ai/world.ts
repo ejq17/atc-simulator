@@ -29,6 +29,38 @@ export function etaToThresholdSec(ac: Aircraft, g: RunwayEndGeom): number {
   return (distToThresholdNm(ac, g) / kt) * 3600;
 }
 
+/**
+ * Speed (kt) an inbound aircraft will hold toward the threshold: its ground speed, or the speed restriction it is already slowing to
+ * (or `assignedKt`, the restriction the controller is about to give), never below the approach speed unless it is already slower.
+ */
+export function inboundSpeedKt(ac: Aircraft, assignedKt?: number): number {
+  const vApp = getPerformance(ac.type).approachSpeedKt;
+  const cap = assignedKt ?? ac.target.speedKt ?? ac.groundSpeedKt;
+  return Math.max(Math.min(ac.groundSpeedKt, cap), Math.min(ac.groundSpeedKt, vApp), 1);
+}
+
+export interface ProjectedGap {
+  /** In-trail distance between the two now, nm (follower's distance to the threshold minus the leader's). */
+  nowNm: number;
+  /** Follower's distance to the threshold when the leader crosses it, nm: the in-trail gap at the leader's threshold crossing. */
+  atLeaderThresholdNm: number;
+  /** Smaller of the two (the gap is linear in between, so this is its minimum until the leader's threshold). */
+  minNm: number;
+}
+
+/**
+ * The gap between a follower and the arrival ahead of it on the same final, projected to the moment the leader crosses the threshold
+ * (the leader's ETA from `etaToThresholdSec`, the follower flying on at `inboundSpeedKt`). A fast jet behind a slow single closes at
+ * about a mile a minute: the gap that exists at the approach clearance is not the gap that matters.
+ */
+export function projectedGapNm(follower: Aircraft, leader: Aircraft, g: RunwayEndGeom, assignedKt?: number): ProjectedGap {
+  const dF = distToThresholdNm(follower, g);
+  const nowNm = dF - distToThresholdNm(leader, g);
+  const tL = etaToThresholdSec(leader, g);
+  const atLeaderThresholdNm = dF - (inboundSpeedKt(follower, assignedKt) * tL) / 3600;
+  return { nowNm, atLeaderThresholdNm, minNm: Math.min(nowNm, atLeaderThresholdNm) };
+}
+
 /** Airborne arrival that has not landed (and is not already on a missed approach). */
 export function isInboundArrival(ac: Aircraft): boolean {
   return !ac.isDeparture && !ac.onGround && ['INBOUND', 'APPROACH', 'FINAL', 'LANDING', 'PATTERN'].includes(ac.phase);

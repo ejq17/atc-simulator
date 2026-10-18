@@ -12,7 +12,7 @@
 import type {
   Aircraft, Airport, Clearance, ClearanceKind, CommandOutcome, ControllerPositionId, ParsedCommand, Runway, TaxiNode, TaxiwayGraph, Vec2,
 } from './types';
-import { dist, ftToM, magneticToTrue } from './geo';
+import { dist, ftToM, headingDiff, magneticToTrue, nmToM } from './geo';
 import {
   activeClearance, advancePhase, completeClearances, emitEvent, getRuntime, perfOf, pilotSay, setPhase, speechDurationSec,
 } from './context';
@@ -24,7 +24,7 @@ import type { TaxiRoute } from './pathfinding';
 import { pickRunwayHold, runwayHoldCandidates, runwayRemainingM, takeoffRunM } from './holdSelection';
 import { spokenTaxiway } from '../radio/spoken';
 import { computeStopNodes } from './groundMovement';
-import { initiateGoAround } from './flightDynamics';
+import { glideAltitudeFt, initiateGoAround } from './flightDynamics';
 import { freeParkingCandidates, parkingOccupant, resolveParkingQuery } from './parkingResolver';
 import { assessClearanceSafety, recordUnsafeClearance } from './conflicts';
 import { frequencyById, frequencyByMhz, frequencyForPosition, hearsFrequency, formatMhz } from '../radio/frequencies';
@@ -897,6 +897,27 @@ function planLahso(env: Env, g: RunwayEndGeom): { reject: Reject } | { holdShort
 
 const spokenRunwayForPhrase = (id: string): string => spokenRunway(id);
 
+/** Aligned within this many degrees of the final course, no higher than the 3-degree path + the window, and at least this far out. */
+const REESTABLISH_ALIGN_DEG = 15;
+const REESTABLISH_ABOVE_PATH_FT = 300;
+const REESTABLISH_MIN_NM = 2;
+const GO_AROUND_RECENT_SEC = 300;
+
+/** Why a go-around aircraft is not yet stable on final for `g` (undefined: stable, or not on a missed approach). */
+function goAroundNotStabilised(env: Env, g: RunwayEndGeom): string | undefined {
+  const { ac, rt, ctx } = env;
+  const recent = ac.lastGoAroundSec !== undefined && ctx.state.clock.timeSec - ac.lastGoAroundSec < GO_AROUND_RECENT_SEC;
+  const onMissed = ac.phase === 'GO_AROUND' || (rt.missedFlown === true && recent && (ac.phase === 'APPROACH' || ac.phase === 'INBOUND'));
+  if (!onMissed) return undefined;
+  const { along, cross } = alongCross(g, ac.pos);
+  const dM = Math.max(0, -along);
+  const problems: string[] = [];
+  if (along > 0 || dM < nmToM(REESTABLISH_MIN_NM)) problems.push(`inside ${REESTABLISH_MIN_NM} nm of the threshold`);
+  if (Math.abs(headingDiff(ac.headingDeg, g.headingDeg)) > REESTABLISH_ALIGN_DEG || Math.abs(cross) > nmToM(0.5)) problems.push(`not aligned with the final course (within ${REESTABLISH_ALIGN_DEG} degrees)`);
+  if (ac.altitudeFt > glideAltitudeFt(g.elevationFt, dM) + REESTABLISH_ABOVE_PATH_FT) problems.push('above the 3 degree path');
+  return problems.length ? problems.join(', ') : undefined;
+}
+
 function planLand(env: Env): PlanResult {
   const { ac, rt, ctx } = env;
   const g = env.g!;
@@ -909,6 +930,11 @@ function planLand(env: Env): PlanResult {
   if (ac.assignedRunwayEnd && ac.assignedRunwayEnd !== g.end.id && ac.phase === 'FINAL') {
     return unable(env, `${ac.callsign} is established on final for runway ${ac.assignedRunwayEnd}.`, `we're established on final for runway ${ac.assignedRunwayEnd}`, false);
   }
+  // A missed approach that has not been re-established on final cannot take a landing clearance: the pilot is climbing out / being
+  // re-sequenced (JO 7110.65 5-8-3 / 3-10-5: the clearance is issued to an aircraft that can land). Accepting it only to go around a
+  // moment later ("unstable approach") would be a false clearance.
+  const unstable = goAroundNotStabilised(env, g);
+  if (unstable) return unable(env, `${ac.callsign} is on a missed approach and is not established for runway ${g.end.id}: ${unstable}.`, "unable, we're going around");
   const lahso = planLahso(env, g);
   if ('reject' in lahso) return lahso;
   return {

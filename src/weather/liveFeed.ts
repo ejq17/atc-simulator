@@ -6,6 +6,7 @@
  */
 import type { Weather } from '../sim/types';
 import type { LiveMetar } from './liveWeather';
+import { LiveWeatherError } from './liveWeather';
 
 export type LiveFeedStatus =
   | { kind: 'live'; observedAt: string; raw: string; checkedAtMs: number }
@@ -16,6 +17,7 @@ export type LiveFeedStatus =
 
 export const METAR_POLL_MS = 5 * 60 * 1000;
 export const METAR_RETRY_MS = 60 * 1000;
+// Failed polls back off exponentially from `retryMs` (60 s, 2 min, 4 min ...) up to the normal poll interval.
 
 export interface LiveFeedOptions {
   fetchMetar(): Promise<LiveMetar>;
@@ -47,6 +49,7 @@ export function createLiveFeed(o: LiveFeedOptions): LiveFeed {
   let last: LiveMetar | undefined = o.initial;
   let status: LiveFeedStatus | undefined;
   let inFlight = false;
+  let failures = 0;
 
   const set = (s: LiveFeedStatus) => {
     status = s;
@@ -77,13 +80,17 @@ export function createLiveFeed(o: LiveFeedOptions): LiveFeed {
           last = m;
           o.onWeather(m.weather, m);
         }
+        failures = 0;
         set({ kind: 'live', observedAt: last!.observedAt, raw: last!.raw, checkedAtMs: now() });
         schedule(poll);
       } catch (err) {
         if (stopped) return;
         const error = err instanceof Error ? err.message : String(err);
         set(last ? { kind: 'stale', observedAt: last.observedAt, raw: last.raw, error, failedAtMs: now() } : { kind: 'fallback', error, failedAtMs: now() });
-        schedule(retry);
+        failures += 1;
+        // No backend on this hosting (static build): retrying cannot help, so only look again at the normal cadence.
+        const permanent = err instanceof LiveWeatherError && err.code === 'STATIC_HOSTING';
+        schedule(permanent ? poll : Math.min(retry * 2 ** (failures - 1), poll));
       } finally {
         inFlight = false;
       }

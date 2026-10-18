@@ -12,6 +12,7 @@ import { fitBounds, worldToScreen } from './viewTransform';
 import { buildSurfaceStatic } from './surfaceStatic';
 import { poseOf } from './renderBuffer';
 import type { Frame } from './frame';
+import { GLYPH_HALF, glyphFor, glyphPath, symbolSize } from './symbols';
 
 const airport = loadKacy();
 const nodeId = (e: unknown) => (e as { node?: { id: string }; id?: string }).node?.id ?? (e as { id: string }).id;
@@ -237,5 +238,82 @@ describe('MVA layer on the radar', () => {
     expect(mvaVisible({ ...airport, mvaSectors: [] }, DEFAULT_RADAR_LAYERS, 40)).toBe(false);
     expect(() => textsAt(none, 40)).not.toThrow();
     expect(textsAt(none, 40)).not.toContain('025');
+  });
+});
+
+describe('aircraft glyphs', () => {
+  interface Rec { ops: string[]; xs: number[]; ys: number[] }
+  const record = (halfLen: number, type?: string): Rec => {
+    const r: Rec = { ops: [], xs: [], ys: [] };
+    const ctx = {
+      beginPath: () => r.ops.push('begin'),
+      closePath: () => r.ops.push('close'),
+      moveTo: (x: number, y: number) => { r.ops.push('move'); r.xs.push(x); r.ys.push(y); },
+      lineTo: (x: number, y: number) => { r.ops.push('line'); r.xs.push(x); r.ys.push(y); },
+    } as unknown as CanvasRenderingContext2D;
+    glyphPath(ctx, halfLen, type);
+    return r;
+  };
+  const FAMILIES: [string, string][] = [
+    ['A320', 'narrowbody'], ['B738', 'narrowbody'], ['CRJ9', 'regionalJet'], ['E175', 'narrowbody'], ['DH8D', 'turboprop'], ['C208', 'turbopropSingle'],
+    ['C25B', 'bizjet'], ['GLF4', 'bizjet'], ['C172', 'gaHigh'], ['PA28', 'gaLow'],
+  ];
+  it('has a closed path for every family, starting at the nose and ending closed', () => {
+    for (const [type, family] of FAMILIES) {
+      const g = glyphFor(type);
+      expect(g.family).toBe(family);
+      const r = record(20, type);
+      expect(r.ops[0]).toBe('begin');
+      expect(r.ops[1]).toBe('move');
+      expect(r.ops[r.ops.length - 1]).toBe('close');
+      expect(r.ops.filter((o) => o === 'move').length).toBe(r.ops.filter((o) => o === 'close').length); // every sub-path is closed
+      expect(r.xs[0]).toBeCloseTo(0, 9);
+      expect(r.ys[0]).toBeCloseTo(-20, 9); // nose at -y (up the screen)
+      for (const v of [...r.xs, ...r.ys]) expect(Number.isFinite(v)).toBe(true);
+      expect(g.half[0][0]).toBe(0);
+      expect(g.half[g.half.length - 1][0]).toBe(0); // the outline meets the centreline at the tail
+    }
+  });
+  it('is symmetric about the centreline and sized by symbolSize (true span and length)', () => {
+    for (const [type] of FAMILIES) {
+      const size = symbolSize({ type }, 3); // 3 px per metre
+      const r = record(size.halfLenPx, type);
+      expect(Math.min(...r.xs)).toBeCloseTo(-Math.max(...r.xs), 6);
+      const g = glyphFor(type);
+      expect(Math.max(...r.xs)).toBeCloseTo(g.spanRatio * size.halfLenPx, 6); // half the wingspan in px
+      // length: nose to tail within the glyph's half length (propeller bars may stick out a few percent)
+      expect(Math.min(...r.ys)).toBeLessThanOrEqual(-size.halfLenPx + 1e-9);
+      expect(Math.min(...r.ys)).toBeGreaterThan(-size.halfLenPx * 1.06);
+      expect(Math.max(...r.ys)).toBeCloseTo(size.halfLenPx, 6);
+    }
+    // never below the readable minimum, true to scale when zoomed in
+    expect(symbolSize({ type: 'C172' }, 0.01).halfLenPx).toBe(7);
+    expect(symbolSize({ type: 'A320' }, 0.01).halfLenPx).toBe(10);
+    expect(symbolSize({ type: 'A320' }, 10).halfLenPx).toBeCloseTo((37.6 * 10) / 2, 9);
+  });
+  it('differs by family: swept jet vs straight prop wing, T-tail jets, aft vs underwing engines', () => {
+    const a320 = glyphFor('A320');
+    const c172 = glyphFor('C172');
+    const crj = glyphFor('CRJ9');
+    expect(a320.spanRatio).toBeGreaterThan(0.9);
+    expect(c172.spanRatio).toBeGreaterThan(1.2);
+    expect(crj.spanRatio).toBeLessThan(0.75);
+    expect(a320.bars.length).toBe(0);
+    expect(c172.bars.length).toBe(1); // propeller
+    expect(glyphFor('DH8D').bars.length).toBe(1); // twin props, mirrored
+    expect(glyphFor('DH8D').bars[0].mirror).toBe(true);
+    // swept wing: the tip leading edge is well aft of the root leading edge for the airliner, level for the Cessna
+    const tipLe = (g: ReturnType<typeof glyphFor>) => g.half.filter(([x]) => Math.abs(x - g.spanRatio) < 1e-9)[0][1];
+    const rootLe = (g: ReturnType<typeof glyphFor>) => g.half.find(([x]) => x === g.fuselageHalfWidth && x > 0)!;
+    void rootLe;
+    expect(tipLe(a320)).toBeGreaterThan(0.1);
+    expect(tipLe(c172)).toBeLessThan(tipLe(a320));
+    expect(glyphFor('A320')).toBe(glyphFor('A320')); // cached
+  });
+  it('falls back to the original generic outline without a type', () => {
+    const r = record(10);
+    expect(r.ops.filter((o) => o === 'move').length).toBe(1);
+    expect(Math.max(...r.xs)).toBeCloseTo(GLYPH_HALF.reduce((m, [x]) => Math.max(m, x), 0) * 10, 9);
+    expect(r.ops[r.ops.length - 1]).toBe('close');
   });
 });

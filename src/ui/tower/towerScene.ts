@@ -9,11 +9,13 @@ import { simUtcMs } from '../../sim/solar';
 import type { Pose } from '../display/renderBuffer';
 import { runwayLabels } from '../display/surfaceStatic';
 import {
-  extrudeMesh, holdBarRects, markingsMesh, mergeMeshes, offsetPolyline, polygonMesh, ribbonMesh, runwayLights, runwayMarkings, samplePolyline,
+  FT, extrudeMesh, holdBarRects, markingsMesh, mergeMeshes, offsetPolyline, polygonMesh, ribbonMesh, runwayLights, runwayMarkings, samplePolyline,
   taxiwaySigns, toScene,
 } from './geometry';
 import type { LightColour, LightPoint, MeshData } from './geometry';
-import { aircraftDims, aircraftParts, billboardWorldHeight, placeAircraft, withinRange } from './aircraftModel';
+import { bankFromTurnRate, billboardWorldHeight, gearDown, lightState, modelPitchRad, placeAircraft, withinRange } from './aircraftModel';
+import { createAircraftFactory } from './aircraftMeshes';
+import type { AircraftModel } from './aircraftMeshes';
 import { lookAtPoint, eyeScene } from './cameraMath';
 import type { CamState } from './cameraMath';
 import { CAB_EYE_HEIGHT_M } from './towerPosition';
@@ -320,17 +322,7 @@ export function createTowerScene(canvas: HTMLCanvasElement, airport: Airport, si
   scene.add(cloud);
 
   // ---- aircraft ---------------------------------------------------------------------------------------------------------
-  const boxGeo = own(new THREE.BoxGeometry(1, 1, 1));
-  const cylGeo = own(new THREE.CylinderGeometry(1, 1, 1, 10));
-  cylGeo.rotateX(Math.PI / 2); // axis along z
-  const partMats = new Map<string, THREE.MeshLambertMaterial>();
-  const partMat = (name: string, color: number) => {
-    let m = partMats.get(name);
-    if (!m) { m = own(new THREE.MeshLambertMaterial({ color })); partMats.set(name, m); }
-    return m;
-  };
-  const ACCENTS = [0x1f5fbf, 0xd03a2e, 0x2e9a5b, 0xe0a020, 0x7a3fb5, 0x20a0b0, 0xc0c0c0];
-  const hashStr = (s: string) => { let h = 7; for (const c of s) h = (h * 31 + c.charCodeAt(0)) >>> 0; return h; };
+  const factory = own(createAircraftFactory());
 
   const dotTex = own(canvasTexture(32, 32, (ctx) => {
     ctx.fillStyle = '#ffffff';
@@ -348,13 +340,20 @@ export function createTowerScene(canvas: HTMLCanvasElement, airport: Airport, si
 
   interface AcObj {
     group: THREE.Group;
+    /** Yaw about the vertical; `tilt` (pitch and roll about the main gear) is its child and holds the model root. */
     model: THREE.Group;
+    tilt: THREE.Group;
+    m: AircraftModel;
+    prevHeading: number;
+    prevMs: number;
+    turnRate: number;
+    bank: number;
     label: THREE.Sprite;
     labelKey: string;
     marker: THREE.Points;
     ring: THREE.Points;
     lights: THREE.Points;
-    dims: ReturnType<typeof aircraftDims>;
+    dims: AircraftModel['dims'];
     ownTextures: THREE.Texture[];
   }
   const aircraft = new Map<string, AcObj>();
@@ -374,20 +373,14 @@ export function createTowerScene(canvas: HTMLCanvasElement, airport: Airport, si
   });
 
   const makeAircraft = (ac: Aircraft, selected: boolean): AcObj => {
-    const dims = aircraftDims(ac.type);
+    const m = factory.build(ac.type, ac.callsign);
+    const dims = m.dims;
     const group = new THREE.Group();
     const model = new THREE.Group();
-    model.rotation.order = 'YXZ';
-    const accent = ACCENTS[hashStr(ac.callsign.replace(/\d.*/, '')) % ACCENTS.length];
-    for (const p of aircraftParts(ac.type)) {
-      const color = p.colour === 'body' ? 0xeceff2 : p.colour === 'wing' ? 0xd2d7dc : p.colour === 'dark' ? 0x2b2e33 : accent;
-      const mat = partMat(`${p.colour}${p.colour === 'accent' ? accent : ''}`, color);
-      const m = new THREE.Mesh(p.shape === 'box' ? boxGeo : cylGeo, mat);
-      if (p.shape === 'box') m.scale.set(p.size[0], p.size[1], p.size[2]);
-      else m.scale.set(p.size[0], p.size[0], p.size[1]);
-      m.position.set(p.pos[0], p.pos[1], p.pos[2]);
-      model.add(m);
-    }
+    const tilt = new THREE.Group();
+    tilt.rotation.order = 'XYZ';
+    tilt.add(m.root);
+    model.add(tilt);
     group.add(model);
     const tex = makeLabelTexture(ac.callsign, selected);
     const label = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, depthTest: false, fog: false, transparent: true }));
@@ -409,10 +402,10 @@ export function createTowerScene(canvas: HTMLCanvasElement, airport: Airport, si
     marker.renderOrder = 29;
     const ring = mkPts(1, 30 * dpr, ringTex, 0x39c5e8, false);
     ring.renderOrder = 29;
-    const lights = mkPts(5, 6 * dpr, glowTex, 0xffffff, true);
+    const lights = mkPts(8, 10 * dpr, glowTex, 0xffffff, true);
     lights.renderOrder = 15;
     scene.add(group, marker, ring, lights);
-    return { group, model, label, labelKey: `${ac.callsign}|${selected}`, marker, ring, lights, dims, ownTextures: [tex] };
+    return { group, model, tilt, m, prevHeading: 0, prevMs: -1, turnRate: 0, bank: 0, label, labelKey: `${ac.callsign}|${selected}`, marker, ring, lights, dims, ownTextures: [tex] };
   };
 
   const disposeAircraft = (o: AcObj) => {
@@ -463,6 +456,7 @@ export function createTowerScene(canvas: HTMLCanvasElement, airport: Airport, si
     sunDot.position.set(sv[0] * 100_000, sv[1] * 100_000, sv[2] * 100_000);
     for (const m of winGlow) m.emissive.setRGB(0.1 * sky.night, 0.09 * sky.night, 0.06 * sky.night);
     for (const m of lightMats) m.opacity = Math.min(1, sky.night * 1.15);
+    factory.setNight(sky.night);
     cloud.visible = !!deck;
     if (deck) {
       cloud.position.y = deck.baseM;
@@ -476,7 +470,6 @@ export function createTowerScene(canvas: HTMLCanvasElement, airport: Airport, si
   const eyeH = CAB_EYE_HEIGHT_M;
   const eye = eyeScene(site.pos, eyeH);
   const v3 = new THREE.Vector3();
-  const lightPulse = (nowMs: number, period: number, duty: number) => ((nowMs % period) / period < duty ? 1 : 0);
 
   const render = (f: TowerFrame) => {
     const sky = applySky(f.state);
@@ -510,7 +503,31 @@ export function createTowerScene(canvas: HTMLCanvasElement, airport: Airport, si
       if (!o) { o = makeAircraft(ac, selected); aircraft.set(ac.id, o); }
       const pl = placeAircraft(ac, pose, elevFt);
       o.group.position.set(pl.x, pl.y, pl.z);
-      o.model.rotation.set(pl.pitchRad, pl.yawRad, 0);
+      o.model.rotation.y = pl.yawRad;
+      const aglFt = pl.y / FT;
+      const fs = { onGround: ac.onGround, aglFt, verticalSpeedFpm: ac.verticalSpeedFpm, phase: ac.phase };
+      o.m.gear.visible = gearDown(o.dims.family, fs);
+      // Bank from the heading change per second of simulated time (smoothed); no bank on the ground.
+      const wallDt = o.prevMs < 0 ? 0 : Math.max(0, (f.nowMs - o.prevMs) / 1000);
+      const simDt = wallDt * f.state.clock.speed;
+      if (simDt > 1e-4) {
+        let dh = pose.headingDeg - o.prevHeading;
+        dh = ((((dh + 180) % 360) + 360) % 360) - 180;
+        o.turnRate += (dh / simDt - o.turnRate) * (1 - Math.exp(-wallDt / 0.6));
+      }
+      if (wallDt > 0) { o.prevHeading = pose.headingDeg; o.prevMs = f.nowMs; } else if (o.prevMs < 0) { o.prevHeading = pose.headingDeg; o.prevMs = f.nowMs; }
+      const bankTarget = ac.onGround ? 0 : bankFromTurnRate(o.turnRate, pose.groundSpeedKt);
+      o.bank += (bankTarget - o.bank) * (wallDt > 0 ? 1 - Math.exp(-wallDt / 0.4) : 0);
+      const pitch = modelPitchRad(ac.type, { ...fs, groundSpeedKt: pose.groundSpeedKt });
+      o.tilt.rotation.set(pitch, 0, -o.bank);
+      // Tilt about the main gear contact point rather than the middle of the fuselage.
+      v3.set(0, 0, o.m.pivotZ).applyEuler(o.tilt.rotation);
+      o.tilt.position.set(-v3.x, -v3.y, o.m.pivotZ - v3.z);
+      const running = !ac.onGround || (ac.phase !== 'PARKED' && ac.phase !== 'ARRIVED');
+      for (const pr of o.m.props) {
+        pr.rotation.z = running ? (f.nowMs * 0.045) % (Math.PI * 2) : 0;
+        if (pr.children[0]) pr.children[0].visible = running;
+      }
       const dist = Math.hypot(pl.x - eye[0], pl.y - eye[1], pl.z - eye[2]);
       const lh = billboardWorldHeight(dist, f.cam.fovDeg, viewH, 22);
       const showLabel = !ac.onGround || dist < 4500;
@@ -527,33 +544,35 @@ export function createTowerScene(canvas: HTMLCanvasElement, airport: Airport, si
       ringPos.setXYZ(0, pl.x, pl.y + o.dims.heightM * 0.5, pl.z);
       ringPos.needsUpdate = true;
       o.ring.visible = selected;
-      // Lights: position/colour of nav, strobe, beacon, landing. Red/green wing tips, white tail, red beacon, white landing light.
+      // Lights (nav, strobes, beacons, landing) sit at the model's own anchors, carried through its attitude.
       const lp = o.lights.geometry.getAttribute('position');
       const lc = o.lights.geometry.getAttribute('color');
-      const half = o.dims.wingspanM / 2;
-      const L = o.dims.lengthM;
-      const baseY = o.dims.heightM * 0.45;
-      o.model.updateMatrix();
-      const place = (i: number, x: number, y: number, z: number) => {
-        v3.set(x, y, z).applyEuler(o!.model.rotation).add(o!.group.position);
+      o.group.updateMatrixWorld(true);
+      const an = o.m.anchors;
+      const place = (i: number, a: [number, number, number]) => {
+        v3.set(a[0], a[1], a[2]).applyMatrix4(o!.m.root.matrixWorld);
         lp.setXYZ(i, v3.x, v3.y, v3.z);
       };
-      place(0, -half, baseY, L * 0.05);
-      place(1, half, baseY, L * 0.05);
-      place(2, 0, baseY * 1.9, L * 0.48);
-      place(3, 0, o.dims.heightM * 0.95, 0);
-      place(4, 0, baseY * 0.5, -L * 0.45);
+      place(0, an.tipLeft);
+      place(1, an.tipRight);
+      place(2, an.tail);
+      place(3, an.tipLeft);
+      place(4, an.tipRight);
+      place(5, an.beaconTop);
+      place(6, an.beaconBelly);
+      place(7, an.landing);
       lp.needsUpdate = true;
       const lightsOn = night > 0.05 || f.state.weather.visibilitySm < 3;
-      const landing = !ac.onGround ? (ac.altitudeFt - elevFt < 10000) : /TAKEOFF|LINE_UP|LANDING|ROLLOUT/.test(ac.phase);
-      const strobe = lightPulse(f.nowMs + (ac.seed % 700), 1100, 0.07);
-      const beacon = lightPulse(f.nowMs + (ac.seed % 500), 1200, 0.45);
-      const k = lightsOn ? 1 : 0;
-      lc.setXYZ(0, k * 1, 0.05 * k, 0.05 * k);
-      lc.setXYZ(1, 0.05 * k, k * 1, 0.1 * k);
-      lc.setXYZ(2, k * strobe, k * strobe, k * strobe);
-      lc.setXYZ(3, k * beacon, 0.05 * k * beacon, 0.05 * k * beacon);
-      lc.setXYZ(4, landing && lightsOn ? 1.6 : 0, landing && lightsOn ? 1.5 : 0, landing && lightsOn ? 1.3 : 0);
+      const ls = lightState({ lightsOn, onGround: ac.onGround, aglFt, phase: ac.phase, nowMs: f.nowMs, seed: ac.seed });
+      const set = (i: number, on: boolean, r: number, g2: number, b2: number) => lc.setXYZ(i, on ? r : 0, on ? g2 : 0, on ? b2 : 0);
+      set(0, ls.nav, 1, 0.05, 0.05);
+      set(1, ls.nav, 0.05, 1, 0.1);
+      set(2, ls.nav, 0.9, 0.9, 0.8);
+      set(3, ls.strobe, 1.6, 1.6, 1.6);
+      set(4, ls.strobe, 1.6, 1.6, 1.6);
+      set(5, ls.beacon, 1.3, 0.05, 0.05);
+      set(6, ls.beacon, 1.3, 0.05, 0.05);
+      set(7, ls.landing, 1.7, 1.6, 1.4);
       lc.needsUpdate = true;
       // Project for picking.
       v3.set(pl.x, pl.y + o.dims.heightM * 0.5, pl.z).project(camera);
@@ -573,7 +592,7 @@ export function createTowerScene(canvas: HTMLCanvasElement, airport: Airport, si
     for (const o of aircraft.values()) {
       (o.marker.material as THREE.PointsMaterial).size = 7 * dpr;
       (o.ring.material as THREE.PointsMaterial).size = 30 * dpr;
-      (o.lights.material as THREE.PointsMaterial).size = 6 * dpr;
+      (o.lights.material as THREE.PointsMaterial).size = 10 * dpr;
     }
   };
 

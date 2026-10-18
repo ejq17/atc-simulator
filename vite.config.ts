@@ -1,3 +1,5 @@
+import fs from 'node:fs'
+import path from 'node:path'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import { defineConfig } from 'vite'
@@ -18,9 +20,29 @@ const noBundledOrtWasm = () => ({
   },
 })
 
+// GitHub Pages serves the site under /atc-simulator/. Override with VITE_BASE (e.g. a custom domain at "/").
+const onPages = Boolean(process.env.GITHUB_PAGES)
+const base = process.env.VITE_BASE ?? (onPages ? '/atc-simulator/' : '/')
+
+/** Pages has no `index.html` fallback for unknown paths: copy it to `404.html` so deep links still open the app. */
+const spaFallback404 = () => ({
+  name: 'spa-404-fallback',
+  apply: 'build' as const,
+  closeBundle() {
+    const dist = path.resolve(import.meta.dirname, 'dist')
+    const index = path.join(dist, 'index.html')
+    if (fs.existsSync(index)) fs.copyFileSync(index, path.join(dist, '404.html'))
+  },
+})
+
 // https://vite.dev/config/
 export default defineConfig({
-  plugins: [react(), tailwindcss(), noBundledOrtWasm()],
+  base,
+  define: {
+    // No backend on Pages: the app reads this to skip /api and the localhost backend.
+    'import.meta.env.VITE_STATIC_HOSTING': JSON.stringify(process.env.VITE_STATIC_HOSTING ?? (onPages ? '1' : '')),
+  },
+  plugins: [react(), tailwindcss(), noBundledOrtWasm(), spaFallback404()],
   worker: { plugins: () => [noBundledOrtWasm()] },
   server: {
     proxy: {

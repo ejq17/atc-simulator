@@ -7,7 +7,8 @@
  * its own, more conservative arrival/departure spacing (`releaseSlackSec`).
  */
 import type { Aircraft } from '../sim/types';
-import { assessClearanceSafety } from '../sim/conflicts';
+import { assessClearanceSafety, departureTrailConflict, landedDistanceExceptionApplies, precedingArrivalBlockers } from '../sim/conflicts';
+import { projectArrival, timeToThreshold } from '../sim/runwayTiming';
 import { findRunwayEnd, isOnFinal } from '../sim/runways';
 import type { RunwayEndGeom } from '../sim/runways';
 import { frequencyForPosition } from '../radio/frequencies';
@@ -17,7 +18,7 @@ import { holdTooShort } from '../sim/holdSelection';
 import { hasActive, mkCmd } from './core';
 import type { Agent, AgentView, Plan } from './core';
 import {
-  assignedEnd, distToThresholdNm, etaToThresholdSec, holdNodeAt, interactingRunways, isInboundArrival, planParking,
+  assignedEnd, distToThresholdNm, etaToThresholdSec, holdNodeAt, interactingRunways, isInboundArrival, planParking, projectedGapNm,
 } from './world';
 import * as say from './phrase';
 
@@ -81,7 +82,7 @@ export function releaseSlackSec(v: AgentView, end: RunwayEndGeom, dep: Aircraft,
 }
 
 /** Two arrivals to one runway need at least this many seconds between their threshold crossings (runway occupancy of the leader). */
-const ARRIVAL_RUNWAY_GAP_SEC = 80;
+export const ARRIVAL_RUNWAY_GAP_SEC = 80;
 
 /**
  * An arrival ahead of `ac` on the same runway (or an intersecting one) that has not left the runway yet, or will not have by the
@@ -98,6 +99,45 @@ export function blockedByLeader(v: AgentView, ac: Aircraft, g: RunwayEndGeom): A
       if (o.occupyingRunways.some((r) => rws.includes(r)) && ['LANDING', 'ROLLOUT', 'RUNWAY_EXIT'].includes(o.phase)) return o;
     } else if (isInboundArrival(o) && o.phase !== 'PATTERN' && distToThresholdNm(o, og) < distToThresholdNm(ac, g)) {
       if (myEta - etaToThresholdSec(o, og) < ARRIVAL_RUNWAY_GAP_SEC) return o;
+    }
+  }
+  return undefined;
+}
+
+/** A follower established on final inside this range (nm) is sent around as soon as its spacing to the leader is lost (a stable 3-4 nm go-around, well before the runway is blocked). */
+export const EARLY_GO_AROUND_NM = 4;
+/** Radar minimum in trail on the same final (JO 7110.65 5-5-4); a leader still on the runway counts inside this range too. */
+const EARLY_GAP_NM = 3;
+/** An aircraft that went around is re-sequenced by Approach (vectors / direct fix, a new approach clearance) for this long before Tower clears it to land again. */
+const GO_AROUND_RESEQUENCE_SEC = 600;
+
+/** An aircraft that has gone around and has not been re-cleared for an approach (or re-established on final / in the pattern) since. */
+export function awaitingResequence(v: AgentView, ac: Aircraft): boolean {
+  const t = ac.lastGoAroundSec;
+  if (t === undefined || v.now - t >= GO_AROUND_RESEQUENCE_SEC) return false;
+  if (ac.phase === 'FINAL' || ac.phase === 'LANDING' || ac.phase === 'PATTERN') return false;
+  return !ac.clearances.some((c) => c.kind === 'APPROACH' && c.issuedAtSec > t);
+}
+
+/**
+ * Why a follower established on final within `EARLY_GO_AROUND_NM` should go around now, before the near-miss alert fires:
+ * the in-trail gap to a leader on the same final is, or at the leader's threshold crossing will be, inside 3 nm; the engine's own
+ * 3-10-3 projection says it would cross the threshold before the leader is down and clear; or it will be inside 3 nm of a leader
+ * still on the runway.
+ */
+export function earlyGoAroundReason(v: AgentView, ac: Aircraft, g: RunwayEndGeom): string | undefined {
+  if (ac.phase !== 'FINAL' || distToThresholdNm(ac, g) > EARLY_GO_AROUND_NM) return undefined;
+  const blockers = precedingArrivalBlockers(v.state, ac, g);
+  if (blockers.length) return `${blockers[0].other.callsign} will not be clear of the runway`;
+  const mine = distToThresholdNm(ac, g);
+  for (const o of Object.values(v.state.aircraft)) {
+    if (o.id === ac.id || o.isDeparture || o.assignedRunwayEnd !== g.end.id) continue;
+    if (!o.onGround) {
+      if ((o.phase !== 'FINAL' && o.phase !== 'LANDING') || distToThresholdNm(o, g) >= mine) continue;
+      const gap = projectedGapNm(ac, o, g);
+      if (gap.minNm < EARLY_GAP_NM) return `${gap.minNm.toFixed(1)} nm behind ${o.callsign}`;
+    } else if (mine <= EARLY_GAP_NM && o.occupyingRunways.includes(g.runway.id) && ['LANDING', 'ROLLOUT', 'RUNWAY_EXIT'].includes(o.phase)) {
+      if (timeToThreshold(ac, g) < projectArrival(v.state, o, g).tClear + 3 && !landedDistanceExceptionApplies(v.state, ac, o, g)) return `${o.callsign} is still on the runway`;
     }
   }
   return undefined;
@@ -174,7 +214,7 @@ export function createTowerAgent(): Agent {
           phrase: say.clearedForTakeoff(ac, g.end.id, ifr), cooldownSec: 20,
           summary: `${ac.callsign} cleared for takeoff runway ${g.end.id}`,
         });
-      } else if (ac.phase === 'HOLDING_SHORT' && slack >= LINEUP_EXTRA_SEC) {
+      } else if (ac.phase === 'HOLDING_SHORT' && slack >= LINEUP_EXTRA_SEC && !departureTrailConflict(state, ac, g)) {
         const luaw = mkCmd('LINE_UP_AND_WAIT', ac, { runwayEnd: g.end.id, runwayId: g.runway.id });
         if (safe(luaw)) {
           plans.push({
@@ -274,14 +314,16 @@ export function createTowerAgent(): Agent {
       // Safety first: inside the go-around range with a runway that is (or will be) blocked.
       const goAroundNm = Math.max(GO_AROUND_NM, (Math.max(ac.groundSpeedKt, 60) * GO_AROUND_SEC) / 3600);
       const inRange = (ac.phase === 'FINAL' ? d <= goAroundNm : isOnFinal(g, ac.pos, ac.headingDeg, goAroundNm)) && ['FINAL', 'APPROACH', 'PATTERN', 'INBOUND'].includes(ac.phase);
-      if (inRange && !landSafe) {
+      const early = earlyGoAroundReason(v, ac, g);
+      if ((inRange && !landSafe) || early) {
         plans.push({
           key: `${ac.id}:go-around`, aircraftId: ac.id, callsign: ac.callsign, priority: 100,
-          cmds: [mkCmd('GO_AROUND', ac)], phrase: say.goAround(ac), cooldownSec: 30, summary: `${ac.callsign} go around runway ${g.end.id} (${why})`,
+          cmds: [mkCmd('GO_AROUND', ac)], phrase: say.goAround(ac), cooldownSec: 30, summary: `${ac.callsign} go around runway ${g.end.id} (${early ?? why})`,
         });
         continue;
       }
-      if (cleared || !ready) continue;
+      // A go-around is re-sequenced first (vectors / direct fix, a new approach clearance): no landing clearance while it is still on the missed approach.
+      if (cleared || !ready || awaitingResequence(v, ac)) continue;
       if (d <= LAND_CLEARANCE_NM) {
         // Give Ground a gap to cross the runway: hold the clearance back while somebody waits at the hold line (until the arrival is close).
         if (landSafe && !(d > CROSSING_WINDOW_NM && crossingWaiting(v, g, ac.id))) {

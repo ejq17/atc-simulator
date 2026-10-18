@@ -8,7 +8,7 @@ test.beforeEach(async ({ page }) => {
 
 test('setup loads, a scenario starts, the surface display renders and N723EJ is listed', async ({ page }) => {
   await page.goto('/');
-  await expect(page).toHaveTitle('KACY ATC Simulator');
+  await expect(page).toHaveTitle(/ATC Simulator/);
   await expect(page.getByTestId('setup-screen')).toBeVisible();
   await expect(page.getByTestId('provenance-footer')).toContainText('FAA NASR 2026-10-01, d-TPP cycle 2610 (effective 2026-10-01 to 2026-10-29); taxiway geometry © OpenStreetMap contributors (ODbL)');
   await expect(page.getByTestId('start-session')).toBeEnabled();

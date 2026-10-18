@@ -222,9 +222,9 @@ export const TRAINING_SCENARIOS: ScenarioDef[] = [
   def('train-05-sequencing', 'Training 5: Sequencing two arrivals', 3, 8, 'A slow Cessna ahead of a fast Airbus on the same final.', 'aircraft sequencing',
     (airport, o) => ({
       id: 'train-05-sequencing', name: 'Training 5: Sequencing two arrivals', mode: 'training', seed: o?.seed ?? 205,
-      description: 'Cessna N723EJ is 4 nm out and slow; Spirit 451 is 9 nm out and faster. Establish the landing order and use speed to keep space between them.',
+      description: 'Cessna N723EJ is 4 nm out and slow; Spirit 451 is 11 nm out and faster. Establish the landing order and use speed to keep space between them.',
       weather: calm(), activeRunways: { departing: ['13'], landing: ['13'] }, controllerPositions: TOWER_AND_GROUND,
-      spawns: [arrivalOnFinal(airport, 'N723EJ', 'C172', '13', 4, 0, { speedKt: 85 }), arrivalOnFinal(airport, 'NKS451', 'A320', '13', 9, 0)],
+      spawns: [arrivalOnFinal(airport, 'N723EJ', 'C172', '13', 4, 0, { speedKt: 85 }), arrivalOnFinal(airport, 'NKS451', 'A320', '13', 11, 0)],
       objectives: [{ id: 'both', text: 'Both aircraft land', check: 'landed:NKS451' }, { id: 'first', text: 'N723EJ lands', check: 'landed:N723EJ' }],
       training: {
         steps: [

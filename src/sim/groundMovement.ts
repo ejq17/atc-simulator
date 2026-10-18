@@ -59,15 +59,45 @@ export function findLeader(ctx: SimContext, ac: Aircraft): { gap: number; minGap
     if (o.phase === 'READY' || (!o.route && o.groundSpeedKt < 0.1 && ctx.state.airport.parking.some((p) => dist(p.pos, o.pos) < 8))) continue;
     const r = vSub(o.pos, ac.pos);
     const along = vDot(r, h);
-    if (along <= 0 || along > 250) continue;
-    if (Math.abs(vCross(h, r)) > 12) continue;
-    if (Math.abs(headingDiff(ac.headingDeg, o.headingDeg)) > 70) continue;
-    if (!best || along < best.gap) {
+    let gap = along;
+    const inCone = along > 0 && along <= 250 && Math.abs(vCross(h, r)) <= 12 && Math.abs(headingDiff(ac.headingDeg, o.headingDeg)) <= 70;
+    if (!inCone) {
+      // A STOPPED aircraft (hold-short queue, a lined-up leader) that sits on the route ahead blocks it whatever its nose points at: the
+      // follower is still turning toward the hold, and the leader faces the runway, so the heading cone above does not see it.
+      if (o.groundSpeedKt >= 1 || dist(o.pos, ac.pos) > 250) continue;
+      const g = gapAlongRoute(ctx, ac, o.pos);
+      if (g === undefined) continue;
+      gap = g;
+    }
+    if (!best || gap < best.gap) {
       const minGap = 1.5 * Math.max(perf.lengthM, perfOf(o).lengthM) + 20;
-      best = { gap: along, minGap };
+      best = { gap, minGap };
     }
   }
   return best;
+}
+
+/** Distance (m) along the aircraft's remaining route to the point nearest `p`, when `p` lies within 12 m of the route in the next 250 m. */
+function gapAlongRoute(ctx: SimContext, ac: Aircraft, p: Vec2): number | undefined {
+  const r = ac.route;
+  if (!r) return undefined;
+  const nodes = ctx.state.airport.taxiwayGraph.nodes;
+  let from = ac.pos;
+  let travelled = 0;
+  for (let i = r.progressIndex; i < r.nodeIds.length && travelled <= 250; i++) {
+    const to = nodes[r.nodeIds[i]]?.pos;
+    if (!to) break;
+    const seg = vSub(to, from);
+    const len = Math.hypot(seg.x, seg.y);
+    if (len > 1e-6) {
+      const t = Math.max(0, Math.min(1, vDot(vSub(p, from), seg) / (len * len)));
+      const q = { x: from.x + seg.x * t, y: from.y + seg.y * t };
+      if (dist(p, q) <= 12) return travelled + len * t;
+    }
+    travelled += len;
+    from = to;
+  }
+  return undefined;
 }
 
 function routeNodePos(ctx: SimContext, id: string): Vec2 {

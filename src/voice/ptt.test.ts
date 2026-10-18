@@ -142,4 +142,26 @@ describe('push-to-talk', () => {
     btn.dispatchEvent(new Event('pointerdown'));
     expect(ptt.isTransmitting()).toBe(false);
   });
+
+  it('attachTarget: the same key works on a pop-out window, and detaching stops it', () => {
+    ptt = createPushToTalk({ key: 'Space', mode: 'hold', onStart, onEnd, debounceMs: 0 });
+    const popup = new EventTarget();
+    const detach = ptt.attachTarget(popup);
+    key('keydown', 'Space', {}, popup);
+    expect(onStart).toHaveBeenCalledTimes(1);
+    key('keyup', 'Space', {}, popup);
+    expect(onEnd).toHaveBeenCalledTimes(1);
+    detach();
+    key('keydown', 'Space', {}, popup);
+    expect(onStart).toHaveBeenCalledTimes(1);
+    // the main window still works, and destroy() detaches every target
+    key('keydown', 'Space');
+    expect(onStart).toHaveBeenCalledTimes(2);
+    key('keyup', 'Space');
+    const again = ptt.attachTarget(popup);
+    ptt.destroy();
+    key('keydown', 'Space', {}, popup);
+    expect(onStart).toHaveBeenCalledTimes(2);
+    again();
+  });
 });

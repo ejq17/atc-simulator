@@ -13,6 +13,8 @@ export interface Draft {
   conflicts: number;
   /** identifiers that failed hard validation (bad runway number etc.) */
   unknownIds: number;
+  /** taxi: a "hold short" clause was spoken but its point (runway or taxiway) could not be read */
+  holdShortUnparsed?: boolean;
   /** IFR clearance: token range of the route phrase, resolved to raw text by parse.ts */
   routeSpan?: [number, number];
 }

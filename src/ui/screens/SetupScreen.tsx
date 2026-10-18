@@ -224,11 +224,11 @@ export function SetupScreen() {
 
   return (
     <div className="atc-grid-bg h-full overflow-y-auto" data-testid="setup-screen">
-      <div className="mx-auto flex min-h-full max-w-[1280px] flex-col px-6 pb-4 pt-8">
-        <header className="mb-7 flex items-end justify-between gap-8 border-b border-atc-border pb-6">
+      <div className="mx-auto flex min-h-full max-w-[1280px] flex-col px-4 pb-4 pt-6 sm:px-6 sm:pt-8">
+        <header className="mb-6 flex items-end justify-between gap-8 border-b border-atc-border pb-6">
           <div>
             <div className="font-sans text-[11px] uppercase tracking-[0.34em] text-atc-cyan">{airport.name} · {airport.icao}</div>
-            <h1 className="mt-2 font-sans text-[34px] font-bold uppercase leading-none tracking-[0.12em] text-atc-text">{airport.icao} ATC Simulator</h1>
+            <h1 className="mt-2 font-sans text-[26px] font-bold uppercase leading-none tracking-[0.08em] sm:text-[34px] sm:tracking-[0.12em] text-atc-text">{airport.icao} ATC Simulator</h1>
             <p className="mt-3 max-w-xl font-sans text-[13px] leading-relaxed text-atc-muted">
               Work Clearance Delivery, Ground, Tower, Departure and Approach at {callName} with real FAA runway, taxiway and procedure data. Speak or type your clearances; pilots read back, taxi, line up and fly.
               Entertainment and learning software, not ATC training.
@@ -328,7 +328,7 @@ export function SetupScreen() {
             {isCustom && (
               <section>
                 <SectionTitle n={3}>Traffic</SectionTitle>
-                <div className="grid grid-cols-2 gap-x-5 gap-y-4 border border-atc-border bg-atc-panel p-4">
+                <div className="grid grid-cols-1 gap-x-5 gap-y-4 border sm:grid-cols-2 border-atc-border bg-atc-panel p-4">
                   <Field label={`Aircraft at start: ${aircraftCount}`}>
                     <input type="range" min={1} max={12} value={aircraftCount} onChange={(e) => setAircraftCount(Number(e.target.value))} className="accent-[#39c5e8]" aria-label="Aircraft count" />
                   </Field>
@@ -369,7 +369,7 @@ export function SetupScreen() {
           <div className="flex flex-col gap-8">
             <section>
               <SectionTitle n={isCustom ? 4 : 3}>Conditions</SectionTitle>
-              <div className="grid grid-cols-2 gap-x-5 gap-y-4 border border-atc-border bg-atc-panel p-4">
+              <div className="grid grid-cols-1 gap-x-5 gap-y-4 border sm:grid-cols-2 border-atc-border bg-atc-panel p-4">
                 <div className="col-span-2">
                   <Field label="Weather">
                     <select className={SELECT} value={weatherKey} onChange={(e) => setWeatherKey(e.target.value)} aria-label="Weather" data-testid="weather-select">
@@ -483,11 +483,11 @@ export function SetupScreen() {
           </div>
         </div>
 
-        <div className="sticky bottom-0 -mx-6 mt-8 flex items-center justify-between gap-4 border-t border-atc-border bg-atc-bg/95 px-6 py-3 backdrop-blur">
+        <div className="sticky bottom-0 -mx-4 mt-8 flex items-center justify-between gap-3 border-t border-atc-border bg-atc-bg/95 px-4 py-3 backdrop-blur sm:-mx-6 sm:gap-4 sm:px-6">
           <div className="text-xs text-atc-muted" aria-live="polite">
             {starting ? <span className="text-atc-cyan">{startStatus || 'Starting…'}</span> : selected && !isCustom ? <>Ready: <b className="text-atc-text">{selected.name}</b> at <b className="text-atc-text">{POSITIONS.find((p) => p.value === position)?.label}</b></> : <>Ready: <b className="text-atc-text">Custom free play</b> at <b className="text-atc-text">{POSITIONS.find((p) => p.value === position)?.label}</b></>}
           </div>
-          <Btn tone="green" size="md" onClick={start} disabled={!canStart} data-testid="start-session" className="min-w-44 !text-[13px] font-bold tracking-[0.2em]">
+          <Btn tone="green" size="md" onClick={start} disabled={!canStart} data-testid="start-session" className="min-w-36 shrink-0 !text-[13px] sm:min-w-44 font-bold tracking-[0.2em]">
             {starting ? 'Starting…' : 'Start session'}
           </Btn>
         </div>

@@ -7,7 +7,7 @@ import { windText, altimeterText } from '../lib/format';
 import { Btn, Field, LABEL, SELECT } from '../components/ui';
 import { Drawer } from './Drawer';
 
-export function WeatherDrawer({ onClose }: { onClose: () => void }) {
+export function WeatherPanel() {
   const session = useSimStore((s) => s.session);
   const setWeather = useSimStore((s) => s.setWeather);
   const setRunways = useSimStore((s) => s.setActiveRunways);
@@ -36,8 +36,8 @@ export function WeatherDrawer({ onClose }: { onClose: () => void }) {
   const setRwy = (kind: 'landing' | 'departing', end: string) => setRunways({ ...st.activeRunways, [kind]: [end] });
 
   return (
-    <Drawer title="Weather and runways" onClose={onClose} width="min(460px,96vw)" testId="weather-drawer">
-      <div className="flex flex-col gap-5 p-4 text-xs">
+    <div className="min-h-0 flex-1 overflow-y-auto">
+      <div className="flex flex-col gap-5 p-4 text-xs" data-testid="weather-panel">
         <section className="flex flex-col gap-1">
           <span className={LABEL}>Current weather ({st.weather.source})</span>
           <div className="text-[13px] tabular-nums">Wind {windText(st.weather, st.airport.magneticVariationDeg)} · {altimeterText(st.weather.altimeterInHg)} · {st.weather.visibilitySm} SM · {st.weather.flightCategory}</div>
@@ -73,6 +73,14 @@ export function WeatherDrawer({ onClose }: { onClose: () => void }) {
           <p className="text-[11px] leading-snug text-atc-muted">Changing runways issues a new ATIS letter. Aircraft already cleared keep their clearance; 13/31 and 4/22 intersect, so using both at once is flagged by the safety checks.</p>
         </section>
       </div>
+    </div>
+  );
+}
+
+export function WeatherDrawer({ onClose }: { onClose: () => void }) {
+  return (
+    <Drawer title="Weather and runways" onClose={onClose} width="min(460px,96vw)" testId="weather-drawer" panel="weather">
+      <WeatherPanel />
     </Drawer>
   );
 }

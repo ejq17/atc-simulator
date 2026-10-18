@@ -1,5 +1,4 @@
 import { useEffect, useRef } from 'react';
-import type { PointerEvent as RPointerEvent } from 'react';
 import { useSimStore } from '../store/simStore';
 import { useUiStore, viewBus } from '../store/uiStore';
 import { useCanvasLoop } from './useCanvasLoop';
@@ -8,6 +7,7 @@ import type { RadarRangeNm } from './radarRenderer';
 import { panBy } from './viewTransform';
 import type { View } from './viewTransform';
 import { hitTestAircraft } from './hitTest';
+import { attachGestures } from './pointerGestures';
 import type { Frame } from './frame';
 import { LayerMenu, OverlayBar, OVL_BTN } from './DisplayChrome';
 import { lerp } from '../lib/geom';
@@ -27,7 +27,6 @@ export function RadarDisplay() {
   /** Pan offset of the scope centre in world metres. */
   const centre = useRef({ x: 0, y: 0 });
   const viewRef = useRef<View>({ cx: 0, cy: 0, scale: 0.01, width: 1, height: 1 });
-  const drag = useRef<{ x: number; y: number; moved: number } | null>(null);
 
   const { canvasRef, containerRef } = useCanvasLoop((ctx, size, nowMs) => {
     const session = useSimStore.getState().session;
@@ -80,35 +79,32 @@ export function RadarDisplay() {
     return () => el.removeEventListener('wheel', onWheel);
   }, [canvasRef, setRange]);
 
-  const onDown = (e: RPointerEvent<HTMLCanvasElement>) => {
-    (e.target as HTMLElement).setPointerCapture(e.pointerId);
-    drag.current = { x: e.clientX, y: e.clientY, moved: 0 };
-  };
-  const onMove = (e: RPointerEvent<HTMLCanvasElement>) => {
-    const d = drag.current;
-    if (!d) return;
-    const dx = e.clientX - d.x;
-    const dy = e.clientY - d.y;
-    d.moved += Math.abs(dx) + Math.abs(dy);
-    d.x = e.clientX;
-    d.y = e.clientY;
-    if (d.moved > 4) {
-      const next = panBy(viewRef.current, dx, dy);
-      centre.current = { x: next.cx, y: next.cy };
-      if (followRef.current) useUiStore.getState().setFollow(false);
-    }
-  };
-  const onUp = (e: RPointerEvent<HTMLCanvasElement>) => {
-    const d = drag.current;
-    drag.current = null;
-    if (!d || d.moved > 4) return;
-    const session = useSimStore.getState().session;
-    if (!session) return;
-    const r = (e.target as HTMLElement).getBoundingClientRect();
-    const now = performance.now();
-    const frame: Frame = { state: session.engine.getState(), nowMs: now, pose: (ac) => session.buffer.sample(ac, now) };
-    useSimStore.getState().selectAircraft(hitTestAircraft(frame, viewRef.current, e.clientX - r.left, e.clientY - r.top, 18));
-  };
+  // One finger / mouse drag pans, a pinch steps the range, a tap selects (Pointer Events; works the same in a pop-out window).
+  useEffect(() => {
+    const el = canvasRef.current;
+    if (!el) return;
+    let pinch = 1;
+    return attachGestures(el, {
+      pan: (dx, dy) => {
+        const next = panBy(viewRef.current, dx, dy);
+        centre.current = { x: next.cx, y: next.cy };
+      },
+      zoom: (factor) => {
+        pinch *= factor;
+        const i = RADAR_RANGES_NM.indexOf(rangeRef.current);
+        if (pinch > 1.3) { pinch = 1; setRange(RADAR_RANGES_NM[Math.max(0, i - 1)]); }
+        else if (pinch < 0.77) { pinch = 1; setRange(RADAR_RANGES_NM[Math.min(RADAR_RANGES_NM.length - 1, i + 1)]); }
+      },
+      moved: () => { if (followRef.current) useUiStore.getState().setFollow(false); },
+      tap: (x, y, pointerType) => {
+        const session = useSimStore.getState().session;
+        if (!session) return;
+        const now = performance.now();
+        const frame: Frame = { state: session.engine.getState(), nowMs: now, pose: (ac) => session.buffer.sample(ac, now) };
+        useSimStore.getState().selectAircraft(hitTestAircraft(frame, viewRef.current, x, y, pointerType === 'touch' ? 30 : 18));
+      },
+    });
+  }, [canvasRef, setRange]);
 
   return (
     <div ref={containerRef} className="relative h-full w-full overflow-hidden bg-[#040806]" data-testid="radar-display">
@@ -117,19 +113,15 @@ export function RadarDisplay() {
         data-testid="radar-canvas"
         aria-label="Radar display"
         className="absolute inset-0 block cursor-crosshair touch-none"
-        onPointerDown={onDown}
-        onPointerMove={onMove}
-        onPointerUp={onUp}
-        onPointerCancel={() => (drag.current = null)}
       />
-      <OverlayBar className="right-3 top-3">
+      <OverlayBar className="bottom-2 left-2 max-w-[calc(100%-1rem)] flex-wrap sm:bottom-auto sm:left-auto sm:right-3 sm:top-3 sm:max-w-[60%] sm:justify-end">
         {RADAR_RANGES_NM.map((r) => (
           <button key={r} type="button" aria-pressed={r === range} className={`${OVL_BTN} ${r === range ? '!border-atc-cyan !text-atc-cyan' : ''}`} onClick={() => setRange(r)}>
             {r} NM
           </button>
         ))}
       </OverlayBar>
-      <OverlayBar className="left-3 top-3">
+      <OverlayBar className="left-2 top-2 flex-wrap sm:left-3 sm:top-3">
         <LayerMenu layers={layers} labels={RADAR_LAYER_LABELS} onToggle={toggle} />
         <button type="button" className={`${OVL_BTN} ${follow ? '!border-atc-cyan !text-atc-cyan' : ''}`} aria-pressed={follow} onClick={() => useUiStore.getState().setFollow(!follow)}>
           Follow

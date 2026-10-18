@@ -363,6 +363,8 @@ export interface Aircraft {
   /** Ids of runways this aircraft has been explicitly cleared to cross/enter/use. */
   runwayAuthorizations: string[];
   spawnedAtSec: number;
+  /** Sim time of the aircraft's latest go-around / missed approach (undefined: none). Controllers must not clear it to land again until it is re-established. */
+  lastGoAroundSec?: number;
   history: Vec2[];                 // recent positions for trails
   voiceId: string;                 // which synthetic pilot voice
   flags: { emergency?: boolean; holdingPosition?: boolean; readbackErrorPending?: boolean };

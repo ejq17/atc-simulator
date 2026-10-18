@@ -20,13 +20,28 @@ import { getPerformance } from '../sim/performance';
 import { frequencyForPosition } from '../radio/frequencies';
 import { hasActive, mkCmd } from './core';
 import type { Agent, AgentView, Plan } from './core';
-import { distToThresholdNm, isInboundArrival } from './world';
+import { distToThresholdNm, inboundSpeedKt, isInboundArrival, projectedGapNm } from './world';
+import { ARRIVAL_RUNWAY_GAP_SEC } from './tower';
 import * as say from './phrase';
 
 /** Spacing the AI builds between arrivals on the same final (the engine's own minimum is 3 nm, 4 nm for a light behind a jet). */
 export const ARRIVAL_SPACING_NM = 5;
 const SLOW_SPEED_KT = 140;
 const SLOW_FROM_NM = 5;
+/** Speed assignments tried in order ("reduce speed to one six zero", "... one four zero") to build the spacing before the approach clearance. */
+const SLOW_STEPS_KT = [160, SLOW_SPEED_KT];
+/** The projected in-trail gap never drops below the radar minimum (JO 7110.65 5-5-4: 3 nm). */
+const MIN_PROJECTED_GAP_NM = 3;
+/** Speed alone cannot build the gap and the projected gap is short by more than this (nm): hold at the published fix instead of flying on. */
+const HOLD_SHORTFALL_NM = 1.5;
+
+/**
+ * Spacing needed at the leader's threshold crossing: the clearance spacing (5 nm) or the runway occupancy gap
+ * (`ARRIVAL_RUNWAY_GAP_SEC` at the follower's approach speed, 7110.65 3-10-3 same runway separation), whichever is larger.
+ */
+export function requiredGapNm(ac: Aircraft): number {
+  return Math.max(ARRIVAL_SPACING_NM, (getPerformance(ac.type).approachSpeedKt * ARRIVAL_RUNWAY_GAP_SEC) / 3600);
+}
 
 interface ApproachChoice {
   type: ApproachType;
@@ -185,7 +200,9 @@ export function createApproachAgent(handleDepartures: (v: AgentView) => boolean)
 
       // Spacing against the aircraft ahead, then the approach clearance.
       const lead = leaderOf(v, ac, choice.end);
-      const gapOk = !lead || lead.gapNm >= ARRIVAL_SPACING_NM;
+      const need = requiredGapNm(ac);
+      const proj = lead ? projectedGapNm(ac, lead.leader, choice.end) : undefined;
+      const gapOk = !lead || (lead.gapNm >= ARRIVAL_SPACING_NM && proj!.atLeaderThresholdNm >= need && proj!.minNm >= MIN_PROJECTED_GAP_NM);
       const clearance = mkCmd('APPROACH', ac, { approachType: choice.type, runwayEnd: choice.end.end.id, runwayId: choice.end.runway.id });
       if (gapOk && assessClearanceSafety(v.state, clearance).safe) {
         plans.push({
@@ -201,7 +218,16 @@ export function createApproachAgent(handleDepartures: (v: AgentView) => boolean)
       const dNm = distToThresholdNm(ac, choice.end);
       const holdIssued = [...mem.done].some((k) => k.startsWith(`${ac.id}:hold:`));
       if (holdIssued || phase === 'HOLDING') continue; // released by the approach clearance once the gap is there
-      if (lead.gapNm < ARRIVAL_SPACING_NM - 1.5 && choice.info && ac.nav) {
+      // Speed first (the follower is faster than the leader almost always): the gentlest assignment whose projected gap at the leader's
+      // threshold crossing meets the requirement, else the lowest one; when speed cannot build the gap, the published hold.
+      const cur = inboundSpeedKt(ac);
+      const steps = SLOW_STEPS_KT.map((kt) => Math.max(kt, getPerformance(ac.type).minSpeedKt + 20)).filter((kt, i, a) => kt < cur - 10 && a.indexOf(kt) === i);
+      const fixing = steps.find((kt) => projectedGapNm(ac, lead.leader, choice.end, kt).atLeaderThresholdNm >= need);
+      const speedKt = fixing ?? steps[steps.length - 1];
+      const slowAvailable = dNm > SLOW_FROM_NM && speedKt !== undefined && !mem.done.has(`${ac.id}:slow:${speedKt}`);
+      const speedsExhausted = fixing === undefined;
+      const tryHold = lead.gapNm < ARRIVAL_SPACING_NM - 1.5 || (speedsExhausted && !slowAvailable && proj!.atLeaderThresholdNm < need - HOLD_SHORTFALL_NM);
+      if (tryHold && choice.info && ac.nav) {
         const remaining = ac.nav.fixes.slice(ac.nav.index);
         const hold = choice.info.procedure.holdingPatterns?.find(
           (h) => h.role === 'hold_in_lieu' && remaining.some((f) => (findNavFix(airport, f)?.id ?? f).toUpperCase() === h.fix.toUpperCase()) && (distanceToFixNm(airport, ac.pos, h.fix) ?? 0) > 2,
@@ -211,17 +237,17 @@ export function createApproachAgent(handleDepartures: (v: AgentView) => boolean)
             key: `${ac.id}:hold:${hold.fix}`, aircraftId: ac.id, callsign: ac.callsign, priority: 45, once: true,
             cmds: [mkCmd('HOLD_AT_FIX', ac, { hold: { fix: hold.fix, asPublished: true, turns: hold.turns } })],
             phrase: say.clauses(say.callsign(ac), say.holdAsPublished(airport, hold.fix)),
-            summary: `${ac.callsign} hold at ${hold.fix} as published, ${lead.gapNm.toFixed(1)} nm behind ${lead.leader.callsign}`,
+            summary: `${ac.callsign} hold at ${hold.fix} as published, ${lead.gapNm.toFixed(1)} nm behind ${lead.leader.callsign} (${proj!.atLeaderThresholdNm.toFixed(1)} nm projected at its threshold)`,
           });
           continue;
         }
       }
-      if (dNm > SLOW_FROM_NM && !mem.done.has(`${ac.id}:slow`) && (ac.target.speedKt ?? ac.airspeedKt) > SLOW_SPEED_KT + 10) {
-        const kt = Math.max(getPerformance(ac.type).minSpeedKt + 20, SLOW_SPEED_KT);
+      if (slowAvailable) {
+        const kt = speedKt!;
         plans.push({
-          key: `${ac.id}:slow`, aircraftId: ac.id, callsign: ac.callsign, priority: 45, once: true,
+          key: `${ac.id}:slow:${kt}`, aircraftId: ac.id, callsign: ac.callsign, priority: 45, once: true,
           cmds: [mkCmd('SPEED', ac, { speedKt: kt })], phrase: say.clauses(say.callsign(ac), say.reduceSpeed(kt)),
-          summary: `${ac.callsign} reduce speed ${kt}, ${lead.gapNm.toFixed(1)} nm behind ${lead.leader.callsign}`,
+          summary: `${ac.callsign} reduce speed ${kt}, ${lead.gapNm.toFixed(1)} nm behind ${lead.leader.callsign} (${proj!.atLeaderThresholdNm.toFixed(1)} nm projected at its threshold, ${need.toFixed(1)} needed)`,
         });
       }
     }
