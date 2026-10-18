@@ -12,6 +12,8 @@ import { cardinal } from '../sim/geo';
 import { seeded01 } from '../sim/rng';
 import { findNavFix } from '../sim/navigation';
 import type { ApproachType } from '../sim/types';
+import { isVehicleType } from '../sim/performance';
+import { airTaxiReadback, overheadReadback, vehicleProceedReadback } from './specialCalls';
 
 export interface ReadbackEnv {
   airport: Airport;
@@ -142,8 +144,11 @@ export function buildReadback(aircraft: Aircraft, c: Clearance, env: ReadbackEnv
   const body = ((): string => {
     switch (c.kind) {
       case 'TAKEOFF':
+        // Helicopter takeoff from a helipad / taxiway / present position (JO 7110.65 3-11-2; AIM 4-3-17: "CLEARED FOR TAKEOFF FROM (taxiway, helipad, runway number, etc.)")
+        if (!c.runwayEnd && !c.runwayId) return `Cleared for takeoff${c.destination ? ` from ${helipadWords(env, c.destination)}` : ' from present position'}${c.turnDirection ? `, make ${c.turnDirection} turn` : ''}`;
         return `Runway ${runwaySpoken(c.runwayEnd ?? c.runwayId ?? '')}, cleared for takeoff`;
       case 'LAND':
+        if (!c.runwayEnd && !c.runwayId && c.destination) return `Cleared to land ${helipadWords(env, c.destination)}`; // helicopter landing clearance (3-11-6)
         // land and hold short (JO 7110.65 3-10-5; AIM 4-3-11: the readback includes "hold short of ...")
         return `Runway ${runwaySpoken(c.runwayEnd ?? c.runwayId ?? '')}, cleared to land${c.holdShort?.length ? `, hold short of runway ${runwayRef(c.holdShort[0])}` : ''}`;
       case 'LINE_UP_AND_WAIT':
@@ -151,15 +156,16 @@ export function buildReadback(aircraft: Aircraft, c: Clearance, env: ReadbackEnv
       case 'TAXI':
       case 'TAXI_TO_PARKING': {
         const rwy = c.runwayEnd ?? runwayFromDestination(c.destination);
+        const verb = isVehicleType(aircraft.type) ? 'proceed' : 'taxi'; // vehicles are told to "proceed", never "taxi" (JO 7110.65 3-7-2)
         let head: string;
-        if (rwy) head = `Runway ${runwaySpoken(rwy)}, taxi`; // 7110.65 3-7-2: RUNWAY (number), TAXI VIA ...
+        if (rwy) head = isVehicleType(aircraft.type) ? `Proceed to runway ${runwaySpoken(rwy)}` : `Runway ${runwaySpoken(rwy)}, taxi`; // 7110.65 3-7-2: RUNWAY (number), TAXI VIA ...
         else if (c.destination) {
           const up = c.destination.toUpperCase();
           const twy = /^TWY\s*([A-Z]{1,2}\d{0,2})$/.exec(up)?.[1];
           const park = env.airport.parking.find((p) => p.id.toUpperCase() === up || p.name.toUpperCase() === up);
-          head = `Taxi to ${park ? spokenParking(park) : twy ? spokenTaxiway(twy) : spokenText(c.destination)}`;
+          head = `${capitalize(verb)} to ${park ? spokenParking(park) : twy ? spokenTaxiway(twy) : spokenText(c.destination)}`;
         }
-        else head = c.kind === 'TAXI_TO_PARKING' ? 'Taxi to parking' : 'Taxi';
+        else head = c.kind === 'TAXI_TO_PARKING' ? `${capitalize(verb)} to parking` : capitalize(verb);
         let route = c.route;
         // A wrong taxiway in the route read back (seeded from the aircraft, so the shared random stream is untouched).
         if (!error && route?.length && env.rng && (env.errorRate ?? 0) > 0 && (env.taxiwayErrorShare ?? 0) > 0
@@ -265,6 +271,12 @@ export function buildReadback(aircraft: Aircraft, c: Clearance, env: ReadbackEnv
         return 'Frequency change approved, good day';
       case 'SQUAWK':
         return `Squawk ${digitsSpoken(c.squawk ?? '1200')}`;
+      case 'PROCEED':
+        return vehicleProceedReadback({ taxiways: c.destination === 'TAXIWAYS', runwayEnd: c.runwayEnd ?? c.runwayId ?? '', reportClear: c.reportClear, reportInspection: c.reportClear && c.destination === 'INSPECTION' });
+      case 'AIR_TAXI':
+        return airTaxiReadback({ mode: c.taxiMode, route: c.route, where: c.destination ? helipadWords(env, c.destination) : 'as requested' });
+      case 'OVERHEAD':
+        return overheadReadback({ runwayEnd: c.runwayEnd ?? c.runwayId ?? '', altitudeFt: c.altitudeFt, turnDirection: c.turnDirection, reports: c.destination === 'BREAK' ? ['initial', 'break'] : ['initial'] });
       case 'AIRPORT_INFO':
         return c.info?.altimeterInHg !== undefined ? `Altimeter ${digitsSpoken(String(Math.round(c.info.altimeterInHg * 100)))}` : 'Roger';
       default:
@@ -275,6 +287,18 @@ export function buildReadback(aircraft: Aircraft, c: Clearance, env: ReadbackEnv
   if (error) result.error = error;
   if (omittedHoldShort) result.omittedHoldShort = omittedHoldShort;
   return result;
+}
+
+/** Spoken name of a helicopter destination: a parking id ("USCG-1" -> "Coast Guard helipad one"), a taxiway ("TWY A") or free text. */
+function helipadWords(env: ReadbackEnv, dest: string): string {
+  const up = dest.toUpperCase();
+  const park = env.airport.parking.find((p) => p.id.toUpperCase() === up || p.name.toUpperCase() === up);
+  if (park) return park.id.startsWith('USCG') ? spokenText(park.name.replace(/^USCG/i, 'Coast Guard')) : spokenText(park.name);
+  const twy = /^TWY\s*([A-Z]{1,2}\d{0,2})$/.exec(up)?.[1];
+  if (twy) return `taxiway ${spokenTaxiway(twy)}`;
+  const rwy = runwayFromDestination(dest);
+  if (rwy) return `runway ${runwayRef(rwy)}`;
+  return spokenText(dest);
 }
 
 /** Pilot readback of a runway exit instruction (JO 7110.65 3-10-9: "TURN LEFT/RIGHT (taxiway)", "IF ABLE, TURN LEFT/RIGHT (taxiway)"). */

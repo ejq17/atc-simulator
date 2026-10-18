@@ -12,7 +12,9 @@ import * as THREE from 'three';
 import { RECIPES, aircraftDims } from './aircraftModel';
 import type { ModelDims, Recipe } from './aircraftModel';
 import { finPaint, fuselagePaint, liveryFor } from './liveries';
+import { box, closeSeam, lathe, mapVerts, merge, paint, plate, slab, tube, wheel } from './meshKit';
 import type { FuselageStyle, Livery } from './liveries';
+import { buildSpecialGeometry } from './specialModels';
 
 const DEG = Math.PI / 180;
 const TYRE = 0x1a1c20;
@@ -33,7 +35,7 @@ export interface ModelAnchors {
 export interface AircraftModel {
   root: THREE.Group;
   gear: THREE.Object3D;
-  /** Propeller assemblies to spin about z (empty on jets). */
+  /** Propeller and rotor assemblies to spin about their local z (empty on jets); the rotors' assemblies sit in a pivot that points z up / sideways. */
   props: THREE.Object3D[];
   anchors: ModelAnchors;
   dims: ModelDims;
@@ -43,127 +45,14 @@ export interface AircraftModel {
 }
 
 export interface AircraftFactory {
-  /** A fresh instance (shared geometry and materials) for the aircraft's type and callsign. */
-  build(type: string, callsign: string): AircraftModel;
+  /**
+   * A fresh instance (shared geometry and materials) for the aircraft's type and callsign. `formation` = number of aircraft the one sim
+   * aircraft stands for (JO 7110.65 2-1-13): a fighter flight of two is drawn as two airframes, the second in a loose right-wing position.
+   */
+  build(type: string, callsign: string, opts?: { formation?: number }): AircraftModel;
   /** 0 (day) .. 1 (night): lifts the unlit side of the aircraft so it keeps its colours under apron lighting. */
   setNight(night: number): void;
   dispose(): void;
-}
-
-// ---- geometry helpers --------------------------------------------------------------------------------------------------------------
-
-type Colour = number | ((x: number, y: number, z: number) => number);
-
-function paint(geo: THREE.BufferGeometry, colour: Colour): THREE.BufferGeometry {
-  const pos = geo.getAttribute('position');
-  const arr = new Float32Array(pos.count * 3);
-  const c = new THREE.Color();
-  for (let i = 0; i < pos.count; i++) {
-    c.setHex(typeof colour === 'number' ? colour : colour(pos.getX(i), pos.getY(i), pos.getZ(i)));
-    arr[i * 3] = c.r;
-    arr[i * 3 + 1] = c.g;
-    arr[i * 3 + 2] = c.b;
-  }
-  geo.setAttribute('color', new THREE.BufferAttribute(arr, 3));
-  return geo;
-}
-
-function merge(geos: THREE.BufferGeometry[]): THREE.BufferGeometry {
-  const parts = geos.map((g) => {
-    const n = g.index ? g.toNonIndexed() : g;
-    if (!n.getAttribute('normal')) n.computeVertexNormals();
-    return n;
-  });
-  const total = parts.reduce((s, g) => s + g.getAttribute('position').count, 0);
-  const position = new Float32Array(total * 3);
-  const normal = new Float32Array(total * 3);
-  const color = new Float32Array(total * 3);
-  let o = 0;
-  for (const g of parts) {
-    const p = g.getAttribute('position');
-    const n = g.getAttribute('normal');
-    const c = g.getAttribute('color');
-    position.set(p.array as Float32Array, o * 3);
-    normal.set(n.array as Float32Array, o * 3);
-    if (c) color.set(c.array as Float32Array, o * 3);
-    else color.fill(1, o * 3, (o + p.count) * 3);
-    o += p.count;
-  }
-  const out = new THREE.BufferGeometry();
-  out.setAttribute('position', new THREE.BufferAttribute(position, 3));
-  out.setAttribute('normal', new THREE.BufferAttribute(normal, 3));
-  out.setAttribute('color', new THREE.BufferAttribute(color, 3));
-  return out;
-}
-
-/** Revolve (radius, distance-from-front) points about the z axis; the first point is the front (z = 0), later points go aft (+z). */
-function lathe(points: [number, number][], segments: number): THREE.BufferGeometry {
-  const g = new THREE.LatheGeometry(points.map(([r, d]) => new THREE.Vector2(r, d)), segments);
-  g.rotateX(Math.PI / 2); // lathe y -> z; lathe phi = 0 ends up at the belly (-y), phi = pi at the crown
-  return g;
-}
-
-/** Average the normals on the lathe seam (first and last segment share positions) so no crease shows on the belly. */
-function closeSeam(g: THREE.BufferGeometry, ringSize: number, segments: number): void {
-  const n = g.getAttribute('normal');
-  const v = new THREE.Vector3();
-  for (let j = 0; j < ringSize; j++) {
-    const a = j;
-    const b = segments * ringSize + j;
-    v.set(n.getX(a) + n.getX(b), n.getY(a) + n.getY(b), n.getZ(a) + n.getZ(b)).normalize();
-    n.setXYZ(a, v.x, v.y, v.z);
-    n.setXYZ(b, v.x, v.y, v.z);
-  }
-}
-
-function mapVerts(g: THREE.BufferGeometry, fn: (x: number, y: number, z: number) => [number, number, number]): THREE.BufferGeometry {
-  const p = g.getAttribute('position');
-  for (let i = 0; i < p.count; i++) {
-    const [x, y, z] = fn(p.getX(i), p.getY(i), p.getZ(i));
-    p.setXYZ(i, x, y, z);
-  }
-  p.needsUpdate = true;
-  return g;
-}
-
-/** A horizontal slab from a planform polygon [x, z] of constant thickness, centred on y = 0. */
-function slab(poly: [number, number][], thick: number): THREE.BufferGeometry {
-  const sh = new THREE.Shape();
-  poly.forEach(([x, z], i) => (i === 0 ? sh.moveTo(x, -z) : sh.lineTo(x, -z)));
-  const g = new THREE.ExtrudeGeometry(sh, { depth: thick, bevelEnabled: false });
-  g.translate(0, 0, -thick / 2);
-  g.rotateX(-Math.PI / 2); // (x, y, depth) -> (x, depth, -y)
-  return g;
-}
-
-/** A vertical plate from a profile polygon [z aft, y up] of the given thickness (across x), centred on x = 0. */
-function plate(poly: [number, number][], thick: number): THREE.BufferGeometry {
-  const sh = new THREE.Shape();
-  poly.forEach(([z, y], i) => (i === 0 ? sh.moveTo(z, y) : sh.lineTo(z, y)));
-  const g = new THREE.ExtrudeGeometry(sh, { depth: thick, bevelEnabled: false });
-  g.translate(0, 0, -thick / 2);
-  g.rotateY(-Math.PI / 2); // (z, y, depth) -> (-depth, y, z)
-  return g;
-}
-
-function tube(a: [number, number, number], b: [number, number, number], r: number, seg = 6): THREE.BufferGeometry {
-  const d = new THREE.Vector3(b[0] - a[0], b[1] - a[1], b[2] - a[2]);
-  const len = d.length();
-  const g = new THREE.CylinderGeometry(r, r, len, seg, 1, true);
-  g.applyQuaternion(new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), d.normalize()));
-  g.translate((a[0] + b[0]) / 2, (a[1] + b[1]) / 2, (a[2] + b[2]) / 2);
-  return g;
-}
-
-function wheel(x: number, y: number, z: number, r: number, width: number): THREE.BufferGeometry {
-  const g = new THREE.CylinderGeometry(r, r, width, 10, 1);
-  g.rotateZ(Math.PI / 2);
-  g.translate(x, y, z);
-  return g;
-}
-
-function box(w: number, h: number, d: number, x: number, y: number, z: number): THREE.BufferGeometry {
-  return new THREE.BoxGeometry(w, h, d).translate(x, y, z);
 }
 
 // ---- family recipes ----------------------------------------------------------------------------------------------------------------
@@ -202,7 +91,8 @@ export interface BuiltModel {
   /** Always-visible parts of the gear (fixed gear) are merged into `gear`; retractable gear hides the whole object. */
   anchors: ModelAnchors;
   pivotZ: number;
-  props: { pos: [number, number, number]; radius: number; blades: number }[];
+  /** `axis` is the spin axis in model space (default z, the nose axis of a propeller; y for a main rotor, x for a tail rotor). */
+  props: { pos: [number, number, number]; radius: number; blades: number; axis?: 'x' | 'y' | 'z' }[];
   style: FuselageStyle;
   windows: number;
 }
@@ -210,6 +100,7 @@ export interface BuiltModel {
 /** Build the geometry for a type (pure three.js data, no materials), painted for the livery. */
 export function buildGeometry(type: string, livery: Livery): BuiltModel {
   const d = aircraftDims(type);
+  if (d.family === 'helicopter' || d.family === 'fighter' || d.family === 'groundVehicle') return buildSpecialGeometry(d.family, livery);
   const rc = RECIPES[d.family];
   const L = d.lengthM;
   const b = d.wingspanM;
@@ -542,11 +433,24 @@ export function createAircraftFactory(): AircraftFactory {
   };
 
   return {
-    build(type, callsign) {
+    build(type, callsign, opts) {
       const t = template(type, callsign);
       const root = new THREE.Group();
       root.add(new THREE.Mesh(t.fuselageGeo, t.fuselageMat), new THREE.Mesh(t.airframeGeo, t.airframeMat));
-      const gearObj = new THREE.Mesh(t.gearGeo, t.gearMat);
+      const lead = new THREE.Mesh(t.gearGeo, t.gearMat);
+      let gearObj: THREE.Object3D = lead;
+      if (t.dims.family === 'fighter' && (opts?.formation ?? 1) >= 2) {
+        // a flight of two: the wingman in a loose position, right and aft of the leader (it shares the geometry and the gear toggle)
+        const off = new THREE.Vector3(18 * (t.dims.lengthM / 15.06), 0, 10 * (t.dims.lengthM / 15.06));
+        const fus = new THREE.Mesh(t.fuselageGeo, t.fuselageMat);
+        const air = new THREE.Mesh(t.airframeGeo, t.airframeMat);
+        const gear2 = new THREE.Mesh(t.gearGeo, t.gearMat);
+        for (const m of [fus, air, gear2]) m.position.copy(off);
+        root.add(fus, air);
+        const grp = new THREE.Group();
+        grp.add(lead, gear2);
+        gearObj = grp;
+      }
       gearObj.name = 'gear';
       root.add(gearObj);
       const props: THREE.Object3D[] = [];
@@ -562,8 +466,19 @@ export function createAircraftFactory(): AircraftFactory {
           blade.rotation.z = (i * Math.PI) / Math.ceil(p.blades / 2);
           grp.add(blade);
         }
-        grp.position.set(...p.pos);
-        root.add(grp);
+        if (p.axis === 'y' || p.axis === 'x') {
+          // the assembly spins about its own z: a pivot turns that axis up (main rotor) or sideways (tail rotor)
+          const pivot = new THREE.Group();
+          pivot.name = 'rotorPivot';
+          if (p.axis === 'y') pivot.rotation.x = -Math.PI / 2;
+          else pivot.rotation.y = Math.PI / 2;
+          pivot.position.set(...p.pos);
+          pivot.add(grp);
+          root.add(pivot);
+        } else {
+          grp.position.set(...p.pos);
+          root.add(grp);
+        }
         props.push(grp);
       }
       return {

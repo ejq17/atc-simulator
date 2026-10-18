@@ -6,6 +6,8 @@ import { closedEndsOf } from '../../sim/airportOps';
 import { DEFAULT_AIRPORT_ICAO, airportOrDefault, listAirports } from '../../airport';
 import { airportCallName } from '../../radio/frequencies';
 import { profileTypes } from '../../game/airportProfile';
+import { SPECIAL_TRAFFIC_KINDS, SPECIAL_TRAFFIC_LABELS, availableSpecialKinds, defaultSpecialTraffic, resolveSpecialTraffic } from '../../game/specialTraffic';
+import type { SpecialTrafficSelection } from '../../game/specialTraffic';
 import type { ControllerPositionId, GameMode, Weather } from '../../sim/types';
 import { fetchLiveMetar } from '../../weather/liveWeather';
 import { WEATHER_PRESETS, WEATHER_PRESET_IDS, getPresetWeather } from '../../weather/presets';
@@ -70,6 +72,8 @@ export function SetupScreen() {
   const callName = airportCallName(airport);
   /** Aircraft types the airport's traffic profile can generate (KACY: C172, A320; KMHT adds B738, BCS3, E175, CRJ9, B752, C208). */
   const offeredTypes = useMemo(() => profileTypes(airport.icao), [airport]);
+  /** Special traffic kinds the airport's profile has (KACY: all five; KMHT: VFR transitions and vehicles). Only these are offered. */
+  const offeredSpecial = useMemo(() => availableSpecialKinds(airport.icao), [airport]);
   const starting = useSimStore((s) => s.starting);
   const startStatus = useSimStore((s) => s.startStatus);
   const startSession = useSimStore((s) => s.startSession);
@@ -112,6 +116,7 @@ export function SetupScreen() {
   const [gaPct, setGaPct] = useState(Math.round((prev?.freePlay.gaFraction ?? 0.5) * 100));
   const [maxAircraft, setMaxAircraft] = useState(prev?.freePlay.maxAircraft ?? 8);
   const [types, setTypes] = useState<string[]>(prev?.freePlay.aircraftTypes ?? TYPES.map((t) => t.id));
+  const [special, setSpecial] = useState<SpecialTrafficSelection>(() => resolveSpecialTraffic(prev?.icao ?? DEFAULT_AIRPORT_ICAO, prev?.freePlay.specialTraffic ?? defaultSpecialTraffic(prev?.icao ?? DEFAULT_AIRPORT_ICAO)));
   const [starting_, setStarting_] = useState<NonNullable<FreePlayOptions['startingScenario']>>(prev?.freePlay.startingScenario ?? 'mixed');
   const [difficulty, setDifficulty] = useState<NonNullable<FreePlayOptions['difficulty']>>(prev?.freePlay.difficulty ?? 'normal');
   const [seedText, setSeedText] = useState(prev?.seed !== undefined ? String(prev.seed) : '');
@@ -144,6 +149,7 @@ export function SetupScreen() {
     setCloseTaxiway('none');
     setScenarioId(CUSTOM);
     setMode('free_play');
+    setSpecial(defaultSpecialTraffic(icao));
   }, [icao]);
 
   const isCustom = mode === 'free_play' && scenarioId === CUSTOM;
@@ -217,6 +223,7 @@ export function SetupScreen() {
       gaFraction: gaPct / 100,
       maxAircraft,
       aircraftTypes: offeredTypes.filter((t) => types.includes(t)).length ? offeredTypes.filter((t) => types.includes(t)) : ['C172'],
+      specialTraffic: resolveSpecialTraffic(airport.icao, special),
       startingScenario: starting_,
       closures,
       airportEvents,
@@ -384,6 +391,28 @@ export function SetupScreen() {
                       ))}
                     </div>
                   </div>
+                  {offeredSpecial.length > 0 && (
+                    <div className="col-span-2" role="group" aria-labelledby="special-traffic-label" data-testid="special-traffic">
+                      <span id="special-traffic-label" className={LABEL}>Special traffic</span>
+                      <div className="mt-1.5 grid grid-cols-1 gap-x-5 gap-y-2 sm:grid-cols-2">
+                        {SPECIAL_TRAFFIC_KINDS.filter((k) => offeredSpecial.includes(k)).map((k) => (
+                          <label key={k} className="flex cursor-pointer items-start gap-2 text-xs">
+                            <input
+                              type="checkbox"
+                              className="mt-0.5 accent-[#39c5e8]"
+                              checked={special[k]}
+                              onChange={(e) => setSpecial((cur) => ({ ...cur, [k]: e.target.checked }))}
+                              data-testid={`special-${k}`}
+                            />
+                            <span>
+                              {SPECIAL_TRAFFIC_LABELS[k].label}
+                              <span className="block text-[11px] leading-snug text-atc-muted">{SPECIAL_TRAFFIC_LABELS[k].hint}</span>
+                            </span>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               </section>
             )}

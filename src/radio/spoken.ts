@@ -114,6 +114,7 @@ const TYPE_NAMES: Record<string, string> = {
   C172: 'Cessna', C182: 'Cessna', C152: 'Cessna', C210: 'Cessna', C208: 'Caravan', PA28: 'Piper', SR22: 'Cirrus', BE36: 'Bonanza',
   A320: 'Airbus', A319: 'Airbus', A321: 'Airbus', BCS3: 'Airbus A220', BCS1: 'Airbus A220', B737: 'Boeing 737', B738: 'Boeing 737', B739: 'Boeing 737',
   B38M: 'Boeing 737', B752: 'Boeing 757', B763: 'Boeing 767', E175: 'Embraer 175', E170: 'Embraer 170', E190: 'Embraer 190', CRJ9: 'CRJ-900', CRJ7: 'CRJ-700', CRJ2: 'CRJ-200',
+  H65: 'Dolphin', F16: 'Falcon', VEH: 'Vehicle',
 };
 export function spokenAircraftType(type: string): string {
   return TYPE_NAMES[type.trim().toUpperCase()] ?? digitsSpoken(type);
@@ -134,8 +135,21 @@ export function flightNumberSpoken(num: string): string {
 }
 
 /** "N723EJ" (C172) -> "Cessna seven two three echo juliet"; "NKS451" -> "Spirit four fifty one". */
+/**
+ * Telephony of the military and vehicle callsign forms (internal tags are three letters so the airline-shaped matching in the parser works):
+ *   CGD#####  "Coast Guard six one three two seven"  JO 7110.65 2-4-20 U.S. military: "the service name ... and the last 5 digits of the serial number"
+ *   ANG#####  "Air Guard one three five eight six"   same paragraph (examples "Coast Guard Six One Three Two Seven", "Air Guard One Three Five Eight Six")
+ *   APT##     "Airport two one vehicle"              FAA AC 150/5210-20A Appendix B para 4.3 ("this is Airport 21 vehicle at Charlie 6")
+ * See docs/FAA-REFERENCES.md "Traffic variety".
+ */
+export const SERVICE_TELEPHONY: Readonly<Record<string, string>> = { CGD: 'Coast Guard', ANG: 'Air Guard', APT: 'Airport' };
+
 export function spokenCallsign(callsign: string, type?: string): string {
   const cs = callsign.trim().toUpperCase();
+  const svc = /^(CGD|ANG)(\d{5})$/.exec(cs);
+  if (svc) return `${SERVICE_TELEPHONY[svc[1]]} ${digitsSpoken(svc[2])}`;
+  const veh = /^APT(\d{1,3})$/.exec(cs);
+  if (veh) return `${SERVICE_TELEPHONY.APT} ${digitsSpoken(veh[1])} vehicle`;
   const air = /^([A-Z]{3})(\d{1,4})([A-Z]?)$/.exec(cs);
   if (air && AIRLINES[air[1]]) {
     return `${AIRLINES[air[1]]} ${flightNumberSpoken(air[2])}${air[3] ? ` ${phonetic(air[3])}` : ''}`;

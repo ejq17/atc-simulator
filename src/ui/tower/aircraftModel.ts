@@ -9,10 +9,14 @@ import type { Pose } from '../display/renderBuffer';
 import { FT } from './geometry';
 import type { FuselageStyle } from './liveries';
 
-export type AircraftClass = 'airliner' | 'bizjet' | 'ga';
+export type AircraftClass = 'airliner' | 'bizjet' | 'ga' | 'rotorcraft' | 'fighter' | 'vehicle';
 
 /** Model families: each is built by its own recipe in aircraftMeshes.ts. */
-export type ModelFamily = 'narrowbody' | 'regionalJet' | 'bizjet' | 'gaHigh' | 'gaLow' | 'turboprop' | 'turbopropSingle';
+export type ModelFamily = 'narrowbody' | 'regionalJet' | 'bizjet' | 'gaHigh' | 'gaLow' | 'turboprop' | 'turbopropSingle' | 'helicopter' | 'fighter' | 'groundVehicle';
+
+/** Families built from a parametric Recipe; the special-traffic families (helicopter, fighter, ground vehicle) have their own builders in specialModels.ts. */
+export type RecipeFamily = Exclude<ModelFamily, 'helicopter' | 'fighter' | 'groundVehicle'>;
+export const SPECIAL_FAMILIES: ReadonlySet<ModelFamily> = new Set<ModelFamily>(['helicopter', 'fighter', 'groundVehicle']);
 
 /** ICAO type designators of business jets the sim may use; others are classed by length (see classifyAircraft). */
 const BIZJET = /^(C25[A-Z0-9]?|C5[0-9]{2}[A-Z]?|C6[0-9]{2}[A-Z]?|C7[0-9]{2}|LJ[0-9]{2}|GLF[0-9]|GL[0-9T]{2,3}|FA[0-9][0-9X]|F2TH|F900|H25[A-C]|E50P|E55P|PRM1|CL[0-9]{2}|SF50|ASTR|G[0-9]{3})$/;
@@ -78,6 +82,11 @@ const TYPES: Readonly<Record<string, TypeDims>> = {
   DA40: { family: 'gaLow', len: 8.06, span: 11.94, height: 2.0 },
   BE36: { family: 'gaLow', len: 8.4, span: 10.2, height: 2.5 },
   M20P: { family: 'gaLow', len: 7.7, span: 11.0, height: 2.3 },
+  // Special traffic. H65: length with the rotors turning, rotor diameter 39 ft 2 in, height 13 ft 1 in (USCG MH-65 fact sheet / Airbus AS365N).
+  // F16: USAF F-16C fact sheet (length 49 ft 5 in, span 32 ft 8 in over the wingtip missiles, height 16 ft). VEH: a full-size pickup, 5.5 m.
+  H65: { family: 'helicopter', len: 13.54, span: 11.94, height: 3.99 },
+  F16: { family: 'fighter', len: 15.06, span: 9.96, height: 4.88 },
+  VEH: { family: 'groundVehicle', len: 5.5, span: 2.0, height: 1.9 },
 };
 
 /** The model family of a type: the table above, else a guess from the designator and the performance category/length. */
@@ -94,6 +103,7 @@ export function familyOf(type: string): ModelFamily {
 
 const FAMILY_CLASS: Record<ModelFamily, AircraftClass> = {
   narrowbody: 'airliner', regionalJet: 'airliner', turboprop: 'airliner', bizjet: 'bizjet', gaHigh: 'ga', gaLow: 'ga', turbopropSingle: 'ga',
+  helicopter: 'rotorcraft', fighter: 'fighter', groundVehicle: 'vehicle',
 };
 
 export function classifyAircraft(type: string): AircraftClass {
@@ -103,12 +113,14 @@ export function classifyAircraft(type: string): AircraftClass {
 /** Families whose gear retracts. GA singles and the Caravan keep fixed gear. */
 export const RETRACTABLE: Readonly<Record<ModelFamily, boolean>> = {
   narrowbody: true, regionalJet: true, turboprop: true, bizjet: true, gaHigh: false, gaLow: false, turbopropSingle: false,
+  helicopter: false, fighter: true, groundVehicle: false,
 };
 
 /** Default ratios for a family when the type has no table entry (wingspan / length, height / length). */
 const FAMILY_RATIOS: Record<ModelFamily, { span: number; height: number }> = {
   narrowbody: { span: 0.95, height: 0.31 }, regionalJet: { span: 0.68, height: 0.205 }, turboprop: { span: 1.0, height: 0.27 },
   bizjet: { span: 1.0, height: 0.31 }, gaHigh: { span: 1.33, height: 0.33 }, gaLow: { span: 1.45, height: 0.3 }, turbopropSingle: { span: 1.38, height: 0.39 },
+  helicopter: { span: 0.88, height: 0.295 }, fighter: { span: 0.66, height: 0.324 }, groundVehicle: { span: 0.36, height: 0.345 },
 };
 
 export interface ModelDims { lengthM: number; wingspanM: number; heightM: number; cls: AircraftClass; family: ModelFamily; lowWing: boolean }
@@ -152,7 +164,7 @@ export interface Recipe {
   style: FuselageStyle;
 }
 
-export const RECIPES: Record<ModelFamily, Recipe> = {
+export const RECIPES: Record<RecipeFamily, Recipe> = {
   // A320 / B738 / A220 / E-jets: low swept wing with sharklets, underwing turbofans, conventional tail.
   narrowbody: {
     R: 0.05, sq: 1, clear: 0.045, nose: 2.8, tail: 5.2, up: 0.9,
@@ -291,6 +303,11 @@ export function lightState(i: LightInput): LightState {
     strobe: on && (!i.onGround || ROLL_PHASES.has(i.phase) || i.phase === 'LANDING' || i.phase === 'ROLLOUT') && (phaseMs < 80 || (phaseMs > 160 && phaseMs < 240)),
     landing: on && (ROLL_PHASES.has(i.phase) || FINAL_PHASES.has(i.phase) || (!i.onGround && i.aglFt < 10000)),
   };
+}
+
+/** Amber rotating beacon of an airport vehicle: always running (day and night), a 1 s cycle that is on for 55 percent of it. */
+export function vehicleBeacon(nowMs: number, seed: number): boolean {
+  return ((nowMs + (seed % 500)) % 1000) < 550;
 }
 
 export interface Placement {

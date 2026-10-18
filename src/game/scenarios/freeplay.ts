@@ -129,6 +129,7 @@ export function buildFreePlay(airport: Airport, options: FreePlayOptions = {}, i
     traffic: { enabled: true, arrivalsPerHour, departuresPerHour, gaFraction, maxAircraft },
     difficulty,
     aircraftTypes: types,
+    ...(options.specialTraffic ? { specialTraffic: { ...options.specialTraffic } } : {}),
     ...(options.ifrFlows !== undefined ? { ifrFlows: options.ifrFlows } : {}),
     ...(internal.ifrArrivals !== undefined ? { ifrArrivals: internal.ifrArrivals } : {}),
     ...(internal.ifrDepartures !== undefined ? { ifrDepartures: internal.ifrDepartures } : {}),

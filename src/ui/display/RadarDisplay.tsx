@@ -101,7 +101,7 @@ export function RadarDisplay() {
         if (!session) return;
         const now = performance.now();
         const frame: Frame = { state: session.engine.getState(), nowMs: now, pose: (ac) => session.buffer.sample(ac, now) };
-        useSimStore.getState().selectAircraft(hitTestAircraft(frame, viewRef.current, x, y, pointerType === 'touch' ? 30 : 18));
+        useSimStore.getState().selectAircraft(hitTestAircraft(frame, viewRef.current, x, y, pointerType === 'touch' ? 30 : 18, false));
       },
     });
   }, [canvasRef, setRange]);

@@ -5,7 +5,7 @@
  * Colours are approximations of the real schemes, not trademark-exact reproductions.
  */
 
-export type FuselageStyle = 'airliner' | 'regional' | 'bizjet' | 'ga' | 'turboprop';
+export type FuselageStyle = 'airliner' | 'regional' | 'bizjet' | 'ga' | 'turboprop' | 'rotor' | 'fighter' | 'vehicle';
 
 export interface LiveryBand {
   /** Elevation range around the fuselage (-1 belly .. 1 crown) and length range (0 nose .. 1 tail). */
@@ -83,6 +83,23 @@ export const LIVERIES: Readonly<Record<string, Livery>> = {
     bands: [{ v0: 0.5, v1: 0.6, t0: 0.18, t1: 0.52, colour: 0x1d8f45, dash: [0.05, 0.6] }],
     fin: [0x1d8f45], tailplane: 0x1d8f45, wing: GREY, engine: 0x1d8f45, metalness: 0.1,
   },
+  // Coast Guard (CGD): white upper fuselage and boom, Coast Guard red-orange lower fuselage, a blue band above it and the red-orange racing stripe on the fin.
+  CGD: {
+    id: 'CGD', name: 'U.S. Coast Guard', top: WHITE, belly: 0xe2401c, bellyV: -0.28,
+    bands: [{ v0: -0.38, v1: -0.28, t0: 0.0, t1: 0.52, colour: 0x12295a }],
+    tailCone: WHITE, tailConeT: 0.5,
+    fin: [0xe2401c, 0xf3f5f7, 0xf3f5f7], tailplane: WHITE, wing: WHITE, engine: 0x3a3e44, metalness: 0.05,
+  },
+  // Air National Guard (ANG): F-16C in the low-visibility grey, darker nozzle.
+  ANG: {
+    id: 'ANG', name: 'Air National Guard', top: 0x9ca2a9, belly: 0x8e949b, bellyV: -0.1, bands: [],
+    fin: [0x8b9198], tailplane: 0x868c93, wing: 0x929aa1, engine: 0x42464c, metalness: 0.15,
+  },
+  // Airport vehicle (APT): safety-yellow pickup with a dark lower trim.
+  APT: {
+    id: 'APT', name: 'Airport vehicle', top: 0xf0c000, belly: 0x2b2e33, bellyV: -0.5, bands: [],
+    fin: [0xf0c000], tailplane: 0xf0c000, wing: 0xf0c000, engine: 0x2b2e33, metalness: 0.05,
+  },
   // Regionals flying for the majors: white with the partner's tail.
   RPA: { id: 'RPA', name: 'Republic Airways', top: WHITE, belly: 0xe1e5ea, bellyV: -0.4, bands: [], fin: [0x1f3f75, 0xf2f4f6, 0xc4162e], tailplane: GREY, wing: GREY, engine: 0xe4e7ea, metalness: 0.1 },
   ENY: { id: 'ENY', name: 'Envoy', top: WHITE, belly: 0xe1e5ea, bellyV: -0.4, bands: [], fin: [0xc4162e, 0xf2f4f6, 0x0d3b7a], tailplane: GREY, wing: GREY, engine: 0xe4e7ea, metalness: 0.1 },
@@ -153,6 +170,12 @@ export function fuselagePaint(l: Livery, p: PaintParams, t: number, v: number): 
   if (p.style === 'ga') {
     if (t > 0.27 && t < 0.42 && v > 0.12 && v < 0.78) return DARK_GLASS; // windscreen and door windows
     if (t >= 0.42 && t < 0.62 && v > 0.15 && v < 0.62) return DARK_GLASS;
+  } else if (p.style === 'rotor') {
+    if (t > 0.045 && t < 0.2 && v > 0.1 && v < 0.82) return DARK_GLASS; // windscreen
+    if (t >= 0.2 && t < 0.31 && v > 0.12 && v < 0.55) return DARK_GLASS; // forward door window
+    if (t >= 0.34 && t < 0.46 && v > 0.12 && v < 0.55) return DARK_GLASS; // aft cabin window
+  } else if (p.style === 'fighter' || p.style === 'vehicle') {
+    // no glass painted on the fuselage: canopy and windows are separate parts
   } else {
     const t0 = p.style === 'bizjet' ? 0.1 : 0.058;
     if (t > t0 && t < t0 + 0.03 && v > 0.18 && v < 0.72) return DARK_GLASS; // cockpit

@@ -214,3 +214,7 @@ realised -> released, and everything the shared normaliser already fixes (NATO l
 * Traffic descriptions are matched by the engine, not the parser: the parser only keeps the words ("boeing 737", "skyhawk") and the position clause.
 * Conditional clauses ("behind the landing traffic", "after departure") are not modelled; their words show up as `unrecognised words`.
 * Two-letter taxiway names and runway designators with parallel suffixes are only lightly supported.
+
+## Traffic variety grammar (`rules-special.ts`)
+
+`ruleAirTaxi` ("air taxi via alpha to the Coast Guard ramp", "hover taxi to Coast Guard helipad three"), `makeProceedRule` ("proceed on runway one three, report runway inspection complete" = PROCEED, "proceed on the taxiways", "proceed to runway ... via ..." = the taxi rule), `ruleHeliTakeoff` ("[pad,] make right turn for southeast departure, cleared for takeoff [from present position]"), `ruleHeliLand` ("make straight-in approach to Coast Guard helipad two, cleared to land"), `ruleOverhead` ("runway N, wind ..., pattern altitude N, right turns, report initial", "break at midfield, report break"), `ruleTrafficDirection` ("make right traffic", 3-10-1). Callsigns: "Coast Guard" and "Air Guard" are two-word telephony (`lexicon.ts` PHRASES) followed by 5 digits; "Airport <n> vehicle" (the word "airport" is a callsign only before a number); "flight of two / three / four" is dropped. "Proceed as requested" is deliberately not parsed (3-1-5 NOTE). Tests: `special.test.ts`.

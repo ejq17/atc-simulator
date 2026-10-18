@@ -34,6 +34,7 @@ export const AIRLINES = rec({
   breeze: 'MXY', republic: 'RPA', envoy: 'ENY', skywest: 'SKW', piedmont: 'PDT',
   psa: 'JIA', endeavor: 'EDV', mesa: 'ASH',
   moxy: 'MXY', brickyard: 'RPA', lindbergh: 'GJS', wiggins: 'WIG', streak: 'JIA',
+  airport: 'APT', // AC 150/5210-20A: "Airport 21 vehicle" (only before a number, normalize.ts)
 });
 
 /** General-aviation callsign prefixes ("Cessna 723EJ"), mapped to type-code regexes. */
@@ -54,6 +55,13 @@ export const PHRASES: readonly { words: readonly string[]; to: PhraseTarget }[] 
   { words: ['jet', 'blue'], to: { text: 'JBU', kind: 'airline' } },
   { words: ['fed', 'ex'], to: { text: 'FDX', kind: 'airline' } },
   { words: ['sky', 'west'], to: { text: 'SKW', kind: 'airline' } },
+  // Service callsigns of JO 7110.65 2-4-20 ("Coast Guard Six One Three Two Seven", "Air Guard One Three Five Eight Six")
+  { words: ['coast', 'guard'], to: { text: 'CGD', kind: 'airline' } },
+  { words: ['air', 'guard'], to: { text: 'ANG', kind: 'airline' } },
+  // Formation calls ("flight of two") are part of the callsign, not an instruction or a number (JO 7110.65 2-1-13)
+  { words: ['flight', 'of', 'two'], to: { text: '' } },
+  { words: ['flight', 'of', 'three'], to: { text: '' } },
+  { words: ['flight', 'of', 'four'], to: { text: '' } },
   { words: ['flight', 'level'], to: { text: 'fl' } },
   { words: ['take', 'off'], to: { text: 'takeoff' } },
   { words: ['run', 'way'], to: { text: 'runway' } },
@@ -168,7 +176,7 @@ export const FILLERS: ReadonlySet<string> = new Set([
   'please', 'now', 'immediately', 'expedite', 'and', 'then', 'the', 'a', 'an', 'roger', 'ok', 'okay',
   'thanks', 'thank', 'you', 'good', 'day', 'morning', 'afternoon', 'evening', 'sir', 'atlantic', 'city',
   'ground', 'tower', 'approach', 'departure', 'delivery', 'clearance', 'control', 'hello', 'hi', 'this',
-  'is', 'heavy', 'super', 'also', 'next', 'over',
+  'is', 'heavy', 'super', 'also', 'next', 'over', 'vehicle',
 ]);
 
 /** Speech disfluencies dropped during normalisation (the raw text still keeps them). */

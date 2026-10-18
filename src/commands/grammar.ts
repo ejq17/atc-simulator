@@ -15,6 +15,7 @@ import {
 } from './rules-misc';
 import { ruleContinue, ruleGoAround, ruleLand, rulePushback, ruleTakeoff } from './rules-tower';
 import { ruleBirdAdvisory, ruleBrakingAdvisory, ruleRunwayLights, ruleRvr, ruleStar } from './rules-airport';
+import { makeProceedRule, ruleAirTaxi, ruleHeliLand, ruleHeliTakeoff, ruleOverhead, ruleTrafficDirection } from './rules-special';
 import {
   ruleAirportInfo, ruleCancelTakeoff, ruleExitRunway, ruleFollowTraffic, ruleFrequencyApproved, rulePatternInstruction, ruleRadarServiceTerminated, ruleReportPosition,
   ruleSquawk, ruleTrafficAdvisory, withLuawTraffic,
@@ -41,7 +42,9 @@ import {
  */
 export function buildRules(ctx: Pick<ParseContext, 'fixes' | 'taxiways' | 'runwayEnds' | 'arrivals'> = {}): readonly Rule[] {
   const fixes = makeFixMatcher(ctx.fixes);
+  const taxiRule = makeTaxiRule(ctx.taxiways, ctx.runwayEnds);
   return [
+    ruleAirTaxi, makeProceedRule(taxiRule), ruleHeliTakeoff, ruleHeliLand, ruleOverhead, ruleTrafficDirection,
     ruleAirportInfo, ruleWind, ruleSayAgain, ruleBirdAdvisory, ruleBrakingAdvisory, ruleRvr, ruleRunwayLights, ruleStar(ctx.arrivals ?? [], fixes), ruleTaxiIntoPosition, withLuawTraffic(ruleLineUp), ruleCancelTakeoff, ruleRadarServiceTerminated, ruleFrequencyApproved, ruleSquawk,
     ruleExitRunway, rulePatternInstruction, ruleReportPosition, ruleFollowTraffic, ruleTrafficAdvisory, ruleTakeoff, ruleLand, ruleHoldAtFix(fixes),
     ruleMissedApproach, ruleGoAround, rulePushback, ruleReadBackHold, ruleContinueSegment, ruleRadarContact(fixes), ruleResumeNav, makeClearedToParkingRule(ctx.taxiways, ctx.runwayEnds), ruleApproach, ruleDirectFix(fixes),

@@ -28,6 +28,9 @@ import {
   luawIntentionsCall, positionReportCall, requestNumbersCall, trafficAcquiredCall,
 } from '../radio/readback';
 import type { ReadbackEnv } from '../radio/readback';
+import { isVehicle, initVehicle, vehiclePilotCalls } from './vehicles';
+import { heliPilotCalls, isRotorcraft } from './rotorcraft';
+import { initSpecial, specialPilotCalls, trainingClearCall } from './special';
 
 /** A pilot reports braking action for a runway at most this often, unless the report is worse than the one on file. */
 export const BRAKING_REPORT_INTERVAL_SEC = 600;
@@ -288,6 +291,11 @@ export function spawnFromSpec(ctx: SimContext, spec: SpawnSpec): Aircraft {
     ac.trackDeg = ac.headingDeg;
     rt.firstCallAtSec = now + 1 + rng() * 3;
   }
+  if (spec.behavior) {
+    const b = spec.behavior;
+    if (b.kind === 'vehicle' && s.kind === 'parked') initVehicle(ctx, ac, rt, b, s.parkingId);
+    else initSpecial(ctx, ac, rt, b);
+  }
   ac.history = [{ x: ac.pos.x, y: ac.pos.y }];
   state.aircraft[id] = ac;
   emitEvent(ctx, {
@@ -457,6 +465,18 @@ export function updatePilotRequests(ctx: SimContext): void {
     }
 
     if (ac.radioState === 'TRANSMITTING') continue;
+
+    // Vehicles and helicopters make their own calls (vehicles.ts, rotorcraft.ts); VFR transits, training circuits and the overhead maneuver
+    // replace the generic inbound / clear-of-runway calls (special.ts).
+    if (isVehicle(ac)) {
+      vehiclePilotCalls(ctx, ac, rt, env);
+      continue;
+    }
+    if (isRotorcraft(ac)) {
+      heliPilotCalls(ctx, ac, rt, env);
+      continue;
+    }
+    if (specialPilotCalls(ctx, ac, rt, env)) continue;
 
     if (towerVocabularyCalls(ctx, ac, rt, env)) continue;
 
@@ -700,7 +720,7 @@ export function updatePilotRequests(ctx: SimContext): void {
         } else {
           const taxiway = ac.route ? airport.taxiwayGraph.nodes[ac.route.nodeIds[ac.route.nodeIds.length - 1]].taxiways[0] : undefined;
           const onGround = frequencyByMhz(airport, ac.frequencyMhz)?.position === 'GND';
-          pilotSay(ctx, ac, clearOfRunwayCall(ac, env, g.end.id, taxiway) + (onGround ? ' Request taxi to parking.' : ''), { request: onGround ? 'TAXI' : 'FREQUENCY_CHANGE' });
+          pilotSay(ctx, ac, ac.flags.training ? trainingClearCall(ac, env, taxiway) : clearOfRunwayCall(ac, env, g.end.id, taxiway) + (onGround ? ' Request taxi to parking.' : ''), { request: onGround ? 'TAXI' : 'FREQUENCY_CHANGE' });
           ac.pendingRequest = onGround
             ? { kind: 'TAXI', text: 'request taxi to parking', sinceSec: now }
             : { kind: 'FREQUENCY_CHANGE', text: 'clear of runway, request frequency change', sinceSec: now };
@@ -778,6 +798,16 @@ export function updateLifecycle(ctx: SimContext): void {
     if (ac.phase === 'ARRIVED') {
       rt.arrivedAtSec = rt.arrivedAtSec ?? now;
       if (now - rt.arrivedAtSec >= ctx.pilotBehaviour.ground.arrivedLingerSec) removeAircraft(ctx, ac.id, true, 'arrived and shut down');
+      continue;
+    }
+    if (isVehicle(ac) && rt.vehicle?.stage === 'DWELL' && ac.phase === 'PARKED') {
+      rt.arrivedAtSec = rt.arrivedAtSec ?? now;
+      if (now - rt.arrivedAtSec >= ctx.pilotBehaviour.ground.arrivedLingerSec) removeAircraft(ctx, ac.id, true, "back at the ramp");
+      continue;
+    }
+    // A VFR transit leaves when it reaches the far end of its track (JO 7110.65 7-8-8: service ends when the aircraft leaves the outer area).
+    if (!ac.onGround && rt.special?.transit && dist(ac.pos, rt.special.transit.exitPos) < 1852) {
+      removeAircraft(ctx, ac.id, !!ac.radarIdentified, ac.radarIdentified ? 'crossed the area (Class C service)' : 'left the area without radar identification');
       continue;
     }
     if (!ac.onGround) {

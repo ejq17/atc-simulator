@@ -173,7 +173,7 @@ Conventions (all follow the existing file, not re-verified):
 
 * Cruise speed 250 kt for the jets is the 14 CFR 91.117(a) limit below 10,000 ft, as for the A320; taxi speeds, turn rates and descent rates are the same gameplay simplifications as C172/A320 (section 3).
 * SRS category (JO 7110.65 3-9-6): jets 3, C208 1 (single-engine propeller-driven turbine, 8,750 lb MTOW).
-* RECAT (JO 7110.126A Appendix A, as used in `wakeRecatCategory`): B738, BCS3, E175, CRJ9 = F; C208 = I; B752 = E, following the file's existing "B757 = E" convention. The 7110.126A listing of the 757 was not re-fetched, so that assignment is **UNVERIFIED** (to check: Appendix A, category of B757).
+* RECAT (JO 7110.126A Appendix A, as used in `wakeRecatCategory`): B738 = F, **E175 and CRJ9 = G (corrected 2026-10-18)**, BCS3 = F, C208 = I, B752 = E. Checked on the rendered page A1 of JO 7110.126A (09/28/2019; `pdftoppm -f 3 -r 130`, read visually, not by text alignment): TBL A-1 shows A320 / B738 under F (Upper Large), B752 under E, CRJ9 and E75L / E75S under G (Lower Large), F16 under G, C208 under I; BCS3 (A220) and C172 are not listed (BCS3 stays F by convention, UNVERIFIED; C172 is I by the weight definition). Effect: a G leader needs no wake spacing behind it (src/sim/wake.ts), so a C172 behind a CRJ9 / E175 on approach no longer needs the 4 NM an F leader requires.
 * Runway fit: KMHT 17/35 is 9,250 ft and 6/24 is 7,651 ft; every added type's `takeoffDistanceFt` is below 7,651, so each can depart from the full length of every end (the generator also checks `runwayLongEnoughFor(type)` per active runway). On KACY's 6,145 ft runway 4/22 the B752 (6,800) and B738 (6,000, marginal) would be refused from an intersection exactly as the A320 is; KACY does not generate them.
 * The C208 is category `light`, so it parks on the GA ramp / FBO, uses light-aircraft holding and speed rules, and arrives at 110 kt in IFR flows; the freighters park at the cargo apron (CARGO-N/S) when the airport has one.
 * Wiggins' destination (Portland, KPWM) and the Sun Country charter legs are gameplay assumptions, not schedule data.
@@ -195,3 +195,54 @@ Added for the wind-physics round. Every new number below is either cited or mark
 | VGSI angle and TCH per runway end (visual approaches) | KACY 4 / 22 / 13 / 31: 3.0 deg / 50 / 51 / 71 / 69 ft; KMHT 6 / 24 / 17 / 35: 3.0 / 3.0 / 3.1 / 3.0 deg, 50 / 50 / 67 / 68 ft | NASR APT_RWY_END (cycle 2026-10-01), already in `*-facility.json` | VERIFIED data (NASR); using it as the visual path of large aircraft is a design choice; light aircraft keep 50 ft (design) |
 | Gust model constants | tau 8 s (speed), 12 s (direction), smoothing 2 s, lull fraction 0.5, direction sigma 0.6 deg per kt of spread capped at 10 deg, flare lift 25 ft/min per kt, go-around after 2 s over the demonstrated value + 5 kt; pilot weighs steady + 0.5 x (gust - steady) when accepting a runway | none | DESIGN VALUES, not sourced; documented in `src/sim/wind.ts` |
 | Displaced thresholds | KMHT 6: 442 ft, 17: 336 ft, 35: 850 ft; declared distances TORA / TODA / ASDA / LDA 06 7650 / 7650 / 7650 / 7208, 24 7650 / 7650 / 6850 / 6850, 17 9250 / 9250 / 9250 / 8914, 35 9250 / 9250 / 8500 / 7650 ft | NASR (cycle 2026-10-01), `kmht-facility.json` | VERIFIED data; 24's and 35's LDA are shorter than the geometry allows and the reason is not in NASR (UNVERIFIED, the declared value is used) |
+
+## 9. Traffic variety: MH-65 helicopter, F-16C fighter, airport vehicle (2026-10-18)
+
+New performance entries in `src/sim/performance.ts` (`H65`, `F16`, `VEH`; the same numbers with their source status are in `data/sources/aircraft-performance.json`). Rule of the project: a number without a citable source is **UNVERIFIED** and a conservative design value. Retrieval date of every source: 2026-10-18.
+
+Access caveat: the two fact-sheet servers (dcms.uscg.mil, af.mil) answer HTTP 403 / are blocked for scripted requests from this environment. Their figures below were read from the **text of web-search results that quote the sheets**, not from the PDF / page itself; they are consistent between several results but are second-hand. The FAA pages (JO 7110.65 web edition, AIM, AC 150/5210-20A, JO 7110.126A) were fetched and read directly.
+
+### 9.1 MH-65 Dolphin (`H65`, Coast Guard Air Station Atlantic City)
+
+| Field | Value | Source / status |
+|---|---|---|
+| cruiseSpeedKt | 148 | USCG MH-65E fact sheet (Dec 2024): "cruise speed of 148 knots". Verified (second-hand). |
+| maxSpeedKt | 175 | Coast Guard Aviation Association table for the MH-65C: "Maximum Speed 175 knots". The MH-65E sheet gives no maximum. Verified for the C model. |
+| lengthM | 13.5 | 44 ft 5 in "with rotor blades" (MH-65E sheet) = 13.54 m. Verified (second-hand). |
+| maximum weight | 9,480 lb | MH-65E sheet; not used by the engine (no weight model), recorded in the data file. |
+| rotor diameter / height | 39 ft 2 in / 13 ft 3 in | MH-65E sheet; used for the Tower model scale (src/ui/tower). |
+| hoverTaxiMaxKt | 20 | JO 7110.65 3-11-1: hover taxi "normally below 20 knots and in ground effect". Procedure figure. |
+| air taxi height / speed | below 100 ft AGL, above 20 kt | 3-11-1 and AIM 4-3-17 ("Unless otherwise requested or instructed, pilots are expected to remain below 100 feet AGL"). The simulator flies **40 ft** and **35 kt** (design values inside those limits); hover taxi is flown at **15 ft** and **10 kt** (design). |
+| wake | RECAT: not listed; falls back to I | JO 7110.126A Appendix A TBL A-1 lists no helicopter type (the table was searched for "helicopter", "rotorcraft", H65, HH65, MH65, EC65: no entry; the only mentions are the taxi-proximity cautions of 3-11-1 / 5-5-4). SRS category I: 3-9-6 NOTE "CATEGORY I - small single-engine propeller driven aircraft weighing 12,500 lbs. or less, and all helicopters". |
+| pattern | 500 ft AGL | AIM 4-3-3: "Helicopters operating in the traffic pattern may fly a pattern similar to the fixed-wing aircraft pattern, but at a lower altitude (500 AGL) and closer to the runway." `patternAltitudeFt` returns field + 500 for rotorcraft; the simulator flies no helicopter pattern (helicopters arrive straight to the pad). |
+| everything else (taxi, accel, decel, climb 1,500 fpm, descent 800 fpm, ceiling 10,000 ft, turn rates, approach 70 kt, vertical rate 500 fpm, hover turn 15 deg/s) | | **UNVERIFIED** design values. |
+
+Measured (src/sim/rotorcraft.test.ts, `tsx`-free vitest run of the engine): air taxi USCG-1 to GA-1: 1,767 m in 176 s, max ground speed 32.0 kt, max height 40.0 ft AGL; hover taxi USCG-1 to USCG-4: 214 m in 57 s, max 9.1 kt, 15.0 ft AGL; lift-off hovers at 15 ft with no translation (< 0.5 m), turns to the departure heading, then climbs; a landing from 4 km ends within 1 m of the pad.
+
+### 9.2 F-16C Fighting Falcon (`F16`, 177th Fighter Wing)
+
+| Field | Value | Source / status |
+|---|---|---|
+| lengthM | 15.06 | USAF fact sheets: "49 feet, 5 inches". Verified (second-hand). |
+| serviceCeilingFt | 50,000 | "above 50,000 feet". Verified (second-hand). |
+| weights | 19,700 lb empty, 37,500 lb MTOW (about 39,000 lb for Block 50/52, Shaw sheet) | Fact sheets; not used by the engine. |
+| speed | "Mach 2 at altitude" (1,500 mph) | Fact sheet; `maxSpeedKt` 450 is a design value for the simulation area (below 10,000 ft). |
+| RECAT | G (Lower Large) | JO 7110.126A Appendix A TBL A-1 (pdftotext layout): `F16` sits in the same column as E75L / E75S / F18H / F18S / F900, under "Lower Large" (Category G). Reading by column alignment. |
+| SRS | III | 3-9-6 NOTE "CATEGORY III - all other aircraft". |
+| overhead speed | 200 kt inside 4 nm below 2,500 ft AGL | 14 CFR 91.117(b) as quoted in AIM 3-2-4: "no person may operate an aircraft at or below 2,500 feet above the surface within 4 nautical miles of the primary airport of a Class C airspace area at an indicated airspeed of more than 200 knots (230 mph)" (unless ATC authorises). **The 300 kt overhead break speed found in forum posts and a simulator syllabus is not used.** |
+| overhead pattern altitude | 1,500 ft AGL (1,575 ft MSL at KACY, read "one thousand six hundred") | AIM 4-3-3 for turbine-powered aircraft; the same value the simulator uses for every turbine type. |
+| initial point 3 nm, break over mid-runway, fighter base turn 3.5 nm | | **UNVERIFIED** design values; 3-10-12 says to name the break point "only if nonstandard", it does not define the standard one. |
+| turn rate 8 deg/s | | UNVERIFIED design (about a 2.5 g break at 200-300 kt; the 2-2.5 g break is from a simulator syllabus and a pilot's forum account, not an official document). |
+| all other speeds, accel, decel, rates, takeoff / landing distance | | **UNVERIFIED** design values. The only pattern / approach figures found are forum or simulator-syllabus text. |
+
+Measured (src/sim/special.test.ts): initial and downwind at 1,575 / 1,600 ft MSL, 200 kt maximum inside 4 nm, break at 1,533 m along a 3,048 m runway, downwind offset up to 1,669 m (0.9 nm), landing after the break; a flight of two has a following distance of 1.5 x 2 x 15.06 + 20 = 65 m against 42 m for a single ship (ground spacing / proximity use the formation length).
+
+### 9.3 Airport vehicle (`VEH`)
+
+All values are UNVERIFIED design values (18 kt, 5.5 m, acceleration as for the taxi model). FAA AC 150/5210-20A (9/1/2015) gives no vehicle speed (the airport operator sets limits). The vehicle alert distance of 5 m on the ground (`VEHICLE_PROXIMITY_M`) is a design value.
+
+### 9.4 What was left out because no source was found
+
+* **The five digits of the generated callsigns (CGD##### / ANG#####) are generated by the traffic generator, like the N-numbers of generated GA traffic; they are not real serial numbers.** The 2-4-20 FORM (service name + last 5 digits of the serial) is sourced, the numbers are not.
+* MH-65 tail-number format ("65xx"), the unit's actual call signs and the 177th's tactical call signs ("DEVIL" etc.): not sourced, not used (see docs/FAA-REFERENCES.md "Traffic variety").
+* F-16 pattern and final-turn speeds and the standard overhead break point; arresting-gear (BAK-14 / BAK-12B) rigged state; vehicle speeds; mower and follow-me vehicle radio names.

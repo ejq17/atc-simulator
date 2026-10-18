@@ -7,9 +7,12 @@ const fetchLiveMetar = vi.fn((_icao: string) => new Promise<never>(() => undefin
 vi.mock('../../weather/liveWeather', () => ({ fetchLiveMetar: (icao: string) => fetchLiveMetar(icao) }));
 
 import { SetupScreen } from './SetupScreen';
+import { useSimStore } from '../store/simStore';
+import type { StartOptions } from '../store/simStore';
 
 afterEach(() => {
   cleanup();
+  useSimStore.setState({ startOptions: undefined });
   fetchLiveMetar.mockClear();
 });
 
@@ -56,5 +59,77 @@ describe('<SetupScreen /> closure options', () => {
     fireEvent.change(screen.getByTestId('airport-select'), { target: { value: 'KMHT' } });
     expect((screen.getByTestId('close-runway') as HTMLSelectElement).value).toBe('none');
     expect([...(screen.getByTestId('close-runway') as HTMLSelectElement).options].map((o) => o.value)).toEqual(['none', '6/24', '17/35']);
+  });
+});
+
+describe('<SetupScreen /> special traffic', () => {
+  const KINDS = ['helicopter', 'military', 'transition', 'training', 'vehicles'] as const;
+  /** Replace the store's startSession (before the screen renders, it reads it then); `pressStart` clicks Start and returns the options passed. */
+  const mockStart = () => {
+    const start = vi.fn((_o: StartOptions) => Promise.resolve(true));
+    useSimStore.setState({ startSession: start });
+    return () => {
+      fireEvent.click(screen.getByTestId('start-session'));
+      expect(start).toHaveBeenCalledTimes(1);
+      return start.mock.calls[0][0];
+    };
+  };
+
+  it('KACY offers all five kinds, checked by default, with their labels and hints', () => {
+    render(<SetupScreen />);
+    for (const k of KINDS) expect(screen.getByTestId(`special-${k}`)).toBeChecked();
+    const group = screen.getByTestId('special-traffic');
+    expect(group).toHaveAttribute('role', 'group');
+    expect(group).toHaveTextContent('Special traffic');
+    expect(group).toHaveTextContent('Coast Guard helicopters');
+    expect(group).toHaveTextContent('Air National Guard fighters');
+    expect(screen.getByLabelText(/Airport vehicles/)).toBe(screen.getByTestId('special-vehicles'));
+  });
+
+  it('KMHT offers only VFR transitions and vehicles, and switching airports resets to the defaults of the new airport', () => {
+    render(<SetupScreen />);
+    fireEvent.click(screen.getByTestId('special-training'));
+    expect(screen.getByTestId('special-training')).not.toBeChecked();
+    fireEvent.change(screen.getByTestId('airport-select'), { target: { value: 'KMHT' } });
+    expect(screen.getByTestId('special-transition')).toBeChecked();
+    expect(screen.getByTestId('special-vehicles')).toBeChecked();
+    for (const k of ['helicopter', 'military', 'training']) expect(screen.queryByTestId(`special-${k}`)).toBeNull();
+    fireEvent.change(screen.getByTestId('airport-select'), { target: { value: 'KACY' } });
+    expect(screen.getByTestId('special-training')).toBeChecked();
+  });
+
+  it('passes the checkboxes as freePlay.specialTraffic when the session starts', () => {
+    let pressStart = mockStart();
+    render(<SetupScreen />);
+    expect(pressStart().freePlay.specialTraffic).toEqual({ helicopter: true, military: true, transition: true, training: true, vehicles: true });
+    cleanup();
+    pressStart = mockStart();
+    render(<SetupScreen />);
+    fireEvent.click(screen.getByTestId('special-military'));
+    fireEvent.click(screen.getByTestId('special-vehicles'));
+    expect(screen.getByTestId('special-military')).not.toBeChecked();
+    expect(pressStart().freePlay.specialTraffic).toEqual({ helicopter: true, military: false, transition: true, training: true, vehicles: false });
+  });
+
+  it('at KMHT only the offered kinds can be on', () => {
+    const pressStart = mockStart();
+    render(<SetupScreen />);
+    fireEvent.change(screen.getByTestId('airport-select'), { target: { value: 'KMHT' } });
+    fireEvent.click(screen.getByTestId('special-transition'));
+    expect(pressStart().freePlay.specialTraffic).toEqual({ helicopter: false, military: false, transition: false, training: false, vehicles: true });
+  });
+
+  it('starts from the previous setup when the screen is opened again', () => {
+    useSimStore.setState({
+      startOptions: {
+        icao: 'KACY', mode: 'free_play', freePlay: { specialTraffic: { helicopter: false, military: true, transition: false, training: true, vehicles: false } },
+        weather: { kind: 'preset', id: 'clear' }, controller: 'TWR', ai: true, realTime: true, runways: 'auto',
+      } as StartOptions,
+    });
+    render(<SetupScreen />);
+    expect(screen.getByTestId('special-helicopter')).not.toBeChecked();
+    expect(screen.getByTestId('special-military')).toBeChecked();
+    expect(screen.getByTestId('special-training')).toBeChecked();
+    expect(screen.getByTestId('special-vehicles')).not.toBeChecked();
   });
 });

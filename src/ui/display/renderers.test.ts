@@ -12,7 +12,10 @@ import { fitBounds, worldToScreen } from './viewTransform';
 import { buildSurfaceStatic } from './surfaceStatic';
 import { poseOf } from './renderBuffer';
 import type { Frame } from './frame';
-import { GLYPH_HALF, glyphFor, glyphPath, symbolSize } from './symbols';
+import { GLYPH_HALF, glyphFor, glyphPath, specialMark, symbolSize } from './symbols';
+import { C } from './palette';
+import { typeTag } from '../lib/format';
+import type { Aircraft } from '../../sim/types';
 
 const airport = loadKacy();
 const nodeId = (e: unknown) => (e as { node?: { id: string }; id?: string }).node?.id ?? (e as { id: string }).id;
@@ -315,5 +318,134 @@ describe('aircraft glyphs', () => {
     expect(r.ops.filter((o) => o === 'move').length).toBe(1);
     expect(Math.max(...r.xs)).toBeCloseTo(GLYPH_HALF.reduce((m, [x]) => Math.max(m, x), 0) * 10, 9);
     expect(r.ops[r.ops.length - 1]).toBe('close');
+  });
+});
+
+describe('special traffic on the displays (helicopter, fighter, airport vehicle)', () => {
+  /** The engine's N723EJ as another type: same pose and phase, new id / callsign / type. */
+  function withSpecial(): { frame: Frame; ids: { h: string; f: string; v: string; fl: string } } {
+    const engine = makeEngine();
+    const state = engine.getState();
+    const base = Object.values(state.aircraft).find((a) => a.callsign === 'N723EJ')!;
+    const mk = (id: string, callsign: string, type: string, extra: Partial<Aircraft> = {}): Aircraft => ({ ...base, id, callsign, type, ...extra });
+    const aircraft = {
+      ...state.aircraft,
+      h: mk('h', 'CGD61327', 'H65'),
+      f: mk('f', 'ANG61234', 'F16', { pos: { x: base.pos.x + 80, y: base.pos.y + 60 } }),
+      v: mk('v', 'APT21', 'VEH', { pos: { x: base.pos.x - 80, y: base.pos.y - 60 } }),
+      fl: mk('fl', 'ANG61999', 'F16', { formation: { size: 2 }, pos: { x: base.pos.x + 200, y: base.pos.y } }),
+    };
+    return { frame: { state: { ...state, aircraft }, nowMs: 1234, pose: poseOf }, ids: { h: 'h', f: 'f', v: 'v', fl: 'fl' } };
+  }
+
+  it('marks helicopters, military types and vehicles; ordinary aircraft carry no mark', () => {
+    expect(specialMark('H65')).toBe('rotorcraft');
+    expect(specialMark('F16')).toBe('military');
+    expect(specialMark('VEH')).toBe('vehicle');
+    expect(specialMark('C172')).toBeUndefined();
+    expect(specialMark('A320')).toBeUndefined();
+  });
+
+  it('has closed, symmetric glyphs: a rotor cross for the helicopter, a delta fighter, a boxy vehicle', () => {
+    const rec = (type: string) => {
+      const ops: string[] = [];
+      const xs: number[] = [];
+      const ys: number[] = [];
+      const ctx = {
+        beginPath: () => ops.push('begin'), closePath: () => ops.push('close'),
+        moveTo: (x: number, y: number) => { ops.push('move'); xs.push(x); ys.push(y); },
+        lineTo: (x: number, y: number) => { ops.push('line'); xs.push(x); ys.push(y); },
+      } as unknown as CanvasRenderingContext2D;
+      glyphPath(ctx, 20, type);
+      return { ops, xs, ys };
+    };
+    for (const type of ['H65', 'F16', 'VEH']) {
+      const r = rec(type);
+      expect(r.ops[1]).toBe('move');
+      expect(r.ops.filter((o) => o === 'move').length).toBe(r.ops.filter((o) => o === 'close').length);
+      expect(r.xs[0]).toBeCloseTo(0, 9);
+      expect(r.ys[0]).toBeCloseTo(-20, 9);
+      expect(Math.min(...r.xs)).toBeCloseTo(-Math.max(...r.xs), 6);
+      for (const v of [...r.xs, ...r.ys]) expect(Number.isFinite(v)).toBe(true);
+    }
+    expect(glyphFor('H65').family).toBe('helicopter');
+    expect(glyphFor('H65').bars.length).toBe(2); // the two crossed rotor blades
+    expect(glyphFor('F16').family).toBe('fighter');
+    expect(glyphFor('F16').spanRatio).toBeCloseTo(9.96 / 15.06, 2);
+    expect(glyphFor('F16').bars.length).toBe(0);
+    expect(glyphFor('VEH').family).toBe('groundVehicle');
+    expect(glyphFor('VEH').spanRatio).toBeCloseTo(0.36, 2);
+    // a fighter's wing is swept: its tip leading edge is aft of the root leading edge
+    const g = glyphFor('F16');
+    expect(g.half.find(([x]) => x === g.spanRatio)![1]).toBeGreaterThan(0.1);
+    // symbol sizes follow the real lengths with the readable minimum
+    expect(symbolSize({ type: 'VEH' }, 10).halfLenPx).toBeCloseTo(27.5, 6);
+    expect(symbolSize({ type: 'F16' }, 0.01).halfLenPx).toBe(10);
+  });
+
+  it('the radar never draws or picks airport vehicles; helicopters and fighters keep their callsign data blocks', () => {
+    const { frame } = withSpecial();
+    const v = { cx: 0, cy: 0, scale: radarScale(10, 1000, 700), width: 1000, height: 700 };
+    const { ctx, calls } = stubContext();
+    drawRadar(ctx, frame, v, 10, DEFAULT_RADAR_LAYERS);
+    const texts = calls.filter((c) => c.startsWith('fillText:')).map((c) => c.slice('fillText:'.length));
+    expect(texts.some((t) => t.startsWith('APT21'))).toBe(false);
+    // ground targets are on by default: the helicopter and the fighter show as bare callsigns, the vehicle not at all
+    expect(texts).toContain('ANG61234');
+    expect(texts).toContain('CGD61327');
+    expect(texts).not.toContain('APT21');
+    // hit test: with vehicles excluded the vehicle is not selectable on the radar scope, on the surface it is
+    const sv = fitBounds(buildSurfaceStatic(airport).bounds, 1000, 600);
+    const veh = frame.state.aircraft.v;
+    const s = worldToScreen(sv, veh.pos);
+    expect(hitTestAircraft(frame, sv, s.x, s.y)).toBe('v');
+    expect(hitTestAircraft(frame, sv, s.x, s.y, 16, false)).not.toBe('v');
+  });
+
+  it('draws an airborne helicopter as a rotor disc with a blade cross and a fighter as a double square', () => {
+    const { frame } = withSpecial();
+    const air = (id: string) => ({ ...frame.state.aircraft[id], onGround: false, altitudeFt: 1500, phase: 'DEPARTURE' as const });
+    const f2 = { ...frame, state: { ...frame.state, aircraft: { h: air('h'), f: air('f') } } };
+    const v = { cx: 0, cy: 0, scale: radarScale(10, 1000, 700), width: 1000, height: 700 };
+    const { ctx, calls } = stubContext();
+    drawRadar(ctx, f2, v, 10, { ...DEFAULT_RADAR_LAYERS, sweep: false, rings: false, compass: false });
+    // helicopter: the rotor disc is an arc (no square); fighter: two nested squares
+    expect(calls.filter((c) => c.startsWith('arc')).length).toBeGreaterThan(0);
+    expect(calls.filter((c) => c.startsWith('strokeRect')).length).toBe(2);
+    const texts = calls.filter((c) => c.startsWith('fillText:')).map((c) => c.slice('fillText:'.length));
+    expect(texts).toContain('CGD61327 H65');
+    expect(texts).toContain('ANG61234 F16');
+  });
+
+  it('the surface display draws the vehicle and outlines military aircraft in the military colour', () => {
+    const { frame } = withSpecial();
+    const v = fitBounds(buildSurfaceStatic(airport).bounds, 1000, 600);
+    const strokes: string[] = [];
+    const target: Record<string, unknown> = {};
+    const ctx = new Proxy(target, {
+      get(t, prop: string) {
+        if (prop === 'measureText') return (s: string) => ({ width: s.length * 6.5 });
+        if (prop === 'stroke') return () => strokes.push(String(t.strokeStyle));
+        if (prop in t) return t[prop];
+        return () => undefined;
+      },
+      set(t, prop: string, val) { t[prop] = val; return true; },
+    }) as unknown as CanvasRenderingContext2D;
+    const { ctx: textCtx, calls } = stubContext();
+    drawSurface(ctx, frame, v, DEFAULT_SURFACE_LAYERS);
+    drawSurface(textCtx, frame, v, DEFAULT_SURFACE_LAYERS);
+    expect(strokes).toContain(C.military);
+    const texts = calls.filter((c) => c.startsWith('fillText:')).map((c) => c.slice('fillText:'.length));
+    expect(texts).toContain('APT21');
+    expect(texts.some((t) => t.startsWith('F16x2 '))).toBe(true); // the formation tag in the label
+    expect(texts.some((t) => t.startsWith('VEH '))).toBe(true);
+  });
+
+  it('label text carries the formation size', () => {
+    const { frame } = withSpecial();
+    expect(typeTag(frame.state.aircraft.fl)).toBe('F16x2');
+    expect(typeTag(frame.state.aircraft.f)).toBe('F16');
+    expect(labelLines(frame.state.aircraft.fl, false)[1]).toMatch(/^F16x2 /);
+    expect(dataBlock({ ...frame.state.aircraft.fl, onGround: false }, airport.magneticVariationDeg).lines[0]).toBe('ANG61999 F16x2');
   });
 });

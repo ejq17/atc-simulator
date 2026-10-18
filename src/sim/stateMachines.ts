@@ -23,10 +23,10 @@ export const ALLOWED_TRANSITIONS: Readonly<Record<FlightPhase, readonly FlightPh
   INITIAL_CLIMB: ['DEPARTURE', 'PATTERN'],
   DEPARTURE: ['PATTERN', 'HOLDING'],
   // --- arrival ---
-  INBOUND: ['APPROACH', 'FINAL', 'PATTERN', 'HOLDING'],
+  INBOUND: ['APPROACH', 'FINAL', 'PATTERN', 'HOLDING', 'LANDING'], // LANDING: a helicopter descending to a helipad (JO 7110.65 3-11-6), no runway final
   APPROACH: ['FINAL', 'INBOUND', 'PATTERN', 'HOLDING', 'GO_AROUND'],
   FINAL: ['LANDING', 'GO_AROUND', 'APPROACH'],
-  LANDING: ['ROLLOUT', 'GO_AROUND', 'PATTERN'], // PATTERN: touch-and-go / low approach / option into closed traffic (JO 7110.65 3-8-2)
+  LANDING: ['ROLLOUT', 'GO_AROUND', 'PATTERN', 'ARRIVED'], // ARRIVED: a helicopter that has landed on its helipad // PATTERN: touch-and-go / low approach / option into closed traffic (JO 7110.65 3-8-2)
   ROLLOUT: ['RUNWAY_EXIT', 'PATTERN'], // PATTERN: lift-off after the ground roll of a touch-and-go
   RUNWAY_EXIT: ['TAXI_TO_PARKING'],
   TAXI_TO_PARKING: ['ARRIVED'],

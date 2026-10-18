@@ -7,6 +7,8 @@ the only file that creates a renderer); there are no model files, every shape is
 
 | File | Role |
 | --- | --- |
+| `meshKit.ts` | three.js helpers shared by the recipes: vertex painting, merging, lathe bodies, extruded planforms, tubes, wheels, boxes. |
+| `specialModels.ts` | three.js. Builders for the special traffic: the Coast Guard MH-65 helicopter, the Air National Guard F-16C and the airport pickup truck. |
 | `aircraftModel.ts` | Pure (no three.js). Model family and class by type, the real dimensions of each type, the family proportions (`RECIPES`), gear, pitch, bank and light logic, world placement of an aircraft, callsign billboard scale. Also read by the 2D glyphs in `../display/symbols.ts`. |
 | `liveries.ts` | Pure. Livery table and lookup by callsign, plus the colour functions the fuselage texture and fin are painted with. |
 | `aircraftMeshes.ts` | three.js. Builds the geometry of each family, the livery texture and materials, and a factory that caches them per (type, livery) and hands out cheap clones. |
@@ -30,9 +32,12 @@ B738 39.5 / 35.8 / 12.5, E175 31.7 / 26.0 / 9.7, CRJ9 36.4 / 24.9 / 7.5, DH8D 32
 | `turbopropSingle` | C208, PC12 | Stout fuselage, high wing with struts, nose propeller, fixed gear |
 | `gaHigh` | C172, C182, C152, C206, C210 | High wing with struts, fixed tricycle gear with wheel fairings, cowl, spinner and propeller disc |
 | `gaLow` | PA28, SR22/20, DA40, BE36, M20 | Low wing, fixed tricycle gear with fairings, nose propeller |
+| `helicopter` | H65 (Coast Guard MH-65 Dolphin) | Lathe cabin and tail boom, engine deck, mast and hub, fenestron (ducted tail rotor) in the fin, stabiliser with end plates, fixed wheel gear. The 4-blade main rotor (11.94 m disc) and the 10-blade fenestron rotor are `props` entries in a pivot that points their spin axis up / sideways, so `towerScene` turns them with the same `rotation.z` it uses for propellers. |
+| `fighter` | F16 (Air National Guard F-16C) | Lathe fuselage with nozzle, chin intake, bubble canopy, 40 degree cropped-delta wing with leading-edge root extensions, all-moving tailplanes, tall fin, ventral fins, wingtip missiles, retractable tricycle gear. A flight of two (`Aircraft.formation.size` 2) is built as two airframes sharing geometry, the wingman 18 m right and 10 m aft (scaled to the model length), under one gear toggle. |
+| `groundVehicle` | VEH (airport vehicle) | Full-size crew-cab pickup, 5.5 m long and 2 m wide, boxes and cylinders only; roof light bar with an amber beacon dome; no textured fuselage (an empty mesh keeps the factory contract). |
 
 An unknown type falls back by designator, then by the performance category and length (the same fallback `getPerformance` uses for speeds).
-`classifyAircraft` still returns the coarse class (`airliner`, `bizjet`, `ga`).
+`classifyAircraft` returns the coarse class (`airliner`, `bizjet`, `ga`, plus `rotorcraft`, `fighter` and `vehicle` for the special traffic). The special families are not in `RECIPES`; `buildGeometry` hands them to `buildSpecialGeometry`.
 
 Each aircraft is drawn as at most four meshes: the fuselage (livery texture), the airframe (wings, tail, engines, vertex colours), the gear
 (its own object so it can be hidden) and, on propeller types, one translucent disc with blades per propeller.
@@ -48,6 +53,7 @@ Budget: under 3,000 triangles per aircraft, all families. Current counts (fusela
 | C25B / GLF4 (bizjet) | 1,324 / 1,348 |
 | C172 / PA28 / SR22 (GA) | 860 / 840 / 840 |
 | C208 | 712 |
+| H65 (helicopter) / F16 / VEH (pickup) | 1,084 / 950 / 646 (a flight of two F16: 1,900) |
 
 `tower.test.ts` builds every family and asserts the budget, the real size and that nothing is below the ground.
 
@@ -64,6 +70,9 @@ Budget: under 3,000 triangles per aircraft, all families. Current counts (fusela
 | JBU | JetBlue: white, blue fin and tailplane |
 | SWA | Southwest: canyon blue, yellow and red belly bands, blue fin with red and yellow |
 | FFT | Frontier: white with a green fin and engines |
+| CGD | Coast Guard helicopter: white upper fuselage and boom, red-orange lower fuselage under a blue band, red-orange stripe on the fin |
+| ANG | Air National Guard F-16: low-visibility grey, dark nozzle |
+| APT | Airport vehicle: safety yellow, dark lower trim |
 | RPA, ENY, SKW | Regionals: white with the partner's fin |
 | other 3 letters | White with a fin colour seeded by the prefix |
 | N-number etc. | General aviation: white with two cheat-line stripes in one of seven colour pairs seeded by the registration; the fin takes the main stripe colour |
@@ -73,7 +82,7 @@ and a dashed window row. Textures and materials are cached; two aircraft of the 
 
 ## Gear, attitude and lights
 
-- Gear: retractable on `narrowbody`, `regionalJet`, `turboprop` and `bizjet`; up above 200 ft AGL, down on the ground, on final (`FINAL`, `LANDING`, `ROLLOUT`, `PATTERN`) and when descending below 2,500 ft AGL. GA singles and the Caravan keep fixed gear.
+- Gear: retractable on `narrowbody`, `regionalJet`, `turboprop` and `bizjet`; up above 200 ft AGL, down on the ground, on final (`FINAL`, `LANDING`, `ROLLOUT`, `PATTERN`) and when descending below 2,500 ft AGL. GA singles and the Caravan keep fixed gear, as do the helicopter (wheels) and the airport vehicle; the fighter's gear retracts like a jet's.
 - Pitch (`modelPitchRad`): 3 degrees nose-up on final or in a low descent, 6 to 8 degrees climbing, a 6 degree rotation past the rotate speed on the takeoff roll, otherwise flight-path angle plus 2 degrees (the same range `pitchFromVerticalSpeed` has always used).
 - Bank: the aircraft state has no bank field, so the scene derives the turn rate from the heading change per second of simulated time (smoothed) and banks coordinated (`bankFromTurnRate`, capped at 30 degrees). Pitch and roll turn about the main gear, so the nose rises on the roll without sinking the tail.
 - Lights (`lightState`): position lights red left, green right, white tail, on whenever it is dark or visibility is under 3 SM; red beacon (top and belly, about 45% duty) unless parked; double-flash white strobes airborne and on the runway; landing light from line-up through the roll, on final and below 10,000 ft AGL. Anchors (wing tips, tail, beacons, nose gear) come from each model. At night the models get a small emissive lift so they keep their colours under the apron lighting.
@@ -86,3 +95,4 @@ and a dashed window row. Textures and materials are cached; two aircraft of the 
 ## Closures and runway lights (airport state)
 
 `towerScene.ts` builds the yellow closure markings once (the closed-runway X at each end, 150 m inside the threshold, `closureMarks.ts` + `xMarkRects`; per taxiway a yellow wash ribbon and X marks) and shows them when `closedRunwayIds` / `closedTaxiways` of the frame's state say so. The runway lights are one set of materials per runway: every frame `applyAirportState` sets their opacity and size from `runwayLightLevel(effectiveLightStep(state, runwayId), closed)` (HIRL step 1-5, 0 = off; a closed runway's edge lights stay dark, 3-4-10) and the darkness (`sky.night`), with a fixed strength by day when the lights are on (visibility under 2 SM). The step is the 3-4-11 table default for the visibility unless a pilot request moved it. Brightness ratios are a visual choice. Not checked on a GPU in this round (unit tests cover the pure functions).
+- Special traffic: the helicopter's rotors spin whenever the aircraft is not parked (45 rad/s, with a translucent disc as blur); the fighter pitches like a jet. The airport vehicle has its own light rule in `towerScene`: headlamps in the dark, no nav lights or strobes, and the amber beacon flashes day and night (`vehicleBeacon`, 1 s cycle). The wingman of a flight shows no lights of its own.

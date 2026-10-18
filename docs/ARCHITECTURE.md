@@ -110,3 +110,4 @@ variation comes from NASR per airport (KACY 10 W, KMHT 15 W). Altitudes in feet 
   airport diagram; anything hand-digitised is flagged `approximate: true`.
 * No connection to real radio, ADS-B, or live traffic. Live weather is an input only.
 * This is entertainment/learning software, not ATC training.
+- Traffic variety (src/sim/{rotorcraft,vehicles,special}.ts, src/game/specialGenerator.ts, src/ai/special.ts): see src/sim/README.md and src/game/README.md.

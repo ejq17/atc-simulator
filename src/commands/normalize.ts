@@ -351,6 +351,9 @@ function minuteCut(words: readonly string[], afterFlightLevel: boolean): number 
   return 0;
 }
 
+/** Callsign words of the military / vehicle forms that are also ordinary words ("air", "airport", "coast"). */
+const SERVICE_CODES: ReadonlySet<string> = new Set(['APT', 'ANG', 'CGD']);
+
 function resolveTokens(items: Item[], airlines: ReadonlyMap<string, string>): Token[] {
   const tokens: Token[] = [];
   items.forEach((it, idx) => {
@@ -368,7 +371,8 @@ function resolveTokens(items: Item[], airlines: ReadonlyMap<string, string>): To
       return nextIsNumber && !blocked ? push('DAL', 'airline') : push('d', 'letter');
     }
     const code = airlines.get(w);
-    if (code) return push(code, 'airline');
+    if (code && (!SERVICE_CODES.has(code) || nextIsNumber)) return push(code, 'airline'); // "airport 21 vehicle", "air guard": words of ordinary phrases ("air taxi"), a callsign only before a number
+    if (code) return push(w, 'word');
     if (GA_PREFIXES.has(w)) return push(w, 'gaPrefix');
     const letter = NATO.get(w);
     if (letter) return push(letter, 'letter');

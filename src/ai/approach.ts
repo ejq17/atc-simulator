@@ -133,6 +133,8 @@ export function createApproachAgent(handleDepartures: (v: AgentView) => boolean)
     for (const ac of v.onFrequency) {
       if (ac.radioState === 'TRANSMITTING' || ac.onGround) continue;
       if (ac.isDeparture) continue;
+      // VFR transits, overhead maneuvers and helicopters are worked by the special agent (special.ts), not sequenced as arrivals
+      if (ac.flags.transit || ac.flags.overhead || ac.type === 'H65') continue;
       const pending = ac.pendingRequest?.kind;
       const ready = pending !== undefined || v.settled(ac) >= 4;
       if (!ready) continue;

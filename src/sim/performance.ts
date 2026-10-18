@@ -130,25 +130,110 @@ export const C208: AircraftPerformance = {
   takeoffDistanceFt: 2300, landingDistanceFt: 1900, lengthM: 11.5, propulsion: 'turbofan', // ESTIMATE: Textron 208B/208 specifications, POH Section 5, typical weight
 };
 
+// ---------------------------------------------------------------------------------------------------------------------------------
+// Types added for the traffic variety task (U.S. Coast Guard helicopters, Air National Guard fighters, airport vehicles).
+// Every figure names its source; a figure without one is marked UNVERIFIED and is a conservative gameplay (design) value. The evidence
+// and the retrieval dates are in docs/REALISM-VERIFICATION.md section 9 and data/sources/aircraft-performance.json.
+// ---------------------------------------------------------------------------------------------------------------------------------
+
+/**
+ * Eurocopter MH-65 Dolphin (US Coast Guard Air Station Atlantic City). Sourced: USCG MH-65E fact sheet (dcms.uscg.mil, Dec 2024, read through a search
+ * result: the PDF itself answers HTTP 403 to scripts): maximum weight 9,480 lb, cruise speed 148 kt, length 44 ft 5 in with blades turning, rotor diameter
+ * 39 ft 2 in, endurance 3 h; Coast Guard Aviation Association MH-65C table: maximum speed 175 kt. All other values are UNVERIFIED design values.
+ * Hover and air-taxi limits are the procedure values of JO 7110.65 3-11-1 and AIM 4-3-17 (hover taxi "normally below 20 knots", air taxi "normally below
+ * 100 feet AGL and at airspeeds above 20 knots"). Not in JO 7110.126A Appendix A (no helicopter appears in TBL A-1): `wakeRecatCategory` falls back to I
+ * (small), and `srsCategory` is 1 by JO 7110.65 3-9-6 NOTE ("all helicopters" are Category I).
+ */
+export const H65: AircraftPerformance = {
+  type: 'H65', category: 'light', wakeCategory: 'light',
+  taxiSpeedKt: 10, taxiTurnSpeedKt: 5, // UNVERIFIED design: wheeled ground taxi (3-11-1 "ground taxiing"); not used by the air-taxi model
+  accelKtPerSec: 4, decelKtPerSec: 5, // UNVERIFIED design
+  rotateSpeedKt: 0, climbSpeedKt: 80, // UNVERIFIED design: translational lift / best climb speed
+  cruiseSpeedKt: 148, // USCG MH-65E fact sheet (Dec 2024): cruise speed 148 kt
+  approachSpeedKt: 70, touchdownSpeedKt: 0, // UNVERIFIED design
+  climbRateFpm: 1500, descentRateFpm: 800, // UNVERIFIED design
+  turnRateDegPerSec: 3, groundTurnRateDegPerSec: 20, // UNVERIFIED design (3 deg/s is standard rate)
+  minSpeedKt: 0,
+  maxSpeedKt: 175, // Coast Guard Aviation Association, MH-65C: maximum speed 175 kt (the MH-65E fact sheet lists 148 kt cruise only)
+  serviceCeilingFt: 10000, // UNVERIFIED design
+  takeoffDistanceFt: 0, landingDistanceFt: 0, // vertical lift-off and landing
+  lengthM: 13.5, // 44 ft 5 in (USCG MH-65E fact sheet) = 13.54 m
+  propulsion: 'turbofan', // turbine powered (AIM 4-3-3 groups it with turbine aircraft; helicopters use the 500 ft AGL pattern, see `patternAltitudeFt`)
+  craft: 'rotorcraft', military: true,
+  rotorcraft: { hoverTaxiMaxKt: 20, airTaxiKt: 35, hoverAglFt: 15, verticalRateFpm: 500, hoverTurnRateDegPerSec: 15 },
+};
+
+/**
+ * General Dynamics / Lockheed Martin F-16C Fighting Falcon (New Jersey Air National Guard, 177th Fighter Wing). Sourced: USAF F-16 fact sheets (af.mil
+ * and unit sheets, read through search results: af.mil refuses scripted requests): length 49 ft 5 in, empty weight 19,700 lb, maximum takeoff weight
+ * 37,500 lb (the Block 50/52 sheet at Shaw lists about 39,000 lb), speed "Mach 2 at altitude / 1,500 mph", ceiling above 50,000 ft. RECAT category G
+ * (Lower Large): JO 7110.126A Appendix A TBL A-1 lists F16 in the Lower Large column. SRS category III (JO 7110.65 3-9-6 "all other aircraft"). Pattern
+ * and approach speeds, acceleration and climb are UNVERIFIED design values: the only sources found for the overhead break (300 kt, 1,500 ft AGL, about
+ * 7 s break, 200-250 kt downwind) are forum posts and a flight-simulator syllabus, not USAF documents.
+ */
+export const F16: AircraftPerformance = {
+  type: 'F16', category: 'large', wakeCategory: 'medium',
+  taxiSpeedKt: 20, taxiTurnSpeedKt: 8, // UNVERIFIED design
+  accelKtPerSec: 6, decelKtPerSec: 5, // UNVERIFIED design
+  rotateSpeedKt: 150, // UNVERIFIED design
+  climbSpeedKt: 300, // UNVERIFIED design (below 10,000 ft the 250 kt limit of 14 CFR 91.117 is waived by `maxSpeedKt` only for the overhead break entry)
+  cruiseSpeedKt: 350, // UNVERIFIED design
+  approachSpeedKt: 160, touchdownSpeedKt: 140, // UNVERIFIED design
+  climbRateFpm: 6000, descentRateFpm: 2500, // UNVERIFIED design (far below capability, sized for the simulation area)
+  turnRateDegPerSec: 8, groundTurnRateDegPerSec: 18, // UNVERIFIED design (8 deg/s is about a 2.5 g break at 300 kt; the sources above give the 2 to 2.5 g break)
+  minSpeedKt: 130, // UNVERIFIED design
+  maxSpeedKt: 450, // UNVERIFIED design (fact sheet: Mach 2 at altitude)
+  serviceCeilingFt: 50000, // USAF fact sheet: ceiling above 50,000 ft
+  takeoffDistanceFt: 3000, landingDistanceFt: 3500, // UNVERIFIED design (the KACY runways are far longer)
+  lengthM: 15.06, // 49 ft 5 in (USAF fact sheet)
+  propulsion: 'turbofan', military: true,
+};
+
+/**
+ * Airport ground vehicle (operations truck, pavement / runway inspection vehicle). All figures are UNVERIFIED design values: FAA AC 150/5210-20A gives
+ * no vehicle speed (airport operators set limits). It moves on the taxiway graph with the ground-movement model and is subject to the same
+ * runway authorisation rules (JO 7110.65 3-7-2, 3-1-3).
+ */
+export const VEH: AircraftPerformance = {
+  type: 'VEH', category: 'light', wakeCategory: 'light',
+  taxiSpeedKt: 18, taxiTurnSpeedKt: 8, accelKtPerSec: 3, decelKtPerSec: 5,
+  rotateSpeedKt: 0, climbSpeedKt: 0, cruiseSpeedKt: 0, approachSpeedKt: 0, touchdownSpeedKt: 0, climbRateFpm: 0, descentRateFpm: 0,
+  turnRateDegPerSec: 0, groundTurnRateDegPerSec: 35, minSpeedKt: 0, maxSpeedKt: 30, serviceCeilingFt: 0, takeoffDistanceFt: 0, landingDistanceFt: 0,
+  lengthM: 5.5, craft: 'vehicle',
+};
+
+/** True for the helicopter model (`AircraftPerformance.craft`). */
+export function isRotorcraftType(type: string): boolean {
+  return getPerformance(type).craft === 'rotorcraft';
+}
+/** True for airport ground vehicles. */
+export function isVehicleType(type: string): boolean {
+  return getPerformance(type).craft === 'vehicle';
+}
+/** True for military types (Air Guard / Coast Guard callsign forms of JO 7110.65 2-4-20). */
+export function isMilitaryType(type: string): boolean {
+  return getPerformance(type).military === true;
+}
+
 import type { WakeCategory } from './wake';
-const registry: Record<string, AircraftPerformance> = { C172, A320, B738, BCS3, E175, CRJ9, B752, C208 };
+const registry: Record<string, AircraftPerformance> = { C172, A320, B738, BCS3, E175, CRJ9, B752, C208, H65, F16, VEH };
 
 /**
  * Same-runway-separation (SRS) category, FAA JO 7110.65 3-9-6 NOTE (aircraft types per JO 7360.1):
  * I = small single-engine propeller-driven <= 12,500 lb and all helicopters; II = small twin-engine propeller-driven <= 12,500 lb;
  * III = all other aircraft. Derived here from the type code; unknown types are I when `category === 'light'`, else III.
  */
-const SRS: Record<string, 1 | 2 | 3> = { C172: 1, C182: 1, C152: 1, C210: 1, PA28: 1, SR22: 1, BE36: 1, PA34: 2, BE58: 2, C310: 2, C208: 1, A320: 3, B738: 3, BCS3: 3, E175: 3, CRJ9: 3, B752: 3 };
+const SRS: Record<string, 1 | 2 | 3> = { C172: 1, C182: 1, C152: 1, C210: 1, PA28: 1, SR22: 1, BE36: 1, PA34: 2, BE58: 2, C310: 2, C208: 1, H65: 1, A320: 3, B738: 3, BCS3: 3, E175: 3, CRJ9: 3, B752: 3, F16: 3 };
 export function srsCategory(type: string): 1 | 2 | 3 {
   return SRS[type] ?? (getPerformance(type).category === 'light' ? 1 : 3);
 }
 
 /**
  * Wake RECAT category, FAA JO 7110.126A Appendix A (verified by the accuracy review): A320 = F ("other aircraft over 41,000 lb"),
- * C172 = I ("41,000 lb and under"); B757 = E; heavies B / D. Added types follow the same convention: B738, BCS3, E175, CRJ9 = F (over 41,000 lb, not
- * heavy); B752 = E (the file's B757 convention; the 7110.126A Appendix A listing of the 757 was not re-fetched when it was added); C208 = I (MTOW 8,750 lb). Types not listed: `wakeCategory` light -> I, medium -> F, heavy -> D.
+ * C172 = I ("41,000 lb and under"); B757 = E; heavies B / D. Added types follow the same convention: B738 = F (TBL A-1 Upper Large), E175 and CRJ9 = G (TBL A-1 Lower Large: E75L / E75S / CRJ9 read visually on the rendered page A1, 2026-10-18), BCS3 = F
+ * (NOT listed in TBL A-1: kept F by the over-41,000-lb convention, UNVERIFIED); B752 = E (TBL A-1 lists B752 / B753 under E); C208 = I (MTOW 8,750 lb). Types not listed: `wakeCategory` light -> I, medium -> F, heavy -> D.
  */
-const RECAT: Record<string, WakeCategory> = { C172: 'I', C182: 'I', C152: 'I', C210: 'I', PA28: 'I', SR22: 'I', BE36: 'I', PA34: 'I', BE58: 'I', C310: 'I', C208: 'I', A320: 'F', B738: 'F', BCS3: 'F', E175: 'F', CRJ9: 'F', B752: 'E' };
+const RECAT: Record<string, WakeCategory> = { C172: 'I', C182: 'I', C152: 'I', C210: 'I', PA28: 'I', SR22: 'I', BE36: 'I', PA34: 'I', BE58: 'I', C310: 'I', C208: 'I', F16: 'G', A320: 'F', B738: 'F', BCS3: 'F', E175: 'G', CRJ9: 'G', B752: 'E' };
 export function wakeRecatCategory(type: string): WakeCategory {
   const known = RECAT[type];
   if (known) return known;
@@ -184,6 +269,8 @@ export const SPEED_LIMIT_BELOW_10K_KT = 250;
 /** Standard pattern altitudes, FAA AIM 4-3-3 (fetched 2026-10-18): propeller-driven 1,000 ft AGL; large and turbine-powered not less than 1,500 ft AGL or 500 ft above the established pattern altitude. */
 export const AIM_PROPELLER_PATTERN_AGL_FT = 1000;
 export const AIM_TURBINE_PATTERN_AGL_FT = 1500;
+/** AIM 4-3-3 (fetched 2026-10-18): helicopters in the traffic pattern fly 500 ft AGL, closer to the runway. */
+export const AIM_HELICOPTER_PATTERN_AGL_FT = 500;
 
 /** Large or turbine-powered (AIM 4-3-3): turboprops and turbofans, any aircraft of category large / heavy; unknown light types are propeller-driven. */
 export function isLargeOrTurbine(perf: AircraftPerformance): boolean {
@@ -196,6 +283,8 @@ export function isLargeOrTurbine(perf: AircraftPerformance): boolean {
  * Without one the AIM defaults apply (1,000 / 1,500 ft AGL). Neither KACY nor KMHT has a TPA in NASR, so the defaults apply there.
  */
 export function patternAltitudeFt(perf: AircraftPerformance, fieldElevFt: number, publishedTpaFt?: number): number {
+  // AIM 4-3-3: helicopters "may fly a pattern similar to the fixed-wing aircraft pattern, but at a lower altitude (500 AGL)".
+  if (perf.craft === 'rotorcraft') return fieldElevFt + AIM_HELICOPTER_PATTERN_AGL_FT;
   const turbine = isLargeOrTurbine(perf);
   if (publishedTpaFt !== undefined) return turbine ? Math.max(publishedTpaFt + 500, fieldElevFt + AIM_TURBINE_PATTERN_AGL_FT) : publishedTpaFt;
   return fieldElevFt + (turbine ? AIM_TURBINE_PATTERN_AGL_FT : AIM_PROPELLER_PATTERN_AGL_FT);

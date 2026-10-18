@@ -15,7 +15,7 @@ import {
 import { closedRunwayMarks, closedTaxiwayMarks } from '../display/closureMarks';
 import { closedRunwayIds, closedTaxiways, effectiveLightStep, runwayLightsOn } from '../../sim/airportOps';
 import type { LightColour, LightPoint, MeshData } from './geometry';
-import { bankFromTurnRate, billboardWorldHeight, gearDown, lightState, modelPitchRad, placeAircraft, withinRange } from './aircraftModel';
+import { bankFromTurnRate, billboardWorldHeight, gearDown, lightState, modelPitchRad, placeAircraft, vehicleBeacon, withinRange } from './aircraftModel';
 import { createAircraftFactory } from './aircraftMeshes';
 import type { AircraftModel } from './aircraftMeshes';
 import { lookAtPoint, eyeScene } from './cameraMath';
@@ -396,7 +396,7 @@ export function createTowerScene(canvas: HTMLCanvasElement, airport: Airport, si
   });
 
   const makeAircraft = (ac: Aircraft, selected: boolean): AcObj => {
-    const m = factory.build(ac.type, ac.callsign);
+    const m = factory.build(ac.type, ac.callsign, { formation: ac.formation?.size });
     const dims = m.dims;
     const group = new THREE.Group();
     const model = new THREE.Group();
@@ -607,6 +607,22 @@ export function createTowerScene(canvas: HTMLCanvasElement, airport: Airport, si
       const lightsOn = night > 0.05 || f.state.weather.visibilitySm < 3;
       const ls = lightState({ lightsOn, onGround: ac.onGround, aglFt, phase: ac.phase, nowMs: f.nowMs, seed: ac.seed });
       const set = (i: number, on: boolean, r: number, g2: number, b2: number) => lc.setXYZ(i, on ? r : 0, on ? g2 : 0, on ? b2 : 0);
+      if (o.dims.family === 'groundVehicle') {
+        // airport vehicle: headlamps in the dark and the amber beacon, which runs day and night
+        set(0, lightsOn, 1.3, 1.25, 1.1);
+        set(1, lightsOn, 1.3, 1.25, 1.1);
+        set(2, false, 0, 0, 0);
+        set(3, false, 0, 0, 0);
+        set(4, false, 0, 0, 0);
+        const amber = vehicleBeacon(f.nowMs, ac.seed);
+        set(5, amber, 1.6, 0.85, 0.05);
+        set(6, false, 0, 0, 0);
+        set(7, false, 0, 0, 0);
+        lc.needsUpdate = true;
+        v3.set(pl.x, pl.y + o.dims.heightM * 0.5, pl.z).project(camera);
+        if (v3.z > -1 && v3.z < 1) screenPos.set(ac.id, { x: ((v3.x + 1) / 2) * viewW, y: ((1 - v3.y) / 2) * viewH });
+        continue;
+      }
       set(0, ls.nav, 1, 0.05, 0.05);
       set(1, ls.nav, 0.05, 1, 0.1);
       set(2, ls.nav, 0.9, 0.9, 0.8);

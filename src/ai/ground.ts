@@ -22,6 +22,7 @@ import { closedTaxiways } from '../sim/airportOps';
 import { busyHoldIds, etaToThresholdSec, holdNodeAt, interactingRunways, nextProgressiveSegment, opposingTraffic, pendingIntermediateStops, planDeparture, planParking, remainingRouteM, taxiStartNode } from './world';
 import { holdTooShort } from '../sim/holdSelection';
 import * as say from './phrase';
+import { isRotorcraftType, isVehicleType } from '../sim/performance';
 
 const HANDOFF_WITHIN_M = 400;
 /** A second aircraft is not released onto a route within this distance of a freshly released one for this long. */
@@ -157,7 +158,7 @@ export function createGroundAgent(store: ClearanceStore): Agent {
       }
 
       // 1. Departure asking for taxi.
-      if (ac.isDeparture && (ac.phase === 'READY' || ac.phase === 'PARKED') && pending === 'TAXI' && !hasActive(ac, 'TAXI')) {
+      if (ac.isDeparture && !isVehicleType(ac.type) && !isRotorcraftType(ac.type) && (ac.phase === 'READY' || ac.phase === 'PARKED') && pending === 'TAXI' && !hasActive(ac, 'TAXI')) {
         const needsIfr = ac.flightPlan?.flightRules === 'IFR' && !ac.flightPlan.ifrClearance;
         if (needsIfr || !taxiFollowOk(v, ac)) continue;
         const dep = planDeparture(airport, ac, state.activeRunways.departing, busyHoldIds(state, ac.id), closedTaxiways(state));
@@ -172,7 +173,7 @@ export function createGroundAgent(store: ClearanceStore): Agent {
       }
 
       // 1b. Departure standing at an intersection hold with too little runway for its type (Tower sent it back): taxi to full length.
-      if (ac.isDeparture && ac.phase === 'HOLDING_SHORT' && ac.groundSpeedKt < 1 && v.settled(ac) >= 4) {
+      if (ac.isDeparture && !isVehicleType(ac.type) && ac.phase === 'HOLDING_SHORT' && ac.groundSpeedKt < 1 && v.settled(ac) >= 4) {
         const g = findRunwayEnd(airport, ac.assignedRunwayEnd);
         const hold = holdNodeAt(airport, ac);
         if (g && hold && hold.runwayId === g.runway.id && holdTooShort(g, hold, ac)) {
@@ -276,7 +277,7 @@ export function createGroundAgent(store: ClearanceStore): Agent {
       }
 
       // 4. Arrival that left the runway and asks to taxi to parking.
-      if (!ac.isDeparture && ac.phase === 'RUNWAY_EXIT' && pending === 'TAXI' && !hasActive(ac, 'TAXI_TO_PARKING')) {
+      if (!ac.isDeparture && !isRotorcraftType(ac.type) && ac.phase === 'RUNWAY_EXIT' && pending === 'TAXI' && !hasActive(ac, 'TAXI_TO_PARKING')) {
         const p = planParking(state, ac);
         if (!p || opposingTraffic(state, p.nodeIds, ac.id)) continue;
         plans.push({

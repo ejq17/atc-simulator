@@ -197,6 +197,10 @@ See `docs/ARCHITECTURE.md` (module map and contracts) and `docs/PROGRESS.md`
   clearances are detected and scored; training mode refuses unsafe clearances with an
   explanation referencing FAA JO 7110.65.
 
+## Traffic variety (free play)
+
+Besides airline arrivals / departures and GA, free play can add (setup screen, one checkbox per kind): **Coast Guard MH-65 helicopters** (air taxi, hover, takeoff from the helipad, landing at a helipad: JO 7110.65 3-11), **Air National Guard F-16C** (singles and flights of two from the ANG ramp, overhead maneuver arrivals: 3-10-12, 2-1-13), **VFR transitions through the Class C** (squawk, radar contact, release: 7-8, AIM 3-2-4), **flight training** (touch-and-go circuits) and **airport vehicles** (runway and pavement inspections, "proceed" / "hold" instructions, runway occupancy and incursions: 3-7-2, AC 150/5210-20A). KACY offers all five, KMHT only transitions and vehicles. Everything is sourced or marked UNVERIFIED: docs/REALISM-VERIFICATION.md section 9, docs/FAA-REFERENCES.md "Traffic variety". Callsign digits are generated, never real serial numbers or tactical callsigns.
+
 ## Supported ATC instructions
 
 Taxi (with via routes and hold-short; the route is required, "read back hold instructions" is understood, progressive steps like "turn left on Bravo, continue to Charlie"), pushback approved (airliners are pushed back to the lane, "tail east" / "face south", non-standard phrase), hold position, hold short, cross runway, line up

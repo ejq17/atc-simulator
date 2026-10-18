@@ -44,6 +44,9 @@ import { buildIfrClearance } from './ifr';
 import { findStar, onStarRoute, starBottomAltitudeFt, starRouteFrom, starRunwayLeg } from './star';
 import { MAX_LIGHT_STEP, closedRunwayIds, closedTaxiways, effectiveLightStep, lightsRunwayId, runwayLightsOn } from './airportOps';
 import { runwayCondition } from '../weather/runwayCondition';
+import { planProceed, isVehicle } from './vehicles';
+import { airTaxiPlan, holdDispatch, landDispatch, planOverhead, takeoffDispatch } from './specialCommands';
+import { isRotorcraft } from './rotorcraft';
 import {
   luawTrafficIssue, noteAirportInfo, planAirportInfo, planCancelTakeoff, planExitRunway, planFollowTraffic, planFrequencyApproved, planLandingHoldShort, planPatternInstruction,
   planReportPosition, planSquawk, planTrafficAdvisory,
@@ -197,7 +200,9 @@ function executeInner(ctx: SimContext, cmdInput: ParsedCommand, opts?: ExecOpts)
     return clarify(ac, cmdIn.issues[0] ?? `Low confidence (${cmdIn.confidence.toFixed(2)}); say again, ${ac.callsign}.`, false);
   }
   const { cmd, g } = normalizeCommand(airport, ac, cmdIn, cmdIn.confidence >= 0.8);
-  const missing = missingEntities(cmd, g);
+  // A helicopter takes off from / lands at a place that is not a runway (JO 7110.65 3-11-2, 3-11-6); "air taxi" and "proceed" name their own destination.
+  const rotorNoRunway = isRotorcraft(ac) && !g && (cmd.kind === 'TAKEOFF' || cmd.kind === 'LAND');
+  const missing = rotorNoRunway ? [] : missingEntities(cmd, g);
   if (missing.length) {
     return clarify(ac, `${ac.callsign}: missing ${missing.join(', ')}${cmdIn.confidence < 0.8 ? ' (confidence too low to assume)' : ''}.`, false);
   }
@@ -315,7 +320,7 @@ function executeInner(ctx: SimContext, cmdInput: ParsedCommand, opts?: ExecOpts)
 // ---------------------------------------------------------------------------
 
 function normalizeCommand(airport: Airport, ac: Aircraft, cmd: ParsedCommand, mayInfer: boolean): { cmd: ParsedCommand; g?: RunwayEndGeom } {
-  const needsEnd = cmd.kind === 'TAKEOFF' || cmd.kind === 'LAND' || cmd.kind === 'LINE_UP_AND_WAIT' || cmd.kind === 'ENTER_PATTERN' || cmd.kind === 'APPROACH';
+  const needsEnd = cmd.kind === 'TAKEOFF' || cmd.kind === 'LAND' || cmd.kind === 'LINE_UP_AND_WAIT' || cmd.kind === 'ENTER_PATTERN' || cmd.kind === 'APPROACH' || cmd.kind === 'OVERHEAD';
   const n: ParsedCommand = { ...cmd };
   let g: RunwayEndGeom | undefined;
   if (needsEnd) {
@@ -357,6 +362,15 @@ function missingEntities(cmd: ParsedCommand, g?: RunwayEndGeom): string[] {
       break;
     case 'CROSS_RUNWAY':
       if (!cmd.crossRunwayId && !cmd.runwayId && !cmd.runwayEnd) m.push('runway to cross');
+      break;
+    case 'OVERHEAD':
+      if (!g) m.push('runway');
+      break;
+    case 'PROCEED':
+      if (!cmd.runwayId && !cmd.runwayEnd && cmd.destination !== 'TAXIWAYS') m.push('runway to proceed on');
+      break;
+    case 'AIR_TAXI':
+      if (!cmd.destination && !cmd.route?.length) m.push('air taxi destination');
       break;
     case 'HOLD_SHORT':
       if (!cmd.holdShort?.length && !cmd.runwayId && !cmd.runwayEnd && !cmd.crossRunwayId) m.push('runway to hold short of');
@@ -562,7 +576,7 @@ function planTaxi(env: Env): PlanResult {
     targets = [pq.parking.nodeId];
   } else if (pq.kind === 'category' || pq.kind === 'default') {
     const cat = pq.kind === 'category' ? pq.category : undefined;
-    const cands = freeParkingCandidates(ctx.state, ac, cat, rt.homeParkingCategory);
+    const cands = freeParkingCandidates(ctx.state, ac, cat, rt.homeParkingCategory, pq.kind === 'category' ? pq.idPrefix : undefined);
     if (!cands.length) {
       return unable(env, `No unoccupied ${cat ? `${cat} ` : ''}parking position is available.`, 'there is no parking available');
     }
@@ -577,7 +591,7 @@ function planTaxi(env: Env): PlanResult {
         "we can't find that destination",
       );
     }
-    if (closedRunwayIds(ctx.state).has(g.runway.id)) return unable(env, `Runway ${g.runway.id} is closed (NOTAM); ${ac.callsign} cannot be taxied to it for departure.`, `runway ${spokenRunway(g.end.id)} is closed`, false);
+    if (!isVehicle(ac) && closedRunwayIds(ctx.state).has(g.runway.id)) return unable(env, `Runway ${g.runway.id} is closed (NOTAM); ${ac.callsign} cannot be taxied to it for departure.`, `runway ${spokenRunway(g.end.id)} is closed`, false);
     runwayEnd = g.end.id;
     runwayG = g;
   }
@@ -1831,12 +1845,15 @@ const PLANNERS: Partial<Record<ClearanceKind, (env: Env) => PlanResult>> = {
   RADAR_CONTACT: planRadarContact,
   TAXI: planTaxi,
   TAXI_TO_PARKING: planTaxi,
-  HOLD_POSITION: planHoldPosition,
+  HOLD_POSITION: (env) => holdDispatch(env, planHoldPosition),
   HOLD_SHORT: planHoldShort,
   CROSS_RUNWAY: planCross,
   LINE_UP_AND_WAIT: planLineUp,
-  TAKEOFF: planTakeoff,
-  LAND: planLand,
+  TAKEOFF: (env) => takeoffDispatch(env, planTakeoff),
+  LAND: (env) => landDispatch(env, planLand),
+  PROCEED: planProceed,
+  AIR_TAXI: (env) => airTaxiPlan(env, planTaxi),
+  OVERHEAD: planOverhead,
   GO_AROUND: planGoAround,
   CONTINUE_APPROACH: planContinueApproach,
   CONTACT_FREQUENCY: planContact,

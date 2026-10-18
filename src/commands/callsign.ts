@@ -49,7 +49,7 @@ function findMentions(tokens: readonly Token[]): Mention[] {
   for (let i = 0; i < tokens.length;) {
     const t = tokens[i];
     // airline telephony + flight number
-    if (t.kind === 'airline' && isInt(tokens[i + 1]) && tokens[i + 1].text.length <= 4) {
+    if (t.kind === 'airline' && isInt(tokens[i + 1]) && tokens[i + 1].text.length <= (t.text === 'CGD' || t.text === 'ANG' ? 5 : 4)) {
       out.push({ start: i, end: i + 2, airline: t.text, explicitPrefix: true, id: tokens[i + 1].text });
       i += 2;
       continue;
@@ -119,7 +119,7 @@ function digitSlip(m: Mention, full: string): boolean {
 function scoreMention(m: Mention, ac: AircraftRef): number {
   const cs = ac.callsign.toUpperCase();
   const nNum = /^N(\d{1,5}[A-Z]{0,2})$/.exec(cs);
-  const airline = /^([A-Z]{3})(\d{1,4}[A-Z]?)$/.exec(cs);
+  const airline = /^([A-Z]{3})(\d{1,5}[A-Z]?)$/.exec(cs);
   const positionPenalty = m.start === 0 ? 0 : 0.02;
   let s = 0;
   if (nNum && !m.airline) {
@@ -154,7 +154,7 @@ const missingOneDigit = (heard: string, full: string): boolean =>
 function droppedDigitMatch(m: Mention, aircraft: readonly AircraftRef[]): string | null {
   if (!m.airline) return null;
   const same = aircraft
-    .map((ac) => ({ cs: ac.callsign, flight: /^([A-Z]{3})(\d{1,4}[A-Z]?)$/.exec(ac.callsign.toUpperCase()) }))
+    .map((ac) => ({ cs: ac.callsign, flight: /^([A-Z]{3})(\d{1,5}[A-Z]?)$/.exec(ac.callsign.toUpperCase()) }))
     .filter((x) => x.flight !== null && x.flight[1] === m.airline)
     .map((x) => ({ cs: x.cs, id: (x.flight as RegExpExecArray)[2] }));
   const hits = same.filter((x) => missingOneDigit(m.id, x.id));

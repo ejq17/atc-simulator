@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import * as THREE from 'three';
 import type { Runway, Vec2 } from '../../sim/types';
 import { loadKacy } from '../../airport';
 import {
@@ -7,7 +8,7 @@ import {
 } from './geometry';
 import type { MeshData } from './geometry';
 import {
-  aircraftDims, bankFromTurnRate, billboardWorldHeight, classifyAircraft, familyOf, gearDown, lightState, modelPitchRad, pitchFromVerticalSpeed, placeAircraft, withinRange,
+  aircraftDims, bankFromTurnRate, billboardWorldHeight, classifyAircraft, familyOf, gearDown, lightState, modelPitchRad, pitchFromVerticalSpeed, placeAircraft, vehicleBeacon, withinRange,
 } from './aircraftModel';
 import type { ModelFamily } from './aircraftModel';
 import { buildGeometry, countTriangles, createAircraftFactory } from './aircraftMeshes';
@@ -571,5 +572,149 @@ describe('aircraft families and models', () => {
     const on = Array.from({ length: 60 }, (_, i) => lightState({ ...base, lightsOn: true, nowMs: i * 20 }).beacon);
     expect(on.some((x) => x)).toBe(true);
     expect(on.some((x) => !x)).toBe(true);
+  });
+});
+
+describe('special traffic models (Coast Guard helicopter, Air National Guard F-16, airport vehicle)', () => {
+  const CASES: [string, string, ModelFamily, string][] = [
+    ['H65', 'CGD61327', 'helicopter', 'CGD'], ['F16', 'ANG61234', 'fighter', 'ANG'], ['VEH', 'APT21', 'groundVehicle', 'APT'],
+  ];
+  it('maps the types to their families and classes, and the callsign prefix to the livery', () => {
+    for (const [type, cs, family, prefix] of CASES) {
+      expect(familyOf(type)).toBe(family);
+      expect(liveryFor(cs)).toBe(LIVERIES[prefix]);
+      expect(airlinePrefix(cs)).toBe(prefix);
+    }
+    expect(classifyAircraft('H65')).toBe('rotorcraft');
+    expect(classifyAircraft('F16')).toBe('fighter');
+    expect(classifyAircraft('VEH')).toBe('vehicle');
+    // the Coast Guard scheme is white over red-orange, the Guard fighter is grey, the vehicle is yellow
+    expect(LIVERIES.CGD.top).toBe(0xf3f5f7);
+    expect(LIVERIES.CGD.belly).toBe(0xe2401c);
+    expect(LIVERIES.ANG.top).toBeLessThan(0xaaaaaa);
+    expect(LIVERIES.APT.top).toBe(0xf0c000);
+  });
+  it('uses the real size of each type', () => {
+    const h = aircraftDims('H65');
+    expect(h.lengthM).toBeCloseTo(13.5, 1);
+    expect(h.wingspanM).toBeCloseTo(11.94 * (13.5 / 13.54), 1); // the rotor diameter, 39 ft 2 in
+    const f = aircraftDims('F16');
+    expect(f.lengthM).toBeCloseTo(15.06, 2);
+    expect(f.wingspanM).toBeCloseTo(9.96, 2);
+    expect(f.heightM).toBeCloseTo(4.88, 2);
+    const v = aircraftDims('VEH');
+    expect(v.lengthM).toBeCloseTo(5.5, 2);
+    expect(v.wingspanM).toBeCloseTo(2.0, 2);
+  });
+  it('builds finite geometry within the triangle budget, nothing below the ground and nothing taller than the type', () => {
+    const factory = createAircraftFactory();
+    for (const [type, cs] of CASES) {
+      const built = buildGeometry(type, liveryFor(cs));
+      for (const g of [built.fuselage, built.airframe, built.gear]) {
+        const arr = g.getAttribute('position').array as Float32Array;
+        for (let i = 0; i < arr.length; i++) expect(Number.isFinite(arr[i])).toBe(true);
+      }
+      const d = aircraftDims(type);
+      const m = factory.build(type, cs);
+      expect(m.triangles).toBeGreaterThan(300);
+      expect(m.triangles).toBeLessThan(3000);
+      expect(countTriangles(m.root)).toBe(m.triangles);
+      built.airframe.computeBoundingBox();
+      const bb = built.airframe.boundingBox!;
+      expect(bb.min.y).toBeGreaterThanOrEqual(-0.01);
+      expect(bb.max.y).toBeLessThanOrEqual(d.heightM * 1.01);
+      expect(bb.max.y).toBeGreaterThan(d.heightM * 0.9);
+      built.gear.computeBoundingBox();
+      expect(built.gear.boundingBox!.min.y).toBeGreaterThanOrEqual(-0.01);
+      // the whole model fits the type's length and width
+      const box = new THREE.Box3().setFromObject(m.root);
+      expect(box.max.z - box.min.z).toBeLessThanOrEqual(d.lengthM * 1.02);
+      expect(box.max.x - box.min.x).toBeLessThanOrEqual(Math.max(d.wingspanM, 2.2) * 1.05);
+    }
+    factory.dispose();
+  });
+  it('the airport vehicle is a pickup of about 5.5 m with the amber beacon on the roof', () => {
+    const factory = createAircraftFactory();
+    const m = factory.build('VEH', 'APT21');
+    const box = new THREE.Box3().setFromObject(m.root);
+    expect(box.max.z - box.min.z).toBeGreaterThan(5.3);
+    expect(box.max.z - box.min.z).toBeLessThan(5.7);
+    expect(box.max.y).toBeLessThan(2.0);
+    expect(m.props.length).toBe(0);
+    expect(m.anchors.beaconTop[1]).toBeGreaterThan(1.6); // roof level
+    expect(m.anchors.beaconTop[1]).toBeLessThan(2.0);
+    expect(gearDown(m.dims.family, { onGround: true, aglFt: 0, verticalSpeedFpm: 0, phase: 'TAXIING' })).toBe(true);
+    const flashes = Array.from({ length: 50 }, (_, i) => vehicleBeacon(i * 20, 7));
+    expect(flashes.some((x) => x)).toBe(true);
+    expect(flashes.some((x) => !x)).toBe(true);
+    expect(vehicleBeacon(0, 7)).toBe(vehicleBeacon(1000, 7)); // 1 s cycle
+    factory.dispose();
+  });
+  it('the helicopter has a main rotor that spins about the vertical and a fenestron rotor about the lateral axis', () => {
+    const factory = createAircraftFactory();
+    const m = factory.build('H65', 'CGD61327');
+    expect(m.props.length).toBe(2);
+    const [main, tail] = m.props;
+    m.root.updateMatrixWorld(true);
+    const axisOf = (o: THREE.Object3D) => new THREE.Vector3(0, 0, 1).transformDirection(o.matrixWorld);
+    const up = axisOf(main);
+    expect(Math.abs(up.y)).toBeCloseTo(1, 6);
+    const lateral = axisOf(tail);
+    expect(Math.abs(lateral.x)).toBeCloseTo(1, 6);
+    // the rotor disc spans the 11.9 m rotor diameter above the cabin and carries four blades (two crossed bars)
+    const worldPos = new THREE.Vector3().setFromMatrixPosition(main.matrixWorld);
+    expect(worldPos.y).toBeGreaterThan(3.5);
+    expect(worldPos.y).toBeLessThan(aircraftDims('H65').heightM + 0.3);
+    expect(main.children.length).toBe(3); // disc + 2 blade bars
+    const disc = main.children[0] as THREE.Mesh;
+    expect(disc.scale.x).toBeCloseTo(aircraftDims('H65').wingspanM / 2, 3);
+    // rotating the assembly (what towerScene does every frame) turns the blades about the vertical axis
+    const blade = main.children[1];
+    const dir = () => new THREE.Vector3(1, 0, 0).transformDirection(blade.matrixWorld);
+    const before = dir();
+    main.rotation.z = Math.PI / 3;
+    m.root.updateMatrixWorld(true);
+    const after = dir();
+    expect(Math.abs(after.y)).toBeLessThan(1e-6); // blades stay horizontal
+    expect(before.angleTo(after)).toBeCloseTo(Math.PI / 3, 5);
+    // the rotor is above the whole fuselage
+    expect(worldPos.y).toBeGreaterThan(new THREE.Box3().setFromObject(m.root.children[0]).max.y);
+    factory.dispose();
+  });
+  it('the fighter has no propeller, retractable gear, and a flight of two draws a second airframe', () => {
+    const factory = createAircraftFactory();
+    const one = factory.build('F16', 'ANG61234');
+    const two = factory.build('F16', 'ANG61234', { formation: 2 });
+    expect(one.props.length).toBe(0);
+    expect(gearDown(one.dims.family, { onGround: false, aglFt: 5000, verticalSpeedFpm: 0, phase: 'DEPARTURE' })).toBe(false);
+    expect(gearDown(one.dims.family, { onGround: false, aglFt: 800, verticalSpeedFpm: -600, phase: 'FINAL' })).toBe(true);
+    expect(two.triangles).toBe(one.triangles * 2);
+    const b1 = new THREE.Box3().setFromObject(one.root);
+    const b2 = new THREE.Box3().setFromObject(two.root);
+    expect(b2.max.x - b2.min.x).toBeGreaterThan((b1.max.x - b1.min.x) * 2); // the wingman is out to the side, not on top of the leader
+    expect(b2.min.y).toBeGreaterThanOrEqual(-0.01);
+    // the gear toggle hides both airframes' gear
+    expect(two.gear.type).toBe('Group');
+    let meshes = 0;
+    two.gear.traverse((o) => { if ((o as THREE.Mesh).isMesh) meshes++; });
+    expect(meshes).toBe(2);
+    // a one-ship "formation" and non-fighters ignore the option
+    expect(factory.build('F16', 'ANG61234', { formation: 1 }).triangles).toBe(one.triangles);
+    expect(factory.build('H65', 'CGD61327', { formation: 2 }).triangles).toBe(factory.build('H65', 'CGD61327').triangles);
+    factory.dispose();
+  });
+  it('shares geometry between two aircraft of one special type', () => {
+    const factory = createAircraftFactory();
+    const a = factory.build('H65', 'CGD61327');
+    const b = factory.build('H65', 'CGD61328');
+    expect((a.root.children[1] as THREE.Mesh).geometry).toBe((b.root.children[1] as THREE.Mesh).geometry);
+    factory.dispose();
+  });
+  it('paints the helicopter fuselage: white above, red-orange below, windscreen glass', () => {
+    const p = { style: 'rotor' as const, windows: 0 };
+    expect(fuselagePaint(LIVERIES.CGD, p, 0.3, 0.9)).toBe(0xf3f5f7);
+    expect(fuselagePaint(LIVERIES.CGD, p, 0.3, -0.8)).toBe(0xe2401c);
+    expect(fuselagePaint(LIVERIES.CGD, p, 0.1, 0.4)).toBe(0x151a22);
+    expect(fuselagePaint(LIVERIES.ANG, { style: 'fighter', windows: 0 }, 0.5, 0.2)).toBe(LIVERIES.ANG.top);
   });
 });

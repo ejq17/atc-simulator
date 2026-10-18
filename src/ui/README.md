@@ -199,6 +199,11 @@ state (~10 Hz and after each command).
   hint says why not). S and X work while the Strips tab shows. A dropped strip of an aircraft that is still there is not reprinted until the aircraft changes bay.
 * Aircraft details sit behind a collapsed bar under the board (`details-toggle`) so the board gets the column.
 
+## Special traffic setup
+
+* **Setup** (free play, under "Aircraft types"): a "Special traffic" group with one checkbox per kind (`special-helicopter`, `special-military`, `special-transition`, `special-training`, `special-vehicles`), only the kinds `availableSpecialKinds(icao)` returns (KACY all five, KMHT VFR transitions and vehicles). Labels and hints come from `SPECIAL_TRAFFIC_LABELS`; the initial state is the previous setup's `freePlay.specialTraffic`, else `defaultSpecialTraffic(icao)`, and it resets to the new airport's defaults when the airport changes. The selection goes out as `FreePlayOptions.specialTraffic` (`resolveSpecialTraffic`, so a kind the airport lacks is always off).
+* **Tower view models, radar and surface symbols**: see the Displays section below and `tower/README.md`.
+
 ## Airport state in the UI (`lib/airportStatus.ts`, `components/AirportNotices.tsx`, `display/closureMarks.ts`)
 
 * **Setup**: "Close a runway" / "Close a taxiway" (for the whole session; the recommended runway skips a closed one, its end options are disabled), "Airport events" (free play: seeded inspections, taxiway closures, bird activity, pilot light requests; on by default). They become `FreePlayOptions.closures` / `airportEvents`; the store copies the closures onto catalogue scenarios and passes `startUtcMs` for the season weighting of the bird event.
@@ -236,10 +241,10 @@ Status (`unsupported`, `permission_denied`, `listening`, `processing`, `error`, 
   (rotated along the runway axis, kept upright for legibility, not pilot-view), yellow hold lines with runway id, parking dots (names when zoomed in), HS 1, ARP,
   scale bar, compass, OSM attribution. Aircraft are oriented glyphs sized by category (true-to-scale when zoomed in), data labels with leader lines and greedy
   non-overlap placement, cyan selection ring, planned taxi route (bold for the selected aircraft, faint for others) with red hold-short markers, 60 s trails,
-  conflict rings. Wheel zoom (0.05-8 px/m), drag pan, click select, follow toggle, Fit.
+  conflict rings. Special traffic (`display/symbols.ts`, `specialMark`): the helicopter glyph is a slim cabin and tail boom with a rotor cross of two blade bars, the F-16 a cropped-delta silhouette outlined in the military gold (`C.military`), an airport vehicle a small chamfered box with a cab window and an amber dot; a flight of two shows `F16x2` in the label (`typeTag`). Wheel zoom (0.05-8 px/m), drag pan, click select, follow toggle, Fit.
 * **Radar** (north-up TRUE, compass rose labelled MAGNETIC): 5/10/20/40/60 NM (60 shows VCN, SIE, ...), range rings, runways to scale, extended centrelines with 1 NM ticks for the active landing
   runways, ACY/VCN/SIE/CYN (and other VORs in range), approach fixes CARYL MAYBN STEVV PRSTY SMITS (all fixes optional), airborne data blocks
-  (callsign/type, altitude in hundreds with trend arrow, ground speed, magnetic heading, phase), ground targets dimmed, history dots, cosmetic sweep drawn under the targets.
+  (callsign/type, altitude in hundreds with trend arrow, ground speed, magnetic heading, phase), ground targets dimmed, history dots, cosmetic sweep drawn under the targets. Helicopters are a rotor disc with a cross instead of the square, military aircraft a double gold square; airport vehicles are never drawn or picked on the radar (`hitTestAircraft(..., includeVehicles = false)`).
   IFR additions: the **instrument procedure of each active landing runway** (`lib/procedures.ts`: ILS first, then RNAV/LOC/VOR; ILS 13 CARYL MAYBN,
   ILS 31 STEVV PRSTY, RNAV 22 KOPCE FLDER EFEWY, RNAV 4 JEDOB FASEN TEMVE) is drawn as the on-course fixes (filled triangles, IF / FAF tags, feeders such
   as VCN stay ordinary navaids) with the extended final approach course out to the IF, labelled with the procedure ("ILS 13"). The **selected

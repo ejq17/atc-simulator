@@ -55,6 +55,24 @@ export interface AirportTrafficProfile {
   gaTypes: readonly (readonly [string, number])[];
   /** Representative jet used to pick runways that "jets can use" (free play). */
   referenceJet: string;
+  /**
+   * Special traffic (specialTraffic.ts). A kind is present only when the airport has it for a documented reason (data/sources/README.md
+   * "Traffic variety"); rates are design values at the peak bank, scaled by the free-play density curve like the airline rates.
+   */
+  special?: SpecialTrafficProfile;
+}
+
+export interface SpecialTrafficProfile {
+  /** USCG MH-65 operations from the airport's helipads (parking category 'military', ids starting with `padPrefix`). */
+  helicopter?: { perHour: number; padPrefix: string };
+  /** Military fighters from a military ramp (parking ids starting with `rampPrefix`); `formationShare` of the sorties fly as a flight of two. */
+  military?: { perHour: number; rampPrefix: string; formationShare: number };
+  /** VFR aircraft crossing the Class C area on a transition (7110.65 7-8). */
+  transition?: { perHour: number };
+  /** Share (0..1) of generated GA flights that are flight-training pattern work. */
+  training?: { gaShare: number };
+  /** Airport vehicles asking for runway / taxiway access. */
+  vehicles?: { perHour: number };
 }
 
 /** Local hours (airport time) in which 'night' / 'day' flights are at full weight. Outside them the weight is `OFF_HOURS_FACTOR`. */
@@ -93,6 +111,15 @@ const KACY: AirportTrafficProfile = {
   },
   gaTypes: [['C172', 1]],
   referenceJet: 'A320',
+  // Existence: NJ ANG 177th Fighter Wing (F-16C) and Coast Guard Air Station Atlantic City (helipads USCG-1..4 from OSM), Class C airport (NASR);
+  // FAA ops frequency 123.4 and ANG ops 140.7 are in the dataset. Rates are design values.
+  special: {
+    helicopter: { perHour: 2, padPrefix: 'USCG-' },
+    military: { perHour: 2, rampPrefix: 'ANG-', formationShare: 0.5 },
+    transition: { perHour: 4 },
+    training: { gaShare: 0.4 },
+    vehicles: { perHour: 3 },
+  },
 };
 
 // ---------------------------------------------------------------------------
@@ -145,6 +172,12 @@ const KMHT: AirportTrafficProfile = {
   gaRemote: ['KASH', 'KCON', 'KLCI', 'KPSM', 'KLWM', 'KBVY', 'KEEN', 'KBED', 'KFIT'],
   gaTypes: [['C172', 0.75], ['PA28', 0.25]],
   referenceJet: 'B738',
+  // KMHT is a Class C airport (NASR) so VFR transitions apply; vehicles exist at every towered airport. No USCG or ANG unit, no flight-training
+  // source: those kinds are left out (data/sources/README.md "Traffic variety").
+  special: {
+    transition: { perHour: 4 },
+    vehicles: { perHour: 3 },
+  },
 };
 
 const PROFILES: Readonly<Record<string, AirportTrafficProfile>> = { KACY, KMHT };

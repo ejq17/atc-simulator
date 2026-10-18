@@ -20,7 +20,7 @@ import { TAXI_PHASES } from './stateMachines';
 import { activeClearance, emitEvent, perfOf } from './context';
 import { activeClosures } from './airportOps';
 import { isDaylight, simUtcMs } from './solar';
-import { getPerformance, lineUpTimeSec, srsCategory, wakeRecatCategory } from './performance';
+import { getPerformance, isVehicleType, lineUpTimeSec, srsCategory, wakeRecatCategory } from './performance';
 import { wakeMinimumNm } from './wake';
 import type { RunwayEndGeom } from './runways';
 import type { SimContext } from './context';
@@ -52,6 +52,8 @@ export interface SafetyAssessment {
 
 const FINAL_TAKEOFF_NM = 2;
 const FINAL_CROSSING_NM = 3;
+/** A vehicle sent onto a runway stays for minutes (a runway inspection): no arrival on final inside this range (nm) and no traffic in the pattern (design value). */
+const FINAL_PROCEED_NM = 8;
 
 function cs(state: SimulationState, ids: string[]): string {
   return ids.map((i) => state.aircraft[i]?.callsign ?? i).join(', ');
@@ -412,7 +414,7 @@ export function assessClearanceSafety(state: SimulationState, cmd: ParsedCommand
   if (cmd.kind === 'TAKEOFF' || cmd.kind === 'LINE_UP_AND_WAIT' || cmd.kind === 'LAND') {
     const g = findRunwayEnd(airport, cmd.runwayEnd ?? cmd.runwayId ?? ac.assignedRunwayEnd);
     runwayId = g?.runway.id;
-  } else if (cmd.kind === 'CROSS_RUNWAY') {
+  } else if (cmd.kind === 'CROSS_RUNWAY' || cmd.kind === 'PROCEED') {
     runwayId = findRunway(airport, cmd.crossRunwayId ?? cmd.runwayId ?? cmd.runwayEnd)?.id;
   } else {
     return { safe: issues.length === 0, issues };
@@ -472,6 +474,22 @@ export function assessClearanceSafety(state: SimulationState, cmd: ParsedCommand
     const crossing = others(act.crossing).filter((i) => !occ.includes(i));
     if (crossing.length) push(`Landing clearance for ${ac.callsign} while ${cs(state, crossing)} is cleared to cross runway ${runwayId}`, REF_TAXI, crossing);
     if (gLand) issues.push(...precedingArrivalIssues(state, ac, gLand));
+  } else if (cmd.kind === 'PROCEED') {
+    // A vehicle onto a runway (JO 7110.65 3-1-3, 3-7-2): the runway and the runways it may cross must be free of aircraft, nothing departing, in position or
+    // landing, and no arrival close.
+    for (const rid of [runwayId, ...crossingRunways(airport, runwayId).map((r) => r.id)]) {
+      const a2 = activity[rid];
+      if (!a2) continue;
+      const occ = others(a2.occupants);
+      if (occ.length) push(`Vehicle ${ac.callsign} sent onto runway ${runwayId} while runway ${rid} is occupied by ${cs(state, occ)}`, REF_TAXI, occ);
+      const dep = others([...a2.departing, ...a2.lineUp, ...a2.landing]).filter((i) => !occ.includes(i));
+      if (dep.length) push(`Vehicle ${ac.callsign} sent onto runway ${runwayId} while ${cs(state, dep)} is departing / in position / landing on runway ${rid}`, REF_TAXI, dep);
+      const near = arrivalsOnFinal(state, rid, FINAL_PROCEED_NM, ac.id).filter((a) => !occ.includes(a.id));
+      const rw = airport.runways.find((r) => r.id === rid);
+      const pattern = Object.values(state.aircraft).filter((o) => o.id !== ac.id && !o.onGround && o.phase === 'PATTERN' && rw && rw.ends.some((e) => e.id === o.assignedRunwayEnd));
+      const all = [...near, ...pattern];
+      if (all.length) push(`Vehicle ${ac.callsign} sent onto runway ${runwayId} with ${cs(state, all.map((x) => x.id))} landing / in the pattern for runway ${rid}`, REF_TAXI, all.map((x) => x.id));
+    }
   } else if (cmd.kind === 'CROSS_RUNWAY') {
     const occ = others(act.occupants);
     if (occ.length) push(`Crossing clearance for ${ac.callsign} over runway ${runwayId} while it is occupied by ${cs(state, occ)}`, REF_TAXI, occ);
@@ -753,9 +771,14 @@ interface Candidate {
 
 export const GROUND_PROXIMITY_M = 30;
 /** The normal following distance of the taxi model (`groundMovement.findLeader`): 1.5 x the longer aircraft + 20 m. */
-export const followingDistanceM = (a: Aircraft, b: Aircraft): number => 1.5 * Math.max(perfOf(a).lengthM, perfOf(b).lengthM) + 20;
+/** A formation of N aircraft is handled as one aircraft (JO 7110.65 2-1-13) that is N lengths long. */
+export const followingDistanceM = (a: Aircraft, b: Aircraft): number =>
+  1.5 * Math.max(perfOf(a).lengthM * (a.formation?.size ?? 1), perfOf(b).lengthM * (b.formation?.size ?? 1)) + 20;
 /** Alert when an aircraft is closer than its following target by 20% (0.8 x), but never at more than 30 m. */
-export const groundProximityM = (a: Aircraft, b: Aircraft): number => Math.min(GROUND_PROXIMITY_M, 0.8 * followingDistanceM(a, b));
+/** A vehicle (5.5 m, driven by an operator who sees the aircraft) passes closer than two aeroplanes may: its alert distance is 5 m (design value). */
+export const VEHICLE_PROXIMITY_M = 5;
+export const groundProximityM = (a: Aircraft, b: Aircraft): number =>
+  Math.min(GROUND_PROXIMITY_M, 0.8 * followingDistanceM(a, b), isVehicleType(a.type) || isVehicleType(b.type) ? VEHICLE_PROXIMITY_M : Infinity);
 /** Two aircraft standing still one behind the other in the same queue (holding short / waiting to taxi): not a proximity event. */
 function sameQueue(state: SimulationState, a: Aircraft, b: Aircraft): boolean {
   const q = (x: Aircraft) => x.groundSpeedKt < 1 && (x.phase === 'TAXIING' || x.phase === 'HOLDING_SHORT' || x.phase === 'READY') && x.occupyingRunways.length === 0;

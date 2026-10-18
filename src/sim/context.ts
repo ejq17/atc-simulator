@@ -13,6 +13,9 @@ import type { HoldState } from './holding';
 import type { Minima } from './minima';
 import type { PilotBehaviour } from './pilotBehaviour';
 import type { GustState } from './wind';
+import type { HeliRuntime } from './rotorcraft';
+import type { VehicleRuntime } from './vehicles';
+import type { SpecialRuntime } from './special';
 
 export const EVENT_CAP = 2000;
 
@@ -232,6 +235,12 @@ export interface AircraftRuntime {
   gustAirKt?: number;
   /** Seconds the effective (gusted) crosswind / tailwind has been over the type's limit on final. */
   windExceedSec?: number;
+  /** Helicopter state (rotorcraft.ts): lift-off, approach to a helipad, hover. */
+  heli?: HeliRuntime;
+  /** Airport vehicle task (vehicles.ts). */
+  vehicle?: VehicleRuntime;
+  /** VFR transition, flight training and overhead-maneuver state (special.ts). */
+  special?: SpecialRuntime;
 }
 
 export interface SimContext {

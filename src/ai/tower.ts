@@ -18,12 +18,13 @@ import { predictedExit } from '../sim/flightDynamics';
 import { describeTraffic, luawTraffic } from '../sim/towerCommands';
 import { getPerformance } from '../sim/performance';
 import { holdTooShort } from '../sim/holdSelection';
-import { hasActive, mkCmd } from './core';
+import { hasActive, lastClearance, mkCmd } from './core';
 import type { Agent, AgentView, Plan } from './core';
 import {
   assignedEnd, distToThresholdNm, etaToThresholdSec, holdNodeAt, interactingRunways, isInboundArrival, planParking, projectedGapNm,
 } from './world';
 import * as say from './phrase';
+import { isRotorcraftType, isVehicleType } from '../sim/performance';
 import { latestBrakingReport } from '../sim/airportOps';
 import { brakingAdvisoriesInEffect, runwayCondition } from '../weather/runwayCondition';
 import { runwayHasRvr, rvrForVisibility, rvrPhrase } from '../weather/rvr';
@@ -201,7 +202,7 @@ export function createTowerAgent(): Agent {
     // ---- departures on the ground: first come, first served per runway -------------------------------------------------
     const queue: { ac: Aircraft; g: RunwayEndGeom; since: number }[] = [];
     for (const ac of v.onFrequency) {
-      if (!ac.isDeparture || !ac.onGround || ac.radioState === 'TRANSMITTING') continue;
+      if (!ac.isDeparture || !ac.onGround || ac.radioState === 'TRANSMITTING' || isVehicleType(ac.type) || isRotorcraftType(ac.type)) continue;
       const g = findRunwayEnd(airport, ac.assignedRunwayEnd);
       if (!g) continue;
       const waiting = ac.phase === 'HOLDING_SHORT' && atDepartureHold(v, ac, g);
@@ -278,6 +279,7 @@ export function createTowerAgent(): Agent {
     // ---- everything else on the frequency --------------------------------------------------------------------------------
     for (const ac of v.onFrequency) {
       if (ac.radioState === 'TRANSMITTING') continue;
+      if (isVehicleType(ac.type) || isRotorcraftType(ac.type)) continue; // special.ts
       const pending = ac.pendingRequest?.kind;
       const ready = pending !== undefined || v.settled(ac) >= 4;
 
@@ -294,7 +296,10 @@ export function createTowerAgent(): Agent {
       }
 
       // Arrival rolling out with Ground staffed: the exit and the frequency change in one transmission (3-10-9 example); the aircraft changes once clear.
-      if (!ac.isDeparture && ac.onGround && ac.phase === 'ROLLOUT' && v.staffed.has('GND') && ac.groundSpeedKt <= EXIT_CALL_MAX_KT && !hasActive(ac, 'EXIT_RUNWAY')) {
+      // (not for a touch-and-go / option: the aircraft is about to take off again, 3-8-2)
+      const landDest = lastClearance(ac, 'LAND')?.destination;
+      const goesAgain = landDest === 'touch_and_go' || landDest === 'option' || landDest === 'stop_and_go' || landDest === 'low_approach';
+      if (!ac.isDeparture && ac.onGround && ac.phase === 'ROLLOUT' && !goesAgain && v.staffed.has('GND') && ac.groundSpeedKt <= EXIT_CALL_MAX_KT && !hasActive(ac, 'EXIT_RUNWAY')) {
         const g = findRunwayEnd(airport, ac.assignedRunwayEnd);
         const gnd = frequencyForPosition(airport, 'GND');
         const ex = g ? predictedExit(state, ac, g) : undefined;
@@ -385,12 +390,15 @@ export function createTowerAgent(): Agent {
         continue;
       }
 
-      // Arrivals to land.
+      // Arrivals to land. An overhead maneuver is cleared to land only after the break (JO 7110.65 3-10-12 examples).
       if (!isInboundArrival(ac) || ac.phase === 'LANDING') continue;
+      if (ac.flags.overhead && ac.flags.overhead !== 'BROKE') continue;
       const g = assignedEnd(airport, ac);
       if (!g) continue;
       const d = distToThresholdNm(ac, g);
-      const land = mkCmd('LAND', ac, { runwayEnd: g.end.id, runwayId: g.runway.id });
+      // Flight training: touch-and-go while circuits remain (the pilot's request), a full stop on the last one.
+      const touchGo = !!ac.flags.training && (ac.flags.circuits ?? 0) > 1;
+      const land = mkCmd('LAND', ac, { runwayEnd: g.end.id, runwayId: g.runway.id, ...(touchGo ? { destination: 'touch_and_go' } : {}) });
       const landAssess = assessClearanceSafety(state, land);
       const ahead = blockedByLeader(v, ac, g);
       const landSafe = landAssess.safe && !ahead;
@@ -415,7 +423,7 @@ export function createTowerAgent(): Agent {
         if (landSafe && !(d > CROSSING_WINDOW_NM && crossingWaiting(v, g, ac.id))) {
           plans.push({
             key: `${ac.id}:land`, aircraftId: ac.id, callsign: ac.callsign, priority: 85, cmds: [land],
-            phrase: say.clearedToLand(ac, g.end.id, landingInfo(v, g)), cooldownSec: 20, summary: `${ac.callsign} cleared to land runway ${g.end.id}`,
+            phrase: touchGo ? say.clearedTouchAndGo(ac, g.end.id, landingInfo(v, g)) : say.clearedToLand(ac, g.end.id, landingInfo(v, g)), cooldownSec: 20, summary: `${ac.callsign} cleared ${touchGo ? 'touch-and-go' : 'to land'} runway ${g.end.id}`,
           });
         }
       } else if (pending === 'LANDING' && !mem.done.has(`${ac.id}:continue`)) {

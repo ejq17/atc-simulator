@@ -192,7 +192,7 @@ export function planParking(state: SimulationState, ac: Aircraft): ParkingPlan |
   const graph = airport.taxiwayGraph;
   const start = taxiStartNode(airport, ac);
   if (!start) return undefined;
-  const cands = freeParkingCandidates(state, ac, undefined, undefined).filter((p) => p.category !== 'military' || getPerformance(ac.type).category === 'light');
+  const cands = freeParkingCandidates(state, ac, undefined, undefined).filter((p) => p.category !== 'military' || getPerformance(ac.type).category === 'light' || !!getPerformance(ac.type).military);
   if (!cands.length) return undefined;
   const closed = closedTaxiways(state);
   const dmap = shortestDistances(graph, start.id, { allowedRunwayIds: allRunwayIds(airport), avoidTaxiways: closed });

@@ -16,7 +16,8 @@ import { worldToScreen, visibleBounds } from './viewTransform';
 import type { View } from './viewTransform';
 import { drawGlyphDetail, glyphPath, symbolSize } from './symbols';
 import { niceLength, deg2rad } from '../lib/geom';
-import { TONE_COLOR, statusTone, phaseShort } from '../lib/format';
+import { TONE_COLOR, statusTone, phaseShort, typeTag } from '../lib/format';
+import { isMilitaryType } from '../../sim/performance';
 
 export interface SurfaceLayers {
   labels: boolean;
@@ -525,7 +526,7 @@ function drawConflicts(ctx: CanvasRenderingContext2D, v: View, frame: Frame): vo
 
 export function labelLines(ac: Aircraft, compact: boolean): string[] {
   if (compact) return [ac.callsign];
-  return [ac.callsign, `${ac.type} ${phaseShort(ac.phase)} ${Math.round(ac.groundSpeedKt)}kt`];
+  return [ac.callsign, `${typeTag(ac)} ${phaseShort(ac.phase)} ${Math.round(ac.groundSpeedKt)}kt`];
 }
 
 function drawAircraft(ctx: CanvasRenderingContext2D, v: View, frame: Frame, layers: SurfaceLayers): void {
@@ -591,8 +592,10 @@ function drawAircraft(ctx: CanvasRenderingContext2D, v: View, frame: Frame, laye
     ctx.lineJoin = 'round';
     ctx.stroke();
     ctx.fillStyle = color;
-    ctx.strokeStyle = '#05070a';
-    ctx.lineWidth = 1.25;
+    // military aircraft keep their status colour but are outlined in the military gold instead of black
+    const military = isMilitaryType(ac.type);
+    ctx.strokeStyle = military ? C.military : '#05070a';
+    ctx.lineWidth = military ? 1.8 : 1.25;
     ctx.fill();
     ctx.stroke();
     if (close) drawGlyphDetail(ctx, size.halfLenPx, ac.type);

@@ -32,6 +32,8 @@ export interface FreePlayOptions {
   maxAircraft?: number;
   difficulty?: 'easy' | 'normal' | 'hard';
   aircraftTypes?: string[];                    // e.g. ['C172','A320']
+  /** Special traffic kinds (Coast Guard helicopters, ANG fighters, VFR transitions, flight training, airport vehicles): `scenario.specialTraffic`. Unset = none (the setup screen passes its checkboxes; its default is `defaultSpecialTraffic`). */
+  specialTraffic?: Partial<import('./specialTraffic').SpecialTrafficSelection>;
   startingScenario?: 'quiet' | 'busy_departures' | 'busy_arrivals' | 'mixed';
   /**
    * IFR flows: airline arrivals appear over the published approach fix on the Approach frequency (ILS 13 via CARYL, ILS 31 via STEVV,

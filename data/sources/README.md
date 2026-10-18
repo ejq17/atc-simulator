@@ -196,3 +196,24 @@ Diagram identifiers (read from the chart text and a render): A A1 A2 A3 A5 B C D
 * **TCH is the plate's glidepath TCH, not the VGSI TCH.** Several plates print both ("GS 3.00 TCH 58" and "VGSI Angle 3.00 / TCH 71 not coincident"); the first is `glidepath.tchFt`, the second is the NASR `threshold_crossing_height_ft` of the runway end, kept as `RunwayEnd.visualGlidepath` and used for visual approaches. VOR plates print a visual descent angle (VDA 3.05 deg TCH 47 on VOR 4, 3.12 / 52 on VOR 31). The COPTER ILS 13 plate prints HCH 58 (helicopter crossing height).
 * **Fallbacks, labelled**: an instrument approach without a transcribed glidepath flies 3 deg / 50 ft (`glidePathFor(...).source === 'default'`); a missed approach without a published altitude climbs to 2,000 ft (`IFR_MISSED_APPROACH_FT`) with an INFO event.
 * **Not verified**: the plates are a human / extracted transcription, not checked against the FAA digital procedures data; the cycle is 2610 (expires 2026-10-29).
+
+## Traffic variety (added 2026-10-18)
+
+No new geometry file: everything below is read from the datasets already in the repo plus the web sources listed. What exists, and why each kind is (not) generated:
+
+| Kind | Evidence in the data | Used at |
+|---|---|---|
+| Coast Guard helicopters | KACY OSM `aeroway=helipad name=USCG` (4 features) -> parking positions `USCG-1..4` in `src/airport/kacy/kacy.airport.json` (category `military`, `scripts/airports/kacy.ts`). The 2 other OSM helipads are not USCG-tagged and are not used. The NASR private helipad H1 ("PVT - EXPERIMENTAL USE ONLY") is not used. The pads connect to the taxi graph through nodes AP021-AP024 (about 53 m). | KACY only |
+| Air National Guard fighters | `ANG-1..6` (synthetic spots 30 m north of OSM hangars on the ANG ramp) and `ANG-PAD-1/2` (arm / dearm pad spots, not used for departures) in the same file; the README notes above say the ramp polygon is not in the dataset and taxiway G is absent from OSM, so the real nearest taxi nodes of the graph are used. The 177th Fighter Wing's F-16C/D and Atlantic City ANG base: public (af.mil / ang.af.mil, njmilitiamuseum.gov, Wikipedia search results 2026-10-18). Tail-number lists are photo databases, not used. | KACY only |
+| Arresting gear BAK-14 / BAK-12B | `kacy-facility.json` (NASR). No source for the rigged / derigged state or its announcement: **informational only, no gameplay, no ATIS text**. | - |
+| FAA ops 123.4 / ANG ops 140.7 | recorded as "not ATC" frequencies (OTHER); not used. | - |
+| VFR transitions | Class C airspace flag of KACY (NASR, `airspaceClass` C) and KMHT (C); JO 7110.65 7-8, AIM 3-2-4. | KACY, KMHT |
+| Flight training | No dataset or source names a flight school at KACY or KMHT. The pattern-work behaviour is generic (touch-and-go circuits of GA arrivals, JO 7110.65 3-8-2); the share (40 %) is a design value, enabled for KACY only (the task named training at KACY; KMHT has no source and gets none). | KACY |
+| Airport vehicles | Every towered airport has them (AC 150/5210-20A); they park at the `fbo` / `cargo` positions (KACY FBO-1/2, FAA-1/2/3; KMHT FBO-1..3 and CARGO-*). No published vehicle crossing points exist in the data (no `vehicle crossing` feature in OSM, NASR or the diagram notes searched), so vehicle crossings use the ordinary taxiway-runway crossings of the graph. | KACY, KMHT |
+| KMHT USCG / ANG | None found: no helipad or military ramp feature in the KMHT dataset and no unit sourced; KMHT gets neither kind. | - |
+
+Web sources (retrieved 2026-10-18): USCG MH-65E fact sheet (dcms.uscg.mil, via search result text; HTTP 403 to scripts); Coast Guard Aviation Association MH-65C table (search result text); USAF F-16 fact sheets (af.mil and unit sites, via search result text); FAA JO 7110.65BB, AIM, AC 150/5210-20A and JO 7110.126A (fetched). Figures and verdicts: docs/REALISM-VERIFICATION.md section 9; callsign and phrase sources: docs/FAA-REFERENCES.md "Traffic variety".
+
+The COPTER ILS 13 plate (HCH 58) in `kacy-procedures.json` is not flown: helicopters in the simulator are VFR and go straight to their pad.
+
+Callsign digits of generated Coast Guard (`CGD#####`) and Air Guard (`ANG#####`) flights are generated, exactly as the N-numbers of generated GA traffic are; no real serial number is stored anywhere.

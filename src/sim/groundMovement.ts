@@ -15,6 +15,7 @@ import { closedTaxiwayHoldCall } from '../radio/readback';
 import type { AircraftRuntime, SimContext } from './context';
 import { findRunwayEnd } from './runways';
 import { runwayCrossingsAlong } from './pathfinding';
+import { taxiSpeedKtFor } from './rotorcraft';
 import { seeded01 } from './rng';
 
 export const TAXI_ACCEL_MPS2 = 1.0;
@@ -89,7 +90,7 @@ export function findLeader(ctx: SimContext, ac: Aircraft): { gap: number; minGap
       gap = g;
     }
     if (!best || gap < best.gap) {
-      const minGap = 1.5 * Math.max(perf.lengthM, perfOf(o).lengthM) + 20;
+      const minGap = 1.5 * Math.max(perf.lengthM * (ac.formation?.size ?? 1), perfOf(o).lengthM * (o.formation?.size ?? 1)) + 20;
       best = { gap, minGap };
     }
   }
@@ -246,12 +247,13 @@ function stepGround(ctx: SimContext, ac: Aircraft, dt: number): void {
 
   const hasPath = !!ac.route && ac.route.progressIndex < ac.route.nodeIds.length;
   const sf = taxiSpeedFactor(ctx, ac);
-  let vmax = ktToMps((lineUpMode ? perf.taxiTurnSpeedKt : perf.taxiSpeedKt) * sf);
+  // A helicopter in a hover / air taxi moves at that mode's speed (JO 7110.65 3-11-1), a wheeled ground taxi at the type's taxi speed.
+  let vmax = ktToMps((lineUpMode ? perf.taxiTurnSpeedKt : taxiSpeedKtFor(ac, rt) ?? perf.taxiSpeedKt) * sf);
   // Taxilanes and apron connectors: "not more than 15 mph (13 kts)" (AC 150/5300-13B Chg 1, Appendix 1 glossary "Taxilane").
   if (ac.route && ac.route.progressIndex < ac.route.nodeIds.length) {
     const r0 = ac.route;
     const apronNode = (id: string | undefined) => { const k = id ? graph.nodes[id]?.kind : undefined; return k === 'parking' || k === 'apron'; };
-    if (apronNode(r0.nodeIds[r0.progressIndex]) || apronNode(r0.nodeIds[r0.progressIndex - 1])) vmax = Math.min(vmax, ktToMps(ctx.pilotBehaviour.ground.taxilaneMaxKt));
+    if (rt.heli?.taxiMode !== 'air' && (apronNode(r0.nodeIds[r0.progressIndex]) || apronNode(r0.nodeIds[r0.progressIndex - 1]))) vmax = Math.min(vmax, ktToMps(ctx.pilotBehaviour.ground.taxilaneMaxKt));
   }
   let vTarget = ac.flags.holdingPosition ? 0 : vmax;
   let stopDist = Infinity;

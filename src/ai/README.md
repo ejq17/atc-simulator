@@ -135,3 +135,15 @@ intersecting runway; scoring cannot tell AI from player (`COMMAND_ACCEPTED` has 
 rejected commands still log an ATC line); no dry-run validation call; READY aircraft block the lane behind them; C172 queues are 32 m
 apart against the 30 m GROUND_PROXIMITY alert; landings on 22 exit onto hold B-1 and must re-cross 4/22; ENTER_PATTERN right after a
 go-around can put the aircraft straight on final.
+
+## Special traffic (`special.ts`)
+
+One agent per position (`createSpecialAgent('GND' | 'TWR' | 'APP')`, added in `controllers.ts`) for the aircraft tuned to it:
+
+* **Ground, vehicles**: a vehicle's first call is answered with "proceed to runway N via ..., hold short ..." (inspection; `planDeparture` starting with the requested end), "proceed on the taxiways, hold short of all runways" (pavement tour; one tour at a time), or "proceed to the ramp" (errand / return). The ordinary departure rules (`ground.ts` 1 and 1b) and the Tower departure queue skip vehicles and helicopters.
+* **Tower, vehicles**: "proceed on runway N, report runway inspection complete" only when `runwayInUse` is false and the engine's `assessClearanceSafety` (PROCEED) accepts it; afterwards the vehicle is handed to Ground.
+* **Tower, helicopters**: takeoff from the pad ("make right turn for southeast departure, cleared for takeoff", bearing from `clearBearingFrom`, not while another helicopter hovers within 150 m), landing at the pad only when no aeroplane is within 1.2 nm of the straight path (`heliPathClear`) and the pad is free, otherwise "hold position" (hover) 1.5 nm out; crossing requests of an air taxi like aeroplanes; Ground: "air taxi to ..." between pads.
+* **Approach / Tower, VFR transits**: squawk (a seeded octal code, never 1200 / 75xx / 76xx / 7700), "radar contact", and at 8 nm out "radar service terminated, squawk VFR, frequency change approved". The approach agent never sequences transits, overhead maneuvers or helicopters as arrivals.
+* **Tower, overhead maneuver**: "runway N, wind ..., pattern altitude ..., report initial", then "break at midfield, report break", then the ordinary landing logic (no landing clearance before the break). **Training**: "cleared touch-and-go" while circuits remain (`flags.circuits > 1`), a full stop on the last; the exit-and-contact-Ground call is not made during a touch-and-go roll.
+* Not done: traffic advisories between VFR aircraft (7-8-2), "standby / remain outside Charlie airspace" (7-8-4), coordination of the fighter / helicopter flows with Approach beyond the above.
+* Tests: `special.test.ts` (vehicle inspection cycle, helicopter departure / landing / reposition, F-16 flight of two and overhead, transit with Approach and Tower-only, training circuits, arrival-versus-vehicle safety, squawk validity), `specialSoak.test.ts`.

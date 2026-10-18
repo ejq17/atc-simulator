@@ -202,3 +202,61 @@ export const holdAsPublished = (airport: Airport, fix: string): Phrase => {
 
 /** Re-issue after a wrong readback: "negative, ..." (7110.65 2-4-3: have the pilot correct a faulty readback). */
 export const negative = (p: Phrase): Phrase => ({ text: `negative, ${p.text}`, spoken: `negative, ${p.spoken}` });
+
+// ---------------------------------------------------------------------------------------------------------------------
+// Traffic variety (vehicles, helicopters, VFR transitions, flight training, overhead maneuver)
+// ---------------------------------------------------------------------------------------------------------------------
+
+/** Vehicles are told to "proceed" or "hold", never "taxi" or "cleared" (JO 7110.65 3-7-2). */
+export function proceedToRunway(ac: Aircraft, runwayEnd: string, via: string[], holdShort: string[]): Phrase {
+  return clauses(
+    callsign(ac),
+    words('proceed to runway', rwy(runwayEnd), via.length ? words('via', taxiwayList(via)) : undefined),
+    ...holdShort.map((r) => words('hold short of runway', rwy(r))),
+  );
+}
+
+/** "<callsign>, proceed on runway one three, report runway inspection complete." */
+export const proceedOnRunway = (ac: Aircraft, runwayEnd: string, report: string): Phrase =>
+  clauses(callsign(ac), words('proceed on runway', rwy(runwayEnd)), report);
+
+export const proceedOnTaxiways = (ac: Aircraft): Phrase => clauses(callsign(ac), 'proceed on the taxiways', 'hold short of all runways');
+
+export function proceedToRamp(ac: Aircraft, via: string[], holdShort: string[]): Phrase {
+  return clauses(callsign(ac), words('proceed to the ramp', via.length ? words('via', taxiwayList(via)) : undefined), ...holdShort.map((r) => words('hold short of runway', rwy(r))));
+}
+
+/** Helicopter takeoff (JO 7110.65 3-11-2): "<callsign>, <pad>, make right turn for southeast departure, cleared for takeoff." */
+export const heliTakeoff = (ac: Aircraft, from: string, turn: 'left' | 'right', direction: string): Phrase =>
+  clauses(callsign(ac), from, `make ${turn} turn for ${direction} departure`, 'cleared for takeoff');
+
+/** Helicopter landing (3-11-6): "<callsign>, make straight-in approach to <pad>, cleared to land." */
+export const heliLand = (ac: Aircraft, pad: string): Phrase => clauses(callsign(ac), `make straight-in approach to ${pad}`, 'cleared to land');
+
+/** "air taxi to <place>" (3-11-1; hover taxi when asked for). */
+export const airTaxi = (ac: Aircraft, where: string, mode: 'air' | 'hover' = 'air'): Phrase =>
+  clauses(callsign(ac), `${mode === 'hover' ? 'hover taxi' : 'air taxi'} to ${where}`);
+
+/** "hold position" for a helicopter in the air (it hovers). */
+export const holdPosition = (ac: Aircraft): Phrase => clauses(callsign(ac), 'hold position');
+
+export const squawkCode = (ac: Aircraft, code: string): Phrase =>
+  clauses(callsign(ac), { text: `squawk ${code}`, spoken: `squawk ${digitsSpoken(code)}` });
+
+/** Class C: radio contact and radar identification (7-8-4: "(a/c call sign) standby"; 7-8-2 services). */
+export const radarContactVfr = (ac: Aircraft, facility: string): Phrase => clauses(callsign(ac), facility, 'radar contact');
+
+/** Leaving the Class C outer area: services end and the frequency change is approved (7-8-8: "CHANGE TO ADVISORY FREQUENCY APPROVED"). */
+export const classCTerminated = (ac: Aircraft): Phrase => clauses(callsign(ac), 'radar service terminated', 'squawk VFR', 'frequency change approved');
+
+/** Overhead maneuver (3-10-12): "<callsign>, runway six, wind ..., pattern altitude six thousand, report initial." */
+export function overheadInstruction(ac: Aircraft, runwayEnd: string, wind: Phrase, altitudeFt: number): Phrase {
+  return clauses(callsign(ac), words('runway', rwy(runwayEnd)), wind, { text: `pattern altitude ${altitude(altitudeFt).text}`, spoken: `pattern altitude ${spokenAltitude(altitudeFt)}` }, 'report initial');
+}
+
+/** "<callsign>, break at midfield, report break." (3-10-12 example). */
+export const breakAtMidfield = (ac: Aircraft): Phrase => clauses(callsign(ac), 'break at midfield', 'report break');
+
+/** Touch-and-go landing clearance (3-8-1). */
+export const clearedTouchAndGo = (ac: Aircraft, runwayEnd: string, info: Phrase[] = []): Phrase =>
+  clauses(callsign(ac), ...info, words('runway', rwy(runwayEnd)), 'cleared touch-and-go');

@@ -263,6 +263,26 @@ export interface AircraftPerformance {
   maxCrosswindKt?: number;
   /** Cited maximum tailwind component for takeoff / landing, kt. Undefined = no citable figure: no limit applied. */
   maxTailwindKt?: number;
+  /**
+   * What the machine is: undefined = fixed-wing aeroplane; 'rotorcraft' flies the helicopter model (src/sim/rotorcraft.ts: hover, hover / air taxi,
+   * point-to-point departures and arrivals); 'vehicle' is an airport ground vehicle (src/sim/vehicles.ts) that moves on the taxiway graph.
+   */
+  craft?: 'rotorcraft' | 'vehicle';
+  /** Military aircraft: callsign form of JO 7110.65 2-4-20 ("Air Guard" + serial digits), overhead pattern, formation flights. */
+  military?: boolean;
+  /** Rotorcraft data. Hover / air taxi altitude limits come from JO 7110.65 3-11-1 and AIM 4-3-17; speeds are design values unless a source is named in performance.ts. */
+  rotorcraft?: {
+    /** Hover taxi: slow movement above the surface, "normally below 20 knots and in ground effect" (JO 7110.65 3-11-1). */
+    hoverTaxiMaxKt: number;
+    /** Air taxi speed the simulator flies ("above 20 knots", below 100 ft AGL: JO 7110.65 3-11-1, AIM 4-3-17). */
+    airTaxiKt: number;
+    /** Hover height AGL (ft) in ground effect. */
+    hoverAglFt: number;
+    /** Vertical climb / descent rate used for lift-off and landing (fpm). */
+    verticalRateFpm: number;
+    /** Heading change rate in the hover (deg/s). */
+    hoverTurnRateDegPerSec: number;
+  };
 }
 
 export type FlightRules = 'VFR' | 'IFR';
@@ -302,7 +322,11 @@ export type ClearanceKind =
   | 'REPORT_POSITION'     // destination REPORT_MIDFIELD_DOWNWIND | REPORT_BASE | REPORT_FINAL (+ distanceNm)
   | 'FREQUENCY_CHANGE_APPROVED' // "squawk VFR, frequency change approved"
   | 'SQUAWK'              // "squawk 1200" / "squawk VFR"
-  | 'AIRPORT_INFO';       // "wind one three zero at eight, altimeter three zero one zero"
+  | 'AIRPORT_INFO'        // "wind one three zero at eight, altimeter three zero one zero"
+  // Traffic variety (JO 7110.65 3-7-2 / 3-1-3 vehicles, 3-11 helicopters, 3-10-12 overhead maneuver, 7-8 Class C; see docs/FAA-REFERENCES.md)
+  | 'PROCEED'             // vehicle: "proceed on runway one three, report runway inspection complete" (3-7-2 "proceed" for vehicles, 3-1-3)
+  | 'AIR_TAXI'            // helicopter: "air taxi via Alpha to the Coast Guard ramp" / "hover taxi to ..." (3-11-1)
+  | 'OVERHEAD';           // "runway 13, pattern altitude one thousand five hundred, right turns, report initial" (3-10-12)
 
 /** Traffic described by the controller ("Cessna two-mile final", "the Skyhawk on base"). */
 export interface TrafficRef {
@@ -405,6 +429,10 @@ export interface Clearance {
   brakingTerm?: BrakingTerm;
   lightsDirection?: 'UP' | 'DOWN';
   lightStep?: number;
+  /** PROCEED: report when the runway is clear / the inspection is complete ("report runway inspection complete"). */
+  reportClear?: boolean;
+  /** AIR_TAXI: 'hover' for a hover taxi (below 20 kt in ground effect), otherwise an air taxi (above 20 kt, below 100 ft AGL) (3-11-1). */
+  taxiMode?: 'air' | 'hover';
   /** Set when the engine finished executing the clearance. */
   completedAtSec?: number;
 }
@@ -475,8 +503,10 @@ export interface Aircraft {
   lastGoAroundSec?: number;
   history: Vec2[];                 // recent positions for trails
   voiceId: string;                 // which synthetic pilot voice
-  flags: { emergency?: boolean; holdingPosition?: boolean; readbackErrorPending?: boolean; /** The clearance that was misread back (so a correction re-issues it, not a later companion command). */ readbackErrorClearanceId?: string };
+  flags: { emergency?: boolean; holdingPosition?: boolean; /** Flight-training pilot (touch-and-go circuits, then "taxi back"). */ training?: boolean; /** Touch-and-go circuits left including the one being flown (training pilots). */ circuits?: number; /** Helicopter: parking id of the pad it flies to / wants to air taxi to. */ padId?: string; /** Vehicle task in progress (vehicles.ts). */ vehicleTask?: string; /** Parking id a vehicle returns to. */ vehicleHome?: string; /** VFR transition through the Class C (special.ts). */ transit?: boolean; /** Overhead maneuver stage: the aircraft is not cleared to land before the break. */ overhead?: 'INBOUND' | 'INITIAL' | 'BROKE'; readbackErrorPending?: boolean; /** The clearance that was misread back (so a correction re-issues it, not a later companion command). */ readbackErrorClearanceId?: string };
   seed: number;
+  /** Formation flight of this many aircraft handled as ONE aircraft (JO 7110.65 2-1-13: "Control formation flights as a single aircraft"). Undefined = single ship. */
+  formation?: { size: number };
 }
 
 // ---------------------------------------------------------------------------
@@ -535,6 +565,8 @@ export interface ParsedCommand {
   /** RUNWAY_LIGHTS: `UP` / `DOWN` (one step) or an explicit intensity step. */
   lightsDirection?: 'UP' | 'DOWN';
   lightStep?: number;
+  reportClear?: boolean;
+  taxiMode?: 'air' | 'hover';
   /** 0..1, calibrated from grammar match quality and entity resolution. */
   confidence: number;
   rawText: string;
@@ -705,7 +737,21 @@ export interface ScenarioAircraftSpawn {
   flightPlan?: Omit<FlightPlan, 'ifrClearance'>;
   /** Where a generated flight comes from (arrivals) / goes to (departures), ICAO. Unset: the engine picks from its own origin lists (KACY). */
   remoteAirport?: string;
+  /** Special traffic behaviour (src/sim/specialTraffic.ts): vehicle task, VFR transit, flight training, formation / overhead, helicopter mission. */
+  behavior?: SpawnBehavior;
 }
+
+/** What a special-traffic spawn does beyond the ordinary arrival / departure (see `src/sim/specialTraffic.ts`). */
+export type SpawnBehavior =
+  | { kind: 'vehicle'; task: 'RUNWAY_INSPECTION' | 'PAVEMENT_INSPECTION' | 'ERRAND'; runwayId?: string; errandCategory?: ParkingPosition['category'] }
+  /** VFR transition through the Class C (7110.65 7-8): flies the straight track from its spawn point to `exitPos` at `altitudeFt`. */
+  | { kind: 'transit'; exitPos: Vec2; altitudeFt: number }
+  /** Flight training: `circuits` touch-and-goes (the option) before a full stop and "taxi back". */
+  | { kind: 'training'; circuits: number }
+  /** Fighter: `size` aircraft (2 = flight of two, handled as one aircraft: 2-1-13); `overhead` = arrives through the overhead maneuver (3-10-12). */
+  | { kind: 'military'; size?: number; overhead?: boolean }
+  /** Helicopter at a helipad (parking id `padId`): departs from the pad or arrives to it. */
+  | { kind: 'helicopter'; padId: string; mission?: 'DEPARTURE' | 'ARRIVAL' | 'REPOSITION' };
 
 export interface Scenario {
   id: string;

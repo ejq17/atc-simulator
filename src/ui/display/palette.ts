@@ -20,6 +20,8 @@ export const C = {
   red: '#ff4d4f',
   white: '#ffffff',
   hold: '#f2c744',
+  /** Military aircraft outline (Air National Guard fighters, Coast Guard helicopters) on both displays. */
+  military: '#d6c35a',
   labelBg: 'rgba(7,9,12,0.82)',
 } as const;
 

@@ -41,6 +41,9 @@ import { arrivalJoinNm, arrivalProcedure, ifrArrivalSpawn, ifrDepartureSpawn, is
 import { alongCross, findRunwayEnd } from '../sim/runways';
 import { mToNm } from '../sim/geo';
 import { findNavFix } from '../sim/navigation';
+import { createSpecialTrafficGenerator, isTrainingFlight, trainingCircuits } from './specialGenerator';
+import { profileFor as profileForSpecial } from './airportProfile';
+import { resolveSpecialTraffic } from './specialTraffic';
 
 export const MIN_SPAWN_SPACING_SEC = 45;
 /** IFR arrivals on the same procedure: at least this long apart in time ... */
@@ -92,6 +95,9 @@ export function createTrafficGenerator(scenario: Scenario, airport: Airport, opt
   const departureFreq = towerOnly ? 'TWR' : 'GND';
 
   const profile = profileFor(icao);
+  const specialSel = resolveSpecialTraffic(icao, gs.specialTraffic);
+  const trainingShare = profileForSpecial(icao).special?.training?.gaShare ?? 0;
+  const specialGen = createSpecialTrafficGenerator(gs, airport, options);
   let rng: Rng | undefined;
   let nextArr = Infinity;
   let nextDep = Infinity;
@@ -161,9 +167,12 @@ export function createTrafficGenerator(scenario: Scenario, airport: Airport, opt
     const start = pickArrivalStart(airport, endId, type, rng!, others);
     if (!start) return undefined;
     const leg = pickLeg(rng!, icao, flight);
+    // Flight training: a seeded share of the GA arrivals fly touch-and-go circuits (decided from the callsign: no random number is drawn)
+    const training = ga && specialSel.training && isTrainingFlight(flight.callsign, trainingShare);
     return {
       atSec: state.clock.timeSec, callsign: commit(flight), type, flightRules: ga ? 'VFR' : 'IFR', start,
       isDeparture: false, initialFrequencyId: arrivalFreq, initialRequest: 'LANDING', ...(leg.remoteAirport ? { remoteAirport: leg.remoteAirport } : {}),
+      ...(training ? { behavior: { kind: 'training' as const, circuits: trainingCircuits(flight.callsign) } } : {}),
     };
   };
 
@@ -263,7 +272,7 @@ export function createTrafficGenerator(scenario: Scenario, airport: Airport, opt
     return rng!() < options.densityAt(state);
   };
 
-  return {
+  const base: TrafficGenerator = {
     update(state) {
       const now = state.clock.timeSec;
       if (!rng) {
@@ -308,4 +317,6 @@ export function createTrafficGenerator(scenario: Scenario, airport: Airport, opt
       return [];
     },
   };
+  if (!specialGen) return base;
+  return { update: (state) => [...base.update(state), ...specialGen.update(state)] };
 }

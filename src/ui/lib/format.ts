@@ -95,6 +95,12 @@ export function statusTone(ac: Pick<Aircraft, 'phase' | 'onGround' | 'flags'>): 
   }
 }
 
+/** Type code for a data block / label: `F16` for a single ship, `F16x2` for a formation flight handled as one aircraft (JO 7110.65 2-1-13). */
+export function typeTag(ac: Pick<Aircraft, 'type' | 'formation'>): string {
+  const n = ac.formation?.size ?? 1;
+  return n > 1 ? `${ac.type}x${n}` : ac.type;
+}
+
 export const TONE_COLOR: Record<StatusTone, string> = {
   idle: '#7f8a96',
   taxi: '#39d353',

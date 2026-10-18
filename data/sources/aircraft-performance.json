@@ -21,7 +21,7 @@
       "BOEING_757_ACAPD": "Boeing 757 Airplane Characteristics for Airport Planning, D6-58327. NOT re-fetched; figures marked ESTIMATE.",
       "TEXTRON_208": "Textron Aviation Cessna Caravan / Grand Caravan EX specifications and Cessna 208B POH Section 5 (Performance). NOT re-fetched; figures marked ESTIMATE.",
       "EUROCONTROL_ACD": "EUROCONTROL Aircraft Performance Database (learningzone.eurocontrol.int/ilp/customs/ATCPFDB/details.aspx?ICAO=<type>) for B738, BCS3, E175, CRJ9, B752, C208: climb/cruise speeds and ceilings. NOT re-fetched; ESTIMATE.",
-      "FAA_JO_7110_126A": "FAA JO 7110.126A Consolidated Wake Turbulence (RECAT) Appendix A; B738/BCS3/E175/CRJ9 = F, C208 = I; B757 = E follows this file's existing convention (see src/sim/performance.ts), not re-fetched."
+      "FAA_JO_7110_126A": "FAA JO 7110.126A Consolidated Wake Turbulence (RECAT) Appendix A; B738/BCS3 = F, E175/CRJ9 = G (corrected 2026-10-18 from the rendered TBL A-1), C208 = I; B757 = E follows this file's existing convention (see src/sim/performance.ts), not re-fetched."
     }
   },
 
@@ -429,6 +429,146 @@
         "value": "taxi 15 kt, turn 3 deg/s, ground turn 25 deg/s, descent 1000 fpm",
         "source": "none authoritative; same gameplay simplifications as C172/A320",
         "status": "UNVERIFIED simplification"
+      }
+    }
+  },
+  "_meta_traffic_variety": {
+    "added_2026-10-18": "H65 (USCG MH-65 Dolphin), F16 (F-16C Fighting Falcon) and VEH (airport vehicle) were added for the traffic-variety task. Values named in _sources with status VERIFIED were read on 2026-10-18 from the cited pages or, for the two fact sheets (dcms.uscg.mil MH-65E sheet, af.mil F-16 sheet), from web-search result text because those servers answered HTTP 403 / blocked scripted requests; everything else is UNVERIFIED design values. docs/REALISM-VERIFICATION.md section 9.",
+    "source_keys": {
+      "USCG_MH65E": "https://www.dcms.uscg.mil/Portals/10/CG-9/Acquisition%20PDFs/Factsheets/MH65_120224.pdf (MH-65E fact sheet, Dec 2024; HTTP 403 to scripted fetches, figures read from search-result text 2026-10-18): maximum weight 9,480 lb, cruise speed 148 kt, range 350 nm, endurance 3 h, length 44 ft 5 in with blades, rotor diameter 39 ft 2 in, height 13 ft 3 in",
+      "CGAA_MH65C": "Coast Guard Aviation Association history table, MH-65C (search-result text 2026-10-18): maximum gross weight 9,480 lb, maximum speed 175 kt, cruise 148 kt, empty mission weight 6,896 lb, range 355 nm",
+      "USAF_F16": "https://www.af.mil/About-Us/Fact-Sheets/Display/Article/104505/f-16-fighting-falcon/ and unit sheets (af.mil refuses scripted requests; figures read from search-result text 2026-10-18): length 49 ft 5 in, wingspan 32 ft 8 in, height 16 ft, empty weight 19,700 lb, maximum takeoff weight 37,500 lb (about 39,000 lb for Block 50/52 at Shaw), speed Mach 2 at altitude (1,500 mph), ceiling above 50,000 ft",
+      "JO7110_126A_TBL_A1": "https://www.faa.gov/documentLibrary/media/Order/JO_7110.126A.pdf Appendix A TBL A-1 (read 2026-10-18 with pdftotext): F16 in the Lower Large (G) column; no helicopter type listed",
+      "JO7110_65_3_11": "https://www.faa.gov/air_traffic/publications/atpubs/atc_html/chap3_section_11.html (3-11-1: hover taxi below 20 kt in ground effect; air taxi below 100 ft AGL above 20 kt); AIM 4-3-17; AIM 4-3-3 helicopter pattern 500 ft AGL",
+      "AC150_5210_20A": "https://www.faa.gov/documentLibrary/media/Advisory_Circular/150-5210-20A.pdf (9/1/2015) Appendix B 4.3 vehicle calls; no vehicle speed is given"
+    }
+  },
+  "H65": {
+    "type": "H65",
+    "category": "light",
+    "wakeCategory": "light",
+    "taxiSpeedKt": 10,
+    "taxiTurnSpeedKt": 5,
+    "accelKtPerSec": 4,
+    "decelKtPerSec": 5,
+    "rotateSpeedKt": 0,
+    "climbSpeedKt": 80,
+    "cruiseSpeedKt": 148,
+    "approachSpeedKt": 70,
+    "touchdownSpeedKt": 0,
+    "climbRateFpm": 1500,
+    "descentRateFpm": 800,
+    "turnRateDegPerSec": 3,
+    "groundTurnRateDegPerSec": 20,
+    "minSpeedKt": 0,
+    "maxSpeedKt": 175,
+    "serviceCeilingFt": 10000,
+    "takeoffDistanceFt": 0,
+    "landingDistanceFt": 0,
+    "lengthM": 13.5,
+    "_sources": {
+      "cruiseSpeedKt": {
+        "value": "148",
+        "source": "USCG_MH65E",
+        "status": "VERIFIED (via search text)"
+      },
+      "maxSpeedKt": {
+        "value": "175",
+        "source": "CGAA_MH65C",
+        "status": "VERIFIED for the MH-65C table (the MH-65E sheet lists cruise only)"
+      },
+      "lengthM": {
+        "value": "13.54 (44 ft 5 in)",
+        "source": "USCG_MH65E",
+        "status": "VERIFIED (via search text)"
+      },
+      "rotorcraft block": {
+        "value": "hoverTaxiMaxKt 20 (hover taxi), air taxi flown at 35 kt in the graph model, hover 15 ft AGL, air-taxi height 40 ft AGL",
+        "source": "JO7110_65_3_11; AIM 4-3-17",
+        "status": "the 20 kt and 100 ft limits are procedure figures (VERIFIED); 35 kt, 15 ft and 40 ft are UNVERIFIED design values inside them"
+      },
+      "wake/SRS": {
+        "value": "RECAT: not in TBL A-1, falls back to I; SRS category I (all helicopters)",
+        "source": "JO7110_126A_TBL_A1; JO 7110.65 3-9-6 NOTE",
+        "status": "VERIFIED (absence documented)"
+      },
+      "everything else": {
+        "value": "taxi, accel, decel, climb 1500 fpm, descent 800 fpm, ceiling 10000 ft, turn rates, approach speed",
+        "source": "none found",
+        "status": "UNVERIFIED design value"
+      }
+    }
+  },
+  "F16": {
+    "type": "F16",
+    "category": "large",
+    "wakeCategory": "medium",
+    "taxiSpeedKt": 20,
+    "taxiTurnSpeedKt": 8,
+    "accelKtPerSec": 6,
+    "decelKtPerSec": 5,
+    "rotateSpeedKt": 150,
+    "climbSpeedKt": 300,
+    "cruiseSpeedKt": 350,
+    "approachSpeedKt": 160,
+    "touchdownSpeedKt": 140,
+    "climbRateFpm": 6000,
+    "descentRateFpm": 2500,
+    "turnRateDegPerSec": 8,
+    "groundTurnRateDegPerSec": 18,
+    "minSpeedKt": 130,
+    "maxSpeedKt": 450,
+    "serviceCeilingFt": 50000,
+    "takeoffDistanceFt": 3000,
+    "landingDistanceFt": 3500,
+    "lengthM": 15.06,
+    "_sources": {
+      "lengthM": {
+        "value": "15.06 (49 ft 5 in)",
+        "source": "USAF_F16",
+        "status": "VERIFIED (via search text)"
+      },
+      "serviceCeilingFt": {
+        "value": "50000",
+        "source": "USAF_F16",
+        "status": "VERIFIED (via search text)"
+      },
+      "RECAT": {
+        "value": "G (Lower Large)",
+        "source": "JO7110_126A_TBL_A1",
+        "status": "VERIFIED (column alignment of the pdftotext layout)"
+      },
+      "SRS": {
+        "value": "III",
+        "source": "JO 7110.65 3-9-6 NOTE",
+        "status": "VERIFIED"
+      },
+      "overhead speed": {
+        "value": "200 kt in the overhead (not 300)",
+        "source": "14 CFR 91.117(b) as quoted in AIM 3-2-4: at or below 2,500 ft AGL within 4 nm of the primary Class C airport",
+        "status": "VERIFIED regulation; the 300 kt break speed of simulator syllabi and forums was NOT used"
+      },
+      "everything else": {
+        "value": "rotate, climb, cruise, approach, touchdown speeds, accel, decel, rates, turn 8 deg/s (about 2.5 g at 300 kt), takeoff/landing distances",
+        "source": "none citable (the only overhead figures found are forum / simulator-syllabus text)",
+        "status": "UNVERIFIED design value"
+      }
+    }
+  },
+  "VEH": {
+    "type": "VEH",
+    "category": "light",
+    "wakeCategory": "light",
+    "taxiSpeedKt": 18,
+    "taxiTurnSpeedKt": 8,
+    "accelKtPerSec": 3,
+    "decelKtPerSec": 5,
+    "lengthM": 5.5,
+    "_sources": {
+      "all": {
+        "value": "18 kt, 5.5 m",
+        "source": "none: AC 150/5210-20A gives no vehicle speed (the airport operator sets limits)",
+        "status": "UNVERIFIED design value"
       }
     }
   }

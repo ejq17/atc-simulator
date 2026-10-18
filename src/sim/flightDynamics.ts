@@ -5,6 +5,8 @@
  * Units: positions in metres, speeds converted to m/s for integration, altitudes in feet.
  * `ac.target.headingDeg` is a TRUE heading (the executor converts controller magnetic headings).
  */
+import { rotorOwnsMotion } from './rotorcraft';
+import { trainingCircuitDone } from './special';
 import type { Aircraft, AircraftPerformance, FlightPhase, Vec2 } from './types';
 import {
   clamp, deg2rad, dist, ftToM, headingDiff, headingToVec, ktToMps, mpsToKt, mToFt, mToNm, nmToM, normHeading, pointInPolygon, rad2deg,
@@ -37,6 +39,8 @@ const CROSSWIND_TURN_BELOW_TPA_FT = 300;
 /** Base leg turn point behind the threshold: standard, and after "make short approach" (the turn to final stays at least 1/4 mile out, AIM 4-3-3). */
 const BASE_ALONG_M = nmToM(1.2);
 const SHORT_BASE_ALONG_M = nmToM(0.8);
+/** Fighters fly the overhead pattern at 1,500 ft AGL and 150-200 kt: the base turn is far enough out for a 3 degree final from that height (design value, 3.5 nm). */
+const FIGHTER_BASE_ALONG_M = nmToM(3.5);
 /** "Extend downwind" without a "turn base" call: the pilot turns base on his own at this distance behind the threshold (safety limit of the simulator). */
 const EXTEND_LIMIT_M = nmToM(6);
 
@@ -147,6 +151,7 @@ function goAroundAltitudeFt(ctx: SimContext, ac: Aircraft, elevFt: number, g: Ru
 
 export function updateFlightDynamics(ctx: SimContext, dt: number): void {
   for (const ac of Object.values(ctx.state.aircraft)) {
+    if (rotorOwnsMotion(getRuntime(ctx, ac))) continue; // helicopter lift-off, hover or approach to a helipad (rotorcraft.ts)
     if (ac.onGround) {
       if (ac.phase === 'TAKEOFF_ROLL') stepTakeoffRoll(ctx, ac, dt);
       else if (ac.phase === 'ROLLOUT' && getRuntime(ctx, ac).tgo) stepTouchAndGo(ctx, ac, dt);
@@ -490,6 +495,7 @@ function resolveLandingOp(ac: Aircraft, rt: AircraftRuntime): 'full_stop' | 'tou
 /** Touch-and-go and low approach: the aircraft climbs out over the runway and flies the closed traffic pattern. */
 function continueInPattern(ctx: SimContext, ac: Aircraft, rt: AircraftRuntime, g: RunwayEndGeom, what: 'touch and go' | 'low approach'): void {
   completeClearances(ctx, ac, ['LAND']);
+  if (what === 'touch and go') trainingCircuitDone(ac, rt); // flight training: one circuit of the touch-and-go series flown
   const idx = ac.runwayAuthorizations.indexOf(g.runway.id);
   if (idx >= 0) ac.runwayAuthorizations.splice(idx, 1);
   rt.landingEnd = undefined;
@@ -944,7 +950,8 @@ function patternHeading(ctx: SimContext, g: RunwayEndGeom, ac: Aircraft, rt: Air
   }
   if (p.leg === 'DOWNWIND') {
     if (p.extend && -along > EXTEND_LIMIT_M) rt.pattern = p = { ...p, extend: false };
-    const turnAt = p.short ? SHORT_BASE_ALONG_M : BASE_ALONG_M;
+    const perfP = perfOf(ac);
+    const turnAt = p.short ? SHORT_BASE_ALONG_M : perfP.military && !perfP.craft ? FIGHTER_BASE_ALONG_M : BASE_ALONG_M;
     if (!p.extend && !followHolds(ctx, rt, g, turnAt, along) && along <= -turnAt && Math.abs(cross - offset) < 600) {
       rt.pattern = p = { ...p, leg: 'BASE' };
     } else {

@@ -4,13 +4,15 @@
  */
 import type { Aircraft, Airport, NavigationAid, Vec2 } from '../../sim/types';
 import type { Frame } from './frame';
-import { FONT_MONO } from './palette';
+import { C, FONT_MONO } from './palette';
+import { specialMark } from './symbols';
+import { isMilitaryType, isVehicleType } from '../../sim/performance';
 import { placeLabels } from './labels';
 import type { LabelRequest } from './labels';
 import { worldToScreen } from './viewTransform';
 import type { View } from './viewTransform';
 import { M_PER_NM, deg2rad, headingVec, polygonCentroid } from '../lib/geom';
-import { altHundreds, magHeading, phaseShort, trendArrow } from '../lib/format';
+import { altHundreds, magHeading, phaseShort, trendArrow, typeTag } from '../lib/format';
 import { navLetter } from '../lib/ifr';
 import { procedureGeometry } from '../lib/procedures';
 
@@ -87,7 +89,7 @@ export function dataBlock(ac: Aircraft, variationDeg: number, groundSpeedKt = ac
   const mode = navLetter(ac);
   return {
     lines: [
-      `${ac.callsign} ${ac.type}`,
+      `${ac.callsign} ${typeTag(ac)}`,
       `${altHundreds(altitudeFt)}${arrow || ' '}${String(Math.round(groundSpeedKt)).padStart(3, ' ')}${ac.squawk ? ` ${ac.squawk}` : ''}`,
       `H${magHeading(headingDeg, variationDeg)} ${phaseShort(ac.phase)}${mode ? ` ${mode}` : ''}`,
     ],
@@ -453,6 +455,7 @@ function drawTargets(ctx: CanvasRenderingContext2D, v: View, frame: Frame, layer
   const variation = frame.state.airport.magneticVariationDeg;
   ctx.font = `11px ${FONT_MONO}`;
   const acs = Object.values(frame.state.aircraft)
+    .filter((a) => !isVehicleType(a.type)) // airport vehicles are never radar targets (they show on the surface display only)
     .filter((a) => layers.groundTargets || !a.onGround)
     .sort((a, b) => (a.id === frame.selectedId ? -1 : b.id === frame.selectedId ? 1 : 0));
 
@@ -488,22 +491,38 @@ function drawTargets(ctx: CanvasRenderingContext2D, v: View, frame: Frame, layer
     }
     // Target symbol
     if (air) {
-      ctx.strokeStyle = color;
+      const mark = specialMark(ac.type);
+      const hdg = frame.pose(ac).headingDeg;
+      ctx.strokeStyle = mark === 'military' ? C.military : color;
       ctx.lineWidth = 1.5;
-      ctx.strokeRect(x - 4, y - 4, 8, 8);
+      if (mark === 'rotorcraft') {
+        // helicopter: a rotor disc with the blade cross (military helicopters keep the gold outline)
+        ctx.strokeStyle = isMilitaryType(ac.type) ? C.military : color;
+        ctx.beginPath();
+        ctx.arc(x, y, 5.5, 0, Math.PI * 2);
+        ctx.moveTo(x - 3.9, y - 3.9);
+        ctx.lineTo(x + 3.9, y + 3.9);
+        ctx.moveTo(x + 3.9, y - 3.9);
+        ctx.lineTo(x - 3.9, y + 3.9);
+        ctx.stroke();
+      } else {
+        ctx.strokeRect(x - 4, y - 4, 8, 8);
+        if (mark === 'military') ctx.strokeRect(x - 6.5, y - 6.5, 13, 13); // fighter: a second, outer square
+      }
       if (ac.radarIdentified) {
-        // Radar-identified: the target square carries a centre dot.
-        ctx.fillStyle = color;
+        // Radar-identified: the target symbol carries a centre dot.
+        ctx.fillStyle = mark === 'military' ? C.military : color;
         ctx.fillRect(x - 1.5, y - 1.5, 3, 3);
       }
       // heading tick (velocity vector, 60 s of ground speed would be long: use a fixed short stub)
-      const hv = headingVec(frame.pose(ac).headingDeg);
+      const hv = headingVec(hdg);
+      const r0 = mark === 'military' ? 7 : mark === 'rotorcraft' ? 6 : 4;
       ctx.beginPath();
-      ctx.moveTo(x + hv.x * 4, y - hv.y * 4);
-      ctx.lineTo(x + hv.x * 13, y - hv.y * 13);
+      ctx.moveTo(x + hv.x * r0, y - hv.y * r0);
+      ctx.lineTo(x + hv.x * (r0 + 9), y - hv.y * (r0 + 9));
       ctx.stroke();
     } else {
-      ctx.fillStyle = color;
+      ctx.fillStyle = specialMark(ac.type) === 'military' ? C.military : color;
       ctx.beginPath();
       ctx.arc(x, y, 2.2, 0, Math.PI * 2);
       ctx.fill();

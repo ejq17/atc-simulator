@@ -149,10 +149,10 @@ describe('performance entries for the KMHT types', () => {
   });
 
   it('SRS and RECAT categories', () => {
-    for (const t of ['B738', 'BCS3', 'E175', 'CRJ9']) {
-      expect(srsCategory(t)).toBe(3);
-      expect(wakeRecatCategory(t)).toBe('F');
-    }
+    for (const t of ['B738', 'BCS3', 'E175', 'CRJ9']) expect(srsCategory(t)).toBe(3);
+    for (const t of ['B738', 'BCS3']) expect(wakeRecatCategory(t)).toBe('F');
+    // JO 7110.126A TBL A-1 (page A1, read visually): E75L / E75S and CRJ9 are in Category G (Lower Large)
+    for (const t of ['E175', 'CRJ9']) expect(wakeRecatCategory(t)).toBe('G');
     expect(srsCategory('B752')).toBe(3);
     expect(wakeRecatCategory('B752')).toBe('E');
     expect(srsCategory('C208')).toBe(1);

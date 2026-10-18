@@ -14,9 +14,11 @@ export function missingRequired(d: Draft): string[] {
     case 'TAXI_TO_PARKING': return [...(f.destination ? [] : ['missing parking destination']), ...unreadHoldShort(d)];
     case 'HOLD_SHORT': return f.holdShort?.length ? [] : ['missing hold short point (runway or taxiway)'];
     case 'CROSS_RUNWAY': return f.crossRunwayId ? [] : ['missing runway'];
-    case 'LINE_UP_AND_WAIT':
-    case 'TAKEOFF':
-    case 'LAND': return f.runwayEnd ? [] : ['missing runway'];
+    case 'LINE_UP_AND_WAIT': return f.runwayEnd ? [] : ['missing runway'];
+    case 'TAKEOFF': return f.runwayEnd || f.destination ? [] : ['missing runway']; // a helicopter
+    case 'LAND': return f.runwayEnd || (f.destination && !['touch_and_go', 'option', 'stop_and_go', 'low_approach'].includes(f.destination)) ? [] : ['missing runway']; // a helicopter takes off from / lands at a place that is not a runway (3-11-2, 3-11-6)
+    case 'PROCEED': return f.runwayEnd || f.destination === 'TAXIWAYS' ? [] : ['missing runway to proceed on'];
+    case 'AIR_TAXI': return f.destination || f.route?.length ? [] : ['missing air taxi destination'];
     case 'CONTACT_FREQUENCY':
       return f.frequencyId || f.frequencyMhz !== undefined || f.destination ? [] : ['missing frequency or facility'];
     case 'HEADING': return f.headingDeg !== undefined || f.destination ? [] : ['missing heading'];

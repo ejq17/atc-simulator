@@ -4,9 +4,10 @@
  * surface display has A320 swept wings and underwing engines, a CRJ aft engines and a T-tail, a Cessna a straight high wing and propeller.
  */
 import type { Aircraft } from '../../sim/types';
-import { getPerformance } from '../../sim/performance';
+import { getPerformance, isMilitaryType, isRotorcraftType, isVehicleType } from '../../sim/performance';
 import { RECIPES, aircraftDims } from '../tower/aircraftModel';
 import type { ModelFamily } from '../tower/aircraftModel';
+import { C } from './palette';
 
 type Pt = readonly [number, number];
 
@@ -44,8 +45,56 @@ export function glyphFor(type: string): Glyph {
   return g;
 }
 
+/** Which special mark a type carries on the displays: the rotor cross of a helicopter, the military outline, the airport-vehicle box. */
+export type SpecialMark = 'rotorcraft' | 'military' | 'vehicle';
+
+/** Helicopter, military and vehicle types get their own symbol treatment; every other type is undefined. Rotorcraft wins over military (the Coast Guard MH-65). */
+export function specialMark(type: string): SpecialMark | undefined {
+  if (isVehicleType(type)) return 'vehicle';
+  if (isRotorcraftType(type)) return 'rotorcraft';
+  if (isMilitaryType(type)) return 'military';
+  return undefined;
+}
+
+/** Thin bar from (x0, y0) to (x1, y1) as a closed rectangle `w` wide (unit half-length). */
+function bar(x0: number, y0: number, x1: number, y1: number, w: number): readonly Pt[] {
+  const dx = x1 - x0;
+  const dy = y1 - y0;
+  const n = Math.hypot(dx, dy) || 1;
+  const px = (-dy / n) * (w / 2);
+  const py = (dx / n) * (w / 2);
+  return [[x0 + px, y0 + py], [x1 + px, y1 + py], [x1 - px, y1 - py], [x0 - px, y0 - py]];
+}
+
+/** Top-down silhouettes of the special-traffic families (unit half-length; the proportions follow specialModels.ts). */
+function buildSpecialGlyph(family: 'helicopter' | 'fighter' | 'groundVehicle', spanRatio: number): Glyph {
+  if (family === 'helicopter') {
+    // Slim cabin, tail boom with the stabiliser; the main rotor is drawn as a cross of two blade bars through the mast.
+    const half: Pt[] = [[0, -1], [0.17, -0.9], [0.2, -0.7], [0.2, -0.3], [0.16, -0.05], [0.07, 0.2], [0.05, 0.5], [0.05, 0.74], [0.2, 0.78], [0.2, 0.86], [0.05, 0.9], [0.04, 0.97], [0, 1]];
+    const c = -0.18; // mast position
+    const k = spanRatio * 0.707;
+    return {
+      family, half, fuselageHalfWidth: 0.2, noseY: -0.78, tailY: 1, spanRatio: k,
+      bars: [{ pts: bar(-k, c - k, k, c + k, 0.07), mirror: false }, { pts: bar(k, c - k, -k, c + k, 0.07), mirror: false }],
+    };
+  }
+  if (family === 'fighter') {
+    const W = spanRatio;
+    const half: Pt[] = [
+      [0, -1], [0.05, -0.8], [0.09, -0.55], [0.1, -0.35], [0.2, -0.17], [0.24, -0.1], [W, 0.27], [W, 0.46], [0.12, 0.47], [0.12, 0.64],
+      [0.37, 0.8], [0.37, 0.95], [0.09, 0.93], [0.08, 1], [0, 1],
+    ];
+    return { family, half, bars: [], fuselageHalfWidth: 0.1, noseY: -0.55, tailY: 1, spanRatio: W };
+  }
+  // ground vehicle: a chamfered rectangle (pickup seen from above)
+  const W = spanRatio;
+  const half: Pt[] = [[0, -1], [W * 0.8, -1], [W, -0.9], [W, 0.92], [W * 0.85, 1], [0, 1]];
+  return { family, half, bars: [], fuselageHalfWidth: W, noseY: -0.9, tailY: 1, spanRatio: W };
+}
+
 function buildGlyph(type: string): Glyph {
   const d = aircraftDims(type);
+  if (d.family === 'helicopter' || d.family === 'fighter' || d.family === 'groundVehicle') return buildSpecialGlyph(d.family, d.wingspanM / d.lengthM);
   const rc = RECIPES[d.family];
   const span = d.wingspanM / d.lengthM; // = max |x| in unit half-length
   const W = span;
@@ -139,7 +188,37 @@ export function glyphPath(ctx: CanvasRenderingContext2D, halfLenPx: number, type
 export function drawGlyphDetail(ctx: CanvasRenderingContext2D, halfLenPx: number, type: string): void {
   const g = glyphFor(type);
   const k = halfLenPx;
+  if (g.family === 'groundVehicle') {
+    // cab glass and the amber beacon on the roof
+    ctx.save();
+    ctx.fillStyle = 'rgba(5,8,12,0.75)';
+    ctx.fillRect(-g.spanRatio * k * 0.72, -0.5 * k, g.spanRatio * k * 1.44, 0.32 * k);
+    ctx.fillStyle = C.amber;
+    ctx.beginPath();
+    ctx.arc(0, -0.06 * k, Math.max(1.5, g.spanRatio * k * 0.28), 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+    return;
+  }
   const fw = g.fuselageHalfWidth * k * 0.55;
+  if (g.family === 'helicopter') {
+    // windscreen only (the boom is too narrow for the spine) and the rotor hub
+    ctx.save();
+    ctx.fillStyle = 'rgba(5,8,12,0.75)';
+    ctx.beginPath();
+    ctx.moveTo(-fw * 1.2, -0.7 * k);
+    ctx.lineTo(fw * 1.2, -0.7 * k);
+    ctx.lineTo(fw * 1.55, -0.5 * k);
+    ctx.lineTo(-fw * 1.55, -0.5 * k);
+    ctx.closePath();
+    ctx.fill();
+    ctx.fillStyle = 'rgba(255,255,255,0.5)';
+    ctx.beginPath();
+    ctx.arc(0, -0.18 * k, Math.max(1.2, 0.05 * k), 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+    return;
+  }
   ctx.save();
   ctx.fillStyle = 'rgba(255,255,255,0.22)';
   ctx.beginPath();

@@ -6,6 +6,7 @@
  * plain JSON so a scenario survives structuredClone / persistence.
  */
 import type { ClosureKind, CommandKind, Scenario, Weather } from '../sim/types';
+import type { SpecialTrafficSelection } from './specialTraffic';
 
 /** A scripted occurrence at a scenario time. The UI applies them with `applyDueScenarioEvents` (scenarios/events.ts). */
 export type ScenarioEvent =
@@ -69,6 +70,8 @@ export interface GameScenarioExtras {
   difficulty?: Difficulty;
   /** Aircraft types the traffic generator may use. */
   aircraftTypes?: string[];
+  /** Special traffic kinds the generator may produce (specialTraffic.ts); unset = none (scripted and career scenarios keep their traffic). */
+  specialTraffic?: Partial<SpecialTrafficSelection>;
   careerStep?: number;
   /** Longer briefing text (description is the short form). */
   briefing?: string;
