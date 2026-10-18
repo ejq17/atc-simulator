@@ -434,6 +434,7 @@ function towerVocabularyCalls(ctx: SimContext, ac: Aircraft, rt: ReturnType<type
     && (ac.pendingRequest.kind === 'DEPARTURE' || ac.pendingRequest.kind === 'LANDING')
     && frequencyByMhz(airport, ac.frequencyMhz)?.position === 'TWR' && pilotNeedsNumbers(ac, ctx.pilotBehaviour.noAtisFraction)) {
     rt.numbersRequested = true;
+    rt.requestBeforeNumbers = ac.pendingRequest;
     pilotSay(ctx, ac, requestNumbersCall(ac, env), { request: 'OTHER', numbersRequest: true });
     ac.pendingRequest = { kind: 'OTHER', text: 'request wind and altimeter', sinceSec: now };
     return true;

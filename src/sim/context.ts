@@ -3,7 +3,7 @@
  * bookkeeping lives in per-aircraft `AircraftRuntime` records here so determinism and the public
  * type surface are unaffected.
  */
-import type { Aircraft, AircraftPerformance, ApproachType, Vec2, Clearance, ClearanceKind, ConflictAlert, ControllerPositionId, FlightPhase, SimEvent, SimulationState } from './types';
+import type { Aircraft, AircraftPerformance, ApproachType, Vec2, Clearance, ClearanceKind, ConflictAlert, ControllerPositionId, FlightPhase, SimEvent, SimulationState, PendingRequest } from './types';
 import type { EngineOptions } from './api';
 import type { Rng } from './rng';
 import { getPerformance } from './performance';
@@ -151,6 +151,8 @@ export interface AircraftRuntime {
   haveNumbers?: boolean;
   /** The pilot already asked for the numbers once. */
   numbersRequested?: boolean;
+  /** The request (landing, departure) the pilot was waiting on when he asked for the numbers: the numbers do not answer it, so it is restored after the answer. */
+  requestBeforeNumbers?: PendingRequest;
   trafficLook?: TrafficLook;
   /** Ids of traffic the pilot has reported in sight. */
   trafficSeen?: string[];

@@ -118,7 +118,8 @@ function leaderOf(v: AgentView, ac: Aircraft, g: RunwayEndGeom): { leader: Aircr
   const mine = distToThresholdNm(ac, g);
   let best: { leader: Aircraft; gapNm: number } | undefined;
   for (const o of Object.values(v.state.aircraft)) {
-    if (o.id === ac.id || !isInboundArrival(o) || o.assignedRunwayEnd !== g.end.id) continue;
+    // Pattern traffic is Tower's: it is sequenced around the approach traffic (sequence.ts), not the other way round.
+    if (o.id === ac.id || !isInboundArrival(o) || o.phase === 'PATTERN' || o.assignedRunwayEnd !== g.end.id) continue;
     const gap = mine - distToThresholdNm(o, g);
     if (gap > 0 && (!best || gap < best.gapNm)) best = { leader: o, gapNm: gap };
   }

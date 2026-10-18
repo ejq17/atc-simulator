@@ -37,12 +37,12 @@ export const GLIDEPATH_DEG = 3;
 /** AIM 4-3-3: the crosswind turn is made beyond the departure end, within 300 feet of pattern altitude. */
 const CROSSWIND_TURN_BELOW_TPA_FT = 300;
 /** Base leg turn point behind the threshold: standard, and after "make short approach" (the turn to final stays at least 1/4 mile out, AIM 4-3-3). */
-const BASE_ALONG_M = nmToM(1.2);
-const SHORT_BASE_ALONG_M = nmToM(0.8);
+export const BASE_ALONG_M = nmToM(1.2);
+export const SHORT_BASE_ALONG_M = nmToM(0.8);
 /** Fighters fly the overhead pattern at 1,500 ft AGL and 150-200 kt: the base turn is far enough out for a 3 degree final from that height (design value, 3.5 nm). */
 const FIGHTER_BASE_ALONG_M = nmToM(3.5);
 /** "Extend downwind" without a "turn base" call: the pilot turns base on his own at this distance behind the threshold (safety limit of the simulator). */
-const EXTEND_LIMIT_M = nmToM(6);
+export const EXTEND_LIMIT_M = nmToM(6);
 
 /**
  * Touch-and-go ground roll (JO 7110.65 3-8-2: an arrival until it touches down, a departure after). DESIGN VALUES, not FAA figures:

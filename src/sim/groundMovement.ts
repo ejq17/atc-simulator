@@ -22,6 +22,12 @@ export const TAXI_ACCEL_MPS2 = 1.0;
 export const TAXI_DECEL_CAP_MPS2 = 1.2;
 const TAXI_DECEL_PLAN_MPS2 = 0.9;
 const ARRIVE_EPS = 0.02;
+/**
+ * A new route that starts at a runway hold line the aircraft has already passed (it stopped between the hold line and the runway, e.g. the second
+ * arrival to use a runway exit whose hold line is taken by the first) counts as holding at that line: backing up to it would put it head-on with the
+ * aircraft standing there, and neither could move (free-play soak, docs/PROGRESS.md "Free-play jam"). DESIGN VALUE: 40 m.
+ */
+export const HOLD_START_SNAP_M = 40;
 
 /**
  * Hold-position nodes along a path that need an explicit clearance: those from which the route goes
@@ -39,6 +45,15 @@ export function computeStopNodes(graph: TaxiwayGraph, nodeIds: string[], authori
     if (entersRunway || i === nodeIds.length - 1) out.push(n.id);
   }
   return out;
+}
+
+/** The route's first node is a runway hold line that needs a clearance and the aircraft stands within `HOLD_START_SNAP_M` of it on the runway side. */
+function pastStartHold(graph: TaxiwayGraph, ac: Aircraft, route: NonNullable<Aircraft['route']>, node: TaxiNode): boolean {
+  if (route.progressIndex !== 0 || node.kind !== 'holding_position' || !route.stopAtNodeIds.includes(node.id) || nodeAuthorized(ac, node)) return false;
+  const next = graph.nodes[route.nodeIds[1]];
+  if (!next) return false;
+  const d = dist(ac.pos, node.pos);
+  return d <= HOLD_START_SNAP_M && dist(ac.pos, next.pos) < dist(node.pos, next.pos);
 }
 
 function nodeAuthorized(ac: Aircraft, node: TaxiNode): boolean {
@@ -78,6 +93,9 @@ export function findLeader(ctx: SimContext, ac: Aircraft): { gap: number; minGap
     // does not hold up an aircraft passing on the apron connector. Only aircraft on the graph edges count for spacing.
     if ((o.phase === 'READY' && !ctx.runtime?.get(o.id)?.pushedBack) || (!o.route && o.groundSpeedKt < 0.1 && ctx.state.airport.parking.some((p) => dist(p.pos, o.pos) < 8))) continue;
     const r = vSub(o.pos, ac.pos);
+    // Aircraft standing at the same spot (arrivals that stopped on one runway exit point, one behind the other): neither is ahead of the other, so
+    // each used to wait for the other for good. The one whose id sorts first goes first (deterministic).
+    if (Math.hypot(r.x, r.y) < 1 && o.id > ac.id) continue;
     const along = vDot(r, h);
     let gap = along;
     const inCone = along > 0 && along <= 250 && Math.abs(vCross(h, r)) <= 12 && Math.abs(headingDiff(ac.headingDeg, o.headingDeg)) <= 70;
@@ -110,7 +128,14 @@ function gapAlongRoute(ctx: SimContext, ac: Aircraft, p: Vec2): number | undefin
     const seg = vSub(to, from);
     const len = Math.hypot(seg.x, seg.y);
     if (len > 1e-6) {
-      const t = Math.max(0, Math.min(1, vDot(vSub(p, from), seg) / (len * len)));
+      const raw = vDot(vSub(p, from), seg) / (len * len);
+      // A point behind the aircraft (before the start of the first segment) is not on the route ahead.
+      if (travelled === 0 && raw < 0) {
+        travelled += len;
+        from = to;
+        continue;
+      }
+      const t = Math.max(0, Math.min(1, raw));
       const q = { x: from.x + seg.x * t, y: from.y + seg.y * t };
       if (dist(p, q) <= 12) return travelled + len * t;
     }
@@ -217,7 +242,7 @@ function stepGround(ctx: SimContext, ac: Aircraft, dt: number): void {
   if (route) {
     while (route.progressIndex < route.nodeIds.length) {
       const node = graph.nodes[route.nodeIds[route.progressIndex]];
-      if (dist(ac.pos, node.pos) >= ARRIVE_EPS) break;
+      if (dist(ac.pos, node.pos) >= ARRIVE_EPS && !pastStartHold(graph, ac, route, node)) break;
       const isLast = route.progressIndex === route.nodeIds.length - 1;
       route.progressIndex++;
       if (isLast) {

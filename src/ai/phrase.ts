@@ -153,6 +153,12 @@ export const continueApproach = (ac: Aircraft): Phrase => clauses(callsign(ac), 
 
 export const goAround = (ac: Aircraft): Phrase => clauses(callsign(ac), 'go around');
 
+/** "extend downwind, I'll call your base" (JO 7110.65 3-8-1 EXTEND DOWNWIND; the "call your base" wording follows the 3-9-4 example). */
+export const extendDownwind = (ac: Aircraft): Phrase => clauses(callsign(ac), "extend downwind, I'll call your base");
+
+/** "turn base now": not a 7110.65 phrase (BEHAVIOUR-ACCURACY T15), plain English for the call the extend instruction promised. */
+export const turnBaseNow = (ac: Aircraft): Phrase => clauses(callsign(ac), 'turn base now');
+
 export const enterPattern = (ac: Aircraft, runwayEnd: string, leg: string): Phrase =>
   clauses(callsign(ac), words(leg, 'runway', rwy(runwayEnd)));
 

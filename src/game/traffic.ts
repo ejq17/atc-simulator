@@ -39,6 +39,7 @@ import type { AirbornePoint } from './placement';
 import type { Difficulty, GameScenario } from './types';
 import { arrivalJoinNm, arrivalProcedure, ifrArrivalSpawn, ifrDepartureSpawn, isTurbojet, resolveIfrFlows, starArrival, starArrivalSpawn } from './ifr';
 import { alongCross, findRunwayEnd } from '../sim/runways';
+import { getPerformance } from '../sim/performance';
 import { mToNm } from '../sim/geo';
 import { findNavFix } from '../sim/navigation';
 import { createSpecialTrafficGenerator, isTrainingFlight, trainingCircuits } from './specialGenerator';
@@ -46,6 +47,27 @@ import { profileFor as profileForSpecial } from './airportProfile';
 import { resolveSpecialTraffic } from './specialTraffic';
 
 export const MIN_SPAWN_SPACING_SEC = 45;
+/**
+ * Arrival flow control (design values; nothing in the FAA order fixes them). A new arrival is held back (the clock stays due and the generator
+ * retries) while it would reach the threshold within `ARRIVAL_SLOT_SEC` of another arrival for the same runway, or while `MAX_ARRIVALS_IN_FLIGHT`
+ * arrivals are airborne and not yet landed. This is the acceptance rate of one runway shared with departures, crossings and taxiing arrivals
+ * (docs/PROGRESS.md, "Free-play jam"): without it the Poisson clock puts several light aircraft on the same final within minutes, and the
+ * Tower can only send them around or hold them on an extended downwind.
+ */
+export const ARRIVAL_SLOT_SEC = 160;
+export const MAX_ARRIVALS_IN_FLIGHT = 6;
+/**
+ * Departure flow control (design value): no new departure appears at a gate while this many departures are on the ground and not yet airborne
+ * (parked and calling, pushing back, taxiing, at the hold). The airline would hold the flight at the gate with an "expect a delay" message.
+ */
+export const MAX_DEPARTURES_ON_GROUND = 5;
+/** Nominal minutes-to-threshold of a new arrival (it appears 10-12 nm out at 100 kt and slows to its approach speed; an airliner appears at the procedure fix). */
+const NOMINAL_ETA_LIGHT_SEC = 520;
+const NOMINAL_ETA_JET_SEC = 330;
+const EXPECTED_SPEED_LIGHT_KT = 70;
+const EXPECTED_SPEED_JET_KT = 145;
+/** Seconds counted for an arrival already in the pattern or on a missed approach (it is at the field and will land within a few minutes). */
+const NEAR_FIELD_ETA_SEC = 150;
 /** IFR arrivals on the same procedure: at least this long apart in time ... */
 export const IFR_ARRIVAL_SPACING_SEC = 90;
 /** ... and this far from any other airborne aircraft at the moment they appear. */
@@ -151,6 +173,27 @@ export function createTrafficGenerator(scenario: Scenario, airport: Airport, opt
     return f.callsign;
   };
 
+  /** Would an arrival of `type` for `endId` fit the runway's arrival slots (see `ARRIVAL_SLOT_SEC`)? */
+  const arrivalFits = (state: Readonly<SimulationState>, endId: string, type: string): boolean => {
+    if (cfg.flowControl === false) return true;
+    const g = findRunwayEnd(airport, endId);
+    if (!g) return true;
+    const light = getPerformance(type).category === 'light';
+    const mine = light ? NOMINAL_ETA_LIGHT_SEC : NOMINAL_ETA_JET_SEC;
+    let inFlight = 0;
+    for (const a of Object.values(state.aircraft)) {
+      if (a.onGround || a.isDeparture || a.assignedRunwayEnd === undefined || a.flags.transit || a.type === 'H65') continue;
+      if (a.phase === 'DEPARTURE' || a.phase === 'INITIAL_CLIMB') continue;
+      inFlight++;
+      if (a.assignedRunwayEnd !== endId) continue;
+      const near = a.phase === 'PATTERN' || a.phase === 'GO_AROUND' || a.phase === 'HOLDING';
+      const kt = getPerformance(a.type).category === 'light' ? EXPECTED_SPEED_LIGHT_KT : EXPECTED_SPEED_JET_KT;
+      const eta = near ? NEAR_FIELD_ETA_SEC : (mToNm(Math.hypot(a.pos.x - g.end.threshold.x, a.pos.y - g.end.threshold.y)) / kt) * 3600;
+      if (Math.abs(eta - mine) < ARRIVAL_SLOT_SEC) return false;
+    }
+    return inFlight < MAX_ARRIVALS_IN_FLIGHT;
+  };
+
   const trySpawnArrival = (state: Readonly<SimulationState>): SpawnSpec | undefined => {
     const ends = state.activeRunways.landing.length ? state.activeRunways.landing : state.activeRunways.departing;
     if (!ends.length) return undefined;
@@ -159,6 +202,7 @@ export function createTrafficGenerator(scenario: Scenario, airport: Airport, opt
     if (!flight) return undefined;
     const type = flight.type;
     const endId = ends[Math.min(ends.length - 1, Math.floor(rng!() * ends.length))];
+    if (!arrivalFits(state, endId, flight.type)) return undefined;
     if (!ga && flows.arrivals && isTurbojet(type) && starArrival(airport, endId)) return trySpawnStarArrival(state, flight, endId);
     if (!ga && flows.arrivals && arrivalProcedure(airport, endId)) return trySpawnIfrArrival(state, flight, endId);
     const others: AirbornePoint[] = Object.values(state.aircraft)
@@ -234,6 +278,9 @@ export function createTrafficGenerator(scenario: Scenario, airport: Airport, opt
   };
 
   const trySpawnDeparture = (state: Readonly<SimulationState>): SpawnSpec | undefined => {
+    let waiting = 0;
+    for (const a of Object.values(state.aircraft)) if (a.isDeparture && a.onGround && !['TAKEOFF_ROLL', 'INITIAL_CLIMB', 'DEPARTURE'].includes(a.phase) && !a.flags.vehicleTask && a.type !== 'H65') waiting++;
+    if (cfg.flowControl !== false && waiting >= MAX_DEPARTURES_ON_GROUND) return undefined;
     const depEnds = state.activeRunways.departing.length ? state.activeRunways.departing : state.activeRunways.landing;
     let ga = rng!() < gaFraction;
     let flight: Flight | undefined;

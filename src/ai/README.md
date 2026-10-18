@@ -111,6 +111,16 @@ Departure when the player works either) count as the player's for coordination: 
 `createAiControllers` tells the engine who is human and who is AI (`engine.coordination.setStaffing`). Tests: `coordination.test.ts` (answers, timing, re-asks, rescind,
 release flow, point out, determinism); the existing flows (`ai.test.ts`, `kmht.test.ts`) use `humanAnswers` / `towerMayDepart` in `testkit.ts` for the scripted human.
 
+## Landing sequence for the pattern (`sequence.ts`) and the ground rules added for the free-play jam
+
+JO 7110.65 3-8-1 (sequence / spacing application: EXTEND DOWNWIND, MAKE SHORT APPROACH) and 3-10-3 (same runway separation). Pure functions of the state; the leg of the pattern is read from the heading and position.
+
+* Everything that cannot wait takes a window on the runways that interact with the landing runway: aircraft on final or base, straight-in and IFR arrivals, a landing roll (`projectArrival`: threshold crossing until clear), cleared / rolling departures, a departure that has waited 90 s at the hold, and an aircraft that has waited 30 s at a hold line for a crossing (design values; the sequencer's margin is 15 s). Aircraft on downwind are taken in the order they reach the base turn: a free window is left alone; a taken one gets "extend downwind, I'll call your base" (before the turn point only); a base-turn call ("turn base now", not a 7110.65 phrase) goes out when a window is free (the engine accepts it from 0.75 nm behind the threshold). Fighters, the overhead maneuver and special traffic are not sequenced.
+* A pattern aircraft is cleared to land from base or final only (not from downwind); `releaseSlackSec` ignores an aircraft on downwind that is not about to turn base (the sequencer will extend it when a departure takes the window); two light aircraft on a visual final are sent around at 2 nm (`EARLY_GAP_LIGHT_NM`), airliners at 3 nm. Approach does not treat pattern aircraft as leaders. An aircraft told to go around with no request pending is still re-entered into the pattern.
+* Ground: a crossing request is made by the aircraft nearest the runway on an exit stub (`aheadInCrossingQueue`), never toward a departure standing head-on at the far hold line (`opposingTraffic`), and a pushback is held while another aircraft's route passes within 90 m of the stand. `planDeparture` / `planParking` cache their route searches (static data), so a waiting aircraft costs nothing per second.
+* Engine side: `HOLD_START_SNAP_M` (a route starting at a hold line the aircraft is up to 40 m past counts as holding there), `findLeader` ignores points behind the aircraft and breaks ties between aircraft on one spot by id, the wind-and-altimeter answer restores the pilot's earlier landing / departure request.
+* Test: `freePlaySoak.test.ts` (guarded, `FREEPLAY_SOAK=1`), `patternSequence.test.ts`.
+
 ## Known simplifications
 
 * Coordination covers runway crossings, IFR departure releases, point outs and the "rolling" / "going around" calls only (see "Coordination"
@@ -122,8 +132,7 @@ release flow, point out, determinism); the existing flows (`ai.test.ts`, `kmht.t
   the pilot reports and waits.
 * Approach never vectors with `HEADING` (it uses direct-to-fix, speed and published holds), so there are no intercept-geometry or
   approach-gate issues; spacing target is 5 nm (the engine minimum is 3 nm, 4 nm light behind jet).
-* VFR arrivals are not sequenced against IFR arrivals except by go-arounds; pattern work is limited to `ENTER_PATTERN left_downwind`
-  after a go-around.
+* VFR straight-in arrivals cannot be held in the air (no orbit or hold instruction): only the generator's arrival slots and go-arounds protect them. Pattern traffic is sequenced by `sequence.ts` (below); a pattern entry from a straight-in far out becomes a base turn at once.
 * `LINE_UP_AND_WAIT` is used rarely on purpose (there is no "exit the runway" command).
 * Combined transmissions are read back command by command by the engine's pilots.
 

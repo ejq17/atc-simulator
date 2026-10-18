@@ -283,6 +283,12 @@ function executeInner(ctx: SimContext, cmdInput: ParsedCommand, opts?: ExecOpts)
   ac.activeClearanceId = clr.id;
   const waitSec = ac.pendingRequest ? now - ac.pendingRequest.sinceSec : undefined;
   ac.pendingRequest = undefined;
+  // The numbers answer the pilot's request for wind and altimeter only, not the landing / departure request he made before it: he is still waiting for that
+  // (otherwise a pilot who asked while a go-around was being worked would never be sequenced again).
+  if (rt.requestBeforeNumbers) {
+    if (cmd.kind === 'AIRPORT_INFO') ac.pendingRequest = rt.requestBeforeNumbers;
+    rt.requestBeforeNumbers = undefined;
+  }
   if (rt.readbackError && rt.readbackError.kind === (cmd.kind as string)) {
     // A new instruction of the SAME kind supersedes the earlier mistaken readback. A companion command from the same transmission
     // ("taxi to runway 35 via hotel, hold short of runway 35" parses as TAXI + HOLD_SHORT) must not wipe it: the misread TAXI stays

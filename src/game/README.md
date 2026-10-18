@@ -117,6 +117,15 @@ never above `maxAircraft`. Arrivals: 10-12 nm from the threshold of an active la
 request `TAXI`; A320 departures are replaced by C172 (or skipped) only when no active departure runway is long enough for the type (never at KACY now: an A320 can use 4/22 from full length; the generator only chooses the gate, the runway entry is the player's and the engine refuses < 5,000 ft remaining). Callsigns: N-numbers in three formats and the airport profile's airline flight numbers (KACY Spirit 80 % / American 20 %; KMHT the mix in `airportProfile.ts`),
 unique for the whole session and never ending in the same three characters as an active aircraft.
 
+### Flow control (`traffic.ts`)
+
+Design values (nothing in the FAA order fixes them); the hourly rates are never lowered, spawns wait instead: a due arrival is retried every 10 s, a departure likewise.
+
+* `ARRIVAL_SLOT_SEC` = 160: a new arrival is not generated while it would reach the threshold of its runway end within 160 s of another arrival (nominal 520 s for a light aircraft, 330 s for an airliner; other aircraft by distance / expected speed 70 / 145 kt; an aircraft in the pattern or on a missed approach counts as 150 s). One runway shared with departures, crossings and taxiing arrivals takes about one landing per 160 s.
+* `MAX_ARRIVALS_IN_FLIGHT` = 6 airborne arrivals not yet landed.
+* `MAX_DEPARTURES_ON_GROUND` = 5 departures parked, pushing back, taxiing or at the hold: the next flight stays at the gate ("expect a delay").
+* Measured: with these the 2 h soak at 10 + 10 per hour, 14 aircraft lands 13-22 and departs 12-20 aircraft per run (`src/ai/freePlaySoak.test.ts`).
+
 ### IFR flows (`ifr.ts`, applied by the generator and the free-play builder)
 
 Active when `resolveIfrFlows(scenario)` says so (see `ifrFlows` above). GA C172 traffic is never IFR. Without APP (Tower or Tower + Ground sessions) arrivals keep appearing on final already inside the approach (Tower only issues landing clearances).

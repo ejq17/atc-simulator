@@ -142,37 +142,65 @@ export interface DeparturePlan {
  * hold, and a hold-short for every runway the route crosses, in order.
  */
 export function planDeparture(airport: Airport, ac: Aircraft, ends: string[], busyHolds: ReadonlyMap<string, number> = new Map(), closed?: ReadonlySet<string>): DeparturePlan | undefined {
-  const graph = airport.taxiwayGraph;
   const start = taxiStartNode(airport, ac);
   if (!start) return undefined;
   const need = ftToM(getPerformance(ac.type).takeoffDistanceFt) + 50;
   let fallback: DeparturePlan | undefined;
   let queued: { plan: DeparturePlan; n: number } | undefined;
+  for (const { plan, fullEntry } of departureCandidates(airport, start.id, ends, need, closed)) {
+    const n = busyHolds.get(plan.holdId) ?? 0;
+    // An unoccupied full-length entry wins; otherwise the least crowded one (aircraft queue behind each other, at most three deep).
+    if (fullEntry && n === 0) return plan;
+    if (n < MAX_QUEUE && (!queued || n < queued.n)) queued = { plan, n };
+    if (!fallback && n === 0) fallback = plan;
+  }
+  return fallback ?? queued?.plan;
+}
+
+interface DepartureCandidate {
+  plan: DeparturePlan;
+  /** The picked hold is the entry node itself and leaves the type its full takeoff distance. */
+  fullEntry: boolean;
+}
+
+/**
+ * Every (runway end, entry hold, via list) route from `startId` that leaves `needM` of runway, in the order `planDeparture` tries them.
+ * Pure in the static airport data, the start node, the runway ends, the distance and the closed taxiways, and a taxi route search costs
+ * milliseconds (several hundred searches per call), so it is cached: a Ground controller with an aircraft that cannot be released yet asks
+ * every second, and in a 2 h free-play soak that was 85 % of the run time (docs/PROGRESS.md, "Free-play jam").
+ */
+const departureCandidateCache = new WeakMap<Airport, Map<string, DepartureCandidate[]>>();
+
+function departureCandidates(airport: Airport, startId: string, ends: string[], needM: number, closed?: ReadonlySet<string>): DepartureCandidate[] {
+  let byKey = departureCandidateCache.get(airport);
+  if (!byKey) departureCandidateCache.set(airport, (byKey = new Map()));
+  const key = `${startId}|${ends.join(',')}|${Math.round(needM)}|${closed ? [...closed].sort().join(',') : ''}`;
+  const hit = byKey.get(key);
+  if (hit) return hit;
+  const graph = airport.taxiwayGraph;
+  const out: DepartureCandidate[] = [];
   for (const endId of ends) {
     const g = findRunwayEnd(airport, endId);
     if (!g) continue;
     const entries = runwayEntryNodes(airport, g.end.id).filter((h) => !h.protectsRunwayEnd || normalizeRunwayEndId(h.protectsRunwayEnd) === normalizeRunwayEndId(g.end.id));
     for (const h of entries) {
       const remaining = g.lengthM - alongCross(g, h.pos).along;
-      const r0 = findTaxiRoute(graph, start.id, h.id, { avoidRunways: true, allowedRunwayIds: allRunwayIds(airport), avoidTaxiways: closed });
+      const r0 = findTaxiRoute(graph, startId, h.id, { avoidRunways: true, allowedRunwayIds: allRunwayIds(airport), avoidTaxiways: closed });
       if (!r0.route) continue;
       for (const via of viaCandidates(r0.route.taxiways, false)) {
-        const pick = simulateRunwayTaxiPick(airport, start.id, g, via, closed);
+        const pick = simulateRunwayTaxiPick(airport, startId, g, via, closed);
         if (!pick) continue;
         const pickedRemaining = g.lengthM - alongCross(g, pick.hold.pos).along;
-        const plan: DeparturePlan = {
-          runwayEnd: g.end.id, via, holdShort: pick.route.runwayCrossings.filter((r) => r !== g.runway.id), holdId: pick.hold.id, lengthM: pick.route.lengthM, remainingM: pickedRemaining, nodeIds: pick.route.nodeIds,
-        };
-        if (pickedRemaining < need) continue;
-        const n = busyHolds.get(pick.hold.id) ?? 0;
-        // An unoccupied full-length entry wins; otherwise the least crowded one (aircraft queue behind each other, at most three deep).
-        if (pick.hold.id === h.id && remaining >= need && n === 0) return plan;
-        if (n < MAX_QUEUE && (!queued || n < queued.n)) queued = { plan, n };
-        if (!fallback && n === 0) fallback = plan;
+        if (pickedRemaining < needM) continue;
+        out.push({
+          fullEntry: pick.hold.id === h.id && remaining >= needM,
+          plan: { runwayEnd: g.end.id, via, holdShort: pick.route.runwayCrossings.filter((r) => r !== g.runway.id), holdId: pick.hold.id, lengthM: pick.route.lengthM, remainingM: pickedRemaining, nodeIds: pick.route.nodeIds },
+        });
       }
     }
   }
-  return fallback ?? queued?.plan;
+  byKey.set(key, out);
+  return out;
 }
 
 /** Departures that may queue for one runway hold (the engine spaces them along the taxiway). */
@@ -189,13 +217,12 @@ export interface ParkingPlan {
 /** Nearest (by taxi distance) unoccupied parking position of the aircraft's natural category, with a described route. */
 export function planParking(state: SimulationState, ac: Aircraft): ParkingPlan | undefined {
   const airport = state.airport;
-  const graph = airport.taxiwayGraph;
   const start = taxiStartNode(airport, ac);
   if (!start) return undefined;
   const cands = freeParkingCandidates(state, ac, undefined, undefined).filter((p) => p.category !== 'military' || getPerformance(ac.type).category === 'light' || !!getPerformance(ac.type).military);
   if (!cands.length) return undefined;
   const closed = closedTaxiways(state);
-  const dmap = shortestDistances(graph, start.id, { allowedRunwayIds: allRunwayIds(airport), avoidTaxiways: closed });
+  const { dmap, routeTo } = parkingRouting(airport, start.id, closed);
   let best: ParkingPosition | undefined;
   let bestD = Infinity;
   for (const p of cands) {
@@ -206,13 +233,55 @@ export function planParking(state: SimulationState, ac: Aircraft): ParkingPlan |
     }
   }
   if (!best) return undefined;
-  const r0 = findTaxiRoute(graph, start.id, best.nodeId, { avoidRunways: true, allowedRunwayIds: allRunwayIds(airport), avoidTaxiways: closed });
-  if (!r0.route) return undefined;
-  for (const via of viaCandidates(r0.route.taxiways)) {
-    const r = findTaxiRoute(graph, start.id, best.nodeId, { via, avoidRunways: true, allowedRunwayIds: allRunwayIds(airport), avoidTaxiways: closed });
-    if (r.route) return { spot: best, via, holdShort: r.route.runwayCrossings, lengthM: r.route.lengthM, nodeIds: r.route.nodeIds };
+  const r = routeTo(best.nodeId);
+  return r ? { spot: best, via: r.via, holdShort: r.holdShort, lengthM: r.lengthM, nodeIds: r.nodeIds } : undefined;
+}
+
+interface ParkingRoute {
+  via: string[];
+  holdShort: string[];
+  lengthM: number;
+  nodeIds: string[];
+}
+
+/**
+ * Taxi distances from a start node and, per parking node, the described route there. Static airport data plus the closed taxiways, so cached: an
+ * arrival that cannot be sent yet is asked about every second (docs/PROGRESS.md, "Free-play jam").
+ */
+const parkingRoutingCache = new WeakMap<Airport, Map<string, { dmap: Map<string, number>; routes: Map<string, ParkingRoute | null> }>>();
+
+function parkingRouting(airport: Airport, startId: string, closed: ReadonlySet<string>): { dmap: Map<string, number>; routeTo(nodeId: string): ParkingRoute | undefined } {
+  let byKey = parkingRoutingCache.get(airport);
+  if (!byKey) parkingRoutingCache.set(airport, (byKey = new Map()));
+  const key = `${startId}|${[...closed].sort().join(',')}`;
+  let entry = byKey.get(key);
+  if (!entry) {
+    entry = { dmap: shortestDistances(airport.taxiwayGraph, startId, { allowedRunwayIds: allRunwayIds(airport), avoidTaxiways: closed }), routes: new Map() };
+    byKey.set(key, entry);
   }
-  return undefined;
+  const e = entry;
+  return {
+    dmap: e.dmap,
+    routeTo(nodeId) {
+      let r = e.routes.get(nodeId);
+      if (r === undefined) {
+        const graph = airport.taxiwayGraph;
+        r = null;
+        const r0 = findTaxiRoute(graph, startId, nodeId, { avoidRunways: true, allowedRunwayIds: allRunwayIds(airport), avoidTaxiways: closed });
+        if (r0.route) {
+          for (const via of viaCandidates(r0.route.taxiways)) {
+            const rr = findTaxiRoute(graph, startId, nodeId, { via, avoidRunways: true, allowedRunwayIds: allRunwayIds(airport), avoidTaxiways: closed });
+            if (rr.route) {
+              r = { via, holdShort: rr.route.runwayCrossings, lengthM: rr.route.lengthM, nodeIds: rr.route.nodeIds };
+              break;
+            }
+          }
+        }
+        e.routes.set(nodeId, r);
+      }
+      return r ?? undefined;
+    },
+  };
 }
 
 export interface ProgressiveSegment {
@@ -293,9 +362,12 @@ export function pendingIntermediateStops(airport: Airport, ac: Aircraft): string
   });
 }
 
-/** The runway hold node the (stopped) aircraft is standing at, if any. */
-export function holdNodeAt(airport: Airport, ac: Aircraft): TaxiNode | undefined {
-  const n = nearestNode(airport.taxiwayGraph, ac.pos, { kinds: ['holding_position'], maxDistM: 25 });
+/**
+ * The runway hold node the (stopped) aircraft is standing at, if any. `maxDistM` is 25 m by default; a taxi that starts at a hold line the
+ * aircraft already passed (`HOLD_START_SNAP_M` in the engine) is "at" that hold from up to that far.
+ */
+export function holdNodeAt(airport: Airport, ac: Aircraft, maxDistM = 25): TaxiNode | undefined {
+  const n = nearestNode(airport.taxiwayGraph, ac.pos, { kinds: ['holding_position'], maxDistM });
   return n && n.runwayId ? n : undefined;
 }
 
@@ -319,13 +391,74 @@ export function busyHoldIds(state: SimulationState, exceptId: string): Map<strin
  * Another aircraft is taxiing along part of `nodeIds` in the OPPOSITE direction (a head-on meeting the engine's ground spacing cannot
  * resolve) or is standing still on it. Aircraft in parking positions do not count.
  */
+/** `p` lies within `LANE_WIDTH_M` of a segment of the node path and is not at a parking position (aircraft on their stand are not on the lane). */
+const LANE_WIDTH_M = 12;
+function onRoute(graph: SimulationState['airport']['taxiwayGraph'], nodeIds: string[], p: { x: number; y: number }, facingDeg?: number): boolean {
+  for (let i = 1; i < nodeIds.length; i++) {
+    const a = graph.nodes[nodeIds[i - 1]];
+    const b = graph.nodes[nodeIds[i]];
+    if (!a || !b || a.kind === 'parking' || b.kind === 'parking') continue;
+    const dx = b.pos.x - a.pos.x;
+    const dy = b.pos.y - a.pos.y;
+    const len2 = dx * dx + dy * dy;
+    const t = len2 > 0 ? Math.max(0, Math.min(1, ((p.x - a.pos.x) * dx + (p.y - a.pos.y) * dy) / len2)) : 0;
+    if (Math.hypot(p.x - (a.pos.x + dx * t), p.y - (a.pos.y + dy * t)) > LANE_WIDTH_M) continue;
+    if (facingDeg === undefined) return true;
+    const along = (Math.atan2(dx, dy) * 180) / Math.PI;
+    if (Math.abs(((facingDeg - along + 540) % 360) - 180) > 100) return true; // faces against the direction of the path
+  }
+  return false;
+}
+
+/** Bearing (deg) of the path segment `p` lies within `LANE_WIDTH_M` of, if any. */
+function pathBearingAt(graph: SimulationState['airport']['taxiwayGraph'], nodeIds: string[], p: { x: number; y: number }): number | undefined {
+  for (let i = 1; i < nodeIds.length; i++) {
+    const a = graph.nodes[nodeIds[i - 1]];
+    const b = graph.nodes[nodeIds[i]];
+    if (!a || !b) continue;
+    const dx = b.pos.x - a.pos.x;
+    const dy = b.pos.y - a.pos.y;
+    const len2 = dx * dx + dy * dy;
+    const t = len2 > 0 ? Math.max(0, Math.min(1, ((p.x - a.pos.x) * dx + (p.y - a.pos.y) * dy) / len2)) : 0;
+    if (Math.hypot(p.x - (a.pos.x + dx * t), p.y - (a.pos.y + dy * t)) <= LANE_WIDTH_M) return (Math.atan2(dx, dy) * 180) / Math.PI;
+  }
+  return undefined;
+}
+
 export function opposingTraffic(state: SimulationState, nodeIds: string[], exceptId: string): Aircraft | undefined {
   const graph = state.airport.taxiwayGraph;
   const mine = new Map<string, number>();
   nodeIds.forEach((id, i) => mine.set(id, i));
   for (const o of Object.values(state.aircraft)) {
-    if (o.id === exceptId || !o.onGround || !o.route) continue;
+    if (o.id === exceptId || !o.onGround) continue;
+    if (!o.route) {
+      // A pushed-back aircraft standing on the lane (READY / PUSHBACK, no route yet) blocks every route over its position just as a stopped one would:
+      // an arrival sent past it would wait behind it while it waits for the arrival to clear (free-play soak, docs/PROGRESS.md "Free-play jam").
+      if ((o.phase === 'READY' || o.phase === 'PUSHBACK') && onRoute(graph, nodeIds, o.pos)) return o;
+      continue;
+    }
     if (o.phase === 'PARKED' || o.phase === 'ARRIVED') continue;
+    // An arrival that left the runway and waits for taxi instructions still carries its short exit route; it is not going anywhere on it.
+    if (o.phase === 'RUNWAY_EXIT') continue;
+    // Waiting at a runway hold line for a crossing: Ground does not release it while anything is on the far side of its route (ground.ts, crossing),
+    // so what lies beyond the runway on its route is no reason to keep other traffic off the taxiways there.
+    // The exception: it stands on this path and its way on points back along it (an exit stub: it waits to go east, the path goes west past it).
+    if (o.groundSpeedKt < 1 && o.pendingRequest?.kind === 'CROSSING') {
+      const mineBearing = pathBearingAt(graph, nodeIds, o.pos);
+      const next = graph.nodes[o.route.nodeIds[o.route.progressIndex]];
+      if (mineBearing !== undefined && next) {
+        const theirs = (Math.atan2(next.pos.x - o.pos.x, next.pos.y - o.pos.y) * 180) / Math.PI;
+        if (Math.abs(((theirs - mineBearing + 540) % 360) - 180) > 100) return o;
+      }
+      continue;
+    }
+    // Standing still at the end of a route that arrived over this path from the other side (a departure at the far hold line of a runway the path
+    // crosses): the reverse-order test below needs two shared nodes and sees only one.
+    if (o.groundSpeedKt < 1 && o.route.progressIndex >= 2) {
+      const cur = mine.get(o.route.nodeIds[o.route.progressIndex - 1]);
+      const prev = mine.get(o.route.nodeIds[o.route.progressIndex - 2]);
+      if (cur !== undefined && prev !== undefined && prev > cur) return o;
+    }
     const rest = o.route.nodeIds.slice(Math.max(0, o.route.progressIndex - 1));
     let prevMine = -1;
     let prevTheirs = -1;
@@ -336,6 +469,43 @@ export function opposingTraffic(state: SimulationState, nodeIds: string[], excep
       prevMine = k;
       prevTheirs = j;
     }
+  }
+  return undefined;
+}
+
+/**
+ * Another aircraft is taxiing (or waiting with a route) over a lane within `radiusM` of `pos` in the part of its route still ahead of it.
+ * Ground holds a pushback while this is true: the pushed-back aircraft would stand in the lane in front of the taxiing one, which then waits
+ * behind it while it waits for the lane to clear.
+ */
+export function routePassesNear(state: SimulationState, pos: { x: number; y: number }, radiusM: number, exceptId: string): Aircraft | undefined {
+  const graph = state.airport.taxiwayGraph;
+  for (const o of Object.values(state.aircraft)) {
+    if (o.id === exceptId || !o.onGround || !o.route || (o.phase !== 'TAXIING' && o.phase !== 'TAXI_TO_PARKING')) continue;
+    const rest = o.route.nodeIds.slice(Math.max(0, o.route.progressIndex - 1));
+    for (let i = 0; i < rest.length; i++) {
+      const n = graph.nodes[rest[i]];
+      if (n && n.kind !== 'parking' && Math.hypot(n.pos.x - pos.x, n.pos.y - pos.y) <= radiusM) return o;
+    }
+  }
+  return undefined;
+}
+
+/**
+ * Another stopped aircraft stands between this one and the first runway node of its route, on the same lane (an exit stub where several
+ * arrivals wait to cross): it must go first, the one behind cannot pass it.
+ */
+export function aheadInCrossingQueue(state: SimulationState, ac: Aircraft): Aircraft | undefined {
+  const r = ac.route;
+  if (!r) return undefined;
+  const graph = state.airport.taxiwayGraph;
+  const runwayNode = r.nodeIds.slice(Math.max(0, r.progressIndex - 1)).map((id) => graph.nodes[id]).find((n) => n?.kind === 'runway');
+  if (!runwayNode) return undefined;
+  const mine = Math.hypot(ac.pos.x - runwayNode.pos.x, ac.pos.y - runwayNode.pos.y);
+  for (const o of Object.values(state.aircraft)) {
+    if (o.id === ac.id || !o.onGround || o.groundSpeedKt >= 1) continue;
+    if (Math.hypot(o.pos.x - ac.pos.x, o.pos.y - ac.pos.y) > 60) continue;
+    if (Math.hypot(o.pos.x - runwayNode.pos.x, o.pos.y - runwayNode.pos.y) < mine - 2) return o;
   }
   return undefined;
 }

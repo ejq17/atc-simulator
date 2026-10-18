@@ -165,6 +165,7 @@ describe('setup-screen closures', () => {
 describe('STAR traffic flow at KMHT', () => {
   const run = (airport: typeof kmht, rwy: string, sec: number) => {
     const sc = game.buildFreePlay(airport, { seed: 21, weather: 'clear', aircraftCount: 0, arrivalsPerHour: 40, departuresPerHour: 0, gaFraction: 0.2, maxAircraft: 30, activeRunways: { departing: [rwy], landing: [rwy] }, ifrFlows: true, airportEvents: false });
+    sc.traffic = { ...sc.traffic!, flowControl: false }; // counts the raw clocks' spawns: nothing lands in this run
     const inner = game.createTrafficGenerator(sc, airport);
     const specs: SpawnSpec[] = [];
     const g: TrafficGenerator = { update(s) { const o = inner.update(s); specs.push(...o); return o; } };

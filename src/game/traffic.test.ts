@@ -17,6 +17,7 @@ function scenarioWith(over: Partial<Scenario['traffic']> & { seed?: number; diff
     arrivalsPerHour: over.arrivalsPerHour ?? 14, departuresPerHour: over.departuresPerHour ?? 14, gaFraction: over.gaFraction ?? 0.5, maxAircraft: over.maxAircraft ?? 8,
     activeRunways: over.runways ? { departing: [over.runways], landing: [over.runways] } : undefined,
   });
+  fp.traffic = { ...fp.traffic!, flowControl: false }; // these tests count the raw clocks' spawns with nothing flying away
   return fp;
 }
 

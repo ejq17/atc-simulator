@@ -19,6 +19,8 @@ import { describeTraffic, luawTraffic } from '../sim/towerCommands';
 import { getPerformance } from '../sim/performance';
 import { holdTooShort } from '../sim/holdSelection';
 import { hasActive, lastClearance, mkCmd } from './core';
+import { isSequenceable, patternLeg, sequenceDownwind, turnsBaseSoon } from './sequence';
+import type { SeqWindow } from './sequence';
 import type { Agent, AgentView, Plan } from './core';
 import {
   assignedEnd, distToThresholdNm, etaToThresholdSec, holdNodeAt, interactingRunways, isInboundArrival, planParking, projectedGapNm,
@@ -51,6 +53,11 @@ export function landingInfo(v: AgentView, g: RunwayEndGeom): say.Phrase[] {
 /** Seconds between a takeoff clearance and the pilot starting the roll when the aircraft is still at the hold line (turn onto the runway and align). */
 const LINE_UP_DELAY_SEC = 20;
 const RELEASE_MARGIN_SEC = 30;
+/** A departure waiting longer than this at the hold for a gap makes the pattern traffic that can be delayed leave one. DESIGN VALUE. */
+const DEPARTURE_PRIORITY_WAIT_SEC = 90;
+/** A crossing request that has waited this long (s) makes the delayable pattern traffic leave a gap of CROSSING_WINDOW_SEC. DESIGN VALUES. */
+const CROSSING_PRIORITY_WAIT_SEC = 30;
+const CROSSING_WINDOW_SEC = 75;
 /** Distance from the threshold beyond which a departure no longer blocks the landing runway for a following arrival (7110.65 3-10-3: 6,000 ft, category III). */
 const DEPARTURE_CLEAR_M = 1829;
 
@@ -98,8 +105,17 @@ export function releaseSlackSec(v: AgentView, end: RunwayEndGeom, dep: Aircraft,
     const g = assignedEnd(v.airport, o);
     if (!g || !rws.includes(g.runway.id)) continue;
     const d = distToThresholdNm(o, g);
-    // Pattern traffic is separated visually by the controller: anything in the pattern near the field blocks departures.
-    if (o.phase === 'PATTERN' && d < PATTERN_BLOCK_NM) return -Infinity;
+    // Pattern traffic is separated visually by the controller. Aircraft on base or final count with their ETA below. One on downwind that is not about
+    // to turn base is the Tower's to delay (sequence.ts extends it when the departure's window is in the way); one about to turn base blocks.
+    if (o.phase === 'PATTERN') {
+      if (!isSequenceable(o)) {
+        if (d < PATTERN_BLOCK_NM) return -Infinity;
+      } else {
+        const leg = patternLeg(o, g);
+        if (leg === 'UPWIND' || leg === 'CROSSWIND') continue;
+        if (leg === 'DOWNWIND' && !turnsBaseSoon(o, g)) continue;
+      }
+    }
     const eta = etaToThresholdSec(o, g);
     const kt = Math.max(o.groundSpeedKt, 60);
     const needBeyond = t.beyond6000 + RELEASE_MARGIN_SEC; // the departure is 6,000 ft down the runway (landing behind a departure)
@@ -136,6 +152,12 @@ export function blockedByLeader(v: AgentView, ac: Aircraft, g: RunwayEndGeom): A
 export const EARLY_GO_AROUND_NM = 4;
 /** Radar minimum in trail on the same final (JO 7110.65 5-5-4); a leader still on the runway counts inside this range too. */
 const EARLY_GAP_NM = 3;
+/**
+ * Two light aircraft on a visual final at a tower-controlled airport are not radar-separated (5-5-4 does not apply): the criterion is 3-10-3 (checked
+ * above through `precedingArrivalBlockers`) and the engine's 1.5 nm near-miss alert. At 60-80 kt 3 nm is three minutes, which no single runway can
+ * hold with a stream of training and GA arrivals. DESIGN VALUE.
+ */
+const EARLY_GAP_LIGHT_NM = 2;
 /** An aircraft that went around is re-sequenced by Approach (vectors / direct fix, a new approach clearance) for this long before Tower clears it to land again. */
 const GO_AROUND_RESEQUENCE_SEC = 600;
 
@@ -163,7 +185,8 @@ export function earlyGoAroundReason(v: AgentView, ac: Aircraft, g: RunwayEndGeom
     if (!o.onGround) {
       if ((o.phase !== 'FINAL' && o.phase !== 'LANDING') || distToThresholdNm(o, g) >= mine) continue;
       const gap = projectedGapNm(ac, o, g);
-      if (gap.minNm < EARLY_GAP_NM) return `${gap.minNm.toFixed(1)} nm behind ${o.callsign}`;
+      const lights = getPerformance(ac.type).category === 'light' && getPerformance(o.type).category === 'light';
+      if (gap.minNm < (lights ? EARLY_GAP_LIGHT_NM : EARLY_GAP_NM)) return `${gap.minNm.toFixed(1)} nm behind ${o.callsign}`;
     } else if (mine <= EARLY_GAP_NM && o.occupyingRunways.includes(g.runway.id) && ['LANDING', 'ROLLOUT', 'RUNWAY_EXIT'].includes(o.phase)) {
       if (timeToThreshold(ac, g) < projectArrival(v.state, o, g).tClear + 3 && !landedDistanceExceptionApplies(v.state, ac, o, g)) return `${o.callsign} is still on the runway`;
     }
@@ -276,6 +299,55 @@ export function createTowerAgent(): Agent {
       }
     }
 
+    // ---- pattern sequence: extend downwind / turn base (sequence.ts) -------------------------------------------------------
+    for (const endId of state.activeRunways.landing) {
+      const g = findRunwayEnd(airport, endId);
+      if (!g) continue;
+      const rws = interactingRunways(airport, g.runway.id);
+      const depWindows: SeqWindow[] = [];
+      for (const o of Object.values(state.aircraft)) {
+        if (!o.isDeparture || !o.onGround || (o.phase !== 'CLEARED_FOR_TAKEOFF' && o.phase !== 'TAKEOFF_ROLL')) continue;
+        if (!o.occupyingRunways.some((r) => rws.includes(r)) && o.phase !== 'CLEARED_FOR_TAKEOFF') continue;
+        depWindows.push({ start: 0, end: departureTimes(o, o.occupyingRunways.length > 0).beyond6000 });
+      }
+      // Aircraft waiting at a hold line to cross one of these runways get a window too (Ground asks, `crossingDecision` approves when no arrival is inside
+      // CROSSING_ARRIVAL_SEC): the pattern traffic that can be delayed does not take every gap. DESIGN VALUE: 75 s to walk across, plus the sequencer's margin.
+      for (const o of Object.values(state.aircraft)) {
+        if (!o.onGround || o.groundSpeedKt >= 1 || o.pendingRequest?.kind !== 'CROSSING' || v.now - o.pendingRequest.sinceSec < CROSSING_PRIORITY_WAIT_SEC) continue;
+        const rid = holdNodeAt(airport, o, 45)?.runwayId;
+        if (rid && rws.includes(rid)) {
+          depWindows.push({ start: 0, end: CROSSING_WINDOW_SEC });
+          break;
+        }
+      }
+      // A departure that has waited for a gap this long gets one: the pattern traffic that could be delayed is (the window stays free of landings that
+      // can still be moved), instead of filling every gap between two landings. DESIGN VALUE.
+      for (const o of v.onFrequency) {
+        if (!o.isDeparture || !o.onGround || (o.phase !== 'HOLDING_SHORT' && o.phase !== 'LINE_UP_AND_WAIT') || !rws.includes(findRunwayEnd(airport, o.assignedRunwayEnd)?.runway.id ?? '')) continue;
+        const since = mem.notes.get(`hold:${o.id}`);
+        if (since === undefined || v.now - since < DEPARTURE_PRIORITY_WAIT_SEC) continue;
+        depWindows.push({ start: 0, end: departureTimes(o, o.phase === 'LINE_UP_AND_WAIT').beyond6000 + RELEASE_MARGIN_SEC });
+        break;
+      }
+      for (const dec of sequenceDownwind(state, g, depWindows)) {
+        const ac = dec.ac;
+        if (!v.onFrequency.some((o) => o.id === ac.id) || ac.radioState === 'TRANSMITTING') continue;
+        if (dec.action === 'extend') {
+          plans.push({
+            key: `${ac.id}:extend:${ac.spawnedAtSec}:${ac.lastGoAroundSec ?? 0}`, aircraftId: ac.id, callsign: ac.callsign, priority: 70, once: true,
+            cmds: [mkCmd('PATTERN_INSTRUCTION', ac, { destination: 'EXTEND_DOWNWIND' })], phrase: say.extendDownwind(ac),
+            summary: `${ac.callsign} extend downwind runway ${g.end.id} (landing sequence)`,
+          });
+        } else if (dec.action === 'release') {
+          plans.push({
+            key: `${ac.id}:base-now`, aircraftId: ac.id, callsign: ac.callsign, priority: 71, cooldownSec: 20,
+            cmds: [mkCmd('PATTERN_INSTRUCTION', ac, { destination: 'TURN_BASE_NOW' })], phrase: say.turnBaseNow(ac),
+            summary: `${ac.callsign} turn base now runway ${g.end.id} (landing sequence)`,
+          });
+        }
+      }
+    }
+
     // ---- everything else on the frequency --------------------------------------------------------------------------------
     for (const ac of v.onFrequency) {
       if (ac.radioState === 'TRANSMITTING') continue;
@@ -376,7 +448,7 @@ export function createTowerAgent(): Agent {
               phrase: say.contact(ac, airport, app.id, app.mhz), cooldownSec: 30, summary: `${ac.callsign} missed approach, to Approach`,
             });
           }
-        } else if (!ifr && pending === 'LANDING' && ac.assignedRunwayEnd) {
+        } else if (!ifr && (pending === 'LANDING' || pending === undefined) && ac.assignedRunwayEnd) {
           // (IFR with nobody on Approach is re-sequenced by the Approach agent that Tower runs then; see controllers.ts.)
           // After a runway change the pattern re-entry is for the runway now in use, not the one the go-around was flown from.
           const active = state.activeRunways.landing;
@@ -395,6 +467,11 @@ export function createTowerAgent(): Agent {
       if (ac.flags.overhead && ac.flags.overhead !== 'BROKE') continue;
       const g = assignedEnd(airport, ac);
       if (!g) continue;
+      // A pattern aircraft is cleared to land once it is on base or final: on downwind its place in the landing sequence is not settled (sequence.ts).
+      if (isSequenceable(ac)) {
+        const leg = patternLeg(ac, g);
+        if (leg !== 'BASE' && leg !== 'FINAL') continue;
+      }
       const d = distToThresholdNm(ac, g);
       // Flight training: touch-and-go while circuits remain (the pilot's request), a full stop on the last one.
       const touchGo = !!ac.flags.training && (ac.flags.circuits ?? 0) > 1;

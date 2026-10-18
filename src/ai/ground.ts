@@ -19,12 +19,15 @@ import type { Agent, AgentView, Plan } from './core';
 import { createClearanceAgent } from './clnc';
 import type { ClearanceStore } from './clnc';
 import { closedTaxiways } from '../sim/airportOps';
-import { busyHoldIds, etaToThresholdSec, holdNodeAt, interactingRunways, nextProgressiveSegment, opposingTraffic, pendingIntermediateStops, planDeparture, planParking, remainingRouteM, taxiStartNode } from './world';
+import { HOLD_START_SNAP_M } from '../sim/groundMovement';
+import { aheadInCrossingQueue, busyHoldIds, etaToThresholdSec, holdNodeAt, interactingRunways, nextProgressiveSegment, opposingTraffic, pendingIntermediateStops, planDeparture, planParking, remainingRouteM, routePassesNear, taxiStartNode } from './world';
 import { holdTooShort } from '../sim/holdSelection';
 import * as say from './phrase';
 import { isRotorcraftType, isVehicleType } from '../sim/performance';
 
 const HANDOFF_WITHIN_M = 400;
+/** Pushback is held while another aircraft's remaining route passes within this distance of the stand (DESIGN VALUE: the lead-in plus a tug and tail). */
+const PUSHBACK_LANE_CLEAR_M = 90;
 /** A second aircraft is not released onto a route within this distance of a freshly released one for this long. */
 const TAXI_FOLLOW_SEC = 60;
 const TAXI_FOLLOW_M = 300;
@@ -90,6 +93,7 @@ export function createGroundAgent(store: ClearanceStore): Agent {
 
       // 0. Airliner at its gate asking for pushback (not FAA phraseology; the sim lets Ground approve it): approve, tail toward the lane that leads to the runway.
       if (ac.isDeparture && ac.phase === 'PARKED' && pending === 'PUSHBACK') {
+        if (routePassesNear(state, ac.pos, PUSHBACK_LANE_CLEAR_M, ac.id)) continue; // an aircraft is taxiing over the lane the push ends in: wait until it has passed
         const stand = pushbackStand(airport, ac);
         const geo = stand ? pushbackGeometry(airport, stand, ac, { departingEnds: state.activeRunways.departing }) : undefined;
         const tail = geo ? cardinal(geo.finalHeadingDeg + 180) : undefined;
@@ -218,10 +222,15 @@ export function createGroundAgent(store: ClearanceStore): Agent {
 
       // 2. Holding short of a runway on the taxi route: cross when the runway is not in use.
       if (pending === 'CROSSING' && ac.groundSpeedKt < 1) {
-        const hold = holdNodeAt(airport, ac);
+        const hold = holdNodeAt(airport, ac, HOLD_START_SNAP_M + 5);
         const rid = hold?.runwayId;
         if (!rid) continue;
         const cmd = mkCmd('CROSS_RUNWAY', ac, { crossRunwayId: rid, runwayId: rid });
+        // Several aircraft wait on one exit stub: the one nearest the runway goes first (the others cannot pass it).
+        if (aheadInCrossingQueue(state, ac)) continue;
+        // Not onto a taxiway where an aircraft waits head-on on the far side (a departure standing at the far hold line for the same runway):
+        // the crossing aircraft would stop on the runway behind it, which cannot move until the runway is free.
+        if (ac.route && opposingTraffic(state, ac.route.nodeIds.slice(Math.max(0, ac.route.progressIndex - 1)), ac.id)) continue;
         const rw = findRunway(airport, rid);
         if (rw && crossingNeedsApproval(state, 'GND', rw)) {
           // JO 7110.65 3-1-3: ask local control, wait for the answer (the aircraft keeps holding short), cross inside the approval.
