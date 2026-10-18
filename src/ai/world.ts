@@ -12,6 +12,7 @@ import type { TaxiRoute } from '../sim/pathfinding';
 import { freeParkingCandidates } from '../sim/parkingResolver';
 import { getPerformance } from '../sim/performance';
 import { pickRunwayHold } from '../sim/holdSelection';
+import { closedTaxiways } from '../sim/airportOps';
 import { runwayEntryNodes } from '../airport/graphUtils';
 
 // ---------------------------------------------------------------------------------------------------------------------
@@ -118,8 +119,8 @@ interface PickedHold {
 }
 
 /** The target selection of `commandExecutor.planTaxi` for a "taxi to runway <end> via ..." instruction (full length by default). */
-export function simulateRunwayTaxiPick(airport: Airport, startId: string, end: RunwayEndGeom, via: string[]): PickedHold | undefined {
-  const r = pickRunwayHold(airport, startId, end, via);
+export function simulateRunwayTaxiPick(airport: Airport, startId: string, end: RunwayEndGeom, via: string[], closed?: ReadonlySet<string>): PickedHold | undefined {
+  const r = pickRunwayHold(airport, startId, end, via, closed);
   return r.pick ? { hold: r.pick.hold, route: r.pick.route } : undefined;
 }
 
@@ -139,7 +140,7 @@ export interface DeparturePlan {
  * the hold nearest the threshold (`runwayEntryNodes`), a `via` list for which the engine's own target selection picks that
  * hold, and a hold-short for every runway the route crosses, in order.
  */
-export function planDeparture(airport: Airport, ac: Aircraft, ends: string[], busyHolds: ReadonlyMap<string, number> = new Map()): DeparturePlan | undefined {
+export function planDeparture(airport: Airport, ac: Aircraft, ends: string[], busyHolds: ReadonlyMap<string, number> = new Map(), closed?: ReadonlySet<string>): DeparturePlan | undefined {
   const graph = airport.taxiwayGraph;
   const start = taxiStartNode(airport, ac);
   if (!start) return undefined;
@@ -152,10 +153,10 @@ export function planDeparture(airport: Airport, ac: Aircraft, ends: string[], bu
     const entries = runwayEntryNodes(airport, g.end.id).filter((h) => !h.protectsRunwayEnd || normalizeRunwayEndId(h.protectsRunwayEnd) === normalizeRunwayEndId(g.end.id));
     for (const h of entries) {
       const remaining = g.lengthM - alongCross(g, h.pos).along;
-      const r0 = findTaxiRoute(graph, start.id, h.id, { avoidRunways: true, allowedRunwayIds: allRunwayIds(airport) });
+      const r0 = findTaxiRoute(graph, start.id, h.id, { avoidRunways: true, allowedRunwayIds: allRunwayIds(airport), avoidTaxiways: closed });
       if (!r0.route) continue;
       for (const via of viaCandidates(r0.route.taxiways)) {
-        const pick = simulateRunwayTaxiPick(airport, start.id, g, via);
+        const pick = simulateRunwayTaxiPick(airport, start.id, g, via, closed);
         if (!pick) continue;
         const pickedRemaining = g.lengthM - alongCross(g, pick.hold.pos).along;
         const plan: DeparturePlan = {
@@ -192,7 +193,8 @@ export function planParking(state: SimulationState, ac: Aircraft): ParkingPlan |
   if (!start) return undefined;
   const cands = freeParkingCandidates(state, ac, undefined, undefined).filter((p) => p.category !== 'military' || getPerformance(ac.type).category === 'light');
   if (!cands.length) return undefined;
-  const dmap = shortestDistances(graph, start.id, { allowedRunwayIds: allRunwayIds(airport) });
+  const closed = closedTaxiways(state);
+  const dmap = shortestDistances(graph, start.id, { allowedRunwayIds: allRunwayIds(airport), avoidTaxiways: closed });
   let best: ParkingPosition | undefined;
   let bestD = Infinity;
   for (const p of cands) {
@@ -203,10 +205,10 @@ export function planParking(state: SimulationState, ac: Aircraft): ParkingPlan |
     }
   }
   if (!best) return undefined;
-  const r0 = findTaxiRoute(graph, start.id, best.nodeId, { avoidRunways: true, allowedRunwayIds: allRunwayIds(airport) });
+  const r0 = findTaxiRoute(graph, start.id, best.nodeId, { avoidRunways: true, allowedRunwayIds: allRunwayIds(airport), avoidTaxiways: closed });
   if (!r0.route) return undefined;
   for (const via of viaCandidates(r0.route.taxiways)) {
-    const r = findTaxiRoute(graph, start.id, best.nodeId, { via, avoidRunways: true, allowedRunwayIds: allRunwayIds(airport) });
+    const r = findTaxiRoute(graph, start.id, best.nodeId, { via, avoidRunways: true, allowedRunwayIds: allRunwayIds(airport), avoidTaxiways: closed });
     if (r.route) return { spot: best, via, holdShort: r.route.runwayCrossings, lengthM: r.route.lengthM, nodeIds: r.route.nodeIds };
   }
   return undefined;

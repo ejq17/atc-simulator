@@ -427,13 +427,29 @@ const systems = ilsBase.map((b) => {
 const roleMap = new Map<string, Record<string, string | null>>();
 const addRole = (fix: string, chart: string, role: string): void => {
   const m = roleMap.get(fix) ?? {};
-  m[chart] = role;
+  m[chart] = m[chart] && m[chart] !== role && !m[chart]!.split('; ').includes(role) ? `${m[chart]}; ${role}` : role;
   roleMap.set(fix, m);
 };
 for (const a of proc.instrument_approaches as J[]) {
   for (const fr of a.fixes_and_roles as { fix: string; role: string }[]) {
     const tok = fr.fix.match(/\b[A-Z]{5}\b/)?.[0];
     if (tok && fixBase.some((f) => f.FIX_ID === tok)) addRole(tok, a.chart_name, fr.role);
+  }
+}
+// STAR transcriptions (`stars[].star`): every fix on a transition, on a runway leg or in the approach join of the STAR, with its role on that chart
+for (const st of (proc.stars ?? []) as J[]) {
+  const t = st.star as J | undefined;
+  if (!t) continue;
+  const chart = st.chart_name as string;
+  for (const tr of t.transitions as J[]) {
+    (tr.fixes as string[]).forEach((f, i) => {
+      if (fixBase.some((x) => x.FIX_ID === f)) addRole(f, chart, i === 0 ? `${tr.name as string} transition entry fix` : `${tr.name as string} transition`);
+    });
+  }
+  for (const rw of t.runways as J[]) {
+    (rw.fixes as string[]).forEach((f, i, a) => {
+      if (fixBase.some((x) => x.FIX_ID === f)) addRole(f, chart, i === 0 ? 'common fix' : i === a.length - 1 ? `runway ${rw.runway_end as string} end of the procedure (IAF of the expected approach)` : `runway ${rw.runway_end as string} leg`);
+    });
   }
 }
 const fixes = [...roleMap.keys()].sort().map((id) => {
@@ -457,7 +473,7 @@ const navaids = {
   _provenance: {
     sources: [`FAA NASR 28-day subscription, cycle effective ${CYCLE}; NAV_CSV, ILS_CSV, FIX_CSV zips (https://nfdc.faa.gov/webContent/28DaySub/extra/01_Oct_2026_<NAME>_CSV.zip)`, `FAA d-TPP cycle ${proc._provenance.cycle} approach plate PDFs for roles/minima`],
     ...provenanceBase,
-    method: `Extracted by scripts/extract-nasr-airport.ts ${FAA_ID} ${ICAO}. ILS rows with ARPT_ID == ${FAA_ID}; navaids named in ${icaoLower}-procedures.json navaids_referenced; fixes = every 5-letter fix named in fixes_and_roles of an instrument approach in that file (each also checked against NASR FIX_BASE and, in charted_on, FIX_CHRT).`,
+    method: `Extracted by scripts/extract-nasr-airport.ts ${FAA_ID} ${ICAO}. ILS rows with ARPT_ID == ${FAA_ID}; navaids named in ${icaoLower}-procedures.json navaids_referenced; fixes = every 5-letter fix named in fixes_and_roles of an instrument approach and every fix of a STAR transcription (stars[].star) in that file (each also checked against NASR FIX_BASE and, in charted_on, FIX_CHRT).`,
     raw: `raw/nasr_${CYCLE}/, raw/kmht_dtpp_2610_pdfs/`,
   },
   primary_navaid: { ...navObj(primaryRow), tacan_dme_channel: primaryRow.CHAN, location_note: proc.primary_navaid_note },

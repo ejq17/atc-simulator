@@ -98,6 +98,11 @@ export function fixList(state: Pick<SimulationState, 'airport'>): FixInfo[] {
   return out;
 }
 
+/** The airport's transcribed STARs for the parser ("ROZZE TWO": ident ROZZE2, transitions CRIBB, MUCOW, PONCT, QUINZ, SMYTH). */
+export function arrivalList(state: Pick<SimulationState, 'airport'>): { ident: string; spokenName: string; transitions: string[] }[] {
+  return state.airport.procedures.filter((p) => p.star).map((p) => ({ ident: p.star!.ident, spokenName: p.star!.spokenName, transitions: p.star!.transitions.map((t) => t.name) }));
+}
+
 export function buildParseContext(state: SimulationState, aircraft: Aircraft[] = Object.values(state.aircraft)) {
   const ends = state.airport.runways.flatMap((r) => r.ends.map((e) => e.id));
   return {
@@ -106,6 +111,7 @@ export function buildParseContext(state: SimulationState, aircraft: Aircraft[] =
     runwayEnds: ends,
     frequencies: state.airport.frequencies.map((f) => ({ id: f.id, mhz: f.mhz })),
     fixes: fixList(state),
+    arrivals: arrivalList(state),
   };
 }
 

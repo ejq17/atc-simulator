@@ -37,7 +37,7 @@ import { simUtcMs } from '../sim/solar';
 import { pickArrivalStart, pickParking } from './placement';
 import type { AirbornePoint } from './placement';
 import type { Difficulty, GameScenario } from './types';
-import { arrivalJoinNm, arrivalProcedure, ifrArrivalSpawn, ifrDepartureSpawn, resolveIfrFlows } from './ifr';
+import { arrivalJoinNm, arrivalProcedure, ifrArrivalSpawn, ifrDepartureSpawn, isTurbojet, resolveIfrFlows, starArrival, starArrivalSpawn } from './ifr';
 import { alongCross, findRunwayEnd } from '../sim/runways';
 import { mToNm } from '../sim/geo';
 import { findNavFix } from '../sim/navigation';
@@ -153,6 +153,7 @@ export function createTrafficGenerator(scenario: Scenario, airport: Airport, opt
     if (!flight) return undefined;
     const type = flight.type;
     const endId = ends[Math.min(ends.length - 1, Math.floor(rng!() * ends.length))];
+    if (!ga && flows.arrivals && isTurbojet(type) && starArrival(airport, endId)) return trySpawnStarArrival(state, flight, endId);
     if (!ga && flows.arrivals && arrivalProcedure(airport, endId)) return trySpawnIfrArrival(state, flight, endId);
     const others: AirbornePoint[] = Object.values(state.aircraft)
       .filter((a) => !a.onGround)
@@ -164,6 +165,31 @@ export function createTrafficGenerator(scenario: Scenario, airport: Airport, opt
       atSec: state.clock.timeSec, callsign: commit(flight), type, flightRules: ga ? 'VFR' : 'IFR', start,
       isDeparture: false, initialFrequencyId: arrivalFreq, initialRequest: 'LANDING', ...(leg.remoteAirport ? { remoteAirport: leg.remoteAirport } : {}),
     };
+  };
+
+  /**
+   * A turbojet arrival over a STAR entry fix (KMHT ROZZE TWO; `starArrival` in ifr.ts), or undefined while spacing does not allow one: no other
+   * airborne aircraft within 5 nm of the entry fix and at least 90 s since the previous IFR arrival to the runway. The arrivals share the STAR route
+   * at the same speed, so the in-trail gap at the entry fix stays the gap on final until the Approach controller changes it.
+   */
+  const trySpawnStarArrival = (state: Readonly<SimulationState>, flight: Flight, endId: string): SpawnSpec | undefined => {
+    const sa = starArrival(airport, endId)!;
+    const now = state.clock.timeSec;
+    const last = lastIfrArrival.get(endId);
+    if (last !== undefined && now - last < IFR_ARRIVAL_SPACING_SEC) return undefined;
+    const usable = sa.entries.filter((e) => {
+      const p = findNavFix(airport, e.fix)?.pos;
+      if (!p) return false;
+      return Object.values(state.aircraft).every((a) => a.onGround || Math.hypot(a.pos.x - p.x, a.pos.y - p.y) / NM >= IFR_ARRIVAL_SPACING_NM);
+    });
+    if (!usable.length) return undefined;
+    const entry = usable[Math.min(usable.length - 1, Math.floor(rng!() * usable.length))];
+    const spec = starArrivalSpawn(airport, rng!, { callsign: flight.callsign, type: flight.type, runwayEnd: endId, atSec: now, entry: entry.fix });
+    if (!spec) return undefined;
+    commit(flight);
+    lastIfrArrival.set(endId, now);
+    const leg = pickLeg(rng!, icao, flight);
+    return leg.remoteAirport ? { ...spec, remoteAirport: leg.remoteAirport } : spec;
   };
 
   /** An airline arrival over the procedure fix, or undefined while spacing does not allow one (the caller retries). */

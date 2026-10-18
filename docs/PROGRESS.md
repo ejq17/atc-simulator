@@ -104,6 +104,13 @@ New: about 80 vitest tests (provider queueing/fallback/latency budget with a moc
 Totals: 1740 vitest tests in 91 files, 34 Playwright tests passing across 6 projects (simulator, pilot-TTS in real Chrome, Whisper fake-mic, Web Speech real Chrome, Deepgram protocol) plus the opt-in real-microphone project, type-check clean. Verified by the orchestrator on 2026-10-17 after the AI-controller round.
 
 
+**Airport state and the KMHT arrival (2026-10-18, branch `task/airport-state`)** — `src/sim/airportOps.ts`, `src/sim/star.ts`, `src/weather/{runwayCondition,rvr,observation,atisOps}.ts`, `src/game/scenarios/airportEvents.ts`, `src/commands/rules-airport.ts`, UI panels / renderers:
+- **Closures** (runway, taxiway; NOTAM style, start / end times) from setup-screen options, seeded free-play events (inspection at a quiet time, taxiway closure that keeps the airport connected) and scenario events: read on the ATIS, never selected as the runway in use, avoided by taxi routing (a taxi over a closed taxiway or to a closed runway is refused), unsafe as a clearance (training refuses with the closure's reason), yellow X on the Surface and Tower views, listed on the strips and in the Weather & Runways panel.
+- **Braking action** (terms of 3-3-4, advisories 3-3-5), **runway condition codes** (RCAM, derived from METAR present weather and temperature: documented simplification), **RVR** (14 CFR 91.175(h) table, ATIS and landing clearance), **runway light requests** (pilot asks, controller answers, Tower view brightness), **bird activity** (seeded, season / time aware; "caution, bird activity" parsed and acknowledged). LAHSO now shares the runway-condition derivation.
+- **ATIS cadence**: a new letter on every new official observation (JO 7110.65 2-9-2), plus the material-change triggers and the airport-state triggers; PHRASEOLOGY-AUDIT row 83 and ambiguity 6 resolved.
+- **KMHT ROZZE TWO arrival** transcribed from the d-TPP chart (5 transitions, 4 runway legs, restrictions; checked against NASR STAR_RTE and the fix coordinates), flown with "cleared ROZZE TWO arrival [transition]" / "descend via the ROZZE TWO arrival" (parser, engine, AI Approach); turbojet arrivals at KMHT start at CRIBB / FLYZZ and fly it to the IAF. KACY keeps no STARs.
+- Tests: `src/weather/airportState.test.ts`, `src/sim/airportOps.test.ts`, `src/commands/airportState.test.ts`, `src/airport/kmht/rozze.test.ts`, `src/ai/star.test.ts`, `src/game/airportState.test.ts`, `src/ui/airportState.test.ts` (+ setup screen). Docs: BEHAVIOUR-ACCURACY T18, I17, I18, W11-W18, S3; PHRASEOLOGY-AUDIT section H (rows 135-151).
+
 ## Needs the user (cannot be done autonomously)
 
 1. **Real speech through real hardware.** Open the laptop lid (or use a working headset) so macOS enables a microphone, grant Microphone permission to the app that launches the test (System Settings > Privacy & Security > Microphone: the terminal/VS Code process and Google Chrome), then run:
@@ -128,13 +135,16 @@ Totals: 1740 vitest tests in 91 files, 34 Playwright tests passing across 6 proj
 - Lint: 3 non-blocking warnings.
 
 ## Not yet implemented (goal.md phases 5–6 and beyond)
-- Verified facts, not simplifications: KACY has no published STARs or SIDs (d-TPP cycle 2610 lists none), so IFR arrivals correctly begin at the published IAF/IF (CARYL, STEVV, KOPCE, JEDOB) and departures fly the ATLANTIC CITY THREE (radar vectors). No heavy/super wake categories are needed because neither simulated type is heavy.
+- Verified facts, not simplifications: KACY has no published STARs or SIDs (KMHT's one STAR, ROZZE TWO, is implemented) (d-TPP cycle 2610 lists none), so IFR arrivals correctly begin at the published IAF/IF (CARYL, STEVV, KOPCE, JEDOB) and departures fly the ATLANTIC CITY THREE (radar vectors). No heavy/super wake categories are needed because neither simulated type is heavy.
 - Remaining documented simplifications: the approach-gate ceiling relaxation uses a VMC approximation rather than MVA+500; LAHSO at night is refused, which matches JO 7110.118 because NASR records no LAHSO lighting at KACY (verified in the APT remarks); the 3-10-3 "suitable landmarks" condition is assumed; holding is flown at 170/90 kt (within the AIM 5-3-8 limits); no helicopter, heavy or super wake categories.
 - Additional aircraft types (regional jets, helicopters, ANG F-16s), emergencies beyond a scripted pan-pan call, holding patterns, LAHSO operations, wake-turbulence timing. (Takeoff cancellation is now implemented.)
 - Radio congestion/blocked transmissions beyond the controller stepping on a pilot; pilot clarification requests.
 - Session replay from recorded events; 3D tower view; desktop (Tauri) packaging; additional airports (architecture allows it: everything airport-specific comes from the `Airport` object).
 - Mobile layout; Firefox has no Web Speech recognition.
 - Class C airspace shape, current (2026) magnetic declination (NASR epoch 1965 value used, as charted), UNICOM, traffic pattern altitude: not in the downloaded data and therefore not shown.
+
+- Airport-state limits (docs/BEHAVIOUR-ACCURACY.md W11-W18): the runway condition code comes from the METAR present weather only (no depth, no treatment, dry as soon as the precipitation ends); RVR has no sensor model and assumes equipment on ILS runways; light-request phraseology is plain English because 7110.65 gives none; closures, bird activity and light requests are free-play features, the catalogue career / training scenarios have none unless they script them; an aircraft routed over a taxiway that then closes stops short and calls (non-standard plain English) for new taxi instructions; STAR arrivals start at CRIBB / FLYZZ (47 nm), not at the published transition starts.
+- Closures, birds and light requests were exercised by unit tests and a build, not by playing them in a browser: draw the closures on the Surface view and look at the Tower lights before trusting the pixels.
 
 ## Technical decisions
 - See `docs/ARCHITECTURE.md`. Notable: Canvas 2D instead of PixiJS (no dependency, sufficient performance); Node `http` backend with no framework; pdf.js for charts; engine types are the single contract; OSM layer kept separate from FAA data for licensing.

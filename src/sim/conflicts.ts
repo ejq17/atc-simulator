@@ -18,6 +18,7 @@ import { assessApproach, courseGeom } from './approach';
 import { computeRunwayActivity } from './runwayOccupancy';
 import { TAXI_PHASES } from './stateMachines';
 import { activeClearance, emitEvent, perfOf } from './context';
+import { activeClosures } from './airportOps';
 import { isDaylight, simUtcMs } from './solar';
 import { getPerformance, lineUpTimeSec, srsCategory, wakeRecatCategory } from './performance';
 import { wakeMinimumNm } from './wake';
@@ -27,6 +28,7 @@ import type { SimContext } from './context';
 export const REF_SAME_RUNWAY = 'FAA JO 7110.65 3-9-6 (same runway separation)';
 export const REF_MVA = 'FAA JO 7110.65 5-6-1 (vector aircraft at or above the MVA or the minimum IFR altitude)';
 export const REF_LANDING = 'FAA JO 7110.65 3-10-5 (landing clearance) and 3-10-3 (same runway separation)';
+export const REF_CLOSED_RUNWAY = 'FAA JO 7110.65 3-3-2 (closed/unsafe runway information) and 3-10-5 (landing clearance)';
 export const REF_TAXI = 'FAA JO 7110.65 3-7-2 (taxi and ground movement, runway crossings)';
 export const REF_INTERSECTING = 'FAA JO 7110.65 3-9-8 / 3-10-4 (intersecting runway separation)';
 export const REF_WAKE_INTERSECTION = 'FAA JO 7110.65 3-9-7 (wake turbulence separation for intersection departures)';
@@ -378,12 +380,31 @@ function assessApproachSeparation(state: SimulationState, ac: Aircraft, cmd: Par
  * Would issuing `cmd` create an unsafe situation given the current state?
  * Pure: reads the state only. Used by the executor before any state change.
  */
+/** A takeoff / line up / landing / approach / pattern clearance onto a runway closed by NOTAM (3-3-2: "RUNWAY (number) CLOSED/UNSAFE ... UNABLE TO ISSUE ... CLEARANCE"). */
+function closedRunwayIssues(state: SimulationState, ac: Aircraft, cmd: ParsedCommand): SafetyIssue[] {
+  if (!['TAKEOFF', 'LINE_UP_AND_WAIT', 'LAND', 'APPROACH', 'ENTER_PATTERN'].includes(cmd.kind)) return [];
+  const g = findRunwayEnd(state.airport, cmd.runwayEnd ?? cmd.runwayId ?? ac.assignedRunwayEnd);
+  if (!g) return [];
+  const c = activeClosures(state).find((x) => x.kind === 'RUNWAY' && x.ident === g.runway.id);
+  if (!c) return [];
+  const what = cmd.kind === 'TAKEOFF' ? 'Takeoff clearance' : cmd.kind === 'LINE_UP_AND_WAIT' ? 'Line up and wait' : cmd.kind === 'LAND' ? 'Landing clearance' : cmd.kind === 'APPROACH' ? 'Approach clearance' : 'Pattern clearance';
+  return [{
+    kind: 'UNSAFE_CLEARANCE', aircraftIds: [ac.id], runwayId: g.runway.id, reference: REF_CLOSED_RUNWAY,
+    text: `${what} for ${ac.callsign} to runway ${g.end.id}, but runway ${g.runway.id} is closed (${c.reason})`,
+  }];
+}
+
 export function assessClearanceSafety(state: SimulationState, cmd: ParsedCommand): SafetyAssessment {
   const issues: SafetyIssue[] = [];
   const ac = cmd.callsign ? Object.values(state.aircraft).find((a) => a.callsign.toUpperCase() === cmd.callsign!.toUpperCase()) : undefined;
   if (!ac) return { safe: true, issues };
   const { airport } = state;
-  if (cmd.kind === 'APPROACH') return assessApproachSeparation(state, ac, cmd);
+  issues.push(...closedRunwayIssues(state, ac, cmd));
+  if (cmd.kind === 'APPROACH') {
+    const a = assessApproachSeparation(state, ac, cmd);
+    const all = [...issues, ...a.issues];
+    return { safe: all.length === 0, issues: all };
+  }
   if (cmd.kind === 'HEADING' || cmd.kind === 'ALTITUDE') return assessMva(state, ac, cmd);
   const activity = computeRunwayActivity(state);
 
@@ -394,9 +415,9 @@ export function assessClearanceSafety(state: SimulationState, cmd: ParsedCommand
   } else if (cmd.kind === 'CROSS_RUNWAY') {
     runwayId = findRunway(airport, cmd.crossRunwayId ?? cmd.runwayId ?? cmd.runwayEnd)?.id;
   } else {
-    return { safe: true, issues };
+    return { safe: issues.length === 0, issues };
   }
-  if (!runwayId || !activity[runwayId]) return { safe: true, issues };
+  if (!runwayId || !activity[runwayId]) return { safe: issues.length === 0, issues };
   const act = activity[runwayId];
   const others = (ids: string[]) => ids.filter((i) => i !== ac.id);
 

@@ -7,7 +7,7 @@
   "retrieved": "2026-10-17",
   "faa_cycle_effective": "2026-10-01",
   "faa_cycle_next": "2026-10-29",
-  "method": "Extracted by scripts/extract-nasr-airport.ts MHT KMHT. ILS rows with ARPT_ID == MHT; navaids named in kmht-procedures.json navaids_referenced; fixes = every 5-letter fix named in fixes_and_roles of an instrument approach in that file (each also checked against NASR FIX_BASE and, in charted_on, FIX_CHRT).",
+  "method": "Extracted by scripts/extract-nasr-airport.ts MHT KMHT. ILS rows with ARPT_ID == MHT; navaids named in kmht-procedures.json navaids_referenced; fixes = every 5-letter fix named in fixes_and_roles of an instrument approach and every fix of a STAR transcription (stars[].star) in that file (each also checked against NASR FIX_BASE and, in charted_on, FIX_CHRT).",
   "raw": "raw/nasr_2026-10-01/, raw/kmht_dtpp_2610_pdfs/"
  },
  "primary_navaid": {
@@ -241,6 +241,20 @@
    "source": "NASR FIX_BASE.csv / FIX_NAV.csv / FIX_CHRT.csv; roles read from the d-TPP plate images (human transcription of PDF)"
   },
   {
+   "id": "CRIBB",
+   "lat": 42.66553888,
+   "lon": -72.45023888,
+   "fix_use_code": "WP",
+   "fix_use_meaning": null,
+   "artcc_low": "ZBW",
+   "charted_on": "CONTROLLER, ENROUTE HIGH, STAR",
+   "reference_navaid_radial_distance": [],
+   "roles_on_plates": {
+    "ROZZE TWO ARRIVAL (RNAV)": "CRIBB transition entry fix; MUCOW transition"
+   },
+   "source": "NASR FIX_BASE.csv / FIX_NAV.csv / FIX_CHRT.csv; roles read from the d-TPP plate images (human transcription of PDF)"
+  },
+  {
    "id": "CUXOV",
    "lat": 43.00289722,
    "lon": -71.35610555,
@@ -284,6 +298,20 @@
    "source": "NASR FIX_BASE.csv / FIX_NAV.csv / FIX_CHRT.csv; roles read from the d-TPP plate images (human transcription of PDF)"
   },
   {
+   "id": "FFATY",
+   "lat": 42.59094444,
+   "lon": -72.65568333,
+   "fix_use_code": "WP",
+   "fix_use_meaning": null,
+   "artcc_low": "ZBW",
+   "charted_on": "STAR",
+   "reference_navaid_radial_distance": [],
+   "roles_on_plates": {
+    "ROZZE TWO ARRIVAL (RNAV)": "MUCOW transition"
+   },
+   "source": "NASR FIX_BASE.csv / FIX_NAV.csv / FIX_CHRT.csv; roles read from the d-TPP plate images (human transcription of PDF)"
+  },
+  {
    "id": "FITZY",
    "lat": 42.87009444,
    "lon": -71.52132222,
@@ -312,6 +340,20 @@
    "source": "NASR FIX_BASE.csv / FIX_NAV.csv / FIX_CHRT.csv; roles read from the d-TPP plate images (human transcription of PDF)"
   },
   {
+   "id": "FLYZZ",
+   "lat": 42.803725,
+   "lon": -72.49033333,
+   "fix_use_code": "WP",
+   "fix_use_meaning": null,
+   "artcc_low": "ZBW",
+   "charted_on": "STAR",
+   "reference_navaid_radial_distance": [],
+   "roles_on_plates": {
+    "ROZZE TWO ARRIVAL (RNAV)": "PONCT transition; QUINZ transition; SMYTH transition"
+   },
+   "source": "NASR FIX_BASE.csv / FIX_NAV.csv / FIX_CHRT.csv; roles read from the d-TPP plate images (human transcription of PDF)"
+  },
+  {
    "id": "FOSAN",
    "lat": 42.88311111,
    "lon": -71.71975555,
@@ -322,6 +364,20 @@
    "reference_navaid_radial_distance": [],
    "roles_on_plates": {
     "RNAV (GPS) RWY 06": "IAF"
+   },
+   "source": "NASR FIX_BASE.csv / FIX_NAV.csv / FIX_CHRT.csv; roles read from the d-TPP plate images (human transcription of PDF)"
+  },
+  {
+   "id": "FYSHR",
+   "lat": 42.82058055,
+   "lon": -72.15394166,
+   "fix_use_code": "WP",
+   "fix_use_meaning": null,
+   "artcc_low": "ZBW",
+   "charted_on": "STAR",
+   "reference_navaid_radial_distance": [],
+   "roles_on_plates": {
+    "ROZZE TWO ARRIVAL (RNAV)": "PONCT transition; QUINZ transition; SMYTH transition"
    },
    "source": "NASR FIX_BASE.csv / FIX_NAV.csv / FIX_CHRT.csv; roles read from the d-TPP plate images (human transcription of PDF)"
   },
@@ -377,6 +433,20 @@
    "source": "NASR FIX_BASE.csv / FIX_NAV.csv / FIX_CHRT.csv; roles read from the d-TPP plate images (human transcription of PDF)"
   },
   {
+   "id": "JSTNN",
+   "lat": 43.01771666,
+   "lon": -71.49214166,
+   "fix_use_code": "WP",
+   "fix_use_meaning": null,
+   "artcc_low": "ZBW",
+   "charted_on": "STAR",
+   "reference_navaid_radial_distance": [],
+   "roles_on_plates": {
+    "ROZZE TWO ARRIVAL (RNAV)": "runway 24 end of the procedure (IAF of the expected approach)"
+   },
+   "source": "NASR FIX_BASE.csv / FIX_NAV.csv / FIX_CHRT.csv; roles read from the d-TPP plate images (human transcription of PDF)"
+  },
+  {
    "id": "KHRIS",
    "lat": 42.95030277,
    "lon": -71.25987777,
@@ -395,6 +465,20 @@
    "roles_on_plates": {
     "ILS OR LOC RWY 06": "missed approach hold",
     "RNAV (GPS) RWY 06": "missed approach hold"
+   },
+   "source": "NASR FIX_BASE.csv / FIX_NAV.csv / FIX_CHRT.csv; roles read from the d-TPP plate images (human transcription of PDF)"
+  },
+  {
+   "id": "LUCIC",
+   "lat": 42.79001388,
+   "lon": -72.74296111,
+   "fix_use_code": "WP",
+   "fix_use_meaning": null,
+   "artcc_low": "ZBW",
+   "charted_on": "STAR",
+   "reference_navaid_radial_distance": [],
+   "roles_on_plates": {
+    "ROZZE TWO ARRIVAL (RNAV)": "PONCT transition; QUINZ transition; SMYTH transition"
    },
    "source": "NASR FIX_BASE.csv / FIX_NAV.csv / FIX_CHRT.csv; roles read from the d-TPP plate images (human transcription of PDF)"
   },
@@ -453,6 +537,48 @@
    "roles_on_plates": {
     "ILS OR LOC RWY 35": "FAF (ILS glideslope intercept 1600)",
     "RNAV (GPS) Y RWY 35": "FAF"
+   },
+   "source": "NASR FIX_BASE.csv / FIX_NAV.csv / FIX_CHRT.csv; roles read from the d-TPP plate images (human transcription of PDF)"
+  },
+  {
+   "id": "MONRC",
+   "lat": 42.77674444,
+   "lon": -72.13925277,
+   "fix_use_code": "WP",
+   "fix_use_meaning": null,
+   "artcc_low": "ZBW",
+   "charted_on": "STAR",
+   "reference_navaid_radial_distance": [],
+   "roles_on_plates": {
+    "ROZZE TWO ARRIVAL (RNAV)": "CRIBB transition; MUCOW transition"
+   },
+   "source": "NASR FIX_BASE.csv / FIX_NAV.csv / FIX_CHRT.csv; roles read from the d-TPP plate images (human transcription of PDF)"
+  },
+  {
+   "id": "MUCOW",
+   "lat": 42.48304166,
+   "lon": -72.95228611,
+   "fix_use_code": "WP",
+   "fix_use_meaning": null,
+   "artcc_low": "ZBW",
+   "charted_on": "CONTROLLER, ENROUTE HIGH, STAR",
+   "reference_navaid_radial_distance": [],
+   "roles_on_plates": {
+    "ROZZE TWO ARRIVAL (RNAV)": "MUCOW transition entry fix"
+   },
+   "source": "NASR FIX_BASE.csv / FIX_NAV.csv / FIX_CHRT.csv; roles read from the d-TPP plate images (human transcription of PDF)"
+  },
+  {
+   "id": "NUUKM",
+   "lat": 42.83178888,
+   "lon": -71.92790555,
+   "fix_use_code": "WP",
+   "fix_use_meaning": null,
+   "artcc_low": "ZBW",
+   "charted_on": "STAR",
+   "reference_navaid_radial_distance": [],
+   "roles_on_plates": {
+    "ROZZE TWO ARRIVAL (RNAV)": "runway 17 leg; runway 24 leg; runway 35 leg"
    },
    "source": "NASR FIX_BASE.csv / FIX_NAV.csv / FIX_CHRT.csv; roles read from the d-TPP plate images (human transcription of PDF)"
   },
@@ -527,6 +653,34 @@
    "source": "NASR FIX_BASE.csv / FIX_NAV.csv / FIX_CHRT.csv; roles read from the d-TPP plate images (human transcription of PDF)"
   },
   {
+   "id": "PNARD",
+   "lat": 42.83164444,
+   "lon": -71.92787777,
+   "fix_use_code": "WP",
+   "fix_use_meaning": null,
+   "artcc_low": "ZBW",
+   "charted_on": "STAR",
+   "reference_navaid_radial_distance": [],
+   "roles_on_plates": {
+    "ROZZE TWO ARRIVAL (RNAV)": "runway 6 leg"
+   },
+   "source": "NASR FIX_BASE.csv / FIX_NAV.csv / FIX_CHRT.csv; roles read from the d-TPP plate images (human transcription of PDF)"
+  },
+  {
+   "id": "PONCT",
+   "lat": 42.74689722,
+   "lon": -73.81335277,
+   "fix_use_code": "WP",
+   "fix_use_meaning": null,
+   "artcc_low": "ZBW",
+   "charted_on": "CONTROLLER HIGH, CONTROLLER LOW, ENROUTE HIGH, ENROUTE LOW, STAR",
+   "reference_navaid_radial_distance": [],
+   "roles_on_plates": {
+    "ROZZE TWO ARRIVAL (RNAV)": "PONCT transition entry fix"
+   },
+   "source": "NASR FIX_BASE.csv / FIX_NAV.csv / FIX_CHRT.csv; roles read from the d-TPP plate images (human transcription of PDF)"
+  },
+  {
    "id": "PROES",
    "lat": 42.67808611,
    "lon": -71.82620277,
@@ -558,7 +712,8 @@
    "reference_navaid_radial_distance": [],
    "roles_on_plates": {
     "ILS OR LOC RWY 17": "IAF (second transition, listed after the primary route)",
-    "RNAV (GPS) Y RWY 17": "IAF (second transition, listed after the primary route)"
+    "RNAV (GPS) Y RWY 17": "IAF (second transition, listed after the primary route)",
+    "ROZZE TWO ARRIVAL (RNAV)": "runway 17 end of the procedure (IAF of the expected approach)"
    },
    "source": "NASR FIX_BASE.csv / FIX_NAV.csv / FIX_CHRT.csv; roles read from the d-TPP plate images (human transcription of PDF)"
   },
@@ -577,6 +732,34 @@
    "source": "NASR FIX_BASE.csv / FIX_NAV.csv / FIX_CHRT.csv; roles read from the d-TPP plate images (human transcription of PDF)"
   },
   {
+   "id": "QUINZ",
+   "lat": 42.7732,
+   "lon": -73.05014444,
+   "fix_use_code": "WP",
+   "fix_use_meaning": null,
+   "artcc_low": "ZBW",
+   "charted_on": "CONTROLLER HIGH, CONTROLLER LOW, ENROUTE HIGH, ENROUTE LOW, STAR",
+   "reference_navaid_radial_distance": [],
+   "roles_on_plates": {
+    "ROZZE TWO ARRIVAL (RNAV)": "PONCT transition; QUINZ transition entry fix; SMYTH transition"
+   },
+   "source": "NASR FIX_BASE.csv / FIX_NAV.csv / FIX_CHRT.csv; roles read from the d-TPP plate images (human transcription of PDF)"
+  },
+  {
+   "id": "ROZZE",
+   "lat": 42.82923888,
+   "lon": -71.99245833,
+   "fix_use_code": "WP",
+   "fix_use_meaning": null,
+   "artcc_low": "ZBW",
+   "charted_on": "CONTROLLER, ENROUTE LOW, STAR",
+   "reference_navaid_radial_distance": [],
+   "roles_on_plates": {
+    "ROZZE TWO ARRIVAL (RNAV)": "common fix"
+   },
+   "source": "NASR FIX_BASE.csv / FIX_NAV.csv / FIX_CHRT.csv; roles read from the d-TPP plate images (human transcription of PDF)"
+  },
+  {
    "id": "SHOWZ",
    "lat": 42.805425,
    "lon": -71.58101388,
@@ -587,7 +770,8 @@
    "reference_navaid_radial_distance": [],
    "roles_on_plates": {
     "ILS OR LOC RWY 35": "IAF (second transition, listed after the primary route)",
-    "RNAV (GPS) Y RWY 35": "IAF (second transition, listed after the primary route)"
+    "RNAV (GPS) Y RWY 35": "IAF (second transition, listed after the primary route)",
+    "ROZZE TWO ARRIVAL (RNAV)": "runway 35 end of the procedure (IAF of the expected approach)"
    },
    "source": "NASR FIX_BASE.csv / FIX_NAV.csv / FIX_CHRT.csv; roles read from the d-TPP plate images (human transcription of PDF)"
   },
@@ -613,6 +797,20 @@
    "source": "NASR FIX_BASE.csv / FIX_NAV.csv / FIX_CHRT.csv; roles read from the d-TPP plate images (human transcription of PDF)"
   },
   {
+   "id": "SMYTH",
+   "lat": 42.5046,
+   "lon": -73.88496111,
+   "fix_use_code": "WP",
+   "fix_use_meaning": null,
+   "artcc_low": "ZBW",
+   "charted_on": "CONTROLLER, ENROUTE HIGH, STAR",
+   "reference_navaid_radial_distance": [],
+   "roles_on_plates": {
+    "ROZZE TWO ARRIVAL (RNAV)": "SMYTH transition entry fix"
+   },
+   "source": "NASR FIX_BASE.csv / FIX_NAV.csv / FIX_CHRT.csv; roles read from the d-TPP plate images (human transcription of PDF)"
+  },
+  {
    "id": "TEETO",
    "lat": 42.81309722,
    "lon": -71.70761388,
@@ -622,7 +820,8 @@
    "charted_on": "IAP, STAR",
    "reference_navaid_radial_distance": [],
    "roles_on_plates": {
-    "ILS OR LOC RWY 06": "IAF"
+    "ILS OR LOC RWY 06": "IAF",
+    "ROZZE TWO ARRIVAL (RNAV)": "runway 6 end of the procedure (IAF of the expected approach)"
    },
    "source": "NASR FIX_BASE.csv / FIX_NAV.csv / FIX_CHRT.csv; roles read from the d-TPP plate images (human transcription of PDF)"
   },
@@ -637,6 +836,20 @@
    "reference_navaid_radial_distance": [],
    "roles_on_plates": {
     "RNAV (GPS) RWY 24": "IF/IAF (hold 6000-2800)"
+   },
+   "source": "NASR FIX_BASE.csv / FIX_NAV.csv / FIX_CHRT.csv; roles read from the d-TPP plate images (human transcription of PDF)"
+  },
+  {
+   "id": "WOBLY",
+   "lat": 42.75835555,
+   "lon": -73.49883611,
+   "fix_use_code": "WP",
+   "fix_use_meaning": null,
+   "artcc_low": "ZBW",
+   "charted_on": "CONTROLLER HIGH, CONTROLLER LOW, ENROUTE HIGH, ENROUTE LOW, STAR",
+   "reference_navaid_radial_distance": [],
+   "roles_on_plates": {
+    "ROZZE TWO ARRIVAL (RNAV)": "PONCT transition"
    },
    "source": "NASR FIX_BASE.csv / FIX_NAV.csv / FIX_CHRT.csv; roles read from the d-TPP plate images (human transcription of PDF)"
   },

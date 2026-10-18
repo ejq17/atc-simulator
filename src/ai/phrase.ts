@@ -128,7 +128,13 @@ export function airportInfo(ac: Aircraft, dirDeg: number | undefined, speedKt: n
 export const clearedForTakeoff = (ac: Aircraft, runwayEnd: string, runwayHeading: boolean): Phrase =>
   clauses(callsign(ac), words('runway', rwy(runwayEnd)), runwayHeading && 'fly runway heading', 'cleared for takeoff');
 
-export const clearedToLand = (ac: Aircraft, runwayEnd: string): Phrase => clauses(callsign(ac), words('runway', rwy(runwayEnd)), 'cleared to land');
+/**
+ * "<callsign>, [runway N RVR two thousand four hundred,] [braking action medium, reported by a Boeing seven thirty seven,] runway N, cleared to land."
+ * The RVR (JO 7110.65 2-8-2: local control issues the current RVR to each aircraft prior to landing, 2-8-3 wording) and the braking action
+ * information (3-3-5: the latest report for the runway in use to each arriving aircraft, or "no braking action reports received") go in front of the clearance.
+ */
+export const clearedToLand = (ac: Aircraft, runwayEnd: string, info: Phrase[] = []): Phrase =>
+  clauses(callsign(ac), ...info, words('runway', rwy(runwayEnd)), 'cleared to land');
 
 export const continueApproach = (ac: Aircraft): Phrase => clauses(callsign(ac), 'continue approach');
 
@@ -150,6 +156,19 @@ export function descendMaintain(ft: number, currentFt: number): Phrase {
   const verb = currentFt > ft + 50 ? 'descend and maintain' : currentFt < ft - 50 ? 'climb and maintain' : 'maintain';
   return { text: `${verb} ${altitude(ft).text}`, spoken: `${verb} ${spokenAltitude(ft)}` };
 }
+
+/** "descend via the Rozze Two arrival" (JO 7110.65 4-5-7, 4-7-1: the name and number without the parenthesised chart words). */
+export const descendViaArrival = (spokenName: string): Phrase => {
+  const n = titleCase(spokenName);
+  return { text: `descend via the ${n} arrival`, spoken: `descend via the ${n} arrival` };
+};
+
+/**
+ * Answer to a pilot's request for the runway lights up or down. JO 7110.65 3-4-10 d / 3-4-11 allow the change at the pilot's request but give no
+ * phraseology for the answer: plain English, callsign first (2-4-14).
+ */
+export const lightsAnswer = (ac: Pick<Aircraft, 'spokenCallsign'>, direction: 'up' | 'down'): Phrase =>
+  clauses(callsign(ac), direction === 'up' ? 'runway lights increased' : 'runway lights decreased');
 
 export const direct = (airport: Airport, fix: string): Phrase => {
   const n = spokenFix(airport, fix);

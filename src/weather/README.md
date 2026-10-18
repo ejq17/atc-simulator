@@ -7,8 +7,13 @@ Pure TypeScript, no DOM dependency (except `liveWeather.ts`, which uses `fetch`)
 |---|---|
 | `metar.ts` | `parseMetar(raw)` -> `Weather`; `parseMetarDetailed(raw)` (adds station, time group, AUTO/COR, variable wind sector, remarks, missing/unparsed groups); `computeFlightCategory`, `ceilingFt`, `windMagnetic`, `KACY_MAGNETIC_VARIATION_DEG` (-10) |
 | `presets.ts` | `WEATHER_PRESETS` (clear, light-crosswinds, strong-winds, gusty-crosswind, low-visibility, rain, thunderstorms, imc), `getPresetWeather(id)`, `randomWeather(seed)` (inline mulberry32) |
-| `runwaySelection.ts` | `headwindComponent`, `crosswindComponent`, `crosswindSigned`, `recommendRunways` |
-| `atis.ts` | `generateAtis`, `nextAtisLetter`, `atisNeedsUpdate` / `atisUpdateReasons`, spoken-number helpers |
+| `runwaySelection.ts` | `headwindComponent`, `crosswindComponent`, `crosswindSigned`, `recommendRunways` (option `excludeEnds`: the ends of a closed runway are never picked) |
+| `atis.ts` | `generateAtis` (input `ops`: closures, RVR, runway condition codes, braking action, bird activity), `nextAtisLetter`, `atisNeedsUpdate` / `atisUpdateReasons`, spoken-number helpers |
+| `atisOps.ts` | `buildAtisOps(state, utcMs)`: the airport-state content of an ATIS from the simulation state |
+| `runwayCondition.ts` | `runwayCondition(weather)` (RCAM code 0-6 derived from present weather and temperature), braking action terms, `brakingAdvisoriesInEffect` |
+| `rvr.ts` | RVR table (14 CFR 91.175(h) = AIM TBL 5-4-1), `rvrForVisibility`, `visibilityFromRvr`, `rvrPhrase` |
+| `observation.ts` | `isOfficialObservation` / `isNewObservation`: routine hourly METAR or SPECI (JO 7110.65 2-9-2) |
+| `atisCycle.ts` | the HH:55Z hourly slot for simulated weather |
 | `liveWeather.ts` | `fetchLiveMetar(icao)`: local backend (AWC), else the NWS API from the browser; typed `LiveWeatherError` |
 
 ## Conventions
@@ -52,6 +57,16 @@ spokenText: ... Wind three zero zero at one seven, gusts two three. Visibility o
             eight three. ... Notices to air missions: Taxiway B closed. ...
 ```
 
+```ts
+generateAtis({ ...input, ops: {
+  closures: [{ kind: 'RUNWAY', ident: '4/22' }, { kind: 'TAXIWAY', ident: 'B' }],      // "NOTAMs: Runway 4/22 closed. Taxiway B closed."
+  rvr: [{ runwayEnd: '6', report: { kind: 'value', rvrFt: 2400 } }],                     // "Runway 6 RVR 2400." right after the visibility
+  rwyCondition: [{ runwayEnd: '6', code: 5, atUtc: '1651' }],                            // "Runway 6 condition codes 5, 5, 5 at 1651 Zulu."
+  brakingAdvisories: true, braking: { term: 'medium', aircraftSpoken: 'a Boeing seven thirty seven' },
+  birds: 'flocks of small birds, altitude unknown',                                      // "Bird activity in the vicinity of the airport, ..."
+} });
+```
+
 Content and order follow 7110.65 2-9-3 and AIM 4-1-13 (see `docs/PHRASEOLOGY-AUDIT.md`): the approach in use names the landing
 runway, a departure runway is added only when it differs ("Departing runway 4."), and the hold-short readback statement is
 included unless `holdShortReadback: false`.
@@ -63,10 +78,20 @@ and a `weather` snapshot used by `atisNeedsUpdate`. The text uses the phonetic w
 tens and converted to magnetic. `issuedAtSec` is the sim clock value you pass (`issuedAtSec`, default 0).
 Cloud heights are AGL, so `elevationFt` is only echoed back as `fieldElevationFt`.
 
-`nextAtisLetter('Z') === 'A'`. `atisNeedsUpdate(prevAtis, nextWeather, nextRunways?)` is true when: wind direction
+`nextAtisLetter('Z') === 'A'`. `atisNeedsUpdate(prevAtis, nextWeather, nextRunways?, nextOps?)` is true when: wind direction
 changes >= 30 degrees (ignored while both calm; variable<->steady counts), wind speed or gusts change >= 5 kt,
 altimeter changes >= 0.02 inHg, visibility or ceiling crosses a category boundary (LIFR/IFR/MVFR/VFR bands each),
-a thunderstorm appears/disappears (addition beyond the brief), or the runway set changes.
+a thunderstorm appears/disappears (addition beyond the brief), the runway set changes, **a new official observation** arrives (below) or, with `nextOps`, the airport state changed the way JO 7110.65 2-9-2 lists it: new or canceled closures (NOTAMs), a braking action report worse than the one in the broadcast (or advisories starting / stopping), bird activity starting / stopping, new runway condition codes.
+
+### ATIS cadence (JO 7110.65 2-9-2)
+
+"Make a new recording ... upon receipt of any new official weather regardless of whether there is or is not a change in values." Official weather is the routine hourly METAR and a SPECI (`observation.ts`: observation minute 50-59, KACY and KMHT report at :54, or a `SPECI` prefix); the 5-minute ASOS observations of the NWS feed are not official and only count when the values change enough. Live weather therefore makes a new letter on every new hourly METAR even with identical values. Simulated weather has no observation time: the real-time session runs the HH:55Z slot (`atisCycle.ts`) as the routine hourly observation (the slot is not also run for live weather, so one observation never makes two letters). The material-change triggers stay as they were.
+
+## Airport state (`runwayCondition.ts`, `rvr.ts`)
+
+* **Runway condition** (AC 150/5200-30D Table 5-2, RCAM): `runwayCondition(weather)` derives one code for the whole runway from the CURRENT present weather and temperature: no precipitation = 6 (dry); light rain / drizzle / light snow = 5 (wet, good); heavy rain or moderate-heavy snow above freezing = 2 (water or slush over 1/8 inch, medium to poor); moderate-heavy snow at or below freezing and ice pellets = 3 (medium); freezing rain = 1 (ice, poor). Code to braking term: 5 good, 4 good to medium, 3 medium, 2 medium to poor, 1 poor, 0 nil. SIMPLIFICATION: a METAR has no contaminant depth, runway state or treatment, so depths are assumed from intensity and a runway stays "dry" as soon as the precipitation ends; vicinity (VC) precipitation does not wet it. The same derivation feeds the ATIS condition codes, the braking action pilots report and the LAHSO dry-runway test (`planLahso`).
+* **Braking action**: the six terms of JO 7110.65 3-3-4; "Braking Action Advisories are in effect" (3-3-5) when a medium / medium-to-poor / poor / nil report is on file or the weather is conducive (RwyCC 3 or below, or precipitation at 3 C or colder). The ATIS reads the latest report with the aircraft type ("Braking action medium, reported by a Boeing seven thirty seven").
+* **RVR**: `RVR_TABLE` is 14 CFR 91.175(h)(2) / AIM TBL 5-4-1 (1,600 = 1/4, 2,400 = 1/2, 3,200 = 5/8, 4,000 = 3/4, 4,500 = 7/8, 5,000 = 1, 6,000 = 1 1/4). `rvrForVisibility` inverts it (the largest listed RVR whose visibility does not exceed the prevailing visibility; AIM: converting RVR to visibility uses the next higher listed RVR, no interpolation) and returns nothing above 1 1/4 SM (RVR 6,000 ft or less is reportable, 2-8-2). Below 1/4 SM it says "less than 1,600" rather than inventing a value. No sensor model: RVR is assumed on runway ends with an ILS (the NASR data has no RVR equipment field). The ATIS gives it after the visibility in the 2-8-3 form ("Runway Six RVR two thousand four hundred") and the AI Tower says it in the landing clearance (2-8-2).
 
 ## Live weather
 
@@ -93,6 +118,6 @@ the simulation, not a claim about real airport operations.
 
 ## Tests
 
-`npm test -- src/weather`: about 50 METARs (18 real ones fetched from AWC on 2026-10-17, KACY included, plus hand-built edge cases),
+`npm test -- src/weather` (`airportState.test.ts` covers the airport-state content, RVR table and ATIS cadence): about 50 METARs (18 real ones fetched from AWC on 2026-10-17, KACY included, plus hand-built edge cases),
 category thresholds, wind maths, runway recommendation, presets/random weather, ATIS text and spoken rendering,
 `atisNeedsUpdate`, and the live client (backend, NWS conversion, fallback order) with a mocked `fetch`; tests never touch the network.

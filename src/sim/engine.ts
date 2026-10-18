@@ -26,6 +26,7 @@ import {
 import type { TrafficGenerator } from './traffic';
 import { createBasicTrafficGenerator } from './traffic';
 import { frequencyForPosition } from '../radio/frequencies';
+import { addClosureToState, announceClosureChanges, enforceClosuresOnRoutes, newAirportOps } from './airportOps';
 
 export interface EngineOptionsExt extends EngineOptions {
   /** Probability per eligible clearance of a pilot readback mistake. Default: 0 training, 0.08 otherwise. */
@@ -80,7 +81,12 @@ export function createEngine(opts: EngineOptionsExt): SimulationEngine & Simulat
     scenario,
     score: newScoreCard(),
     seed: scenario.seed,
+    ops: newAirportOps(),
   };
+  for (const c of scenario.closures ?? []) {
+    const r = addClosureToState(state, { ...c, startSec: c.startSec ?? 0 }, 'setup');
+    if (!r.ok) console.warn(`[sim] scenario closure ignored: ${r.reason}`);
+  }
   setSimulationEpoch(state, opts.utcStartMs ?? Date.now());
   const ctx: SimContext = {
     state,
@@ -100,6 +106,7 @@ export function createEngine(opts: EngineOptionsExt): SimulationEngine & Simulat
     clearanceAlerts: [],
     waitStats: { count: 0, totalSec: 0, delaySec: 0 },
     spawnedIdx: new Set(),
+    opsAnnounced: new Set(),
   };
   const generator = opts.trafficGenerator ?? createBasicTrafficGenerator();
   const listeners = new Set<(s: SimulationState) => void>();
@@ -120,11 +127,14 @@ export function createEngine(opts: EngineOptionsExt): SimulationEngine & Simulat
     for (const spec of generator.update(state)) spawnFromSpec(ctx, spec);
     applyPendingFrequencyChanges(ctx);
     updatePilotRequests(ctx);
+    enforceClosuresOnRoutes(ctx);
     updateGroundMovement(ctx, dt);
     updateFlightDynamics(ctx, dt);
     updateRunwayOccupancy(ctx);
     detectConflicts(ctx);
     updateLifecycle(ctx);
+    announceClosureChanges(ctx);
+    if (state.ops.birds && state.clock.timeSec >= state.ops.birds.untilSec) state.ops.birds = undefined;
     updateScoring(ctx);
 
     const before = state.clock.timeSec;
@@ -215,6 +225,35 @@ export function createEngine(opts: EngineOptionsExt): SimulationEngine & Simulat
       const ev = emitEvent(ctx, event);
       notify();
       return ev;
+    },
+    addClosure(spec, source = 'player') {
+      const r = addClosureToState(state, spec, source);
+      if (r.ok) notify();
+      return r;
+    },
+    removeClosure(id) {
+      const c = state.ops.closures.find((x) => x.id === id);
+      if (!c || (c.endSec !== undefined && c.endSec <= state.clock.timeSec)) return false;
+      c.endSec = state.clock.timeSec;
+      notify();
+      return true;
+    },
+    setBirdActivity(text, durationSec = 1800) {
+      state.ops.birds = text ? { text, untilSec: state.clock.timeSec + durationSec } : undefined;
+      if (text) emitEvent(ctx, { kind: 'SCENARIO', severity: 'info', speaker: 'SYSTEM', text: `Bird activity: ${text}`, data: { birds: true } });
+      notify();
+    },
+    setRunwayLightStep(runwayId, step) {
+      if (step === undefined) delete state.ops.lightStep[runwayId];
+      else state.ops.lightStep[runwayId] = Math.max(1, Math.min(5, Math.round(step)));
+      notify();
+    },
+    reportBrakingAction(report) {
+      const full = { ...report, atSec: state.clock.timeSec };
+      state.ops.braking.push(full);
+      if (state.ops.braking.length > 20) state.ops.braking.splice(0, state.ops.braking.length - 20);
+      notify();
+      return full;
     },
     random: () => rng(),
     getAirport: () => airport,

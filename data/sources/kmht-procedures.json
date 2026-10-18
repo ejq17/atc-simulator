@@ -742,7 +742,331 @@
     "bytes": 169998,
     "local_file": "raw/kmht_dtpp_2610_pdfs/00246ROZZE.PDF"
    },
-   "note": "Metadata chart name \"ROZZE TWO (RNAV)\". Transitions into the SHOWZ / PURBL area; route fixes not transcribed. A continuation page 00246ROZZE_C.PDF exists."
+   "note": "Metadata chart name \"ROZZE TWO (RNAV)\". Transcribed in `star` below from the chart page and its continuation page (00246ROZZE_C.PDF, the \"ARRIVAL ROUTE DESCRIPTION\"); both pages read visually and the route checked against NASR STAR_RTE.csv and the fix coordinates (see `star.verification`).",
+   "star": {
+    "ident": "ROZZE2",
+    "faa_id": "ROZZE.ROZZE2",
+    "spoken_name": "ROZZE TWO",
+    "printed_on_chart": "ROZZE TWO ARRIVAL (RNAV); (ROZZE.ROZZE2) 17AUG17; AL-246 (FAA); chart id 21280; NE-1, 01 OCT 2026 to 29 OCT 2026; Manchester Boston Rgnl (MHT)",
+    "provenance": "FAA d-TPP cycle 2610 PDFs 00246ROZZE.PDF (chart) and 00246ROZZE_C.PDF (arrival route description), read visually (human transcription, spot-check before safety use); cross-checked against NASR 2026-10-01 STAR_BASE / STAR_RTE / STAR_APT.csv and FIX_BASE.csv coordinates",
+    "notes": [
+     "RADAR required.",
+     "RNAV 1.",
+     "DME/DME/IRU or GPS required.",
+     "Turbojet aircraft only.",
+     "MUCOW and CRIBB transitions are ATC assigned."
+    ],
+    "transitions": [
+     {
+      "name": "CRIBB",
+      "fixes": [
+       "CRIBB",
+       "MONRC",
+       "ROZZE"
+      ]
+     },
+     {
+      "name": "MUCOW",
+      "fixes": [
+       "MUCOW",
+       "FFATY",
+       "CRIBB",
+       "MONRC",
+       "ROZZE"
+      ]
+     },
+     {
+      "name": "PONCT",
+      "fixes": [
+       "PONCT",
+       "WOBLY",
+       "QUINZ",
+       "LUCIC",
+       "FLYZZ",
+       "FYSHR",
+       "ROZZE"
+      ]
+     },
+     {
+      "name": "QUINZ",
+      "fixes": [
+       "QUINZ",
+       "LUCIC",
+       "FLYZZ",
+       "FYSHR",
+       "ROZZE"
+      ]
+     },
+     {
+      "name": "SMYTH",
+      "fixes": [
+       "SMYTH",
+       "QUINZ",
+       "LUCIC",
+       "FLYZZ",
+       "FYSHR",
+       "ROZZE"
+      ]
+     }
+    ],
+    "runways": [
+     {
+      "runway_end": "6",
+      "fixes": [
+       "ROZZE",
+       "PNARD",
+       "TEETO"
+      ],
+      "narrative": "Landing Rwy 6: From ROZZE on track 102 to cross PNARD between 7000 and 9000 and at 230K, then on track 111 to cross TEETO at 5000 and at 210K. Expect ILS or LOC Rwy 6 or radar vectors to final approach course.",
+      "expect": "ILS or LOC Rwy 6 or radar vectors to final approach course",
+      "join_approach_fixes": [
+       "JAAZZ"
+      ],
+      "join_note": "TEETO is the IAF of ILS OR LOC RWY 06 and JAAZZ its IF (this file, instrument_approaches[0].fixes_and_roles)."
+     },
+     {
+      "runway_end": "17",
+      "fixes": [
+       "ROZZE",
+       "NUUKM",
+       "PURBL"
+      ],
+      "narrative": "Landing Rwy 17: From ROZZE on track 102 to cross NUUKM between 7000 and 9000, then on track 070 to cross PURBL at 5000 and at 210K. Expect RNP approach or ILS or LOC/DME Rwy 17 or radar vectors to final approach course.",
+      "expect": "RNP approach or ILS or LOC/DME Rwy 17 or radar vectors to final approach course",
+      "join_approach_fixes": [
+       "LYLAC",
+       "BLSSM",
+       "BLUUM"
+      ],
+      "join_note": "PURBL is the second-transition IAF of ILS OR LOC RWY 17 (fix on 023 deg route from PURBL to LYLAC, then 090 deg to BLSSM; BLUUM is the IF): this file, instrument_approaches[2].fixes_and_roles."
+     },
+     {
+      "runway_end": "24",
+      "fixes": [
+       "ROZZE",
+       "NUUKM",
+       "JSTNN"
+      ],
+      "narrative": "Landing Rwy 24: From ROZZE on track 102 to cross NUUKM between 7000 and 9000, then on track 075 to cross JSTNN at 5000 and at 210K, then on heading 057. Expect radar vectors to final approach course.",
+      "expect": "radar vectors to final approach course",
+      "then_heading_mag_deg": 57,
+      "join_approach_fixes": []
+     },
+     {
+      "runway_end": "35",
+      "fixes": [
+       "ROZZE",
+       "NUUKM",
+       "SHOWZ"
+      ],
+      "narrative": "Landing Rwy 35: From ROZZE on track 102 to cross NUUKM between 7000 and 9000, then on track 111 to cross SHOWZ at 5000 and at 210K. Expect RNP approach or ILS or LOC Rwy 35 or radar vectors to final approach course.",
+      "expect": "RNP approach or ILS or LOC Rwy 35 or radar vectors to final approach course",
+      "join_approach_fixes": [
+       "IHOBB",
+       "ELEEE",
+       "YOULL"
+      ],
+      "join_note": "SHOWZ is the second-transition IAF of ILS OR LOC RWY 35 (fix on 153 deg route from SHOWZ, then 087 deg to ELEEE; ELEEE to YOULL 022 deg 3.5 NM, YOULL is the IF): this file, instrument_approaches[6].fixes_and_roles."
+     }
+    ],
+    "restrictions": [
+     {
+      "fix": "QUINZ",
+      "at_or_above_ft": 19000,
+      "speed_kt": 280,
+      "chart": "FL190 underlined (at or above), 280K"
+     },
+     {
+      "fix": "MUCOW",
+      "at_or_above_ft": 19000,
+      "speed_kt": 280,
+      "chart": "FL190 underlined (at or above), 280K"
+     },
+     {
+      "fix": "LUCIC",
+      "at_or_above_ft": 16000,
+      "chart": "16000 underlined (at or above)"
+     },
+     {
+      "fix": "FFATY",
+      "at_or_above_ft": 16000,
+      "at_or_below_ft": 20000,
+      "chart": "FL200 over, 16000 under (between 16000 and FL200)"
+     },
+     {
+      "fix": "FLYZZ",
+      "at_or_above_ft": 13000,
+      "chart": "13000 underlined (at or above)"
+     },
+     {
+      "fix": "CRIBB",
+      "at_or_above_ft": 13000,
+      "at_or_below_ft": 16000,
+      "chart": "16000 over, 13000 under (between 13000 and 16000)"
+     },
+     {
+      "fix": "FYSHR",
+      "at_or_above_ft": 9000,
+      "chart": "9000 underlined (at or above)"
+     },
+     {
+      "fix": "MONRC",
+      "at_or_above_ft": 9000,
+      "chart": "9000 underlined (at or above)"
+     },
+     {
+      "fix": "NUUKM",
+      "at_or_above_ft": 7000,
+      "at_or_below_ft": 9000,
+      "chart": "9000 over, 7000 under; narrative: cross NUUKM between 7000 and 9000"
+     },
+     {
+      "fix": "PNARD",
+      "at_or_above_ft": 7000,
+      "at_or_below_ft": 9000,
+      "speed_kt": 230,
+      "chart": "narrative: cross PNARD between 7000 and 9000 and at 230K"
+     },
+     {
+      "fix": "TEETO",
+      "at_ft": 5000,
+      "speed_kt": 210,
+      "chart": "narrative: cross TEETO at 5000 and at 210K"
+     },
+     {
+      "fix": "PURBL",
+      "at_ft": 5000,
+      "speed_kt": 210,
+      "chart": "narrative: cross PURBL at 5000 and at 210K"
+     },
+     {
+      "fix": "SHOWZ",
+      "at_ft": 5000,
+      "speed_kt": 210,
+      "chart": "narrative: cross SHOWZ at 5000 and at 210K"
+     },
+     {
+      "fix": "JSTNN",
+      "at_ft": 5000,
+      "speed_kt": 210,
+      "chart": "narrative: cross JSTNN at 5000 and at 210K"
+     }
+    ],
+    "restriction_notes": "Altitude depiction convention read from the chart: an altitude with a bar over it is 'at or below', with a bar under it 'at or above', with both 'at'. Speeds are knots, 'at' the fix. The single underlined FL190 / 16000 / 13000 / 9000 values are 'at or above'; the numbers printed along the legs (17000, 14000, 12000, 7000, 6000, 4000) are minimum en route altitudes (MEA) and are not crossing restrictions. PONCT, WOBLY, SMYTH and ROZZE carry no crossing restriction.",
+    "legs": [
+     {
+      "from": "PONCT",
+      "to": "WOBLY",
+      "track_mag_deg": 102,
+      "distance_nm": 13,
+      "mea_ft": 17000
+     },
+     {
+      "from": "WOBLY",
+      "to": "QUINZ",
+      "distance_nm": 20
+     },
+     {
+      "from": "SMYTH",
+      "to": "QUINZ",
+      "track_mag_deg": 81,
+      "distance_nm": 40,
+      "mea_ft": 17000
+     },
+     {
+      "from": "QUINZ",
+      "to": "LUCIC",
+      "track_mag_deg": 101,
+      "distance_nm": 14,
+      "mea_ft": 14000
+     },
+     {
+      "from": "LUCIC",
+      "to": "FLYZZ",
+      "distance_nm": 11,
+      "mea_ft": 12000
+     },
+     {
+      "from": "FLYZZ",
+      "to": "FYSHR",
+      "distance_nm": 15,
+      "mea_ft": 7000
+     },
+     {
+      "from": "FYSHR",
+      "to": "ROZZE",
+      "distance_nm": 7,
+      "mea_ft": 6000
+     },
+     {
+      "from": "MUCOW",
+      "to": "FFATY",
+      "track_mag_deg": 79,
+      "distance_nm": 15,
+      "mea_ft": 14000
+     },
+     {
+      "from": "FFATY",
+      "to": "CRIBB",
+      "distance_nm": 10,
+      "mea_ft": 12000
+     },
+     {
+      "from": "CRIBB",
+      "to": "MONRC",
+      "distance_nm": 15,
+      "mea_ft": 7000
+     },
+     {
+      "from": "MONRC",
+      "to": "ROZZE",
+      "distance_nm": 7,
+      "mea_ft": 6000
+     },
+     {
+      "from": "ROZZE",
+      "to": "PNARD",
+      "track_mag_deg": 102,
+      "distance_nm": 3
+     },
+     {
+      "from": "ROZZE",
+      "to": "NUUKM",
+      "track_mag_deg": 102,
+      "distance_nm": 3
+     },
+     {
+      "from": "PNARD",
+      "to": "TEETO",
+      "track_mag_deg": 111,
+      "distance_nm": 10,
+      "mea_ft": 4000
+     },
+     {
+      "from": "NUUKM",
+      "to": "SHOWZ",
+      "track_mag_deg": 111,
+      "distance_nm": 15,
+      "mea_ft": 4000
+     },
+     {
+      "from": "NUUKM",
+      "to": "PURBL",
+      "track_mag_deg": 70,
+      "distance_nm": 14,
+      "mea_ft": 4000
+     },
+     {
+      "from": "NUUKM",
+      "to": "JSTNN",
+      "track_mag_deg": 75,
+      "distance_nm": 22,
+      "mea_ft": 4000
+     }
+    ],
+    "verification": "NASR 2026-10-01 STAR_RTE.csv lists exactly these transitions (CRIBB, MUCOW, PONCT, QUINZ, SMYTH) and the four runway bodies (ROZZE-TEETO RWY 06, ROZZE-PURBL RWY 17, ROZZE-JSTNN RWY 24, ROZZE-SHOWZ RWY 35). Every leg distance and magnetic track above matches the great-circle distance and bearing between the NASR FIX_BASE coordinates (variation 15 W) to within 1 NM and 2 degrees (checked by src/airport/kmht/rozze.test.ts).",
+    "not_transcribed": "The chart's 'RNP approach' expectations for runways 17 and 35 (RNAV (RNP) Z charts are not transcribed); speed / altitude restrictions after the last fix (none printed; runway 24: 'then on heading 057' only)."
+   }
   },
   {
    "chart_name": "ROZZE TWO ARRIVAL (RNAV), CONT.1",

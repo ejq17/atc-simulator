@@ -60,6 +60,11 @@ export interface RecommendOptions {
   calmBelowKt?: number;
   /** Use gust speed instead of steady speed. Default false. */
   useGusts?: boolean;
+  /**
+   * Runway ends that must not be picked: the ends of a closed runway (NOTAM closure, `src/sim/airportOps.ts`; JO 7110.65 3-3-2). They are
+   * dropped before ranking, so they never appear in `best`, `primary` or `ranking`. Throws when nothing is left.
+   */
+  excludeEnds?: readonly string[];
 }
 
 /**
@@ -68,10 +73,13 @@ export interface RecommendOptions {
  */
 export function recommendRunways(
   weather: Pick<Weather, 'windDirDeg' | 'windSpeedKt' | 'windGustKt'>,
-  runwayEnds: readonly RunwayEndInput[],
+  runwayEndsIn: readonly RunwayEndInput[],
   options: RecommendOptions = {},
 ): RunwayRecommendation {
-  if (runwayEnds.length === 0) throw new Error('recommendRunways: no runway ends supplied');
+  if (runwayEndsIn.length === 0) throw new Error('recommendRunways: no runway ends supplied');
+  const excluded = new Set((options.excludeEnds ?? []).map((e) => e.toUpperCase()));
+  const runwayEnds = excluded.size ? runwayEndsIn.filter((r) => !excluded.has(r.id.toUpperCase())) : runwayEndsIn;
+  if (runwayEnds.length === 0) throw new Error('recommendRunways: every runway end is excluded (closed)');
   const {
     preferredOrder = [],
     variationDeg = KACY_MAGNETIC_VARIATION_DEG,

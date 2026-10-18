@@ -39,3 +39,22 @@ describe('<SetupScreen /> airport selector', () => {
     expect(screen.getByTestId('no-scenarios')).toHaveTextContent(/training lessons are written around KACY/);
   });
 });
+
+describe('<SetupScreen /> closure options', () => {
+  it('offers to close a runway or a taxiway for the session; the recommended runway skips the closed one and the airport changes the lists', () => {
+    render(<SetupScreen />);
+    const rwy = screen.getByTestId('close-runway') as HTMLSelectElement;
+    const twy = screen.getByTestId('close-taxiway') as HTMLSelectElement;
+    expect([...rwy.options].map((o) => o.value)).toEqual(['none', '4/22', '13/31']);
+    expect([...twy.options].map((o) => o.value)).toEqual(expect.arrayContaining(['none', 'A', 'B', 'C']));
+    expect(screen.getByTestId('airport-events')).toBeChecked();
+    fireEvent.change(rwy, { target: { value: '13/31' } });
+    const landing = screen.getByLabelText('Landing runway') as HTMLSelectElement;
+    expect(landing.value).toBe('auto');
+    expect(landing.options[0].textContent).toMatch(/Auto · (4|22)$/);
+    expect([...landing.options].filter((o) => o.disabled).map((o) => o.value).sort()).toEqual(['13', '31']);
+    fireEvent.change(screen.getByTestId('airport-select'), { target: { value: 'KMHT' } });
+    expect((screen.getByTestId('close-runway') as HTMLSelectElement).value).toBe('none');
+    expect([...(screen.getByTestId('close-runway') as HTMLSelectElement).options].map((o) => o.value)).toEqual(['none', '6/24', '17/35']);
+  });
+});

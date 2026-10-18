@@ -171,6 +171,12 @@ export interface AircraftRuntime {
   taxiRequestAtSec?: number;
   /** Arrival spawned at a fix: its first call is the approach check-in (replaces the 'inbound' call). */
   approachCheckIn?: boolean;
+  /** A taxiway on the remaining route closed: the aircraft stops short of it at `nodeId` and asks for instructions (`airportOps.enforceClosuresOnRoutes`). */
+  closedHold?: { nodeId: string; taxiway: string };
+  /** Speed (kt) of the last STAR speed restriction passed: held until the next restricted fix (AIM 5-4-1). */
+  starSpeedCapKt?: number;
+  /** Runway end the aircraft touched down on (for the braking action report after landing). */
+  landedEnd?: string;
   /** Identifiers (upper case) of fixes already sequenced; RESUME_OWN_NAVIGATION restarts at the first filed fix not in this set. */
   passedFixes: Set<string>;
   /** An altitude / direct / resume instruction was issued after the handoff (IFR departure counts as handled). */
@@ -204,6 +210,8 @@ export interface SimContext {
   clearanceAlerts: { alert: ConflictAlert; expiresAtSec: number }[];
   waitStats: { count: number; totalSec: number; delaySec: number };
   spawnedIdx: Set<number>;
+  /** Closure start / end announcements already logged (`airportOps.announceClosureChanges`). */
+  opsAnnounced: Set<string>;
   /** Dry run (`validateCommand`): nothing is logged, spoken, scored or changed. */
   dryRun?: boolean;
   /** Position of the AI controller whose command is being executed: its scored events carry `aiPosition`. */

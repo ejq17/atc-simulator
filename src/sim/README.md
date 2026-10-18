@@ -24,7 +24,9 @@ here knows about KACY. Tests run against the synthetic `__fixtures__/testAirport
 | `missedApproach.ts` | Interpreter and guidance for the published missed approach text; published-hold lookup |
 | `runwayTiming.ts` | Pure time projections: arrival threshold / touchdown / rollout-clear times, rollout distance vs time, crossing windows |
 | `wake.ts` | JO 7110.65 5-5-4 wake tables (TBL 5-5-3 / 5-5-4) by RECAT category |
-| `engineExtras.ts` | Types for engine methods beyond `api.ts`: `validateCommand` (dry run) |
+| `engineExtras.ts` | Types for engine methods beyond `api.ts`: `validateCommand` (dry run), airport state (`addClosure`, `removeClosure`, `setBirdActivity`, `setRunwayLightStep`, `reportBrakingAction`) |
+| `airportOps.ts` | Airport operating state (`SimulationState.ops`): closures, braking action reports, bird activity, runway light steps; pure queries used by the executor, the safety check, taxi planning, the ATIS and the renderers |
+| `star.ts` | STAR routes from the transcribed chart (`InstrumentProcedure.star`): `starRouteFrom`, `starProfile`, `findStar` |
 | `solar.ts` | NOAA solar position at the airport: `isDaylight` / `sunriseSunsetUtc`, the engine epoch (`utcStartMs`) for sunrise-sunset rules |
 | `mva.ts` | Minimum vectoring altitude lookup (`Airport.mvaSectors`, optional `holes`), 2 nm look-ahead, exemptions |
 | `holding.ts` | Holding patterns with the AIM 5-3-8 direct / teardrop / parallel entries, `holdingText` parser |
@@ -614,6 +616,28 @@ frequency is a "Say again the squawk code", not "Unable"). **Not applied:** R-B4
 and pilots and controllers use it; "information X received" would be more literal AIM 4-1-13) and R-S1 (the ATIS channel
 125.725 is printed on the chart as such, so it is spoken in full; the controller rule of two decimals is not applied to readbacks).
 
+## Airport state (`airportOps.ts`, `SimulationState.ops`)
+
+Sources: JO 7110.65 2-9-3, 3-3-1, 3-3-2, 3-3-4, 3-3-5, 3-4-10, 3-4-11, 2-1-23; AC 150/5370-2G 2.18.2.1.2; AC 150/5200-30D (docs/FAA-REFERENCES.md).
+* **Closures** (`Closure`: runway pair id or taxiway designator, `startSec`, optional `endSec`, reason, source). Added by `scenario.closures` (setup options, in force from t = 0), the scenario event runner (`engine.addClosure`) or tests; the engine announces a start and an end once each (`NOTAM: Runway 4/22 closed (...)`, `NOTAM cancelled: ...; reopened.`). `addClosure` refuses an unknown ident and the last open runway.
+  Effects: (1) taxi routing: `findTaxiRoute` / `shortestDistances` / `pickRunwayHold` take `avoidTaxiways`; a closed taxiway is never in a route, "taxi via <closed taxiway>" and "taxi to <closed taxiway>" are refused (`Taxiway H is closed`, pilot: "unable, taxiway hotel is closed"), a taxi to a hold of a closed runway is refused, a runway exit onto a closed taxiway is not used for the rollout (`chooseExit`). A taxiway that closes under an aircraft already routed over it is handled by `enforceClosuresOnRoutes` (`airportOps.ts`, run each tick before ground movement): the aircraft stops at the last node before the closed segment (`rt.closedHold`), the pilot calls the hold with a pending TAXI request (plain English, non-standard), and AI Ground re-routes it around the closure (`ai/ground.ts`).
+  (2) `assessClearanceSafety`: TAKEOFF, LINE_UP_AND_WAIT, LAND, APPROACH, ENTER_PATTERN to a closed runway is an `UNSAFE_CLEARANCE` naming the closure and 3-3-2 (training refuses it with that reason; other modes accept and score it as unsafe). (3) The runway selector never picks a closed end (`recommendRunways` `excludeEnds`); the UI session switches the active runways when the runway in use closes. (4) The ATIS reads closures as NOTAMs; the Surface and Tower views mark them; the strips and the Weather panel list them.
+  Crossing a closed runway on a taxi route is still allowed (a taxi across a closed runway needs a clearance like any crossing).
+* **Braking action**: a landing pilot on a wet / contaminated runway (derived from the weather, src/weather/runwayCondition.ts) reports after exiting: "<facility>, <callsign>, braking action medium." (3-3-4 terms; the RCAM row of the derived code, one step better or worse with probability 1/4 each from the seeded RNG; at most one report per runway end per 10 minutes unless worse; `traffic.ts` block 4c). The report is stored with the aircraft type (`BrakingReport`); the ATIS gives it as "Braking action medium, reported by a Boeing seven thirty seven" and the AI Tower includes the latest report (or "no braking action reports received for runway N") in a landing clearance while advisories are in effect (3-3-5).
+* **Runway lights** (`RUNWAY_LIGHTS` command, `ops.lightStep`): HIRL steps 1-5 (both airports' runways are HIGH intensity in NASR). Default step from TBL 3-4-8 by visibility and daylight (`defaultLightStep`); lights are on at night and, by day, below 2 SM (3-4-10). A pilot request ("request lights up / down", free play only: `scenario.pilotRequests.lights`; about one arrival in eight at night or in low visibility, decided from the aircraft's own seed so no shared random number is drawn) is answered with `RUNWAY_LIGHTS` (one step up or down, or an explicit step); a closed runway's edge lights stay off (3-4-10: "Do not turn on the runway edge lights when a NOTAM closing the runway is in effect"). The Tower view reads `effectiveLightStep` per runway.
+* **Bird activity** (`ops.birds`, 2-1-23 / 2-9-3): `ADVISORY` command (`advisory: 'BIRDS'`), acknowledged "Roger, we'll watch for the birds"; the ATIS says "Bird activity in the vicinity of the airport, ..." while it lasts.
+* **LAHSO and the runway condition**: `planLahso` no longer carries its own precipitation list: a runway is "dry" when `runwayCondition(weather).code === 6` (any precipitation at the airport = not dry; vicinity (VC) precipitation no longer counts).
+
+## STAR arrivals (`star.ts`, `Aircraft.star`; KMHT ROZZE TWO)
+
+Sources: JO 7110.65 4-7-1 ("(STAR name and number) ARRIVAL, (transition name) TRANSITION"), 4-5-7 / 5-7-2 ("DESCEND VIA", speed restrictions apply regardless), AIM 5-4-1 (maintain the last assigned altitude until "descend via"; vectors or a deviation cancel the STAR with its restrictions).
+* Data: `InstrumentProcedure.star` (data/sources/kmht-procedures.json, README "ROZZE TWO ARRIVAL"). KACY has no STARs.
+* An arrival spawned with `start.star` (or cleared with the `STAR` command) has `ac.star = { procedureId, name, transition?, runwayEnd, descendVia }` and flies `nav` (mode route / direct) over the transition fixes, the runway leg and the expected approach's join fixes. `STAR` command (`planStar`): needs a published name (an unknown or wrong number is refused / not guessed by the parser), a runway leg for the aircraft's landing runway, and a way onto the route: it is already on it, one of its remaining route fixes is on it, or a transition is named (the route then starts at that entry fix). "Descend via" sets the target altitude to the lowest altitude of the remaining restrictions; a plain "cleared ROZZE TWO arrival" leaves the vertical state alone.
+* Flown in `routeGuidance`: after "descend via" the altitude restrictions (`profileAltitudeFor`: descend just in time, never below the next at-or-above altitude, at-or-below altitudes met 200 ft low, never climbing); the speed restrictions whenever the aircraft is on the arrival (`starSpeedCap`: slows to a restricted speed over the distance the engine's deceleration needs plus 10 s, then holds it until the next restricted fix; 250 kt otherwise, 91.117(a)). The APPROACH phase's slower default speed does not apply until the approach is cleared.
+* Ends: the last fix of the runway leg is the IAF; runway 24 ends "then on heading 057" (the pilot takes the heading, magnetic, and expects vectors). Cancelled by: vectors (`enterVectors`), direct to a fix not on the aircraft's route, the approach clearance. An altitude assignment ends "descend via" but keeps the speed restrictions and the route.
+* AI Approach (`src/ai/approach.ts`): radar contact + "descend via the Rozze Two arrival", no separate descent or direct-to-IAF while the aircraft is before the IAF, then the approach clearance (the clearance cancels the STAR).
+* Simplifications: the published transitions begin 47-100 nm out; the game layer starts flights at CRIBB or FLYZZ (src/game/README.md). No Mach, no pilot "request different altitude", no speed-restriction waiver. `LOST_AIRCRAFT_NM` removal now applies only to aircraft moving away (an arrival entering from a STAR fix beyond 40 nm is kept).
+
 ## Airport data contract
 
 `checkAirportForSim(airport)` (see `airportCheck.ts`) reports what is missing. IFR operations additionally want CLNC and DEP/APP
@@ -626,14 +650,14 @@ surface carry `onRunwayId`; parking nodes of kind `parking`; GND/TWR frequencies
 
 * Performance tables carry `source:` comments per changed value (data/sources/aircraft-performance.json, docs/REALISM-VERIFICATION.md); A320 roll ~35 s / ~1.3 km to rotation, takeoff distance 5,000 ft (refused from an intersection of KACY 4/22 with less remaining).
 * Simplified physics: first-order heading/vertical dynamics, constant accelerations, no density altitude,
-  steady wind (gusts ignored), no wake turbulence, no braking-action effects.
+  steady wind (gusts ignored), no wake turbulence; braking action is reported and published but does not change the rollout.
 * Rejected landings on the runway are not modelled (a rejected takeoff is, see Tower vocabulary); an aircraft told to line up cannot be
   told to exit the runway again except by a taxi instruction from the position it stopped in.
 * Pattern work: upwind, crosswind, downwind, base, final with a fixed 0.8 nm offset and one pattern altitude (1,000 ft AGL) for every type; no overhead
   maneuver, no parallel-runway patterns; a touch-and-go is a low pass (no ground roll). Holding patterns are flown (holding.ts).
 * Pushback is a state change only (no motion). No vehicles, no de-icing, no helicopters.
 * After a go-around the aircraft flies runway heading at a fixed altitude until instructed.
-* IFR: no procedure turns, DME arcs, STARs, speed restrictions per fix (published fix altitudes on approaches are flown); one transponder code per aircraft, no radar coverage model (everything is "radar
+* IFR: no procedure turns, DME arcs; STARs only where transcribed (KMHT ROZZE TWO); published fix altitudes on approaches and the STAR restrictions are flown, approach speed restrictions are not; one transponder code per aircraft, no radar coverage model (everything is "radar
   contact" once identified); departure clearance has no void time; the missed approach is "2000 ft on runway heading" only when the plate text is unavailable or not interpretable.
 * Free-play traffic generation still spawns arrivals on the extended centreline, not at fixes (scenarios use `at_fix`).
 * `radioState` `RECEIVING` is not used (readbacks are instantaneous); no frequency congestion yet.

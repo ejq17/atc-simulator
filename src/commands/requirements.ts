@@ -29,6 +29,9 @@ export function missingRequired(d: Draft): string[] {
     ];
     case 'HOLD_AT_FIX': return f.hold?.fix ? [] : ['missing holding fix'];
     case 'DIRECT_FIX': return f.fix ? [] : ['missing fix'];
+    case 'STAR': return f.starName ? [] : ['missing arrival procedure name'];
+    case 'ADVISORY': return f.advisory ? [] : ['missing advisory'];
+    case 'RUNWAY_LIGHTS': return f.lightsDirection || f.lightStep !== undefined ? [] : ['missing light intensity (up, down or a step)'];
     case 'IFR_CLEARANCE': return f.ifr?.destination ? [] : ['missing destination airport'];
     case 'TRAFFIC_ADVISORY':
     case 'FOLLOW_TRAFFIC': return f.traffic ? [] : ['missing traffic description'];

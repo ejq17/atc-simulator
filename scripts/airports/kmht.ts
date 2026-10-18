@@ -39,8 +39,8 @@ export const kmhtProfile: AirportProfile = {
   simplifyEntryChains: true,
   runwayEndpointNote: ' (OSM runway endpoints were not compared with NASR: OSM maps each runway as several ways including displaced-threshold segments, and the runways come from NASR)',
   provenanceNotes: {
-    navaids: 'kmht-navaids.json (MHT DME, CON and GDM VOR/DMEs, ILS components for runways 6, 17 and 35, 26 fixes)',
-    procedures: 'kmht-procedures.json: 11 IAP charts (7 transcribed), airport diagram, MANCHESTER ONE and PPORT FOUR departures, ROZZE TWO STAR; no hot spot, no LAHSO',
+    navaids: 'kmht-navaids.json (MHT DME, CON and GDM VOR/DMEs, ILS components for runways 6, 17 and 35, 41 fixes (26 on the approach plates, 15 more on the ROZZE TWO arrival))',
+    procedures: 'kmht-procedures.json: 11 IAP charts (7 transcribed), airport diagram, MANCHESTER ONE and PPORT FOUR departures, ROZZE TWO STAR (transcribed: transitions, runway legs, restrictions); no hot spot, no LAHSO',
     osm: 'Taxiways, aprons, parking positions, gates, buildings. Share-alike: the derived taxiway/apron dataset is an ODbL derivative.',
     diagramReconciliation: 'Taxiway identifier reconciliation against the airport diagram (identifiers read from the chart text; no label positions georeferenced).',
   },

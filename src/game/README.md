@@ -25,8 +25,9 @@ engine.subscribe((s) => { runner.update(); training?.update(s); if (game.isScena
 | `airportProfile.ts` | Airport traffic profiles keyed by ICAO: weighted airline entries (`icao3`, telephony, types, weight, destinations with cruise altitudes, flight-number range, `hours` 'day'/'night'/'any'), VFR neighbour table (lat/lon + spoken name), GA type variants, reference jet. KACY = Spirit 80 / American 20, A320 only (unchanged); KMHT = Southwest B738, Breeze BCS3, American regionals (PSA CRJ9, Piedmont/Republic E175), American A320, United Express (SkyWest E175, GoJet CRJ9), UPS/FedEx B752 (night bank), Wiggins C208 (day bank), Sun Country, GA C172/PA28. `pickFlight`, `pickLeg`, `resolveTypeSelection`. |
 | `scenarios/career.ts` | The 12 career steps. |
 | `scenarios/training.ts` | 9 training lessons (8 and 9 are IFR). |
-| `ifr.ts` | IFR flows: `arrivalProcedure(airport, runwayEnd)` (ILS 13 -> CARYL/VCN, ILS 31 -> STEVV, RNAV 22 -> KOPCE, RNAV 4 -> JEDOB, read from the data), `ifrFlightPlan`, `ifrArrivalSpawn`, `ifrDepartureSpawn`, `resolveIfrFlows`. |
-| `scenarios/freeplay.ts` | `buildFreePlay`, weather/runway resolution, initial population. |
+| `ifr.ts` | IFR flows (also `starArrival` / `starArrivalSpawn` for KMHT's ROZZE TWO, `isTurbojet`): `arrivalProcedure(airport, runwayEnd)` (ILS 13 -> CARYL/VCN, ILS 31 -> STEVV, RNAV 22 -> KOPCE, RNAV 4 -> JEDOB, read from the data), `ifrFlightPlan`, `ifrArrivalSpawn`, `ifrDepartureSpawn`, `resolveIfrFlows`. |
+| `scenarios/freeplay.ts` | `buildFreePlay`, weather/runway resolution (closed runways excluded), initial population, setup closures. |
+| `scenarios/airportEvents.ts` | Seeded free-play airport events: runway inspection, taxiway closure, bird activity (`buildAirportEvents`, `closableTaxiways`, `birdActivityProbability`). |
 | `scenarios/events.ts` | `scenarioWeatherSchedule`, `scenarioEvents`, `createScenarioEventRunner`. |
 | `scenarios/index.ts`, `common.ts` | Catalogue + spawn builders. |
 | `placement.ts` | Conflict-free arrival/departure placement shared by the generator and the free-play builder. |
@@ -128,6 +129,18 @@ Active when `resolveIfrFlows(scenario)` says so (see `ifrFlows` above). GA C172 
 * **Engine limitation worked around**: `assessApproachSeparation` (src/sim/conflicts.ts) measures an aircraft on a route at its *next fix* (`joinDM`), not at its own position. A follower that has just appeared over CARYL is measured at MAYBN (4.6 nm), so clearing it
   while a leader is established 2-7 nm out is flagged `UNSAFE_CLEARANCE` although they are 4-6 nm apart. Fixing it in the engine (use the aircraft's own distance when it is already on the course) would let the generator drop the 3.5 nm rule.
 
+* **STAR arrivals (KMHT ROZZE TWO, `ifr.ts` `starArrival` / `starArrivalSpawn`)**: turbojet airline arrivals (the chart says "Turbojet aircraft only": Caravans and Cessnas keep the approach-fix flow above) appear as `at_fix` spawns with `start.star` over a STAR entry fix, already on the arrival route to the landing runway
+  (e.g. runway 6: CRIBB, MONRC, ROZZE, PNARD, TEETO, JAAZZ; runway 17 ends PURBL, LYLAC, BLSSM, BLUUM; runway 35 SHOWZ, IHOBB, ELEEE, YOULL; runway 24 JSTNN, then heading 057). The published transitions start 47-100 nm out, beyond the 40 nm simulated area, so the simulator starts a flight where Boston Center would hand it to Approach:
+  over **CRIBB** (entry fix of the CRIBB transition) or **FLYZZ** (on the QUINZ / PONCT / SMYTH transitions), at a whole-thousand altitude inside the published window of that fix (CRIBB 13,000-16,000; FLYZZ at or above 13,000, up to +2,000), 250 kt, frequency `APP`, request `APPROACH`. The aircraft checks in "level one five thousand" and the Approach controller (player or AI) says
+  "radar contact, descend via the Rozze Two arrival"; the altitude and speed restrictions are flown after that (src/sim/README.md "STAR arrivals"). Spacing: >= 90 s after the previous IFR arrival on the runway and >= 5 nm from every other airborne aircraft at the entry fix. The initial population uses the same flow (staggered 270 s). KACY has no STAR: its flow is unchanged.
+
+### Airport state: closures and seeded events (`scenarios/airportEvents.ts`, `scenarios/events.ts`)
+
+* `FreePlayOptions.closures` (setup screen: "Close a runway", "Close a taxiway") become `scenario.closures`, in force from time 0; `recommendConfig` and the UI's runway helpers never select a closed runway; an explicit active runway on a closed runway is replaced by the recommended open one. `closures` also apply to catalogue scenarios (the store copies them onto the built scenario).
+* `FreePlayOptions.airportEvents` (default true for free play; career 11 turns it off) adds the seeded events to `scenario.events` and `scenario.pilotRequests = { lights: true }`. `buildAirportEvents(airport, seed, { startUtcMs, active, closures })` is a pure function of the seed (own PRNG stream), so seeded runs replay: a **runway inspection** by airport operations (50 % of sessions; 8-35 min in; closes the runway in use 60 % of the time, else the other pair, for 4-8 min, applied only at a quiet time: `quiet: true`, the runner waits until nobody is on, cleared onto or within 8 nm final of the runway), a **taxiway closure** (35 %; 5-40 min in; 15-40 min; only a taxiway that keeps every parking position connected to a hold of the active runways, `closableTaxiways`) and **bird activity** (probability from `birdActivityProbability(startUtcMs)`: spring and fall migration months, dawn and dusk weigh most; 20 % without a start time; 20-45 min). Rates, durations and the bird weights are simulator design choices, not FAA statistics; the wording they trigger (2-1-23, 2-9-3, 3-3-1, 3-3-2) is FAA text.
+* `ScenarioEvent` kinds `closure` (`closure: { kind, ident, durationSec?, reason? }`, `quiet?`) and `birds` (`detail`, `durationSec`) are applied by `createScenarioEventRunner` through the engine extras `addClosure` / `setBirdActivity` (src/sim/engineExtras.ts); a closure the engine refuses (unknown ident, the last open runway) is logged and dropped. Any scenario can script them.
+* The UI session reacts to both: new ATIS letter and, when the runway in use closed, a switch to the best open runway (src/ui/README.md).
+
 ### Airport traffic profiles (`airportProfile.ts`)
 
 Airline callsign, aircraft type, filed destination and cruise altitude come from the session airport's profile (unknown airports use KACY's). `pickFlight` draws a weighted
@@ -143,7 +156,7 @@ an entry in `radio/spoken.ts` and, for destinations, a name in `commands/airport
 ## Scenario events (wind shifts, emergency)
 
 `Scenario` has no event schedule, so `GameScenario.events` (JSON) carries `ScenarioEvent`s:
-`weather` (`weather`, `text`, `recommendedRunways`), `emergency` (`callsign`, `declaration`, `text`), `message`.
+`weather` (`weather`, `text`, `recommendedRunways`), `emergency` (`callsign`, `declaration`, `text`), `message`, `closure` and `birds` (see "Airport state" above).
 * `scenarioWeatherSchedule(scenario): WeatherChange[]` - the timed weather changes (`career-10-runway-change`: one change at 600 s, plus a message at 540 s).
 * `createScenarioEventRunner(engine, scenario, { onPilotTransmission?, onEvent? })` - call `runner.update()` every tick (or from `engine.subscribe`). It applies due events:
   weather -> `engine.setWeather` + a `SCENARIO` log entry (**the runway configuration is not changed; the player must switch it**; regenerate the ATIS yourself);

@@ -17,6 +17,7 @@ import { analyzeProcedure, assessApproach, matchingProcedures, visualApproachAll
 import type { ProcedureInfo } from '../sim/approach';
 import { distanceToFixNm, findNavFix } from '../sim/navigation';
 import { getPerformance } from '../sim/performance';
+import { findStar, starBeforeIaf } from '../sim/star';
 import { frequencyForPosition } from '../radio/frequencies';
 import { hasActive, mkCmd } from './core';
 import type { Agent, AgentView, Plan } from './core';
@@ -154,19 +155,25 @@ export function createApproachAgent(handleDepartures: (v: AgentView) => boolean)
 
       const choice = chooseApproach(v, ac);
       if (!choice) continue;
-      const alt = descentAltitude(v, ac, choice.info);
+      // An arrival on a STAR (KMHT ROZZE TWO): radar contact and "descend via" (JO 7110.65 4-5-7); the arrival's own restrictions then take it down
+      // to the IAF, where the approach is cleared. No separate descent, no direct-to-fix while it is still flying the procedure.
+      const star = ac.star ? findStar(airport, ac.star.procedureId) : undefined;
+      const alt = star ? undefined : descentAltitude(v, ac, choice.info);
 
       // Radar contact (with the descent, as one transmission).
       if (!ac.radarIdentified) {
         const cmds = [mkCmd('RADAR_CONTACT', ac)];
         let phrase = say.radarContact(ac, facility);
-        if (alt !== undefined) {
+        if (star && ac.star) {
+          cmds.push(mkCmd('STAR', ac, { starName: star.star.ident, descendVia: true }));
+          phrase = say.clauses(phrase, say.descendViaArrival(star.star.spokenName));
+        } else if (alt !== undefined) {
           cmds.push(mkCmd('ALTITUDE', ac, { altitudeFt: alt }));
           phrase = say.clauses(phrase, say.descendMaintain(alt, ac.altitudeFt));
         }
         plans.push({
           key: `${ac.id}:radar`, aircraftId: ac.id, callsign: ac.callsign, priority: 50, once: true, cmds, phrase,
-          summary: `${ac.callsign} radar contact${alt !== undefined ? `, descend ${alt}` : ''}`,
+          summary: `${ac.callsign} radar contact${star ? `, descend via the ${star.star.spokenName} arrival` : alt !== undefined ? `, descend ${alt}` : ''}`,
         });
         continue;
       }
@@ -182,6 +189,9 @@ export function createApproachAgent(handleDepartures: (v: AgentView) => boolean)
       }
 
       if (hasActive(ac, 'APPROACH')) continue; // cleared: nothing to add until it is established
+
+      // Still flying the arrival before its IAF: the procedure does the work (restrictions, route); the approach is cleared at the IAF.
+      if (ac.star && ac.nav && (ac.nav.mode === 'route' || ac.nav.mode === 'direct') && starBeforeIaf(airport, ac)) continue;
 
       // Not on a route that joins the procedure: direct to its first fix.
       if (!choice.ok && choice.info && choice.type !== 'VISUAL') {

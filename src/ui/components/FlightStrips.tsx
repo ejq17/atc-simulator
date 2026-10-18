@@ -8,6 +8,7 @@ import { requestBadge } from '../lib/ifr';
 import { BAY_LABEL, BAY_ORDER, STRIP_KEYS, STRIP_LEGEND, bayListFor, bayWorkedByPlayer, zuluHm } from '../strips/stripModel';
 import type { BayId, Strip, StripBoard, UtcSource } from '../strips/stripModel';
 import { Panel } from './ui';
+import { ClosureBar } from './AirportNotices';
 
 const AI_TEXT = 'text-[#b79cff]';
 const BAY_POSITIONS: Record<BayId, ControllerPositionId[]> = { CLNC: ['CLNC'], GND: ['GND'], TWR: ['TWR'], APPDEP: ['APP', 'DEP'], OTHER: [] };
@@ -271,6 +272,7 @@ export function FlightStrips() {
       className="relative min-h-[132px] flex-1"
       right={<span className="font-sans text-[10px] text-atc-muted"><kbd className="font-mono text-atc-text">S</kbd> strike · <kbd className="font-mono text-atc-text">X</kbd> drop · drag <span className="text-atc-text">⠿</span> to resequence</span>}
     >
+      <ClosureBar state={state} />
       <div className="min-h-0 flex-1 overflow-y-auto" data-testid="flight-strips">
         {bays.map((bay) => {
           const owner = bayWorkedByPlayer(bay, controller.positions) ? 'player' : 'ai';

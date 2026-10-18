@@ -13,6 +13,8 @@ import { analyzeProcedure, matchingProcedures } from '../sim/approach';
 import { findNavFix } from '../sim/navigation';
 import { findRunwayEnd } from '../sim/runways';
 import { mToNm } from '../sim/geo';
+import { findStar, starRouteFrom, starRunwayLeg } from '../sim/star';
+import type { StarRef } from '../sim/star';
 import { getPerformance } from '../sim/performance';
 import type { GameScenario } from './types';
 import { profileDestinations, profileFor } from './airportProfile';
@@ -143,6 +145,90 @@ export function ifrArrivalSpeedKt(type: string): number {
 }
 
 // ---------------------------------------------------------------------------
+// Standard terminal arrivals (KMHT ROZZE TWO)
+// ---------------------------------------------------------------------------
+
+/**
+ * Where STAR arrivals appear. The published transitions start far outside the simulated area (SMYTH is about 100 nm out, QUINZ 71 nm, CRIBB
+ * 47 nm, MUCOW 72 nm from KMHT), so the simulator starts a flight where Boston Center would hand it to Boston Approach on the arrival: over
+ * CRIBB (the entry fix of the CRIBB transition, "ATC assigned") or FLYZZ (on the QUINZ / PONCT / SMYTH transitions). Everything from there on
+ * is the published route (JO 7110.65 4-7-1) to the end of the runway leg and the approach join fixes. Documented simplification.
+ */
+export const STAR_SIM_ENTRY_FIXES: readonly string[] = ['CRIBB', 'FLYZZ'];
+/** Speed of a STAR arrival at its entry fix (kt): the engine's own en-route default (250 kt). */
+export const STAR_ENTRY_SPEED_KT = 250;
+
+export interface StarEntry {
+  fix: string;
+  transition: string;
+  /** Fixes flown from the entry fix to the end of the route (runway leg + approach join). */
+  route: string[];
+  /** Published altitude window at the entry fix (ft); the spawn altitude lies within it. */
+  minAltitudeFt: number;
+  maxAltitudeFt: number;
+}
+
+export interface StarArrival {
+  ref: StarRef;
+  runwayEnd: string;
+  entries: StarEntry[];
+}
+
+const starCache = new WeakMap<Airport, Map<string, StarArrival | null>>();
+
+/** The STAR serving a landing runway end (turbojets only, per the chart note), or undefined (KACY: no STARs). */
+export function starArrival(airport: Airport, runwayEnd: string): StarArrival | undefined {
+  let per = starCache.get(airport);
+  if (!per) starCache.set(airport, (per = new Map()));
+  if (per.has(runwayEnd)) return per.get(runwayEnd) ?? undefined;
+  let found: StarArrival | undefined;
+  const g = findRunwayEnd(airport, runwayEnd);
+  const ref = findStar(airport);
+  if (g && ref && starRunwayLeg(ref.star, g.end.id)) {
+    const entries: StarEntry[] = [];
+    for (const fix of STAR_SIM_ENTRY_FIXES) {
+      const r = starRouteFrom(airport, ref, fix, g.end.id);
+      const nav = findNavFix(airport, fix);
+      if (!r || !nav) continue;
+      const restr = ref.star.restrictions.find((x) => x.fix.toUpperCase() === nav.id.toUpperCase());
+      const min = restr?.atFt ?? restr?.atOrAboveFt ?? 10000;
+      const max = restr?.atFt ?? restr?.atOrBelowFt ?? min + 2000;
+      entries.push({ fix: nav.id, transition: r.transition, route: r.fixes, minAltitudeFt: min, maxAltitudeFt: max });
+    }
+    if (entries.length) found = { ref, runwayEnd: g.end.id, entries };
+  }
+  per.set(runwayEnd, found ?? null);
+  return found;
+}
+
+/** The ROZZE TWO arrival is "turbojet aircraft only" (chart note): a turboprop or piston aircraft does not use it. */
+export function isTurbojet(type: string): boolean {
+  return getPerformance(type).category !== 'light';
+}
+
+/** An altitude in the entry window, in whole thousands (seeded). */
+export function pickStarEntryAltitudeFt(rng: Rng, e: StarEntry): number {
+  const lo = Math.ceil(e.minAltitudeFt / 1000);
+  const hi = Math.max(lo, Math.floor(e.maxAltitudeFt / 1000));
+  return (lo + Math.floor(rng() * (hi - lo + 1))) * 1000;
+}
+
+/** A flight that appears over a STAR entry fix on the Approach frequency, already on the arrival (lateral route; descend via still to come). */
+export function starArrivalSpawn(
+  airport: Airport, rng: Rng,
+  o: { callsign: string; type: string; runwayEnd: string; atSec: number; entry?: string },
+): ScenarioAircraftSpawn | undefined {
+  const sa = starArrival(airport, o.runwayEnd);
+  if (!sa || !isTurbojet(o.type)) return undefined;
+  const e = (o.entry ? sa.entries.find((x) => x.fix === o.entry) : undefined) ?? sa.entries[Math.min(sa.entries.length - 1, Math.floor(rng() * sa.entries.length))];
+  return {
+    atSec: o.atSec, callsign: o.callsign, type: o.type, flightRules: 'IFR',
+    start: { kind: 'at_fix', fix: e.fix, altitudeFt: pickStarEntryAltitudeFt(rng, e), speedKt: STAR_ENTRY_SPEED_KT, route: e.route, runwayEnd: sa.runwayEnd, star: { procedureId: sa.ref.procedure.id, transition: e.transition || undefined } },
+    isDeparture: false, initialFrequencyId: 'APP', initialRequest: 'APPROACH',
+  };
+}
+
+// ---------------------------------------------------------------------------
 // Departure flight plans
 // ---------------------------------------------------------------------------
 
@@ -209,6 +295,8 @@ export function ifrArrivalSpawn(
   airport: Airport, rng: Rng,
   o: { callsign: string; type: string; runwayEnd: string; atSec: number; fromFeeder?: boolean; altitudeFt?: number; speedKt?: number },
 ): ScenarioAircraftSpawn | undefined {
+  const viaStar = starArrivalSpawn(airport, rng, { callsign: o.callsign, type: o.type, runwayEnd: o.runwayEnd, atSec: o.atSec });
+  if (viaStar) return viaStar;
   const proc = arrivalProcedure(airport, o.runwayEnd);
   if (!proc) return undefined;
   const fromFeeder = !!o.fromFeeder && !!proc.feederFix;

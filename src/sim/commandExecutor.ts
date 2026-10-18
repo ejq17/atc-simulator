@@ -38,6 +38,9 @@ import { publishedHoldFor } from './missedApproach';
 import { assessApproach, ceilingFt } from './approach';
 import { isDaylight, simUtcMs } from './solar';
 import { buildIfrClearance } from './ifr';
+import { findStar, onStarRoute, starBottomAltitudeFt, starRouteFrom, starRunwayLeg } from './star';
+import { MAX_LIGHT_STEP, closedRunwayIds, closedTaxiways, effectiveLightStep, lightsRunwayId, runwayLightsOn } from './airportOps';
+import { runwayCondition } from '../weather/runwayCondition';
 import {
   luawTrafficIssue, noteAirportInfo, planAirportInfo, planCancelTakeoff, planExitRunway, planFollowTraffic, planFrequencyApproved, planLandingHoldShort, planPatternInstruction,
   planReportPosition, planSquawk, planTrafficAdvisory,
@@ -368,6 +371,7 @@ function commandKey(ac: Aircraft, c: ParsedCommand): string {
     ac.id, c.kind, c.runwayEnd ?? '', c.runwayId ?? '', (c.route ?? []).join('>'), (c.holdShort ?? []).join(','), c.crossRunwayId ?? '',
     c.destination ?? '', c.headingDeg ?? '', c.turnDirection ?? '', c.altitudeFt ?? '', c.speedKt ?? '', c.frequencyMhz ?? '', c.frequencyId ?? '', c.patternLeg ?? '',
     c.approachType ?? '', c.fix ?? '', c.ifr ? JSON.stringify(c.ifr) : '', c.hold ? JSON.stringify(c.hold) : '',
+    c.starName ?? '', c.starTransition ?? '', c.descendVia ?? '', c.advisory ?? '', c.brakingTerm ?? '', c.lightsDirection ?? '', c.lightStep ?? '',
     c.exitTaxiway ?? '', c.ifAble ?? '', c.traffic ? JSON.stringify(c.traffic) : '', c.sequenceNumber ?? '', c.distanceNm ?? '', c.turnDegrees ?? '', c.squawk ?? '', c.info ? JSON.stringify(c.info) : '',
   ].join('|');
 }
@@ -480,6 +484,11 @@ function planTaxi(env: Env): PlanResult {
   }
   const start = currentStartNode(env);
   if (!start) return unable(env, `${ac.callsign} is not on the taxiway system.`, "we're not on a taxiway");
+  // NOTAM closures: a closed taxiway is never part of a route (JO 7110.65 3-3-1: airport conditions the controller knows of are issued; a
+  // clearance onto a closed surface is refused), a taxi to a closed runway's hold is refused.
+  const closedTwy = closedTaxiways(ctx.state);
+  const closedVia = (cmd.route ?? []).filter((v) => closedTwy.has(v.toUpperCase()));
+  if (closedVia.length) return unable(env, `Taxiway ${closedVia.join(', ')} is closed (NOTAM); ${ac.callsign} cannot be routed over it.`, `taxiway ${closedVia.map(spokenTaxiway).join(', ')} is closed`, false);
 
   // Destination.
   let targets: string[] = [];
@@ -500,11 +509,12 @@ function planTaxi(env: Env): PlanResult {
   const twyDest = destRaw ? /^TWY\s*([A-Z]{1,2}\d{0,2})$/i.exec(destRaw.trim())?.[1]?.toUpperCase() : undefined;
   const pq = !isRunwayWord && !twyDest && (destRaw || kind === 'TAXI_TO_PARKING') ? resolveParkingQuery(airport, destRaw) : ({ kind: 'unknown' } as const);
   if (!destRaw && kind !== 'TAXI_TO_PARKING') return unable(env, 'No taxi destination given.', 'say destination', false);
+  if (twyDest && closedTwy.has(twyDest)) return unable(env, `Taxiway ${twyDest} is closed (NOTAM).`, `taxiway ${spokenTaxiway(twyDest)} is closed`, false);
   if (twyDest) {
     // "taxi to kilo via bravo": the nearest point of taxiway K (by taxi distance, never over a runway), reached via the route.
     const onTwy = Object.values(graph.nodes).filter((n) => n.kind !== 'runway' && n.kind !== 'parking' && n.taxiways.some((t) => t.toUpperCase() === twyDest) && dist(n.pos, ac.pos) > 5);
     if (!onTwy.length) return unable(env, `Taxiway ${twyDest} does not exist on this airport.`, `we can't find taxiway ${spokenTaxiway(twyDest)}`);
-    const dm = shortestDistances(graph, start.id);
+    const dm = shortestDistances(graph, start.id, { avoidTaxiways: closedTwy });
     const reachable = onTwy.filter((n) => dm.has(n.id)).sort((a, b) => dm.get(a.id)! - dm.get(b.id)!);
     targets = (reachable.length ? reachable : onTwy).slice(0, 3).map((n) => n.id);
   } else if (pq.kind === 'spot') {
@@ -528,6 +538,7 @@ function planTaxi(env: Env): PlanResult {
         "we can't find that destination",
       );
     }
+    if (closedRunwayIds(ctx.state).has(g.runway.id)) return unable(env, `Runway ${g.runway.id} is closed (NOTAM); ${ac.callsign} cannot be taxied to it for departure.`, `runway ${spokenRunway(g.end.id)} is closed`, false);
     runwayEnd = g.end.id;
     runwayG = g;
   }
@@ -549,16 +560,16 @@ function planTaxi(env: Env): PlanResult {
     // Only a taxiway that merely meets the destination (named as "where it ends": "runway 31 via bravo kilo") may be dropped.
     if (attempt !== via) {
       const dropped = via.find((v, k) => attempt[k] !== v) ?? via[via.length - 1];
-      const ends = runwayG ? runwayHoldCandidates(airport, runwayG, attempt[attempt.length - 1]).map((h) => h.id) : targets;
+      const ends = runwayG ? runwayHoldCandidates(airport, runwayG, attempt[attempt.length - 1], closedTwy).map((h) => h.id) : targets;
       if (!ends.some((id) => touchesTarget(dropped, id))) continue;
     }
     if (runwayG) {
-      const r = pickRunwayHold(airport, start.id, runwayG, attempt);
+      const r = pickRunwayHold(airport, start.id, runwayG, attempt, closedTwy);
       if (r.pick) best = { route: r.pick.route, target: r.pick.hold.id };
       else if (!why) why = r.reason ?? '';
     } else {
       for (const t of targets) {
-        const res = findTaxiRoute(graph, start.id, t, { via: attempt, avoidRunways: true, allowedRunwayIds: allRunwayIds(airport) });
+        const res = findTaxiRoute(graph, start.id, t, { via: attempt, avoidRunways: true, allowedRunwayIds: allRunwayIds(airport), avoidTaxiways: closedTwy });
         if (res.route && (!best || res.route.lengthM < best.route.lengthM)) best = { route: res.route, target: t };
         else if (!res.route && !why) why = res.reason ?? '';
       }
@@ -593,6 +604,7 @@ function planTaxi(env: Env): PlanResult {
         }
         ac.route = { nodeIds: route.nodeIds, taxiways: route.taxiways, stopAtNodeIds: [...stops], progressIndex: 0 };
         rt.stoppedAtNodeId = undefined;
+        rt.closedHold = undefined; // a new taxi instruction (planned around the closure) replaces the route that ran into it
         ac.flags.holdingPosition = false;
         rt.lineUp = undefined;
         rt.takeoffCleared = false;
@@ -881,9 +893,6 @@ function runwayLengthCheck(env: Env, g: RunwayEndGeom, entry: TaxiNode): { rejec
   return undefined;
 }
 
-/** AIM 4-3-11 / JO 7110.118 (11a) precipitation: "dry runway - no visible moisture". */
-const PRECIPITATION = /(RA|SN|DZ|SG|PL|GR|GS|IC|UP|TS|SH)/;
-
 /** Wind component (kt) of a tailwind on the given runway end (positive = tailwind). */
 function tailwindKt(env: Env, endId: string): number {
   const w = env.ctx.state.weather;
@@ -931,7 +940,10 @@ function planLahso(env: Env, g: RunwayEndGeom): { reject: Reject } | { holdShort
   const w = ctx.state.weather;
   const ceil = ceilingFt(w);
   if (ceil < 1000 || w.visibilitySm < 3) problems.push(`LAHSO needs a ceiling of at least 1,000 ft and 3 sm visibility (AIM 4-3-11; JO 7110.118 11a): ceiling ${Number.isFinite(ceil) ? Math.round(ceil) : 'none'} ft, visibility ${w.visibilitySm} sm`);
-  if (w.phenomena.some((p) => PRECIPITATION.test(p.replace(/^[-+]|VC/g, '')))) problems.push('the runway must be dry (no visible moisture; JO 7110.118 11a2): precipitation is reported');
+  // AIM 4-3-11 / JO 7110.118 (11a): "dry runway - no visible moisture". The same derivation as the braking action reports and the ATIS
+  // runway condition codes (src/weather/runwayCondition.ts): any wet or contaminated runway (RCAM code below 6) is not dry.
+  const cond = runwayCondition(w);
+  if (cond.code < 6) problems.push(`the runway must be dry (no visible moisture; JO 7110.118 11a2): precipitation is reported (runway ${cond.description}, runway condition code ${cond.code})`);
   if (!isDaylight(airport.arp, simUtcMs(ctx.state))) problems.push('LAHSO is limited to the period between sunrise and sunset: night LAHSO needs land and hold short lights and a visual glide slope indicator, which the airport data does not confirm (JO 7110.118 11c, 11d)');
   const ends = target.ends.map((e) => e.id).filter((id) => ctx.state.activeRunways.departing.includes(id) || ctx.state.activeRunways.landing.includes(id));
   const worstTail = Math.max(...(ends.length ? ends : target.ends.map((e) => e.id)).map((id) => tailwindKt(env, id)));
@@ -1080,6 +1092,9 @@ function enterVectors(env: Env): void {
     rt.navBeforeVectors = ac.nav.mode === 'direct' ? 'direct' : 'route';
     ac.nav.mode = 'vectors';
   }
+  // AIM 5-4-1: "If vectored or cleared to deviate off a STAR, pilots must consider the STAR canceled" (with its altitude and speed restrictions).
+  ac.star = undefined;
+  rt.starSpeedCapKt = undefined;
 }
 
 function planHeading(env: Env): PlanResult {
@@ -1117,6 +1132,9 @@ function planAltitude(env: Env): PlanResult {
       patch: { altitudeFt: alt },
       commit: () => {
         ac.target.altitudeFt = alt;
+        // an assigned altitude replaces "descend via" (AIM 5-4-1 Example 2: descend to the assigned altitude, keep the published speeds, maintain it
+        // until cleared for further vertical navigation); the lateral route and the speed restrictions stay.
+        if (ac.star) ac.star.descendVia = false;
         if (ac.isDeparture && env.rt.handedOff) env.rt.depInstructed = true;
       },
     },
@@ -1284,6 +1302,68 @@ function rejoinFromGoAround(env: Env, note: string): void {
   if (env.ac.phase === 'GO_AROUND' || (env.ac.phase === 'HOLDING' && !env.ac.isDeparture)) setPhase(env.ctx, env.ac, 'APPROACH', note);
 }
 
+/**
+ * "Cleared ROZZE TWO arrival [CRIBB transition]" (JO 7110.65 4-7-1) and "descend via the ROZZE TWO arrival" (4-5-7; AIM 5-4-1). The aircraft flies the
+ * published fixes to the end of the runway leg of its landing runway and on over the expected approach's join fixes. An aircraft not on the
+ * arrival joins it at the first fix of its remaining route that is on it, or at the entry of the named transition. "Descend via" also
+ * authorizes the descent to the published altitudes (`Aircraft.star.descendVia`).
+ */
+function planStar(env: Env): PlanResult {
+  const { ac, rt, cmd, airport, ctx } = env;
+  if (ac.onGround) return unable(env, `${ac.callsign} is on the ground.`, "we're on the ground");
+  if (ac.isDeparture || !['INBOUND', 'APPROACH', 'HOLDING'].includes(ac.phase)) {
+    return unable(env, `${ac.callsign} (${ac.phase}) is not an arrival that can be cleared on a STAR.`, "we're not able to fly an arrival now");
+  }
+  if (ac.nav?.mode === 'approach' || rt.approach) return unable(env, `${ac.callsign} is already cleared for an approach.`, "we're already cleared for the approach", false);
+  const ref = findStar(airport, cmd.starName);
+  if (!ref) return unable(env, `No arrival "${cmd.starName}" is published at ${airport.icao}.`, "we don't have that arrival");
+  const runwayEnd = ac.assignedRunwayEnd ?? ctx.state.activeRunways.landing[0];
+  const leg = starRunwayLeg(ref.star, runwayEnd);
+  if (!leg) return unable(env, `${ref.star.spokenName} has no route to runway ${runwayEnd ?? '?'}.`, `that arrival doesn't serve runway ${spokenRunway(runwayEnd ?? '')}`);
+  // already flying it (and no transition named): the route stays as it is, a named transition starts again at its entry fix
+  const onIt = ac.star?.procedureId === ref.procedure.id && onStarRoute(ac) && !cmd.starTransition;
+  let fixes: string[] | undefined;
+  let index = 0;
+  let transition = cmd.starTransition ?? ac.star?.transition;
+  if (onIt) {
+    fixes = ac.nav!.fixes;
+    index = ac.nav!.index;
+  } else if (cmd.starTransition) {
+    const r = starRouteFrom(airport, ref, cmd.starTransition, runwayEnd!, cmd.starTransition);
+    if (!r) return unable(env, `${cmd.starTransition} is not a transition of ${ref.star.spokenName}.`, `we don't have that transition`);
+    fixes = r.fixes;
+  } else {
+    const remaining = ac.nav && ac.nav.mode !== 'vectors' ? ac.nav.fixes.slice(ac.nav.index) : [];
+    for (const f of remaining) {
+      const r = starRouteFrom(airport, ref, f, runwayEnd!);
+      if (r) { fixes = r.fixes; transition = r.transition || undefined; break; }
+    }
+    if (!fixes) {
+      return unable(env, `${ac.callsign} is not on a route to ${ref.star.spokenName}; name a transition or send it direct to a fix on the arrival first.`, `we're not on a route to join the ${ref.star.spokenName.toLowerCase()} arrival`);
+    }
+  }
+  const descendVia = !!cmd.descendVia || (onIt && !!ac.star?.descendVia);
+  return {
+    plan: {
+      patch: { starName: ref.star.ident, starTransition: cmd.starTransition ?? transition, descendVia: !!cmd.descendVia },
+      commit: () => {
+        ac.nav = { fixes: [...fixes!], index, mode: 'route' };
+        rt.navMode = 'AUTO';
+        rt.turnDirection = undefined;
+        ac.target.headingDeg = undefined;
+        rt.navBeforeVectors = undefined;
+        if (!onIt) rt.starSpeedCapKt = undefined;
+        ac.star = { procedureId: ref.procedure.id, name: ref.star.spokenName, ...(transition ? { transition } : {}), runwayEnd: runwayEnd!, descendVia };
+        if (descendVia) {
+          const bottom = starBottomAltitudeFt(ref.star, fixes!.slice(index));
+          if (bottom !== undefined) ac.target.altitudeFt = Math.min(ac.target.altitudeFt ?? ac.altitudeFt, bottom);
+        }
+        rejoinFromGoAround(env, `${ref.star.spokenName} arrival`);
+      },
+    },
+  };
+}
+
 function planDirectFix(env: Env): PlanResult {
   const { ac, rt, cmd, airport, ctx } = env;
   if (ac.onGround) return unable(env, `${ac.callsign} is on the ground.`, "we're on the ground");
@@ -1303,7 +1383,13 @@ function planDirectFix(env: Env): PlanResult {
           rt.approach = undefined; // leaving the published procedure cancels the approach clearance
           completeClearances(ctx, ac, ['APPROACH']);
         }
+        // Direct to a fix of the arrival the aircraft is flying stays on it (and on the rest of its route); direct to any other fix leaves it.
+        const starRef = ac.star ? findStar(airport, ac.star.procedureId) : undefined;
+        const starRest = starRef && ac.star ? starRouteFrom(airport, starRef, navFix.id, ac.star.runwayEnd) : undefined; // route of the aircraft's runway from that fix
+        const onStarFix = !!starRest;
+        if (ac.star && !onStarFix) { ac.star = undefined; rt.starSpeedCapKt = undefined; }
         if (onApproach) ac.nav = { fixes: ac.nav!.fixes, index: indexOfFix(airport, ac.nav!.fixes, navFix.id), mode: 'approach' };
+        else if (starRest && k < 0) ac.nav = { fixes: starRest.fixes, index: 0, mode: 'direct' };
         else ac.nav = k >= 0 ? { fixes: [...known], index: k, mode: 'direct' } : { fixes: [navFix.id], index: 0, mode: 'direct' };
         rt.navMode = 'AUTO';
         rt.turnDirection = undefined;
@@ -1384,6 +1470,9 @@ function planApproach(env: Env): PlanResult {
         rt.missed = undefined;
         rt.hold = undefined;
         rt.missedFlown = false;
+        // The approach clearance ends the arrival: "Approach clearances or climb via/descend via clearances cancel any previously assigned speeds" (JO 7110.65 5-7-2).
+        ac.star = undefined;
+        rt.starSpeedCapKt = undefined;
         if (ac.phase === 'HOLDING' && !ac.isDeparture) setPhase(ctx, ac, 'APPROACH', `cleared ${type} approach`);
         rt.approach = {
           type, runwayEnd: g.end.id, procedureId: plan.procedureId, onCourse: plan.onCourse, courseTrue: plan.courseTrue, ifDM: plan.ifDM,
@@ -1474,7 +1563,46 @@ function planMissedApproach(env: Env): PlanResult {
   return { plan: { patch: {}, commit: () => initiateGoAround(ctx, ac, { reason: 'ATC instruction', announce: false }) } };
 }
 
+/**
+ * Informational advisories the controller issues to an aircraft and the pilot acknowledges: bird activity (JO 7110.65 2-1-23: "Issue
+ * advisory information on ... bird activity") and braking action (3-3-4 / 3-3-5). No state changes; the acknowledgement is "Roger".
+ */
+function planAdvisory(env: Env): PlanResult {
+  const { ac, cmd } = env;
+  if (!cmd.advisory) return unable(env, `${ac.callsign}: advisory not understood.`, 'say again', false);
+  return { plan: { patch: { advisory: cmd.advisory, brakingTerm: cmd.brakingTerm }, commit: () => undefined } };
+}
+
+/**
+ * Runway edge light intensity (JO 7110.65 3-4-10 d: "Different from subparagraphs a, b, or c above, when ... requested by a pilot and no other
+ * known aircraft will be adversely affected"; 3-4-11 HIRL steps 1-5, both airports' runways are HIRL). The controller answers a pilot request by
+ * raising / lowering the intensity one step or setting an explicit step; the acknowledgement is generic (the manual gives no phraseology).
+ */
+function planRunwayLights(env: Env): PlanResult {
+  const { ac, cmd, ctx } = env;
+  const st = ctx.state;
+  const rwy = lightsRunwayId(st);
+  if (!rwy) return unable(env, 'No runway in use to set the lights for.', 'say again', false);
+  if (closedRunwayIds(st).has(rwy)) return unable(env, `Runway ${rwy} is closed; its edge lights stay off (JO 7110.65 3-4-10).`, 'the runway lights are off', false);
+  if (!runwayLightsOn(st) && cmd.lightsDirection === 'DOWN') return unable(env, 'The runway lights are off (daylight, visibility 2 miles or more).', 'the lights are already off', false);
+  const cur = effectiveLightStep(st, rwy);
+  const next = cmd.lightStep !== undefined ? cmd.lightStep : cmd.lightsDirection === 'DOWN' ? cur - 1 : cur + 1;
+  const step = Math.max(1, Math.min(MAX_LIGHT_STEP, Math.round(next)));
+  return {
+    plan: {
+      patch: { lightsDirection: cmd.lightsDirection, lightStep: step },
+      commit: () => {
+        st.ops.lightStep[rwy] = step;
+        emitEvent(ctx, { kind: 'INFO', aircraftId: ac.id, callsign: ac.callsign, severity: 'info', speaker: 'SYSTEM', text: `Runway ${rwy} edge lights set to step ${step} (was ${cur === 0 ? 'off' : cur}).`, data: { lightStep: step, runwayId: rwy } });
+      },
+    },
+  };
+}
+
 const PLANNERS: Partial<Record<ClearanceKind, (env: Env) => PlanResult>> = {
+  STAR: planStar,
+  ADVISORY: planAdvisory,
+  RUNWAY_LIGHTS: planRunwayLights,
   HOLD_AT_FIX: planHoldAtFix,
   MISSED_APPROACH: planMissedApproach,
   IFR_CLEARANCE: planIfrClearance,

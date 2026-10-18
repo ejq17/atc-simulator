@@ -82,3 +82,7 @@ and a dashed window row. Textures and materials are cached; two aircraft of the 
 
 `../display/symbols.ts` builds a top-down silhouette per type from the same `RECIPES` and real wingspan, so the surface display shows the correct planform
 (swept wing and underwing engines, aft engines and T-tail, straight prop wing with propeller bar, twin turboprop). Radar targets are unchanged.
+
+## Closures and runway lights (airport state)
+
+`towerScene.ts` builds the yellow closure markings once (the closed-runway X at each end, 150 m inside the threshold, `closureMarks.ts` + `xMarkRects`; per taxiway a yellow wash ribbon and X marks) and shows them when `closedRunwayIds` / `closedTaxiways` of the frame's state say so. The runway lights are one set of materials per runway: every frame `applyAirportState` sets their opacity and size from `runwayLightLevel(effectiveLightStep(state, runwayId), closed)` (HIRL step 1-5, 0 = off; a closed runway's edge lights stay dark, 3-4-10) and the darkness (`sky.night`), with a fixed strength by day when the lights are on (visibility under 2 SM). The step is the 3-4-11 table default for the visibility unless a pilot request moved it. Brightness ratios are a visual choice. Not checked on a GPU in this round (unit tests cover the pure functions).

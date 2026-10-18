@@ -13,13 +13,44 @@
  * Content and order follow FAA JO 7110.65 2-9-3 (Content) and AIM 4-1-13: facility name, phonetic letter, time of the
  * weather (UTC), wind, visibility / obstructions, sky condition, temperature, dew point, altimeter, instrument or
  * visual approach in use (which names the landing runway), departure runway only when it differs from the landing
- * runway, NOTAMs, the hold-short readback statement, then "Advise on initial contact you have information X".
+ * runway, closures / NOTAMs / bird activity, braking action advisories and the latest braking action report, runway condition codes,
+ * the hold-short readback statement, then "Advise on initial contact you have information X". RVR (2-8-2, 2-8-3) follows the
+ * visibility ("transmit these values in the normal sequence used for weather reporting").
  * Numbers follow 2-4-17 (separate digits; "niner"). See docs/PHRASEOLOGY-AUDIT.md.
  */
-import type { Atis, Weather } from '../sim/types';
+import type { Atis, BrakingTerm, Weather } from '../sim/types';
 import { ceilingCategory, ceilingFt, visibilityCategory, windMagnetic } from './metar';
+import { termRank } from './runwayCondition';
+import { isNewObservation } from './observation';
+import { rvrPhrase } from './rvr';
+import type { RvrReport } from './rvr';
 
 export type ActiveRunways = Atis['activeRunways'];
+
+/** Airport-state content of an ATIS (see `src/sim/airportOps.ts`); every field optional. */
+export interface AtisOps {
+  /** Closures in force (2-9-3: "taxiway closures which affect the entrance or exit of active runways, other closures"). */
+  closures?: { kind: 'RUNWAY' | 'TAXIWAY'; ident: string }[];
+  /** RVR for the runway(s) in use (2-8-2 / 2-8-3), only where required. */
+  rvr?: { runwayEnd: string; report: RvrReport }[];
+  /** Runway condition codes (RwyCC) as the airport operator reports them (2-9-3, 3-3-1): one code per runway end, same for the three thirds here. */
+  rwyCondition?: { runwayEnd: string; code: number; atUtc: string }[];
+  /** "Braking Action Advisories are in effect" (3-3-5). */
+  brakingAdvisories?: boolean;
+  /** Latest pilot braking action report (3-3-4 wording: "Braking action medium, reported by a Boeing Seven Thirty-Seven"). */
+  braking?: { term: BrakingTerm; aircraftSpoken: string };
+  /** Bird activity (2-1-23, 2-9-3): detail clause ("flocks of geese, altitude unknown"), '' for the bare advisory. */
+  birds?: string;
+}
+
+/** What the ATIS said about the airport state, kept for `atisUpdateReasons` (2-9-2: new recording on new or canceled NOTAMs, worse braking action). */
+export interface AtisOpsSnapshot {
+  closures: string[];
+  brakingTerm?: BrakingTerm;
+  brakingAdvisories: boolean;
+  birds: boolean;
+  rwyCondition: string;
+}
 
 export interface SimulatedAtis extends Atis {
   icao: string;
@@ -35,6 +66,7 @@ export interface SimulatedAtis extends Atis {
   approachesInUse: string[];
   notams: string[];
   fieldElevationFt: number;
+  ops: AtisOpsSnapshot;
 }
 
 export interface GenerateAtisInput {
@@ -59,6 +91,8 @@ export interface GenerateAtisInput {
    * all runway holding instructions). Default true.
    */
   holdShortReadback?: boolean;
+  /** Closures, RVR, braking action, runway condition codes and bird activity (see `AtisOps`). */
+  ops?: AtisOps;
   elevationFt: number;
   /** Simulation clock seconds at issue (stored as `issuedAtSec`). Default 0. */
   issuedAtSec?: number;
@@ -262,6 +296,12 @@ function visibilitySegment(w: Weather): Segment {
   };
 }
 
+function rvrSegment(ops: AtisOps | undefined): Segment | undefined {
+  if (!ops?.rvr?.length) return undefined;
+  const parts = ops.rvr.map((r) => rvrPhrase(r.runwayEnd, r.report));
+  return { display: parts.map((p) => p.display).join(' '), spoken: parts.map((p) => p.spoken).join(' ') };
+}
+
 function skySegment(w: Weather): Segment {
   const layers = w.clouds
     .filter((c) => c.cover !== 'SKC' && c.cover !== 'CLR')
@@ -314,6 +354,19 @@ function altimeterSegment(w: Weather): Segment {
 }
 
 function uniq(a: readonly string[]): string[] { return [...new Set(a)]; }
+
+/** "Runway 4/22 closed" / spoken "Runway four slash two two closed"; "Taxiway B closed" / "Taxiway Bravo closed" (2-4-16 phonetics). */
+function closureSegment(c: { kind: 'RUNWAY' | 'TAXIWAY'; ident: string }): Segment {
+  if (c.kind === 'RUNWAY') return { display: `Runway ${c.ident} closed`, spoken: `Runway ${c.ident.split('/').map((e) => spokenRunway(e)).join(' slash ')} closed` };
+  return { display: `Taxiway ${c.ident} closed`, spoken: `Taxiway ${c.ident.replace(/[A-Za-z]/g, (ch) => ` ${phoneticForLetter(ch)} `).replace(/\d/g, (d) => ` ${DIGIT_WORDS[Number(d)]} `).replace(/\s+/g, ' ').trim()} closed` };
+}
+
+/** "Runway one three condition codes five, five, five at one three five two Zulu" (2-9-3; the three thirds carry the same code here). */
+function rwyCcSegment(r: { runwayEnd: string; code: number; atUtc: string }): Segment {
+  const c = `${r.code}, ${r.code}, ${r.code}`;
+  const cs = `${spokenDigits(r.code)}, ${spokenDigits(r.code)}, ${spokenDigits(r.code)}`;
+  return { display: `Runway ${r.runwayEnd} condition codes ${c} at ${r.atUtc} Zulu.`, spoken: `Runway ${spokenRunway(r.runwayEnd)} condition codes ${cs} at ${spokenDigits(r.atUtc)} Zulu.` };
+}
 
 function defaultApproaches(w: Weather, landing: readonly string[]): string[] {
   return uniq(landing).map((r) => (w.flightCategory === 'VFR' ? `visual approach runway ${r}` : `ILS runway ${r} approach`));
@@ -369,6 +422,8 @@ export function generateAtis(input: GenerateAtisInput): SimulatedAtis {
   spok.push(`${name} information ${phonetic}, ${spokenDigits(timeZulu)} Zulu.`);
   push(windSegment(weather, variationDeg));
   push(visibilitySegment(weather));
+  const rvr = rvrSegment(input.ops);
+  if (rvr) push(rvr);
   push(skySegment(weather));
   push(tempSegment(weather));
   push(altimeterSegment(weather));
@@ -380,9 +435,29 @@ export function generateAtis(input: GenerateAtisInput): SimulatedAtis {
   const rwyDisp = runwaySegment(activeRunways, false, approaches);
   const rwySpok = runwaySegment(activeRunways, true, approaches);
   if (rwyDisp) { disp.push(rwyDisp); spok.push(rwySpok); }
-  if (notams.length) {
-    disp.push(`NOTAMs: ${notams.join('. ')}.`);
-    spok.push(`Notices to air missions: ${notams.map(speakFreeText).join('. ')}.`);
+  const closures = (input.ops?.closures ?? []).map(closureSegment);
+  if (closures.length || notams.length) {
+    disp.push(`NOTAMs: ${[...closures.map((c) => c.display), ...notams].join('. ')}.`);
+    spok.push(`Notices to air missions: ${[...closures.map((c) => c.spoken), ...notams.map(speakFreeText)].join('. ')}.`);
+  }
+  if (input.ops?.birds !== undefined) {
+    const detail = input.ops.birds ? `, ${input.ops.birds}` : '';
+    disp.push(`Bird activity in the vicinity of the airport${detail}.`);
+    spok.push(`Bird activity in the vicinity of the airport${detail}.`);
+  }
+  if (input.ops?.brakingAdvisories) {
+    disp.push('Braking action advisories are in effect.');
+    spok.push('Braking action advisories are in effect.');
+  }
+  if (input.ops?.braking) {
+    const b = `Braking action ${input.ops.braking.term}, reported by ${input.ops.braking.aircraftSpoken}.`;
+    disp.push(b);
+    spok.push(b);
+  }
+  for (const r of input.ops?.rwyCondition ?? []) {
+    const seg = rwyCcSegment(r);
+    disp.push(seg.display);
+    spok.push(seg.spoken);
   }
   if (input.holdShortReadback ?? true) {
     disp.push('Read back all runway hold short instructions.');
@@ -406,12 +481,24 @@ export function generateAtis(input: GenerateAtisInput): SimulatedAtis {
     approachesInUse: approaches,
     notams,
     fieldElevationFt: input.elevationFt,
+    ops: opsSnapshot(input.ops),
+  };
+}
+
+export function opsSnapshot(ops: AtisOps | undefined): AtisOpsSnapshot {
+  return {
+    closures: (ops?.closures ?? []).map((c) => `${c.kind}:${c.ident}`).sort(),
+    brakingTerm: ops?.braking?.term,
+    brakingAdvisories: !!ops?.brakingAdvisories,
+    birds: ops?.birds !== undefined,
+    rwyCondition: (ops?.rwyCondition ?? []).map((r) => `${r.runwayEnd}:${r.code}`).sort().join(','),
   };
 }
 
 // ---------------------------------------------------------------------------
 // Update criteria
 // ---------------------------------------------------------------------------
+
 
 function angleDiff(a: number, b: number): number {
   const d = Math.abs(a - b) % 360;
@@ -431,12 +518,14 @@ const hasThunder = (w: Weather) => w.phenomena.some((p) => p.includes('TS'));
  * category boundary, thunderstorm appearing/disappearing, or a runway change.
  */
 export function atisUpdateReasons(
-  prev: Pick<SimulatedAtis, 'weather' | 'activeRunways'>,
+  prev: Pick<SimulatedAtis, 'weather' | 'activeRunways'> & { ops?: AtisOpsSnapshot },
   next: Weather,
   nextRunways?: ActiveRunways,
+  nextOps?: AtisOps,
 ): string[] {
   const p = prev.weather;
   const reasons: string[] = [];
+  if (isNewObservation(p, next)) reasons.push('new weather observation');
 
   const pv = p.windDirDeg === 'VRB';
   const nv = next.windDirDeg === 'VRB';
@@ -456,14 +545,24 @@ export function atisUpdateReasons(
   if (nextRunways && (!sameSet(prev.activeRunways.landing, nextRunways.landing) || !sameSet(prev.activeRunways.departing, nextRunways.departing))) {
     reasons.push('runway change');
   }
+  if (nextOps && prev.ops) {
+    const n = opsSnapshot(nextOps);
+    const o = prev.ops;
+    if (n.closures.join(',') !== o.closures.join(',')) reasons.push('closures (NOTAMs)');
+    if (n.brakingTerm !== undefined && (o.brakingTerm === undefined || termRank(n.brakingTerm) < termRank(o.brakingTerm))) reasons.push('braking action worse');
+    else if (n.brakingAdvisories !== o.brakingAdvisories) reasons.push('braking action advisories');
+    if (n.birds !== o.birds) reasons.push('bird activity');
+    if (n.rwyCondition !== o.rwyCondition) reasons.push('runway condition codes');
+  }
   return reasons;
 }
 
 /** True when the weather (or runway configuration) changed enough to issue a new ATIS letter. */
 export function atisNeedsUpdate(
-  prev: Pick<SimulatedAtis, 'weather' | 'activeRunways'>,
+  prev: Pick<SimulatedAtis, 'weather' | 'activeRunways'> & { ops?: AtisOpsSnapshot },
   nextWeather: Weather,
   nextRunways?: ActiveRunways,
+  nextOps?: AtisOps,
 ): boolean {
-  return atisUpdateReasons(prev, nextWeather, nextRunways).length > 0;
+  return atisUpdateReasons(prev, nextWeather, nextRunways, nextOps).length > 0;
 }

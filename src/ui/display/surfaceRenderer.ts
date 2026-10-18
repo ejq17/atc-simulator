@@ -9,6 +9,9 @@ import { C, FONT_MONO } from './palette';
 import { placeLabels } from './labels';
 import type { LabelRequest } from './labels';
 import { buildSurfaceStatic } from './surfaceStatic';
+import { closedRunwayMarks, closedTaxiwayMarks } from './closureMarks';
+import type { XMark } from './closureMarks';
+import { closedRunwayIds, closedTaxiways } from '../../sim/airportOps';
 import { worldToScreen, visibleBounds } from './viewTransform';
 import type { View } from './viewTransform';
 import { drawGlyphDetail, glyphPath, symbolSize } from './symbols';
@@ -133,6 +136,56 @@ function drawRunways(ctx: CanvasRenderingContext2D, v: View, state: SimulationSt
     ctx.stroke();
     ctx.setLineDash([]);
     drawDisplacedThresholds(ctx, v, rw);
+  }
+}
+
+const CLOSED_YELLOW = '#f2c744';
+
+function strokeXs(ctx: CanvasRenderingContext2D, v: View, marks: readonly XMark[], lineWidth: number): void {
+  ctx.strokeStyle = CLOSED_YELLOW;
+  ctx.lineWidth = lineWidth;
+  ctx.lineCap = 'butt';
+  ctx.beginPath();
+  for (const m of marks) {
+    for (const [a, b] of m.segments) {
+      const s1 = worldToScreen(v, a);
+      const s2 = worldToScreen(v, b);
+      ctx.moveTo(s1.x, s1.y);
+      ctx.lineTo(s2.x, s2.y);
+    }
+  }
+  ctx.stroke();
+}
+
+/**
+ * Closures (NOTAM): a closed runway gets a yellow X at each end (AC 150/5370-2G 2.18.2.1.2) and a yellow wash; a closed taxiway a yellow wash along its
+ * centreline and X marks along it. Drawn over the pavement, under the labels and aircraft.
+ */
+function drawClosures(ctx: CanvasRenderingContext2D, v: View, state: SimulationState): void {
+  const airport = state.airport;
+  const rwys = closedRunwayIds(state);
+  for (const rw of airport.runways) {
+    if (!rwys.has(rw.id)) continue;
+    poly(ctx, v, rw.polygon, true);
+    ctx.fillStyle = 'rgba(242,199,68,0.14)';
+    ctx.fill();
+    strokeXs(ctx, v, closedRunwayMarks(rw), Math.max(2, Math.min(5, 90 * v.scale)));
+  }
+  const twys = closedTaxiways(state);
+  if (!twys.size) return;
+  for (const name of Object.keys(airport.taxiwayGraph.taxiwayPolylines)) {
+    if (!twys.has(name.toUpperCase())) continue;
+    const lines = airport.taxiwayGraph.taxiwayPolylines[name];
+    ctx.strokeStyle = 'rgba(242,199,68,0.38)';
+    ctx.lineWidth = Math.max(3, 22 * v.scale);
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    for (const line of lines) {
+      poly(ctx, v, line);
+      ctx.stroke();
+    }
+    ctx.lineCap = 'butt';
+    strokeXs(ctx, v, closedTaxiwayMarks(lines), Math.max(1.5, Math.min(3.5, 40 * v.scale)));
   }
 }
 
@@ -627,6 +680,7 @@ export function drawSurface(ctx: CanvasRenderingContext2D, frame: Frame, v: View
   drawBackdrop(ctx, v);
   drawAirportBase(ctx, v, airport, layers);
   drawRunways(ctx, v, state);
+  drawClosures(ctx, v, state);
   drawRunwayNumbers(ctx, v, airport);
   if (layers.taxiwayIds) drawTaxiwayIds(ctx, v, airport);
   drawHoldLines(ctx, v, airport);

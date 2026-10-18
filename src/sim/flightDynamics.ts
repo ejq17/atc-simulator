@@ -8,7 +8,7 @@
 import type { Aircraft, AircraftPerformance, FlightPhase, Vec2 } from './types';
 import {
   clamp, deg2rad, dist, ftToM, headingDiff, headingToVec, ktToMps, mpsToKt, mToFt, mToNm, nmToM, normHeading, pointInPolygon, rad2deg,
-  vAdd, vDot, vScale, vSub, vecToHeading, bearingDeg,
+  vAdd, vDot, vScale, vSub, vecToHeading, bearingDeg, magneticToTrue,
 } from './geo';
 import { patternAltitudeFt } from './performance';
 import { activeClearance, completeClearances, emitEvent, getRuntime, perfOf, pilotSay, setPhase } from './context';
@@ -16,9 +16,12 @@ import type { AircraftRuntime, ExitInstruction, SimContext } from './context';
 import { alongCross, crossingRunways, findRunwayEnd } from './runways';
 import type { RunwayEndGeom } from './runways';
 import { neighborIds, shortestDistances } from './pathfinding';
+import { closedTaxiways } from './airportOps';
+import { findStar, onStarRoute, starProfile } from './star';
+import type { StarProfileEntry } from './star';
 import { exitUnableCall, goingAroundCall, stoppedAfterRejectCall, touchAndGoRefusedCall } from '../radio/readback';
 import { componentsOfVector, exceedsLimits, newGustState, stepGust, windVector } from './wind';
-import { advanceNav, fixPosition, turnLeadM } from './navigation';
+import { advanceNav, findNavFix, fixPosition, turnLeadM } from './navigation';
 import { landedDistanceExceptionApplies, precedingArrivalBlockers } from './conflicts';
 import { holdGuidance } from './holding';
 import { missedGuidance, publishedMissedAltitudeFt, startPublishedMissed } from './missedApproach';
@@ -329,12 +332,17 @@ const sameTwy = (list: readonly string[], twy: string): boolean => list.some((x)
  */
 function chooseExit(ctx: SimContext, ac: Aircraft, g: RunwayEndGeom, tdAlong: number, vTd: number, lahsoStopAlong?: number, exit?: ExitInstruction, holdShortAlong?: number): RolloutPlan {
   const graph = ctx.state.airport.taxiwayGraph;
+  const closedTwy = closedTaxiways(ctx.state);
   const perf = perfOf(ac);
   const normal = ktToMps(perf.decelKtPerSec);
   const maxBrake = normal * MAX_BRAKE_FACTOR;
   const stopLimit = Math.min(lahsoStopAlong ?? Infinity, holdShortAlong ?? Infinity);
   const cands: { id: string; along: number; holds: string[]; exitRow: RunwayExit }[] = [];
-  for (const row of runwayExits(ctx, g)) cands.push({ id: row.id, along: row.along, holds: row.holds.map((h) => h.id), exitRow: row });
+  // A runway exit taxiway that is closed (NOTAM, marked with a yellow X: AC 150/5370-2G 2.18.2.1) is not used.
+  for (const row of runwayExits(ctx, g)) {
+    const open = row.holds.filter((h) => !h.taxiways.some((t) => closedTwy.has(t.toUpperCase())));
+    if (open.length) cands.push({ id: row.id, along: row.along, holds: open.map((h) => h.id), exitRow: row });
+  }
   // Land and hold short (LAHSO) / "hold short of runway N" after landing: only exits before the hold-short point can be used, otherwise stop at it.
   if (Number.isFinite(stopLimit)) {
     for (let i = cands.length - 1; i >= 0; i--) if (cands[i].along > stopLimit) cands.splice(i, 1);
@@ -346,7 +354,7 @@ function chooseExit(ctx: SimContext, ac: Aircraft, g: RunwayEndGeom, tdAlong: nu
     let bestHold = holds[0];
     let bestCost = Infinity;
     for (const h of holds) {
-      const dm = shortestDistances(graph, h);
+      const dm = shortestDistances(graph, h, { avoidTaxiways: closedTwy });
       let cost = Infinity;
       for (const p of ctx.state.airport.parking) cost = Math.min(cost, dm.get(p.nodeId) ?? Infinity);
       if (cost < bestCost) {
@@ -513,6 +521,7 @@ function touchdown(ctx: SimContext, ac: Aircraft, rt: AircraftRuntime, g: Runway
   rt.approach = undefined;
   rt.navMode = 'AUTO';
   rt.turnRateDegPerSec = 0;
+  rt.landedEnd = g.end.id;
   setPhase(ctx, ac, 'ROLLOUT', 'touchdown');
   const { along } = alongCross(g, ac.pos);
   const op = resolveLandingOp(ac, rt);
@@ -1002,6 +1011,24 @@ function capturePendingApproach(ctx: SimContext, ac: Aircraft, rt: AircraftRunti
 function endOfRoute(ctx: SimContext, ac: Aircraft, rt: AircraftRuntime, g: RunwayEndGeom | undefined): void {
   const mode = ac.nav?.mode;
   ac.nav = undefined;
+  // A STAR that ends "then on heading N" (ROZZE TWO runway 24: heading 057): the pilot flies that heading and expects radar vectors.
+  const starRef = ac.star ? findStar(ctx.state.airport, ac.star.procedureId) : undefined;
+  const thenHeading = starRef ? starRef.star.runways.find((r) => r.runwayEnd === ac.star!.runwayEnd)?.thenHeadingMagDeg : undefined;
+  if (ac.star && mode !== 'approach') {
+    const name = ac.star.name;
+    ac.star = undefined;
+    rt.starSpeedCapKt = undefined;
+    if (thenHeading !== undefined) {
+      rt.navMode = 'HEADING';
+      rt.turnDirection = undefined;
+      ac.target.headingDeg = magneticToTrue(thenHeading, ctx.state.airport.magneticVariationDeg);
+      emitEvent(ctx, {
+        kind: 'INFO', aircraftId: ac.id, callsign: ac.callsign, severity: 'info', speaker: 'SYSTEM',
+        text: `${ac.callsign} reached the end of the ${name} arrival, heading ${String(thenHeading).padStart(3, '0')} (as published), expecting radar vectors to final approach course`, data: { routeComplete: true, starEnd: true },
+      });
+      return;
+    }
+  }
   if (mode === 'approach' && rt.approach && g) {
     rt.navMode = 'AUTO';
     ac.target.headingDeg = undefined;
@@ -1023,11 +1050,22 @@ function endOfRoute(ctx: SimContext, ac: Aircraft, rt: AircraftRuntime, g: Runwa
  * the fix; it never climbs and never goes below the next minimum.
  */
 const PROFILE_LEAD_SEC = 20;
+const STAR_AT_OR_BELOW_MARGIN_FT = 200;
 
 function profileAltitude(ctx: SimContext, ac: Aircraft, rt: AircraftRuntime, perf: AircraftPerformance): number | undefined {
   const ap = rt.approach;
+  if (!ap?.profile?.length) return undefined;
+  return profileAltitudeFor(ctx, ac, perf, ap.profile);
+}
+
+/** The same descent logic over any list of fix restrictions (published approach altitudes, or the STAR restrictions after "descend via"). */
+function profileAltitudeFor(
+  ctx: SimContext, ac: Aircraft, perf: AircraftPerformance,
+  profile: readonly { fix: string; minAltitudeFt?: number; maxAltitudeFt?: number; mandatoryAltitudeFt?: number }[],
+  opts: { viaStar?: boolean } = {},
+): number | undefined {
   const nav = ac.nav;
-  if (!ap?.profile?.length || !nav) return undefined;
+  if (!profile.length || !nav) return undefined;
   const base = ac.target.altitudeFt ?? ac.altitudeFt;
   const gs = Math.max(ktToMps(ac.groundSpeedKt), ktToMps(60));
   let distM = 0;
@@ -1043,10 +1081,11 @@ function profileAltitude(ctx: SimContext, ac: Aircraft, rt: AircraftRuntime, per
     const lead = turnLeadM(ac, perf, nextP ? Math.abs(headingDiff(bearingDeg(prev, p), bearingDeg(p, nextP))) : 0);
     const seqDistM = Math.max(0, distM - lead);
     prev = p;
-    const entries = ap.profile.filter((f) => f.fix === nav.fixes[i].toUpperCase());
+    const entries = profile.filter((f) => f.fix === (findNavFix(ctx.state.airport, nav.fixes[i])?.id ?? nav.fixes[i]).toUpperCase());
     if (!entries.length) continue;
     const lowest = entries.reduce((a, b) => (restrictionReach(b) < restrictionReach(a) ? b : a));
-    const reach = restrictionReach(lowest);
+    // "at or below" altitudes of a STAR are met with a small margin: the pilot is below the limit when crossing the fix, not on it
+    const reach = restrictionReach(lowest) - (opts.viaStar && lowest.mandatoryAltitudeFt === undefined && lowest.maxAltitudeFt !== undefined ? STAR_AT_OR_BELOW_MARGIN_FT : 0);
     if (!Number.isFinite(reach)) continue;
     // aim to be at the fix altitude about 20 s before the fix: the vertical-speed controller (10 s time constant) lags a ramp by that much
     const tSec = Math.max(0, seqDistM / gs - PROFILE_LEAD_SEC);
@@ -1055,7 +1094,37 @@ function profileAltitude(ctx: SimContext, ac: Aircraft, rt: AircraftRuntime, per
   }
   if (!Number.isFinite(ceiling)) return undefined;
   // never climb back up to a later, higher restriction once a fix has been crossed
+  if (opts.viaStar) {
+    // "descend via": the assigned altitude is the lowest altitude of the procedure (the target), not a cap: the profile ceiling decides how fast the
+    // aircraft comes down and the next at-or-above altitude keeps it from going lower than the chart allows.
+    return Math.max(Math.min(ac.altitudeFt, Math.max(ceiling, floor ?? -Infinity)), base);
+  }
   return Math.min(ac.altitudeFt, base, Math.max(ceiling, floor ?? -Infinity));
+}
+
+/**
+ * The speed cap (kt) of the STAR over the remaining fixes: a restriction ahead applies once the aircraft is within the distance needed to slow
+ * to it ("the minimum distance necessary prior to a published speed restriction", AIM 5-4-1), a passed restriction holds until the next one.
+ */
+function starSpeedCap(ctx: SimContext, ac: Aircraft, rt: AircraftRuntime, perf: AircraftPerformance, profile: readonly StarProfileEntry[]): number | undefined {
+  const nav = ac.nav!;
+  let cap = rt.starSpeedCapKt;
+  const decelKtPerSec = perf.category === 'light' ? 1.0 : 1.5; // the engine's own deceleration in stepAirborne
+  let distM = 0;
+  let prev = ac.pos;
+  for (let i = nav.index; i < nav.fixes.length; i++) {
+    const p = fixPosition(ctx.state.airport, nav.fixes[i]);
+    if (!p) continue;
+    distM += dist(prev, p);
+    prev = p;
+    const r = profile.find((f) => f.fix === (findNavFix(ctx.state.airport, nav.fixes[i])?.id ?? nav.fixes[i]).toUpperCase() && f.speedKt !== undefined);
+    if (!r) continue;
+    const slowSec = Math.max(0, ac.airspeedKt - r.speedKt!) / decelKtPerSec;
+    const leadM = ktToMps(Math.max(ac.groundSpeedKt, 100)) * (slowSec + 10);
+    if (distM <= leadM) cap = Math.min(cap ?? Infinity, r.speedKt!);
+    break; // only the next restricted fix matters
+  }
+  return cap;
 }
 
 /** The altitude a published restriction asks to be at over the fix: mandatory, else the maximum, else the minimum. */
@@ -1081,6 +1150,11 @@ function routeGuidance(ctx: SimContext, ac: Aircraft, rt: AircraftRuntime, g: Ru
   const sequenced = advanceNav(airport, ac, perf);
   for (const id of sequenced) {
     rt.passedFixes.add(id.toUpperCase());
+    if (ac.star) {
+      const ref = findStar(airport, ac.star.procedureId);
+      const restr = ref ? starProfile(ref.star).find((r) => r.fix === (findNavFix(airport, id)?.id ?? id).toUpperCase() && r.speedKt !== undefined) : undefined;
+      if (restr) rt.starSpeedCapKt = restr.speedKt;
+    }
     if (rt.approach && ac.nav!.mode === 'approach') {
       emitEvent(ctx, {
         kind: 'INFO', aircraftId: ac.id, callsign: ac.callsign, severity: 'info', speaker: 'SYSTEM',
@@ -1116,7 +1190,21 @@ function routeGuidance(ctx: SimContext, ac: Aircraft, rt: AircraftRuntime, g: Ru
   }
   let altTarget = ac.target.altitudeFt;
   if (nav.mode === 'approach' && rt.approach?.profile?.length) altTarget = profileAltitude(ctx, ac, rt, perf) ?? altTarget;
-  return { desiredHeading: desired, altTargetFt: altTarget, vsFpm, speedKt: ac.target.speedKt ?? defaultSpeedKt(ac, perf, aglFt) };
+  let speedKt = ac.target.speedKt ?? defaultSpeedKt(ac, perf, aglFt);
+  if (onStarRoute(ac)) {
+    // STAR (JO 7110.65 4-7-1, 4-5-7; AIM 5-4-1): after "descend via" the altitude restrictions are flown (descend at the pilot's discretion, just
+    // in time); the published speed restrictions are flown whenever the aircraft is on the procedure.
+    const ref = findStar(airport, ac.star!.procedureId);
+    if (ref) {
+      const profile = starProfile(ref.star);
+      // the en-route speed of the procedure (250 kt below 10,000 ft, 91.117(a)) holds until the approach clearance: the APPROACH phase's
+      // slower default (about 160 kt) belongs to an aircraft that has been cleared for the approach
+      if (ac.target.speedKt === undefined) speedKt = ac.altitudeFt < 10000 && perf.category !== 'light' ? Math.min(perf.cruiseSpeedKt, 250) : perf.cruiseSpeedKt;
+      if (ac.star!.descendVia) altTarget = profileAltitudeFor(ctx, ac, perf, profile, { viaStar: true }) ?? altTarget;
+      speedKt = Math.min(speedKt, starSpeedCap(ctx, ac, rt, perf, profile) ?? Infinity);
+    }
+  }
+  return { desiredHeading: desired, altTargetFt: altTarget, vsFpm, speedKt };
 }
 
 function stepAirborne(ctx: SimContext, ac: Aircraft, dt: number): void {

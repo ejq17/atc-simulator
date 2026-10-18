@@ -10,9 +10,10 @@
 import { create } from 'zustand';
 import { game, createScenarioEventRunner } from '../../game';
 import type { CareerProgress, DebriefReport, FreePlayOptions, TrainingStepState } from '../../game';
-import { airportOrDefault, loadKacy } from '../../airport';
+import { airportOrDefault } from '../../airport';
 import { createEngine } from '../../sim/engine';
-import type { Airport, GameMode, Scenario, SimEvent, SimulationState, Weather } from '../../sim/types';
+import { closedEndsOf, closedRunwayEnds } from '../../sim/airportOps';
+import type { GameMode, Scenario, SimEvent, SimulationState, Weather } from '../../sim/types';
 import { fetchLiveMetar } from '../../weather/liveWeather';
 import type { LiveMetar } from '../../weather/liveWeather';
 import { createLiveFeed, METAR_RETRY_MS } from '../../weather/liveFeed';
@@ -21,7 +22,7 @@ import { initialAtisLetter } from '../../weather/atisCycle';
 import { realTimeDensity } from '../../game/trafficDensity';
 import { getPresetWeather } from '../../weather/presets';
 import type { WeatherPresetId } from '../../weather/presets';
-import { preferredEndOrder, recommendRunways } from '../../weather/runwaySelection';
+import { recommendedRunways, runwayChangeForWind } from './runwayConfig';
 import type { SimulatedAtis } from '../../weather/atis';
 import { unlockAudio } from '../../voice';
 import type { VoiceStatus } from '../../voice';
@@ -70,33 +71,7 @@ export interface Notice {
   text: string;
 }
 
-/** Runway configuration recommended for a weather snapshot (best headwind end, used for both arrivals and departures). */
-export function recommendedRunways(weather: Weather, airport: Pick<Airport, 'icao' | 'runways' | 'magneticVariationDeg'> = loadKacy()): { departing: string[]; landing: string[]; summary: string } {
-  const ends = airport.runways.flatMap((r) => r.ends.map((e) => ({ id: e.id, magneticHeadingDeg: e.magneticHeadingDeg })));
-  const rec = recommendRunways(weather, ends, { preferredOrder: preferredEndOrder(airport, 'high'), variationDeg: airport.magneticVariationDeg });
-  const top = rec.ranking.find((r) => r.id === rec.primary);
-  const summary = rec.calmWindRule
-    ? `Wind calm or light: preferred runway ${rec.primary}`
-    : `Runway ${rec.primary}: headwind ${Math.round(top?.headwindKt ?? 0)} kt, crosswind ${Math.round(Math.abs(top?.crosswindKt ?? 0))} kt`;
-  return { departing: [rec.primary], landing: [rec.primary], summary };
-}
-
-/**
- * Live wind -> runway configuration, with the existing selection rules (best headwind, KACY preference order, calm-wind rule). To avoid flapping
- * on every METAR it only proposes a change when the runway now in use is no longer among the best ends AND (the wind is not calm OR the
- * current runway has a tailwind).
- */
-export function runwayChangeForWind(weather: Weather, current: { landing: string[]; departing: string[] }, airport: Pick<Airport, 'icao' | 'runways' | 'magneticVariationDeg'> = loadKacy()): { departing: string[]; landing: string[]; summary: string } | undefined {
-  const ends = airport.runways.flatMap((r) => r.ends.map((e) => ({ id: e.id, magneticHeadingDeg: e.magneticHeadingDeg })));
-  const rec = recommendRunways(weather, ends, { preferredOrder: preferredEndOrder(airport, 'high'), variationDeg: airport.magneticVariationDeg });
-  const inUse = current.landing[0] ?? current.departing[0];
-  if (!inUse || rec.best.includes(inUse)) return undefined;
-  const cur = rec.ranking.find((r) => r.id === inUse);
-  if (rec.calmWindRule && (cur?.headwindKt ?? 0) >= 0) return undefined;
-  const top = rec.ranking.find((r) => r.id === rec.primary);
-  const summary = `wind ${Math.round(top?.headwindKt ?? 0)} kt headwind on ${rec.primary}`;
-  return { departing: [rec.primary], landing: [rec.primary], summary };
-}
+export { recommendedRunways, runwayChangeForWind } from './runwayConfig';
 
 interface SimStore {
   screen: Screen;
@@ -227,18 +202,25 @@ export const useSimStore = create<SimStore>((set, get) => ({
       // ---- scenario ----------------------------------------------------------------------------------------------
       set({ startStatus: 'Building scenario…' });
       const refWeather = weather ?? getPresetWeather('clear');
+      const closedEnds = closedEndsOf(airport, opts.freePlay.closures ?? []);
       let runways: { departing: string[]; landing: string[] } | undefined;
-      if (opts.runways !== 'auto') runways = { departing: [opts.runways.departing], landing: [opts.runways.landing] };
-      else if (!opts.scenarioId) {
-        const rec = recommendedRunways(refWeather, airport);
+      if (opts.runways !== 'auto' && ![opts.runways.departing, opts.runways.landing].some((e) => closedEnds.includes(e))) runways = { departing: [opts.runways.departing], landing: [opts.runways.landing] };
+      else if (opts.runways !== 'auto') {
+        note('warn', 'The runway you chose is closed for this session (NOTAM); the best open runway was selected instead.');
+        const rec = recommendedRunways(refWeather, airport, closedEnds);
+        runways = { departing: rec.departing, landing: rec.landing };
+      } else if (!opts.scenarioId || closedEnds.length) {
+        const rec = recommendedRunways(refWeather, airport, closedEnds);
         runways = { departing: rec.departing, landing: rec.landing };
       }
       const positions = POSITION_CHOICES[opts.controller];
-      const fp: FreePlayOptions = { ...opts.freePlay, seed, weather: weather ?? opts.freePlay.weather, playerPositions: [...positions], ...(runways ? { activeRunways: runways } : {}) };
+      const startUtcMs = Date.now();
+      const fp: FreePlayOptions = { ...opts.freePlay, seed, startUtcMs, weather: weather ?? opts.freePlay.weather, playerPositions: [...positions], ...(runways ? { activeRunways: runways } : {}) };
       const scenario: Scenario = opts.scenarioId
         ? game.buildScenario(opts.scenarioId, airport, fp)
         : game.buildFreePlay(airport, fp);
-      if (opts.scenarioId && opts.runways !== 'auto' && runways) scenario.activeRunways = runways;
+      if (opts.scenarioId && (opts.runways !== 'auto' || closedEnds.length) && runways) scenario.activeRunways = runways;
+      if (opts.scenarioId && opts.freePlay.closures?.length) scenario.closures = opts.freePlay.closures.map((c) => ({ ...c }));
       if (!weather) {
         weather = scenario.weather === 'live' ? getPresetWeather('clear') : scenario.weather;
         weatherNote = `Scenario weather (${weather.source})`;
@@ -261,7 +243,6 @@ export const useSimStore = create<SimStore>((set, get) => ({
       const prev = get().session;
       prev?.dispose();
       stopLiveFeed();
-      const startUtcMs = Date.now();
       const session = startEngineSession({
         engine,
         scenario,
@@ -307,7 +288,7 @@ export const useSimStore = create<SimStore>((set, get) => ({
             session.setWeather(w);
             set({ weatherNote: `Live METAR ${m.raw}` });
             get().addNotice('info', `New ${airport.icao} METAR (${m.observedAt.slice(11, 16)}Z): ${m.raw}`);
-            const change = autoRunways ? runwayChangeForWind(w, session.engine.getState().activeRunways, airport) : undefined;
+            const change = autoRunways ? runwayChangeForWind(w, session.engine.getState().activeRunways, airport, closedRunwayEnds(session.engine.getState())) : undefined;
             if (change) {
               session.setActiveRunways({ departing: change.departing, landing: change.landing });
               get().addNotice('warn', `The wind favours runway ${change.landing[0]} now (${change.summary}); active runways changed. Aircraft already in the pattern may need to be re-sequenced.`);

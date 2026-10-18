@@ -444,3 +444,31 @@ export function runwayLights(rw: Runway, opts: RunwayLightOptions & { approachEn
   }
   return out;
 }
+
+// ---------------------------------------------------------------------------
+// Closure markings and runway light intensity
+// ---------------------------------------------------------------------------
+
+/** Each stroke of an X (`closureMarks.ts`) as a thin marking rectangle `width` metres wide, for `markingsMesh`. */
+export function xMarkRects(marks: readonly { segments: readonly (readonly [Vec2, Vec2])[] }[], width: number): MarkingRect[] {
+  const out: MarkingRect[] = [];
+  for (const m of marks) {
+    for (const [a, b] of m.segments) {
+      const dx = b.x - a.x;
+      const dy = b.y - a.y;
+      out.push({ c: { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }, headingDeg: (Math.atan2(dx, dy) * 180) / Math.PI, length: Math.hypot(dx, dy), width });
+    }
+  }
+  return out;
+}
+
+/**
+ * Brightness of the runway edge lights for an intensity step of the HIRL system (JO 7110.65 3-4-11: steps 1-5; 0 = off). `closed`: a closed runway's
+ * edge lights are not turned on (3-4-10: "Do not turn on the runway edge lights when a NOTAM closing the runway is in effect"). `opacity` scales the
+ * glow, `size` the light sprite; step 5 is the full-brightness reference. The ratios are a visual choice (the manual gives steps, not candela).
+ */
+export function runwayLightLevel(step: number, closed: boolean): { opacity: number; size: number } {
+  if (closed || step <= 0) return { opacity: 0, size: 0 };
+  const s = Math.max(1, Math.min(5, Math.round(step)));
+  return { opacity: [0.28, 0.45, 0.62, 0.8, 1][s - 1], size: [0.7, 0.8, 0.9, 1, 1.15][s - 1] };
+}

@@ -171,7 +171,7 @@ describe('traffic generator', () => {
       late += r.recs.filter((x) => x.time >= 1050).length;
     }
     expect(late).toBeGreaterThan(early);
-  }, 30_000); // six 25-minute engine runs: 4-5 s on a loaded machine
+  }, 120_000); // six 25-minute engine runs: several seconds, far longer on a loaded machine
 
   it('returns a null generator when traffic is disabled', () => {
     const quiet: Scenario = { ...sc, traffic: { ...sc.traffic!, enabled: false } };

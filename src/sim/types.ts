@@ -167,7 +167,34 @@ export interface InstrumentProcedure {
     role: 'missed_approach' | 'hold_in_lieu' | 'arrival';
     maxSpeedKt?: number;
   }[];
+  /** STAR only: the transcribed procedure (see `StarProcedure`); absent on chart-only entries and continuation pages. */
+  star?: StarProcedure;
   provenance: DataProvenance;
+}
+
+/** Transcription of a standard terminal arrival chart (KMHT ROZZE TWO; data/sources/kmht-procedures.json `stars[].star`). */
+export interface StarProcedure {
+  /** Computer code identifier without the dot, e.g. "ROZZE2" (FAA id "ROZZE.ROZZE2"). */
+  ident: string;
+  /** Name as spoken in a clearance ("ROZZE TWO", 7110.65 4-7-1: name and number, without the parenthesised "(RNAV)"). */
+  spokenName: string;
+  /** Transition entries: the fixes flown from the transition fix to the common fix (inclusive). */
+  transitions: { name: string; fixes: string[] }[];
+  /** Per landing runway end: the fixes flown from the common fix (inclusive) to the end of the procedure (the IAF of the expected approach). */
+  runways: {
+    runwayEnd: string;
+    fixes: string[];
+    /** Fixes of the expected approach that continue the route from the IAF to the approach's feeder / initial fix (from the IAP chart). */
+    joinApproachFixes?: string[];
+    /** The chart ends with "then on heading N": magnetic heading flown after the last fix (JSTNN -> 057 for runway 24). */
+    thenHeadingMagDeg?: number;
+    expect: string;
+  }[];
+  /** Published restrictions by fix (the chart's altitude and speed depiction). */
+  restrictions: { fix: string; atOrAboveFt?: number; atOrBelowFt?: number; atFt?: number; speedKt?: number }[];
+  /** Leg data for integrity checks (magnetic track, distance, MEA as printed). */
+  legs?: { from: string; to: string; trackMagDeg?: number; distanceNm: number; meaFt?: number }[];
+  notes: string[];
 }
 
 export interface HotSpot {
@@ -262,6 +289,10 @@ export type ClearanceKind =
   | 'RADAR_CONTACT'        // "radar contact" (informational; marks the aircraft as identified)
   | 'HOLD_AT_FIX'          // "hold at SMITS as published" / "hold east of SMITS on the 090 radial, right turns, one minute legs"
   | 'MISSED_APPROACH'      // "execute missed approach" / "go around, fly the published missed approach"
+  | 'STAR'                 // "cleared ROZZE TWO arrival" / "descend via the ROZZE TWO arrival" (7110.65 4-7-1, 4-5-7)
+  // Airport state (src/sim/airportOps.ts)
+  | 'ADVISORY'             // informational advisory the pilot acknowledges: "caution, bird activity ..." (2-1-23), braking action (3-3-4)
+  | 'RUNWAY_LIGHTS'       // runway edge light intensity request/answer ("lights up / lights down", 3-4-10, 3-4-11, 3-4-14)
   // Tower vocabulary (JO 7110.65 3-10-9, 3-9-11, 3-1-6, 3-8-1, 3-10-11, 7-6-11, 5-2-1; see docs/FAA-REFERENCES.md)
   | 'EXIT_RUNWAY'         // "turn left at Charlie" / "exit right Bravo" / "continue to the end" (+ optional "hold short of runway N")
   | 'CANCEL_TAKEOFF'      // "cancel takeoff clearance" / "abort takeoff"
@@ -362,6 +393,13 @@ export interface Clearance {
   fix?: string;                    // DIRECT_FIX target
   ifr?: IfrClearanceDetails;       // IFR_CLEARANCE
   hold?: HoldingInstruction;       // HOLD_AT_FIX
+  starName?: string;               // STAR
+  starTransition?: string;
+  descendVia?: boolean;
+  advisory?: 'BIRDS' | 'BRAKING';
+  brakingTerm?: BrakingTerm;
+  lightsDirection?: 'UP' | 'DOWN';
+  lightStep?: number;
   /** Set when the engine finished executing the clearance. */
   completedAtSec?: number;
 }
@@ -412,6 +450,8 @@ export interface Aircraft {
   flightPlan?: FlightPlan;
   /** Active lateral navigation: flying toward `fixes[index]`; undefined while on vectors/heading. */
   nav?: { fixes: string[]; index: number; mode: 'route' | 'direct' | 'approach' | 'vectors' | 'holding' | 'missed' };
+  /** Standard terminal arrival the aircraft is flying (KMHT ROZZE TWO); cleared on spawn, `descendVia` once the controller says "descend via". */
+  star?: { procedureId: string; name: string; transition?: string; runwayEnd: string; descendVia: boolean };
   /** Transponder code and radar identification state. */
   squawk?: string;
   radarIdentified?: boolean;
@@ -469,6 +509,16 @@ export interface ParsedCommand {
   fix?: string;
   ifr?: Partial<IfrClearanceDetails>;
   hold?: Partial<HoldingInstruction>;
+  /** STAR: spoken procedure name as parsed ("ROZZE2"), optional transition fix, and whether the clearance is "descend via". */
+  starName?: string;
+  starTransition?: string;
+  descendVia?: boolean;
+  /** ADVISORY: which advisory ('BIRDS' 2-1-23, 'BRAKING' 3-3-4/3-3-5) and, for braking action, the term. */
+  advisory?: 'BIRDS' | 'BRAKING';
+  brakingTerm?: BrakingTerm;
+  /** RUNWAY_LIGHTS: `UP` / `DOWN` (one step) or an explicit intensity step. */
+  lightsDirection?: 'UP' | 'DOWN';
+  lightStep?: number;
   /** 0..1, calibrated from grammar match quality and entity resolution. */
   confidence: number;
   rawText: string;
@@ -515,6 +565,60 @@ export interface Atis {
   issuedAtSec: number;
   activeRunways: { departing: string[]; landing: string[] };
   simulated: true;
+}
+
+// ---------------------------------------------------------------------------
+// Airport operating state (NOTAM-style closures, braking action, birds, lights)
+// ---------------------------------------------------------------------------
+
+export type ClosureKind = 'RUNWAY' | 'TAXIWAY';
+export type ClosureSource = 'setup' | 'freeplay' | 'scenario' | 'player';
+
+/** A NOTAM-style closure. `ident` is a runway id ("13/31") or a taxiway designator ("B"). Active while `startSec <= now < endSec`. */
+export interface Closure {
+  id: string;
+  kind: ClosureKind;
+  ident: string;
+  startSec: number;
+  /** Undefined = closed for the rest of the session. */
+  endSec?: number;
+  /** Why, in words ("runway inspection by airport operations"). */
+  reason: string;
+  source: ClosureSource;
+}
+
+/** Closure as written in a scenario / setup option; `startSec` defaults to 0. `ident` may be a runway end ("13") or pair ("13/31"). */
+export interface ClosureSpec {
+  kind: ClosureKind;
+  ident: string;
+  startSec?: number;
+  endSec?: number;
+  reason?: string;
+}
+
+/** The six terms of JO 7110.65 3-3-4 / AC 150/5200-30D. */
+export type BrakingTerm = 'good' | 'good to medium' | 'medium' | 'medium to poor' | 'poor' | 'nil';
+
+/** A pilot braking action report (3-3-4: quality, type of aircraft). */
+export interface BrakingReport {
+  /** Runway end the report is for. */
+  runwayEnd: string;
+  term: BrakingTerm;
+  aircraftType: string;
+  /** Spoken aircraft description for the broadcast ("a Boeing Seven Thirty-Seven"). */
+  aircraftSpoken: string;
+  atSec: number;
+}
+
+export interface AirportOps {
+  closures: Closure[];
+  /** Newest last. */
+  braking: BrakingReport[];
+  /** Bird activity advisory (2-1-23 / 2-9-3): text for the ATIS, in force until `untilSec`. */
+  birds?: { text: string; untilSec: number };
+  /** Runway edge light intensity override per runway id ("13/31") set on a pilot request; absent = the 3-4-x table default. */
+  lightStep: Record<string, number>;
+  closureSeq: number;
 }
 
 // ---------------------------------------------------------------------------
@@ -575,7 +679,7 @@ export interface ScenarioAircraftSpawn {
     | { kind: 'parked'; parkingId: string }
     | { kind: 'holding_short'; nodeId: string; runwayEnd: string }
     | { kind: 'airborne'; pos: Vec2; altitudeFt: number; headingDeg: number; speedKt: number; runwayEnd?: string; distanceNm?: number }
-    | { kind: 'at_fix'; fix: string; altitudeFt: number; speedKt: number; route: string[]; runwayEnd?: string };
+    | { kind: 'at_fix'; fix: string; altitudeFt: number; speedKt: number; route: string[]; runwayEnd?: string; star?: { procedureId: string; transition?: string } };
   isDeparture: boolean;
   initialFrequencyId: string;
   initialRequest?: PendingRequest['kind'];
@@ -601,6 +705,10 @@ export interface Scenario {
   spawns: ScenarioAircraftSpawn[];
   /** Continuous traffic generation settings (free play). */
   traffic?: { enabled: boolean; arrivalsPerHour: number; departuresPerHour: number; gaFraction: number; maxAircraft: number };
+  /** Runway / taxiway closures in force from the start of the session (setup-screen options, scenario scripts). See `Closure`. */
+  closures?: ClosureSpec[];
+  /** Pilot-initiated requests beyond the basic calls (free play): `lights` = arrivals at night / in low visibility may ask for the runway lights up or down. Off by default. */
+  pilotRequests?: { lights?: boolean };
   objectives?: { id: string; text: string; check: string }[];
   training?: { steps: { id: string; prompt: string; expectCommand?: CommandKind; explanation: string; reference?: string }[] };
   durationSec?: number;
@@ -643,4 +751,6 @@ export interface SimulationState {
   score: ScoreCard;
   seed: number;
   selectedAircraftId?: string;
+  /** Airport operating state: closures, braking action reports, bird activity, runway light settings (src/sim/airportOps.ts). */
+  ops: AirportOps;
 }

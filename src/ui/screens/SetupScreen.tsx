@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { game } from '../../game';
 import type { FreePlayOptions, ScenarioSummary } from '../../game';
+import type { ClosureSpec } from '../../sim/types';
+import { closedEndsOf } from '../../sim/airportOps';
 import { DEFAULT_AIRPORT_ICAO, airportOrDefault, listAirports } from '../../airport';
 import { airportCallName } from '../../radio/frequencies';
 import { profileTypes } from '../../game/airportProfile';
@@ -114,6 +116,9 @@ export function SetupScreen() {
   const [difficulty, setDifficulty] = useState<NonNullable<FreePlayOptions['difficulty']>>(prev?.freePlay.difficulty ?? 'normal');
   const [seedText, setSeedText] = useState(prev?.seed !== undefined ? String(prev.seed) : '');
   const [weatherKey, setWeatherKey] = useState<string>(prev ? (prev.weather.kind === 'preset' ? `preset:${prev.weather.id}` : prev.weather.kind) : 'live');
+  const [closeRunway, setCloseRunway] = useState<string>('none');
+  const [closeTaxiway, setCloseTaxiway] = useState<string>('none');
+  const [airportEvents, setAirportEvents] = useState<boolean>(prev?.freePlay.airportEvents !== false);
   const [landing, setLanding] = useState<string>('auto');
   const [departing, setDeparting] = useState<string>('auto');
   const [position, setPosition] = useState<PositionChoice>(prev?.controller ?? 'TWR');
@@ -135,6 +140,8 @@ export function SetupScreen() {
     lastIcao.current = icao;
     setLanding('auto');
     setDeparting('auto');
+    setCloseRunway('none');
+    setCloseTaxiway('none');
     setScenarioId(CUSTOM);
     setMode('free_play');
   }, [icao]);
@@ -189,8 +196,14 @@ export function SetupScreen() {
 
   const weatherChoice: WeatherChoice = weatherKey === 'live' ? { kind: 'live' } : weatherKey === 'scenario' ? { kind: 'scenario' } : { kind: 'preset', id: weatherKey.replace('preset:', '') as WeatherPresetId };
   const previewWx: Weather = weatherChoice.kind === 'preset' ? getPresetWeather(weatherChoice.id) : live.status === 'ok' ? live.weather : getPresetWeather('clear');
-  const rec = useMemo(() => recommendedRunways(previewWx, airport), [previewWx, airport]);
+  const closedEnds = useMemo(() => closedEndsOf(airport, closeRunway !== 'none' ? [{ kind: 'RUNWAY', ident: closeRunway }] : []), [airport, closeRunway]);
+  const rec = useMemo(() => recommendedRunways(previewWx, airport, closedEnds), [previewWx, airport, closedEnds]);
   const ends = airport.runways.flatMap((r) => r.ends.map((e) => e.id));
+  const taxiwayNames = useMemo(() => [...new Set(airport.taxiwayGraph.edges.map((e) => e.taxiway.toUpperCase()).filter((t) => !/^RWY/i.test(t)))].sort(), [airport]);
+  const closures: ClosureSpec[] = [
+    ...(closeRunway !== 'none' ? [{ kind: 'RUNWAY' as const, ident: closeRunway, reason: 'closed for the session (setup option)' }] : []),
+    ...(closeTaxiway !== 'none' ? [{ kind: 'TAXIWAY' as const, ident: closeTaxiway, reason: 'closed for the session (setup option)' }] : []),
+  ];
   const canStart = !starting && (isCustom || (!!selected && isUnlocked(selected)));
 
   const start = () => {
@@ -205,6 +218,8 @@ export function SetupScreen() {
       maxAircraft,
       aircraftTypes: offeredTypes.filter((t) => types.includes(t)).length ? offeredTypes.filter((t) => types.includes(t)) : ['C172'],
       startingScenario: starting_,
+      closures,
+      airportEvents,
     };
     const opts: StartOptions = {
       icao,
@@ -398,18 +413,34 @@ export function SetupScreen() {
                 <Field label="Landing runway">
                   <select className={SELECT} value={landing} onChange={(e) => setLanding(e.target.value)} aria-label="Landing runway">
                     <option value="auto">Auto · {rec.landing[0]}</option>
-                    {ends.map((e) => (<option key={e} value={e}>{e}</option>))}
+                    {ends.map((e) => (<option key={e} value={e} disabled={closedEnds.includes(e)}>{e}{closedEnds.includes(e) ? ' (closed)' : ''}</option>))}
                   </select>
                 </Field>
                 <Field label="Departing runway">
                   <select className={SELECT} value={departing} onChange={(e) => setDeparting(e.target.value)} aria-label="Departing runway">
                     <option value="auto">Auto · {rec.departing[0]}</option>
-                    {ends.map((e) => (<option key={e} value={e}>{e}</option>))}
+                    {ends.map((e) => (<option key={e} value={e} disabled={closedEnds.includes(e)}>{e}{closedEnds.includes(e) ? ' (closed)' : ''}</option>))}
                   </select>
                 </Field>
                 <p className="col-span-2 text-[11px] leading-snug text-atc-muted">
                   {rec.summary}. {!isCustom && 'Ready-made scenarios keep their own runway unless you pick one here.'}
                 </p>
+                <Field label="Close a runway" hint="NOTAM style: the runway is closed for the whole session. The ATIS reads it, the runway selector skips it, a clearance onto it is unsafe, and it is drawn with a yellow X.">
+                  <select className={SELECT} value={closeRunway} onChange={(e) => setCloseRunway(e.target.value)} aria-label="Close a runway" data-testid="close-runway">
+                    <option value="none">None</option>
+                    {airport.runways.map((r) => (<option key={r.id} value={r.id} disabled={airport.runways.length < 2}>Runway {r.id}</option>))}
+                  </select>
+                </Field>
+                <Field label="Close a taxiway" hint="Taxi routes avoid it, a taxi instruction over it is refused, and it is marked on the surface display.">
+                  <select className={SELECT} value={closeTaxiway} onChange={(e) => setCloseTaxiway(e.target.value)} aria-label="Close a taxiway" data-testid="close-taxiway">
+                    <option value="none">None</option>
+                    {taxiwayNames.map((t) => (<option key={t} value={t}>Taxiway {t}</option>))}
+                  </select>
+                </Field>
+                <label className="col-span-2 flex cursor-pointer items-start gap-2.5" data-testid="airport-events-option">
+                  <input type="checkbox" className="mt-0.5 accent-[#39c5e8]" checked={airportEvents} onChange={(e) => setAirportEvents(e.target.checked)} aria-label="Airport events" data-testid="airport-events" />
+                  <span className="text-[11.5px] leading-snug text-atc-muted"><b className="text-atc-text">Airport events</b> (free play): a runway inspection that closes a runway for a few minutes, a taxiway closure and bird activity can occur during the session. Braking action reports and runway lights requests follow the weather and time of day.</span>
+                </label>
                 <Field label="Clock" hint="Real time: sim time, day/night and traffic volume follow the real clock. Sim speed: the old 1x/2x/4x sim clock.">
                   <select className={SELECT} value={realTime ? 'real' : 'sim'} onChange={(e) => setRealTime(e.target.value === 'real')} aria-label="Clock" data-testid="clock-select">
                     <option value="real">Real time (live)</option>

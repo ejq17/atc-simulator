@@ -29,6 +29,7 @@ function protectedWords(ctx: ParseContext): ReadonlySet<string> {
   const add = (s: string | undefined) => { for (const w of (s ?? '').toLowerCase().match(/[a-z]+/g) ?? []) words.add(w); };
   for (const ac of ctx.aircraft) add(ac.spokenCallsign);
   for (const f of ctx.fixes ?? []) { add(f.id); add(f.name); add(f.spoken); }
+  for (const a of ctx.arrivals ?? []) { add(a.ident); add(a.spokenName); }
   return words;
 }
 

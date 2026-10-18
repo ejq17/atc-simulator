@@ -164,9 +164,9 @@ describe('KMHT navaids and fixes equal the verified source', () => {
     expect(nav('CON').frequencyMhz).toBe(112.9);
     expect(nav('GDM').frequencyMhz).toBe(116.95);
   });
-  it('26 fixes with NASR coordinates', () => {
+  it('41 fixes with NASR coordinates (26 on the approach plates, 15 more on the ROZZE TWO arrival)', () => {
     const fixes = ap.navaids.filter((n) => n.type === 'FIX');
-    expect(fixes).toHaveLength(26);
+    expect(fixes).toHaveLength(41);
     for (const f of navSrc.fixes_named_on_approach_charts) expect(nav(f.id).latLon).toEqual({ lat: f.lat, lon: f.lon });
   });
   it('ILS components (the runway 6 ILS has no DME)', () => {

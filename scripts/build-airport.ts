@@ -1041,8 +1041,36 @@ for (const d of procSrc.departure_procedures as J[]) {
     provenance: dtppProv(d.pdf.url, `${d.type as string}; printed ${d.printed_date as string}; ${d.note as string}`),
   });
 }
+const starOf = (t: J): NonNullable<InstrumentProcedure['star']> => ({
+  ident: t.ident,
+  spokenName: t.spoken_name,
+  transitions: (t.transitions as J[]).map((x) => ({ name: x.name, fixes: [...x.fixes] })),
+  runways: (t.runways as J[]).map((r) => ({
+    runwayEnd: endId(r.runway_end),
+    fixes: [...r.fixes],
+    ...(r.join_approach_fixes?.length ? { joinApproachFixes: [...r.join_approach_fixes] } : {}),
+    ...(r.then_heading_mag_deg !== undefined ? { thenHeadingMagDeg: r.then_heading_mag_deg } : {}),
+    expect: r.expect,
+  })),
+  restrictions: (t.restrictions as J[]).map((r) => ({
+    fix: r.fix,
+    ...(r.at_or_above_ft !== undefined ? { atOrAboveFt: r.at_or_above_ft } : {}),
+    ...(r.at_or_below_ft !== undefined ? { atOrBelowFt: r.at_or_below_ft } : {}),
+    ...(r.at_ft !== undefined ? { atFt: r.at_ft } : {}),
+    ...(r.speed_kt !== undefined ? { speedKt: r.speed_kt } : {}),
+  })),
+  legs: (t.legs as J[]).map((l) => ({ from: l.from, to: l.to, ...(l.track_mag_deg !== undefined ? { trackMagDeg: l.track_mag_deg } : {}), distanceNm: l.distance_nm, ...(l.mea_ft !== undefined ? { meaFt: l.mea_ft } : {}) })),
+  notes: [...t.notes],
+});
 for (const st of (procSrc.stars ?? []) as J[]) {
-  procedures.push({ id: slug(st.chart_name), name: st.chart_name, type: 'STAR', chartPdfUrl: st.pdf.url, provenance: dtppProv(st.pdf.url, `${st.type as string}; ${st.note as string}`) });
+  for (const f of st.star ? ([...(st.star.transitions as J[]).flatMap((x) => x.fixes), ...(st.star.runways as J[]).flatMap((r) => [...r.fixes, ...(r.join_approach_fixes ?? [])])] as string[]) : []) {
+    if (!knownIds.has(f)) throw new Error(`STAR ${st.chart_name as string}: fix ${f} is not in ${SLUG}-navaids.json`);
+  }
+  procedures.push({
+    id: slug(st.chart_name), name: st.chart_name, type: 'STAR', chartPdfUrl: st.pdf.url,
+    ...(st.star ? { star: starOf(st.star) } : {}),
+    provenance: dtppProv(st.pdf.url, `${st.type as string}; ${st.note as string}`),
+  });
 }
 const volumeId = String(procSrc._provenance.volume).split(' ')[0]; // "NE-2"
 const supportingCharts: KacyAirport['supportingCharts'] = [];

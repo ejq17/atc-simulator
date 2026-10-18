@@ -41,8 +41,9 @@ export function holdTooShort(g: RunwayEndGeom, node: Pick<TaxiNode, 'pos'>, ac: 
 }
 
 /** Holding positions that can serve a departure from `g`; `lastVia` narrows them to the holds on that taxiway. */
-export function runwayHoldCandidates(airport: Airport, g: RunwayEndGeom, lastVia?: string): TaxiNode[] {
-  const holds = Object.values(airport.taxiwayGraph.nodes).filter((n) => n.kind === 'holding_position' && n.runwayId === g.runway.id);
+export function runwayHoldCandidates(airport: Airport, g: RunwayEndGeom, lastVia?: string, avoidTaxiways?: ReadonlySet<string>): TaxiNode[] {
+  const closedHold = (n: TaxiNode) => !!avoidTaxiways && n.taxiways.some((t) => avoidTaxiways.has(t.toUpperCase()));
+  const holds = Object.values(airport.taxiwayGraph.nodes).filter((n) => n.kind === 'holding_position' && n.runwayId === g.runway.id && !closedHold(n));
   const explicit = holds.filter((h) => h.protectsRunwayEnd && normalizeRunwayEndId(h.protectsRunwayEnd) === normalizeRunwayEndId(g.end.id));
   const implicit = holds.filter((h) => !h.protectsRunwayEnd);
   const cands = explicit.length ? explicit : implicit;
@@ -58,15 +59,15 @@ export function runwayHoldCandidates(airport: Airport, g: RunwayEndGeom, lastVia
  * The hold a taxi instruction to runway end `g` via `via` leads to, with its route from `startId`. `reason` explains a failure
  * (no hold, or no route that follows the taxiways in that order).
  */
-export function pickRunwayHold(airport: Airport, startId: string, g: RunwayEndGeom, via: string[] = []): { pick?: PickedHold; reason?: string } {
+export function pickRunwayHold(airport: Airport, startId: string, g: RunwayEndGeom, via: string[] = [], avoidTaxiways?: ReadonlySet<string>): { pick?: PickedHold; reason?: string } {
   const graph = airport.taxiwayGraph;
-  const cands = runwayHoldCandidates(airport, g, via[via.length - 1]);
+  const cands = runwayHoldCandidates(airport, g, via[via.length - 1], avoidTaxiways);
   if (!cands.length) return { reason: `No holding position serves runway ${g.end.id}` };
   const allowedRunwayIds = airport.runways.map((r) => r.id);
   let best: PickedHold | undefined;
   let reason = '';
   for (const h of cands) {
-    const res = findTaxiRoute(graph, startId, h.id, { via, avoidRunways: true, allowedRunwayIds });
+    const res = findTaxiRoute(graph, startId, h.id, { via, avoidRunways: true, allowedRunwayIds, avoidTaxiways });
     if (!res.route) {
       if (!reason) reason = res.reason ?? '';
       continue;

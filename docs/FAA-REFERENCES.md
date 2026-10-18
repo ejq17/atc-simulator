@@ -47,11 +47,23 @@ not quote text. This software is not ATC training.
 | 5-9-1 | VECTORS TO FINAL APPROACH COURSE | Vectoring arrivals to the ILS/RNAV final |
 | 5-9-2 | FINAL APPROACH COURSE INTERCEPTION | Intercept angle / distance from the FAF |
 | 5-9-4 | ARRIVAL INSTRUCTIONS | Approach clearance with altitude until established |
+| 2-1-23 | BIRD ACTIVITY INFORMATION | Bird activity advisory ("Issue advisory information on pilot-reported, tower-observed ... bird activity"; the task brief called it 2-1-22, which in this edition is UAS activity) and the ATIS line |
+| 2-8-1, 2-8-2, 2-8-3 | FURNISH RVR VALUES; ARRIVAL/DEPARTURE RUNWAY VISIBILITY; TERMINOLOGY | When RVR is issued (prevailing visibility 1 mile or less, or RVR 6,000 ft or less) and how ("Runway One Four RVR Two Thousand Four Hundred"; "more than" / "less than") |
+| 2-9-2 | OPERATING PROCEDURES | When a new ATIS recording is made: new official weather regardless of a change in values, braking action reported worse, runway / approach change, new or canceled NOTAMs |
+| 3-3-1 | LANDING AREA CONDITION | Runway Condition Codes via the ATIS ("condition codes two, two, three at one zero one eight zulu"); airport management closes runways |
+| 3-3-2 | CLOSED/UNSAFE RUNWAY INFORMATION | A takeoff / landing clearance onto a closed runway is unsafe; "RUNWAY (number) CLOSED/UNSAFE" |
+| 3-3-4, 3-3-5 | BRAKING ACTION; BRAKING ACTION ADVISORIES | The six terms, aircraft type with a report, "Braking Action Advisories are in effect", issuing the latest report, "NO BRAKING ACTION REPORTS RECEIVED FOR RUNWAY (number)" |
+| 3-4-10, 3-4-11, 3-4-14 | RUNWAY EDGE LIGHTS; HIRL, RCLS, TDZL; MIRL | Lights on at night and below 2 SM by day, pilot-requested changes, HIRL intensity steps 1-5 by visibility (TBL 3-4-8), no edge lights on a runway closed by NOTAM |
+| 4-5-7, 5-7-2 | ALTITUDE INFORMATION; METHODS | "DESCEND VIA (STAR name and number) (transition if required.)"; published speed restrictions apply regardless of climb via / descend via |
+| 4-7-1, 4-7-12 | CLEARANCE INFORMATION; AIRPORT CONDITIONS | "(STAR name and number) ARRIVAL, (transition name) TRANSITION", "Descend via the ... Arrival"; airport conditions and RwyCC to arrivals |
 
 Page URLs (the FAA site returns 403 to non-browser user agents; fetch with a normal browser UA):
 - https://www.faa.gov/air_traffic/publications/atpubs/atc_html/chap2_section_1.html
 - https://www.faa.gov/air_traffic/publications/atpubs/atc_html/chap2_section_4.html
+- https://www.faa.gov/air_traffic/publications/atpubs/atc_html/chap2_section_8.html
 - https://www.faa.gov/air_traffic/publications/atpubs/atc_html/chap2_section_9.html
+- https://www.faa.gov/air_traffic/publications/atpubs/atc_html/chap3_section_3.html
+- https://www.faa.gov/air_traffic/publications/atpubs/atc_html/chap3_section_4.html
 - https://www.faa.gov/air_traffic/publications/atpubs/atc_html/chap3_section_1.html
 - https://www.faa.gov/air_traffic/publications/atpubs/atc_html/chap3_section_5.html
 - https://www.faa.gov/air_traffic/publications/atpubs/atc_html/chap3_section_7.html
@@ -60,6 +72,7 @@ Page URLs (the FAA site returns 403 to non-browser user agents; fetch with a nor
 - https://www.faa.gov/air_traffic/publications/atpubs/atc_html/chap3_section_10.html
 - https://www.faa.gov/air_traffic/publications/atpubs/atc_html/chap4_section_2.html
 - https://www.faa.gov/air_traffic/publications/atpubs/atc_html/chap4_section_3.html
+- https://www.faa.gov/air_traffic/publications/atpubs/atc_html/chap4_section_7.html
 - https://www.faa.gov/air_traffic/publications/atpubs/atc_html/chap4_section_8.html
 - https://www.faa.gov/air_traffic/publications/atpubs/atc_html/chap5_section_2.html
 - https://www.faa.gov/air_traffic/publications/atpubs/atc_html/chap5_section_7.html
@@ -76,6 +89,10 @@ Page URLs (the FAA site returns 403 to non-browser user agents; fetch with a nor
 | AIM 5-3-8 Holding | https://www.faa.gov/air_traffic/publications/atpubs/aim_html/chap5_section_3.html | Holding entries, speeds, leg timing |
 | AIM 4-3-11 LAHSO | https://www.faa.gov/air_traffic/publications/atpubs/aim_html/chap4_section_3.html | Land-and-hold-short operations |
 | 14 CFR 91.117 | https://www.ecfr.gov/current/title-14/part-91/section-91.117 | Speed limits below 10,000 ft and in Class C |
+| 14 CFR 91.175(h)(2) (eCFR, retrieved 2026-10-18) = AIM TBL 5-4-1 | https://www.ecfr.gov/current/title-14/part-91/section-91.175 ; https://www.faa.gov/air_traffic/publications/atpubs/aim_html/chap5_section_4.html | RVR to visibility table (1,600 = 1/4, 2,400 = 1/2, 3,200 = 5/8, 4,000 = 3/4, 4,500 = 7/8, 5,000 = 1, 6,000 = 1 1/4); AIM: "use the next higher RVR value; do not interpolate" |
+| FAA AC 150/5200-30D, Table 5-2 (RCAM) | https://www.faa.gov/documentLibrary/media/Advisory_Circular/150-5200-30D.pdf (read 2026-10-18) | Runway condition codes 6..0, contaminant descriptions and the matching pilot reported braking action (5 good, 4 good to medium, 3 medium, 2 medium to poor, 1 poor, 0 nil) |
+| FAA AC 150/5370-2G, 2.18.2.1.2 and Figure 2-3 | https://www.faa.gov/documentLibrary/media/Advisory_Circular/150-5370-2G.pdf (read 2026-10-18) | Temporarily closed runway: an X at each end on or near the designation numbers; closed runways and exit taxiways are marked with a yellow X |
+| d-TPP cycle 2610 ROZZE TWO ARRIVAL (RNAV), 00246ROZZE.PDF and 00246ROZZE_C.PDF; NASR 2026-10-01 STAR_RTE.csv | https://aeronav.faa.gov/d-tpp/2610/00246ROZZE.PDF ; https://nfdc.faa.gov/webContent/28DaySub/extra/01_Oct_2026_STAR_CSV.zip | KMHT's only STAR (data/sources/README.md "ROZZE TWO ARRIVAL") |
 | AIM 4-3-2 / 4-3-3 Traffic Patterns | https://www.faa.gov/air_traffic/publications/atpubs/aim_html/chap4_section_3.html | Departure/upwind/crosswind/downwind/base legs; pattern altitude 1,000 ft AGL for propeller aircraft; crosswind turn beyond the departure end within 300 ft of pattern altitude; turn to final at least 1/4 mile out |
 | AIM 4-1-20 Transponder and ADS-B Out Operation | https://www.faa.gov/air_traffic/publications/atpubs/aim_html/chap4_section_1.html | `SQUAWK VFR` = code 1200 (or other appropriate VFR code) |
 | AIM 4-1-13 (ATIS) and 4-1-8 | https://www.faa.gov/air_traffic/publications/atpubs/aim_html/chap4_section_1.html | "Pilot use of 'have numbers' does not indicate receipt of the ATIS broadcast" (wind, runway, altimeter only) |

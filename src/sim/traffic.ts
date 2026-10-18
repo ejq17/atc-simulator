@@ -2,7 +2,8 @@
  * Spawning, automatic pilot-initiated calls, aircraft lifecycle and the pluggable
  * `TrafficGenerator` interface (continuous traffic scheduling can be expanded by src/game).
  */
-import type { Aircraft, FlightPlan, Scenario, SimulationState, Vec2 } from './types';
+import type { Aircraft, BrakingReport, FlightPlan, Scenario, SimulationState, Vec2 } from './types';
+import { brakingWorse, effectiveLightStep, latestBrakingReport, lightsRunwayId, pilotBrakingTerm, runwayLightsOn, spokenTypeForReport } from './airportOps';
 import {
   bearingDeg, dist, headingDiff, headingToVec, mToNm, nmToM, vDot, vScale, vSub,
 } from './geo';
@@ -16,14 +17,18 @@ import { LUAW_LIMIT_SEC } from './towerCommands';
 import { DEFAULT_PILOT_BEHAVIOUR } from './pilotBehaviour';
 import { frequencyById, frequencyByMhz, frequencyForPosition, sameFrequency } from '../radio/frequencies';
 import { findNavFix, fixPosition } from './navigation';
+import { findStar } from './star';
 import { assignSquawk } from './ifr';
 import { spokenCallsign as buildSpokenCallsign } from '../radio/spoken';
 import {
-  approachCheckInCall, arrivalTowerCheckInCall, checkInCall, clearOfRunwayCall, departureCheckInCall, establishedCall, finalCall, goAroundEstablishedCall,
+  approachCheckInCall, arrivalTowerCheckInCall, brakingActionCall, lightsRequestCall, checkInCall, clearOfRunwayCall, departureCheckInCall, establishedCall, finalCall, goAroundEstablishedCall,
   holdingShortCall, approachingHoldCall, holdingShortCrossingCall, ifrClearanceRequestCall, inboundCall, missedApproachCheckInCall, readyToTaxiCall, stoppedOnRunwayCall,
   luawIntentionsCall, positionReportCall, requestNumbersCall, trafficAcquiredCall,
 } from '../radio/readback';
 import type { ReadbackEnv } from '../radio/readback';
+
+/** A pilot reports braking action for a runway at most this often, unless the report is worse than the one on file. */
+export const BRAKING_REPORT_INTERVAL_SEC = 600;
 
 export type SpawnSpec = Scenario['spawns'][number];
 
@@ -237,6 +242,12 @@ export function spawnFromSpec(ctx: SimContext, spec: SpawnSpec): Aircraft {
     ac.squawk = ac.flightPlan.squawk ?? assignSquawk(ctx);
     ac.radarIdentified = false;
     ac.trackDeg = ac.headingDeg;
+    if (s.star) {
+      // An arrival on a STAR (JO 7110.65 4-7-1): the lateral route is the procedure, the altitude restrictions apply after "descend via" (4-5-7).
+      const ref = findStar(airport, s.star.procedureId);
+      if (!ref) throw new Error(`Unknown STAR ${s.star.procedureId} at ${airport.icao}`);
+      ac.star = { procedureId: ref.procedure.id, name: ref.star.spokenName, ...(s.star.transition ? { transition: s.star.transition } : {}), runwayEnd: g?.end.id ?? '', descendVia: false };
+    }
     rt.approachCheckIn = true;
     rt.calls.add('inbound'); // the approach check-in replaces the standard inbound call
     rt.firstCallAtSec = now + 1 + rng() * 3;
@@ -524,6 +535,24 @@ export function updatePilotRequests(ctx: SimContext): void {
       continue;
     }
 
+    // 3c. Runway light request (free play, night or low visibility): an arrival on Tower asks for the edge lights up or down (JO 7110.65 3-4-10 d, 3-4-11).
+    // Whether this aircraft asks is a fixed function of its own seed (no shared random numbers are drawn), about one aircraft in eight.
+    if (state.scenario.pilotRequests?.lights && !ac.onGround && !ac.isDeparture && ac.assignedRunwayEnd && !rt.calls.has('lights') && !ac.pendingRequest
+      && (ac.phase === 'APPROACH' || ac.phase === 'FINAL') && frequencyByMhz(airport, ac.frequencyMhz)?.position === 'TWR' && now >= rt.firstCallAtSec + 5 && runwayLightsOn(state)) {
+      const g = findRunwayEnd(airport, ac.assignedRunwayEnd);
+      const dNm = g ? mToNm(-alongCross(g, ac.pos).along) : 0;
+      if (g && dNm <= 9 && dNm > 2) {
+        rt.calls.add('lights');
+        if (((ac.seed >>> 5) % 8) === 0 && lightsRunwayId(state) === g.runway.id) {
+          const step = effectiveLightStep(state, g.runway.id);
+          const dir = step >= 4 ? 'down' : step <= 2 ? 'up' : ac.seed & 1 ? 'up' : 'down';
+          pilotSay(ctx, ac, lightsRequestCall(ac, env, dir), { request: 'OTHER', lights: dir });
+          ac.pendingRequest = { kind: 'OTHER', text: `request lights ${dir}`, sinceSec: now };
+          continue;
+        }
+      }
+    }
+
     // 4. Arrivals: inbound call, then a call on final if not yet cleared.
     if (!ac.onGround && !ac.isDeparture && ac.assignedRunwayEnd) {
       const g = findRunwayEnd(airport, ac.assignedRunwayEnd);
@@ -564,6 +593,22 @@ export function updatePilotRequests(ctx: SimContext): void {
         ? { kind: 'FREQUENCY_CHANGE', text: 'flying the published missed approach, request frequency change', sinceSec: now }
         : { kind: 'LANDING', text: ifr ? 'request vectors for another approach' : 'request another approach', sinceSec: now };
       continue;
+    }
+
+    // 4c. Braking action report after landing on a wet or contaminated runway (JO 7110.65 3-3-4 terms; 3-3-5: the controller solicits and issues
+    // them). One report per runway every 10 minutes, sooner when it is worse than the latest one on file.
+    if (ac.onGround && ac.phase === 'RUNWAY_EXIT' && rt.landedEnd && !rt.calls.has('braking')) {
+      rt.calls.add('braking');
+      const term = pilotBrakingTerm(state.weather, ctx.rng);
+      const prev = latestBrakingReport(state, rt.landedEnd, BRAKING_REPORT_INTERVAL_SEC);
+      if (term && (!prev || brakingWorse(term, prev.term))) {
+        const report: BrakingReport = { runwayEnd: rt.landedEnd, term, aircraftType: ac.type, aircraftSpoken: spokenTypeForReport(ac.type), atSec: now };
+        state.ops.braking.push(report);
+        if (state.ops.braking.length > 20) state.ops.braking.splice(0, state.ops.braking.length - 20);
+        pilotSay(ctx, ac, brakingActionCall(ac, env, term), { brakingAction: term, runwayEnd: rt.landedEnd });
+        emitEvent(ctx, { kind: 'INFO', aircraftId: ac.id, callsign: ac.callsign, severity: 'info', speaker: 'SYSTEM', text: `Braking action ${term} reported by ${ac.callsign} (${ac.type}) on runway ${rt.landedEnd}.`, data: { brakingAction: term, runwayEnd: rt.landedEnd } });
+        continue;
+      }
     }
 
     // 5. Clear of runway after landing.
@@ -672,7 +717,8 @@ export function updateLifecycle(ctx: SimContext): void {
       }
       if (ac.phase === 'DEPARTURE' && dNm > DEPARTURE_EXIT_NM && ac.flightPlan?.flightRules !== 'IFR') {
         removeAircraft(ctx, ac.id, rt.handedOff, rt.handedOff ? 'departed the area (handed off)' : 'left the area without a handoff');
-      } else if (dNm > LOST_AIRCRAFT_NM) {
+      } else if (dNm > LOST_AIRCRAFT_NM && (ac.isDeparture || vDot(headingToVec(ac.trackDeg), ac.pos) > 0)) {
+        // beyond the area and moving away (an arrival coming in from a STAR entry fix outside it is not lost)
         removeAircraft(ctx, ac.id, false, 'left the simulation area');
       }
     }

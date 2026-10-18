@@ -41,7 +41,7 @@ describe('KMHT navaid reference data', () => {
     expect(nav.ils.map((s) => [s.runway, s.plateIdent, s.freqMhz])).toEqual([['06', 'I-MJE', 109.95], ['17', 'I-MNA', 109.1], ['35', 'I-MHT', 109.1]]);
     expect(nav.runwaysWithoutIls).toEqual(['24']);
     expect(nav.nearby.map((n) => n.id).sort()).toEqual(['CON', 'GDM']);
-    expect(nav.fixes).toHaveLength(26);
+    expect(nav.fixes).toHaveLength(41); // 26 on the approach plates + 15 more on the ROZZE TWO arrival
     expect(nav.fixes.filter((f) => f.key).map((f) => f.id)).toEqual(expect.arrayContaining(['MNTIN', 'ORDIE', 'FITZY']));
   });
 });

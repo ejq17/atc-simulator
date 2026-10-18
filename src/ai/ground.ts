@@ -14,6 +14,7 @@ import { hasActive, lastClearance, mkCmd } from './core';
 import type { Agent, AgentView, Plan } from './core';
 import { createClearanceAgent } from './clnc';
 import type { ClearanceStore } from './clnc';
+import { closedTaxiways } from '../sim/airportOps';
 import { busyHoldIds, etaToThresholdSec, holdNodeAt, interactingRunways, opposingTraffic, pendingIntermediateStops, planDeparture, planParking, remainingRouteM } from './world';
 import { holdTooShort } from '../sim/holdSelection';
 import * as say from './phrase';
@@ -72,7 +73,7 @@ export function createGroundAgent(store: ClearanceStore): Agent {
       if (ac.isDeparture && (ac.phase === 'READY' || ac.phase === 'PARKED') && pending === 'TAXI' && !hasActive(ac, 'TAXI')) {
         const needsIfr = ac.flightPlan?.flightRules === 'IFR' && !ac.flightPlan.ifrClearance;
         if (needsIfr || !taxiFollowOk(v, ac)) continue;
-        const dep = planDeparture(airport, ac, state.activeRunways.departing, busyHoldIds(state, ac.id));
+        const dep = planDeparture(airport, ac, state.activeRunways.departing, busyHoldIds(state, ac.id), closedTaxiways(state));
         if (!dep || opposingTraffic(state, dep.nodeIds, ac.id)) continue;
         plans.push({
           key: `${ac.id}:taxi`, aircraftId: ac.id, callsign: ac.callsign, priority: 50,
@@ -88,7 +89,7 @@ export function createGroundAgent(store: ClearanceStore): Agent {
         const g = findRunwayEnd(airport, ac.assignedRunwayEnd);
         const hold = holdNodeAt(airport, ac);
         if (g && hold && hold.runwayId === g.runway.id && holdTooShort(g, hold, ac)) {
-          const dep = planDeparture(airport, ac, state.activeRunways.departing, busyHoldIds(state, ac.id));
+          const dep = planDeparture(airport, ac, state.activeRunways.departing, busyHoldIds(state, ac.id), closedTaxiways(state));
           if (dep && dep.holdId !== hold.id && !opposingTraffic(state, dep.nodeIds, ac.id)) {
             plans.push({
               key: `${ac.id}:taxi-full:${hold.id}`, aircraftId: ac.id, callsign: ac.callsign, priority: 50,
@@ -99,6 +100,32 @@ export function createGroundAgent(store: ClearanceStore): Agent {
           }
           continue;
         }
+      }
+
+      // 1c. Stopped short of a taxiway that closed under its route (pilot: "holding short of Bravo, taxiway closed, request taxi instructions"):
+      // re-route it around the closure (the engine plans every taxi instruction around closed taxiways).
+      const closedStop = pending === 'TAXI' && ac.groundSpeedKt < 1 && !!ac.pendingRequest && /\(closed\)/.test(ac.pendingRequest.text) && (ac.phase === 'TAXIING' || ac.phase === 'TAXI_TO_PARKING');
+      if (closedStop && v.settled(ac) >= 3) {
+        if (ac.phase === 'TAXI_TO_PARKING') {
+          const p = planParking(state, ac);
+          if (p && !opposingTraffic(state, p.nodeIds, ac.id)) {
+            plans.push({
+              key: `${ac.id}:reroute-parking:${ac.pendingRequest!.sinceSec}`, aircraftId: ac.id, callsign: ac.callsign, priority: 52,
+              cmds: [mkCmd('TAXI_TO_PARKING', ac, { destination: p.spot.id, route: p.via, holdShort: p.holdShort })],
+              phrase: say.taxiToParking(ac, p.spot, p.via, p.holdShort), summary: `${ac.callsign} re-routed around a closed taxiway to ${p.spot.name}`,
+            });
+          }
+        } else {
+          const dep = planDeparture(airport, ac, state.activeRunways.departing, busyHoldIds(state, ac.id), closedTaxiways(state));
+          if (dep && !opposingTraffic(state, dep.nodeIds, ac.id)) {
+            plans.push({
+              key: `${ac.id}:reroute-dep:${ac.pendingRequest!.sinceSec}`, aircraftId: ac.id, callsign: ac.callsign, priority: 52,
+              cmds: [mkCmd('TAXI', ac, { destination: `RWY${dep.runwayEnd}`, runwayEnd: dep.runwayEnd, route: dep.via, holdShort: dep.holdShort })],
+              phrase: say.taxiToRunway(ac, dep.runwayEnd, dep.via, dep.holdShort), summary: `${ac.callsign} re-routed around a closed taxiway to runway ${dep.runwayEnd}`,
+            });
+          }
+        }
+        continue;
       }
 
       // 2. Holding short of a runway on the taxi route: cross when the runway is not in use.

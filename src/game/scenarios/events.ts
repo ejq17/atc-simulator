@@ -13,8 +13,13 @@
  *                  PILOT transmission is logged (and passed to `onPilotTransmission` for TTS). The engine itself has no
  *                  emergency behaviour; the aircraft keeps flying its normal approach.
  *  - message    -> an INFO/SCENARIO log entry.
+ *  - closure    -> `engine.addClosure` (a NOTAM-style runway / taxiway closure, `durationSec` from now); `quiet` runways wait for a quiet runway.
+ *  - birds      -> `engine.setBirdActivity` (bird activity on the ATIS and for advisories, JO 7110.65 2-1-23 / 2-9-3).
+ *  The UI session reacts to both (ATIS letter, runway change when the runway in use closed).
  */
 import type { SimulationEngine } from '../../sim/api';
+import type { SimulationEngineExtras } from '../../sim/engineExtras';
+import { resolveClosureIdent, runwayIsQuiet } from '../../sim/airportOps';
 import type { Scenario, Weather } from '../../sim/types';
 import type { GameScenario, ScenarioEvent } from '../types';
 
@@ -70,6 +75,20 @@ export function createScenarioEventRunner(engine: SimulationEngine, scenario: Sc
             break;
           case 'message':
             engine.logEvent({ kind: 'SCENARIO', severity: 'info', speaker: 'SYSTEM', text: e.text });
+            break;
+          case 'closure': {
+            const ex = engine as SimulationEngine & SimulationEngineExtras;
+            if (!ex.addClosure) break;
+            if (e.quiet && e.closure.kind === 'RUNWAY') {
+              const id = resolveClosureIdent(state.airport, 'RUNWAY', e.closure.ident);
+              if (id && !runwayIsQuiet(state, id)) return; // not a quiet time yet: try again on the next update
+            }
+            const r = ex.addClosure({ kind: e.closure.kind, ident: e.closure.ident, startSec: now, ...(e.closure.durationSec !== undefined ? { endSec: now + e.closure.durationSec } : {}), reason: e.closure.reason }, 'scenario');
+            if (!r.ok) engine.logEvent({ kind: 'SCENARIO', severity: 'info', speaker: 'SYSTEM', text: `Closure not applied: ${r.reason}` }); // success: the engine logs the NOTAM itself
+            break;
+          }
+          case 'birds':
+            (engine as SimulationEngine & SimulationEngineExtras).setBirdActivity?.(e.detail, e.durationSec);
             break;
           case 'emergency': {
             const ac = Object.values(state.aircraft).find((a) => a.callsign.toUpperCase() === e.callsign.toUpperCase());

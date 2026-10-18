@@ -334,7 +334,7 @@ const step11 = def(
     // IFR departures only: airline departures start on Clearance Delivery (positions TWR, GND, CLNC, DEP); arrivals stay on final for Tower.
     const fp = buildFreePlay(airport, {
       seed: o?.seed ?? 111, weather: 'light-crosswinds', difficulty: 'hard', startingScenario: 'mixed',
-      aircraftCount: 6, arrivalsPerHour: 20, departuresPerHour: 20, gaFraction: 0.35, maxAircraft: 14,
+      aircraftCount: 6, arrivalsPerHour: 20, departuresPerHour: 20, gaFraction: 0.35, maxAircraft: 14, airportEvents: false,
     }, { ifrArrivals: false, ifrDepartures: true, controllerPositions: IFR_DEPARTURE_POSITIONS });
     return {
       ...fp,

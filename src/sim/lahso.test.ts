@@ -82,6 +82,17 @@ describe('LAHSO validation on KACY runway 4 (hold short of 13/31)', () => {
     expect(land(e).status).toBe('rejected');
   });
 
+  it('the dry-runway test is the shared runway condition (src/weather/runwayCondition.ts): drizzle, snow, a shower or a thunderstorm at the airport make it wet; precipitation only in the vicinity does not', () => {
+    for (const p of ['-DZ', 'SN', 'SHRA', '+TSRA', 'FZRA']) {
+      const e = make('C172', { weather: { phenomena: [p], temperatureC: p === 'SN' ? -3 : 15 } });
+      const out = land(e);
+      expect(out.status, p).toBe('rejected');
+      expect((out as { reason: string }).reason, p).toMatch(/must be dry.*runway condition code [0-5]/);
+    }
+    expect(land(make('C172', { weather: { phenomena: ['VCSH'] } })).status).toBe('accepted');
+    expect(land(make('C172', { weather: { phenomena: ['BR'], visibilitySm: 5 } })).status).toBe('accepted');
+  });
+
   it('ceiling below 1,000 ft or visibility under 3 sm is refused; a plain clearance is unaffected', () => {
     expect(land(make('C172', { weather: { clouds: [{ cover: 'OVC', baseFtAgl: 800 }] } })).status).toBe('rejected');
     expect(land(make('C172', { weather: { visibilitySm: 2 } })).status).toBe('rejected');

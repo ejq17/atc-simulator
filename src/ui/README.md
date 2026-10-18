@@ -183,6 +183,13 @@ state (~10 Hz and after each command).
   hint says why not). S and X work while the Strips tab shows. A dropped strip of an aircraft that is still there is not reprinted until the aircraft changes bay.
 * Aircraft details sit behind a collapsed bar under the board (`details-toggle`) so the board gets the column.
 
+## Airport state in the UI (`lib/airportStatus.ts`, `components/AirportNotices.tsx`, `display/closureMarks.ts`)
+
+* **Setup**: "Close a runway" / "Close a taxiway" (for the whole session; the recommended runway skips a closed one, its end options are disabled), "Airport events" (free play: seeded inspections, taxiway closures, bird activity, pilot light requests; on by default). They become `FreePlayOptions.closures` / `airportEvents`; the store copies the closures onto catalogue scenarios and passes `startUtcMs` for the season weighting of the bird event.
+* **Session** (`store/session.ts`): `syncAirportOps` runs about once a second (and right after a `closure` / `birds` scenario event): when the runway in use is closed the active runways switch to the best open runway (`store/runwayConfig.ts`, a warning notice), and the ATIS gets a new letter when `atisUpdateReasons` (weather observation, runways, closures, braking action worse, bird activity, condition codes) says so. The hourly HH:55Z letter now runs only for simulated weather in real-time mode (live weather has real observation times: `weather/observation.ts`).
+* **Strips**: a NOTAM bar above the bays lists active closures with the minutes left (`ClosureBar`); a STAR clearance prints `STAR` / `DV` (descend via) in the strip's instruction column. **Weather & Runways**: "Airport conditions" block (closures, derived runway condition, braking action, RVR, lights step, birds), closed ends are marked and "Use recommended" excludes them.
+* **Surface view**: a closed runway has a yellow wash and a yellow X at each end (AC 150/5370-2G 2.18.2.1.2); a closed taxiway a yellow wash and X marks along it (`drawClosures`). **Tower view** (src/ui/tower/README.md): the same markings as flat meshes, and the runway edge light brightness follows the light step (`runwayLightLevel`).
+
 ## Transmission pipeline (`commands/transmit.ts`)
 
 `transmit({engine, text, source, controller})`: parse with ALL aircraft and ALL fixes in the context (so "not on frequency" can be reported

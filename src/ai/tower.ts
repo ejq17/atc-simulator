@@ -23,6 +23,28 @@ import {
   assignedEnd, distToThresholdNm, etaToThresholdSec, holdNodeAt, interactingRunways, isInboundArrival, planParking, projectedGapNm,
 } from './world';
 import * as say from './phrase';
+import { latestBrakingReport } from '../sim/airportOps';
+import { brakingAdvisoriesInEffect, runwayCondition } from '../weather/runwayCondition';
+import { runwayHasRvr, rvrForVisibility, rvrPhrase } from '../weather/rvr';
+
+/** RVR and braking action information that goes with a landing clearance (2-8-2, 2-8-3, 3-3-5); empty when neither applies. */
+export function landingInfo(v: AgentView, g: RunwayEndGeom): say.Phrase[] {
+  const out: say.Phrase[] = [];
+  const w = v.state.weather;
+  const rvr = rvrForVisibility(w.visibilitySm);
+  if (rvr && runwayHasRvr(g.end)) {
+    const p = rvrPhrase(g.end.id, rvr);
+    out.push({ text: p.display.replace(/\.$/, ''), spoken: p.spoken.replace(/\.$/, '') });
+  }
+  const reports = v.state.ops?.braking ?? [];
+  if (runwayCondition(w).code < 6 && brakingAdvisoriesInEffect(w, reports)) {
+    const b = latestBrakingReport(v.state, g.end.id);
+    out.push(b
+      ? { text: `braking action ${b.term}, reported by ${b.aircraftSpoken}`, spoken: `braking action ${b.term}, reported by ${b.aircraftSpoken}` }
+      : { text: `no braking action reports received for runway ${g.end.id}`, spoken: `no braking action reports received for runway ${say.rwy(g.end.id).spoken}` });
+  }
+  return out;
+}
 
 /** Seconds between a takeoff clearance and the pilot starting the roll when the aircraft is still at the hold line (turn onto the runway and align). */
 const LINE_UP_DELAY_SEC = 20;
@@ -303,6 +325,16 @@ export function createTowerAgent(): Agent {
         continue;
       }
 
+      // A pilot asks for the runway lights up or down (free play, night / low visibility): the AI grants it (3-4-10 d).
+      const lightsAsk = ac.pendingRequest?.kind === 'OTHER' ? /^request lights (up|down)/.exec(ac.pendingRequest.text) : null;
+      if (lightsAsk && !ac.onGround && !ac.isDeparture) {
+        const dir = lightsAsk[1] as 'up' | 'down';
+        plans.push({
+          key: `${ac.id}:lights:${dir}`, aircraftId: ac.id, callsign: ac.callsign, priority: 45, once: true,
+          cmds: [mkCmd('RUNWAY_LIGHTS', ac, { lightsDirection: dir === 'up' ? 'UP' : 'DOWN' })], phrase: say.lightsAnswer(ac, dir), summary: `${ac.callsign} runway lights ${dir}`,
+        });
+      }
+
       if (ac.onGround || ac.isDeparture) continue;
 
       // Missed approach / go-around that reached the Tower frequency.
@@ -362,7 +394,7 @@ export function createTowerAgent(): Agent {
         if (landSafe && !(d > CROSSING_WINDOW_NM && crossingWaiting(v, g, ac.id))) {
           plans.push({
             key: `${ac.id}:land`, aircraftId: ac.id, callsign: ac.callsign, priority: 85, cmds: [land],
-            phrase: say.clearedToLand(ac, g.end.id), cooldownSec: 20, summary: `${ac.callsign} cleared to land runway ${g.end.id}`,
+            phrase: say.clearedToLand(ac, g.end.id, landingInfo(v, g)), cooldownSec: 20, summary: `${ac.callsign} cleared to land runway ${g.end.id}`,
           });
         }
       } else if (pending === 'LANDING' && !mem.done.has(`${ac.id}:continue`)) {

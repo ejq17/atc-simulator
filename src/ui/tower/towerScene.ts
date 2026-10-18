@@ -9,9 +9,11 @@ import { simUtcMs } from '../../sim/solar';
 import type { Pose } from '../display/renderBuffer';
 import { runwayLabels } from '../display/surfaceStatic';
 import {
-  FT, extrudeMesh, holdBarRects, markingsMesh, mergeMeshes, offsetPolyline, polygonMesh, ribbonMesh, runwayLights, runwayMarkings, samplePolyline,
-  taxiwaySigns, toScene,
+  FT, extrudeMesh, holdBarRects, markingsMesh, mergeMeshes, offsetPolyline, polygonMesh, ribbonMesh, runwayLights, runwayLightLevel, runwayMarkings, samplePolyline,
+  taxiwaySigns, toScene, xMarkRects,
 } from './geometry';
+import { closedRunwayMarks, closedTaxiwayMarks } from '../display/closureMarks';
+import { closedRunwayIds, closedTaxiways, effectiveLightStep, runwayLightsOn } from '../../sim/airportOps';
 import type { LightColour, LightPoint, MeshData } from './geometry';
 import { bankFromTurnRate, billboardWorldHeight, gearDown, lightState, modelPitchRad, placeAircraft, withinRange } from './aircraftModel';
 import { createAircraftFactory } from './aircraftMeshes';
@@ -165,6 +167,23 @@ export function createTowerScene(canvas: HTMLCanvasElement, airport: Airport, si
   });
   addFlat(markingsMesh(holdRects, 0.075), 0xf0c020, 7, 0x2a2000);
 
+  // Closure markings (yellow, AC 150/5370-2G 2.18.2.1.2: an X at each end of a closed runway; closed taxiways: yellow wash and Xs). Built once, shown by state.
+  const closedRunwayGroups = new Map<string, THREE.Object3D[]>();
+  for (const rw of airport.runways) {
+    const parts: THREE.Object3D[] = [addFlat(markingsMesh(xMarkRects(closedRunwayMarks(rw), 1.6), 0.09), 0xf2c744, 9, 0x4a3a00)].filter((x): x is NonNullable<typeof x> => !!x);
+    for (const m of parts) m.visible = false;
+    closedRunwayGroups.set(rw.id, parts);
+  }
+  const closedTaxiwayGroups = new Map<string, THREE.Object3D[]>();
+  for (const [name, lines] of Object.entries(g.taxiwayPolylines)) {
+    if (name === 'UNNAMED') continue;
+    const wash = addFlat(mergeMeshes(lines.map((l) => ribbonMesh(l, TAXIWAY_WIDTH_M * 0.9, 0.055))), 0xb08a10, 4.5, 0x2a2000);
+    const xs = addFlat(markingsMesh(xMarkRects(closedTaxiwayMarks(lines), 0.9), 0.09), 0xf2c744, 9, 0x4a3a00);
+    const parts: THREE.Object3D[] = [wash, xs].filter((x): x is NonNullable<typeof x> => !!x);
+    for (const m of parts) m.visible = false;
+    closedTaxiwayGroups.set(name.toUpperCase(), parts);
+  }
+
   // Runway numbers (painted, readable from the approach: the text's up points the way the aircraft is going).
   const numberTex = new Map<string, THREE.CanvasTexture>();
   const numberGeo = own(new THREE.PlaneGeometry(1, 1));
@@ -257,7 +276,8 @@ export function createTowerScene(canvas: HTMLCanvasElement, airport: Airport, si
     ctx.fillRect(0, 0, 32, 32);
   }));
   const lightMats: THREE.PointsMaterial[] = [];
-  const addLights = (pts: LightPoint[], size: number) => {
+  const addLights = (pts: LightPoint[], size: number): THREE.PointsMaterial[] => {
+    const made: THREE.PointsMaterial[] = [];
     const byColour = new Map<LightColour, number[]>();
     for (const p of pts) {
       const arr = byColour.get(p.colour) ?? [];
@@ -271,20 +291,22 @@ export function createTowerScene(canvas: HTMLCanvasElement, airport: Airport, si
       }));
       mat.userData.baseSize = size;
       lightMats.push(mat);
+      made.push(mat);
       const o = new THREE.Points(geo, mat);
       o.frustumCulled = false;
       scene.add(o);
     }
+    return made;
   };
-  const runwayPts: LightPoint[] = [];
+  // Runway lights, one set of materials per runway so the intensity step (JO 7110.65 3-4-11, pilot requests) and a NOTAM closure act per runway.
+  const runwayLightMats = new Map<string, THREE.PointsMaterial[]>();
   for (const rw of airport.runways) {
     const approachEnds = rw.ends.filter((e) => {
       const a = (e as { approachLighting?: string | null }).approachLighting;
       return !!a && !/^none/i.test(a);
     }).map((e) => e.id);
-    runwayPts.push(...runwayLights(rw, { centreline: rw.ends.some((e) => !!e.ils), approach: approachEnds.length > 0, approachEnds }));
+    runwayLightMats.set(rw.id, addLights(runwayLights(rw, { centreline: rw.ends.some((e) => !!e.ils), approach: approachEnds.length > 0, approachEnds }), 5 * 1));
   }
-  addLights(runwayPts, 5 * 1);
   const taxiPts: LightPoint[] = [];
   for (const [name, lines] of Object.entries(g.taxiwayPolylines)) {
     if (name === 'UNNAMED') continue;
@@ -472,8 +494,27 @@ export function createTowerScene(canvas: HTMLCanvasElement, airport: Airport, si
   const eye = eyeScene(site.pos, eyeH);
   const v3 = new THREE.Vector3();
 
+  /** Closure markings and runway light intensity follow the airport state (closures, pilot-requested light steps, the HIRL table by visibility and daylight). */
+  const applyAirportState = (state: SimulationState, night: number) => {
+    const closedR = closedRunwayIds(state);
+    const closedT = closedTaxiways(state);
+    for (const [id, parts] of closedRunwayGroups) for (const m of parts) m.visible = closedR.has(id);
+    for (const [name, parts] of closedTaxiwayGroups) for (const m of parts) m.visible = closedT.has(name);
+    const lit = runwayLightsOn(state);
+    for (const [rid, mats] of runwayLightMats) {
+      const level = runwayLightLevel(effectiveLightStep(state, rid), closedR.has(rid));
+      // night: the glow follows the darkness; by day with the lights on (visibility under 2 SM) they show at a fixed lower strength
+      const base = Math.min(1, Math.max(night * 1.15, lit ? 0.5 : 0));
+      for (const m of mats) {
+        m.opacity = base * level.opacity;
+        m.size = (m.userData.baseSize as number) * dpr * 0.6 * level.size;
+      }
+    }
+  };
+
   const render = (f: TowerFrame) => {
     const sky = applySky(f.state);
+    applyAirportState(f.state, sky.night);
     camera.fov = f.cam.fovDeg;
     camera.aspect = viewW / viewH;
     camera.updateProjectionMatrix();
@@ -589,7 +630,7 @@ export function createTowerScene(canvas: HTMLCanvasElement, airport: Airport, si
     dpr = Math.min(2, ratio);
     renderer.setPixelRatio(dpr);
     renderer.setSize(viewW, viewH, false);
-    for (const m of lightMats) m.size = (m.userData.baseSize as number) * dpr * 0.6;
+    for (const m of lightMats) m.size = (m.userData.baseSize as number) * dpr * 0.6; // the runway lights' own scale is re-applied every frame
     for (const o of aircraft.values()) {
       (o.marker.material as THREE.PointsMaterial).size = 7 * dpr;
       (o.ring.material as THREE.PointsMaterial).size = 30 * dpr;

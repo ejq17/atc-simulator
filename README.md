@@ -38,8 +38,8 @@ ATIS, charts, navaids, runway ends, parking) comes from that airport's data.
 **KMHT (second airport)**, same sources and cycle (NASR 2026-10-01, d-TPP 2610, OSM snapshot 2026-10-17): runways 06/24 (7651 x 150 ft) and
 17/35 (9250 x 150 ft) with displaced thresholds recorded, ILS on 6 (I-MJE 109.95), 17 (I-MNA 109.1) and 35 (I-MHT 109.1, CAT III), ATIS 119.55,
 Clearance 135.9, Ground 121.9, Tower 121.3 (24 h, Class C), Boston Approach/Departure 124.9 (the Boston Consolidated TRACON), the MHT DME,
-the CON and GDM VOR/DMEs, 26 approach fixes, the 18 d-TPP charts (diagram, 11 approaches of which 7 are transcribed, MANCHESTER ONE and
-PPORT FOUR departures, ROZZE TWO arrival, minimums pages), 19 taxiway identifiers of the 22 on the diagram, 14 gates and 15 GA/FBO stands (OSM). KMHT
+the CON and GDM VOR/DMEs, 41 fixes (26 on the approach plates, 15 on the ROZZE TWO arrival), the 18 d-TPP charts (diagram, 11 approaches of which 7 are transcribed, MANCHESTER ONE and
+PPORT FOUR departures, the ROZZE TWO arrival (transcribed: five transitions, four runway legs, altitude and speed restrictions), minimums pages), 19 taxiway identifiers of the 22 on the diagram, 14 gates and 15 GA/FBO stands (OSM). KMHT
 has **no** LAHSO, hot spot, MVA sectors, plate holding patterns or plate fix altitudes in the dataset: those layers are empty, not invented
 (`data/sources/README.md`, "KACY layers with no KMHT equivalent"). The career steps and training lessons are written around KACY's
 runway ends, taxiways and stands, so at KMHT the setup offers Free play (all five presets, custom traffic, IFR flows).
@@ -86,9 +86,11 @@ published missed approach altitude, and the displaced thresholds at Manchester (
 (corrected against `performance.now`, so it does not drift), the Zulu time, sunrise/sunset (DAY/NIGHT in the top bar) and
 free-play traffic volume follow the real date and time at the airport (quiet overnight, busy morning and evening banks),
 and the top bar shows **LIVE**. With live weather the airport's METAR is refreshed every 5 minutes (new observation times only),
-the ATIS letter advances at HH:55Z and when the weather changes materially, and the runway in use follows the wind. If the backend is
+the ATIS letter advances at every new hourly METAR / SPECI (JO 7110.65 2-9-2, even when no value changed; simulated weather: HH:55Z) and when the weather or the airport state changes materially, and the runway in use follows the wind. If the backend is
 unreachable the last good METAR stays in use (**WX STALE**) or the session falls back to simulated weather (**WX SIMULATED**), and
 the top bar says so. Pause is always available.
+
+**Airport state.** The airport changes during a session: a **runway inspection** closes a runway for a few minutes at a quiet time, a **taxiway** can close, **bird activity** appears, and in rain or snow landing pilots report **braking action** (good, good to medium, medium, medium to poor, poor, nil). The ATIS reads closures as NOTAMs, gives RVR below 1 1/4 SM, runway condition codes and the latest braking action report, and bird activity; a closed runway is never selected, taxi routes avoid a closed taxiway, a clearance onto a closed runway is unsafe (training refuses it), and the Surface and Tower views mark closures with yellow Xs. At night or in low visibility a pilot may ask for the runway lights up or down; the Tower view dims and brightens the edge lights. The setup screen can close a runway or a taxiway for the whole session. At KMHT turbojet arrivals fly the published **ROZZE TWO** arrival from CRIBB or FLYZZ ("descend via the Rozze Two arrival", altitude and speed restrictions flown). Weather-derived values are simplifications and are listed in `docs/BEHAVIOUR-ACCURACY.md` (W11-W18, I17-I18, T18, S3); this is not ATC training.
 
 **Sim speed (override).** The **2x / 4x** buttons ("Sim speed") release the real-time lock; the badge turns to **SIM 2x**. Press **1x**
 to lock back to the wall clock. To start a session on the old sim clock instead, choose **Clock: Sim speed** on the setup screen.

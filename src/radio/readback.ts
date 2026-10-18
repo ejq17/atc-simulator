@@ -196,6 +196,16 @@ export function buildReadback(aircraft: Aircraft, c: Clearance, env: ReadbackEnv
         return holdReadback(env.airport, c);
       case 'MISSED_APPROACH':
         return 'Executing the published missed approach';
+      case 'STAR': {
+        // 7110.65 4-7-1: "(STAR name and number) ARRIVAL, (transition name) TRANSITION"; 4-5-7: "DESCEND VIA the (STAR) ARRIVAL"
+        const name = spokenStarName(env.airport, c.starName);
+        const trans = c.starTransition ? `, ${spokenFix(env.airport, c.starTransition)} transition` : '';
+        return c.descendVia ? `Descend via the ${name} arrival${trans}` : `Cleared ${name} arrival${trans}`;
+      }
+      case 'ADVISORY':
+        return c.advisory === 'BIRDS' ? "Roger, we'll watch for the birds" : 'Roger';
+      case 'RUNWAY_LIGHTS':
+        return 'Roger, thank you';
       case 'EXIT_RUNWAY':
         return exitReadback(c);
       case 'CANCEL_TAKEOFF':
@@ -292,6 +302,15 @@ function holdReadback(airport: Airport, c: Clearance): string {
   else if (h.legMinutes !== undefined) parts.push(`${h.legMinutes === 1 ? 'one' : h.legMinutes === 1.5 ? 'one and a half' : numberWords(Math.round(h.legMinutes))} minute legs`);
   if (h.efcZulu) parts.push(`expect further clearance ${digitsSpoken(h.efcZulu)}`);
   return parts.join(', ');
+}
+
+/** "ROZZE2" -> "Rozze two": the procedure's spoken name from the airport data (`InstrumentProcedure.star.spokenName`), else name + digit words. */
+export function spokenStarName(airport: Airport, ident: string | undefined): string {
+  const id = (ident ?? '').toUpperCase().replace(/\s+/g, '');
+  const proc = airport.procedures.find((p) => p.star && (p.star.ident.toUpperCase() === id || p.star.spokenName.toUpperCase().replace(/\s+/g, '') === id));
+  if (proc?.star) return titleCase(proc.star.spokenName);
+  const m = /^([A-Z]+?)(\d+)$/.exec(id);
+  return m ? `${titleCase(m[1])} ${digitsSpoken(m[2])}` : titleCase(id);
 }
 
 /** Navaid name when the airport data has one ("Cedar Lake"), else the identifier as written ("CARYL"). */
@@ -428,6 +447,28 @@ export function departureCheckInCall(aircraft: Aircraft, env: ReadbackEnv, o: { 
   return climbing
     ? `${facility(aircraft, env)}, ${aircraft.spokenCallsign}, leaving ${alt}, climbing to ${spokenAltitude(o.targetAltitudeFt!)}.`
     : `${facility(aircraft, env)}, ${aircraft.spokenCallsign}, level ${alt}.`;
+}
+
+/** After landing on a wet or contaminated runway: "Manchester Tower, Southwest 123, braking action medium." (terms of JO 7110.65 3-3-4). */
+export function brakingActionCall(aircraft: Aircraft, env: ReadbackEnv, term: string): string {
+  return `${facility(aircraft, env)}, ${aircraft.spokenCallsign}, braking action ${term}.`;
+}
+
+/**
+ * "Manchester Tower, Southwest 123, request lights up." JO 7110.65 3-4-10 d / 3-4-11 allow a pilot request for the runway light intensity;
+ * the manual prescribes no phraseology for the request, so this is plain English (no invented phraseology beyond "request").
+ */
+export function lightsRequestCall(aircraft: Aircraft, env: ReadbackEnv, direction: 'up' | 'down'): string {
+  return `${facility(aircraft, env)}, ${aircraft.spokenCallsign}, request lights ${direction}.`;
+}
+
+/**
+ * Stopped short of a taxiway that closed after the taxi instruction: "Atlantic City Ground, Cessna one two three, holding short of Bravo, taxiway
+ * closed, request taxi instructions." NON-STANDARD plain English: JO 7110.65 3-7-2 gives no pilot phraseology for this; the content (where, why,
+ * what is wanted) follows the position / request order of AIM 4-3-18.
+ */
+export function closedTaxiwayHoldCall(aircraft: Aircraft, env: ReadbackEnv, taxiway: string): string {
+  return `${facility(aircraft, env)}, ${aircraft.spokenCallsign}, holding short of ${spokenTaxiway(taxiway)}, taxiway closed, request taxi instructions.`;
 }
 
 /** Established on the approach course while still on the Approach frequency (asks for the tower). */

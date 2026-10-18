@@ -4,7 +4,7 @@
  * This file is the interface the UI depends on. The gameplay builder fills in
  * src/game/* behind these exports; the signatures below must stay stable.
  */
-import type { Airport, ControllerPositionId, GameMode, Scenario, SimulationState, Weather } from '../sim/types';
+import type { Airport, ClosureSpec, ControllerPositionId, GameMode, Scenario, SimulationState, Weather } from '../sim/types';
 import type { TrafficGenerator } from '../sim/traffic';
 
 export interface ScenarioSummary {
@@ -47,6 +47,18 @@ export interface FreePlayOptions {
    * position each one is about (see `defaultPlayerPositions`, e.g. the Ground lessons give GND only), free play leaves it unset (= all).
    */
   playerPositions?: ControllerPositionId[];
+  /**
+   * Runway / taxiway closures in force for the whole session (setup-screen options; NOTAM style, JO 7110.65 3-3-1, 3-3-2): `scenario.closures`.
+   * The runway selector never picks a closed runway, taxi routes avoid a closed taxiway, the ATIS reads them.
+   */
+  closures?: ClosureSpec[];
+  /**
+   * Seeded free-play airport events (default true): a runway inspection by airport operations that closes a runway for a few minutes at a quiet
+   * time, a taxiway closure, bird activity (`scenario.events`, see scenarios/airportEvents.ts). False = none.
+   */
+  airportEvents?: boolean;
+  /** Wall-clock UTC ms of scenario time 0 (the UI passes its start time): season and time of day weight the bird activity event. */
+  startUtcMs?: number;
 }
 
 export interface DebriefReport {

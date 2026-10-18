@@ -12,8 +12,11 @@ import type { ScenarioEventRunner, TrainingController, TrainingStepState } from 
 import { game } from '../../game';
 import { sameFrequency } from '../../radio/frequencies';
 import { altimeterText, windText } from '../lib/format';
-import { atisNeedsUpdate, generateAtis, nextAtisLetter } from '../../weather/atis';
-import { atisSlot, hourlyAtisAdvance } from '../../weather/atisCycle';
+import { atisNeedsUpdate, atisUpdateReasons, generateAtis, nextAtisLetter } from '../../weather/atis';
+import { closedRunwayEnds } from '../../sim/airportOps';
+import { runwayChangeForWind } from './runwayConfig';
+import { buildAtisOps } from '../../weather/atisOps';
+import { atisSlot, hourlyAtisAdvance, hourlySlotApplies } from '../../weather/atisCycle';
 import { M_PER_NM } from '../../sim/geo';
 import { createRealtimeClock } from './realtimeClock';
 import type { ClockStatus } from './realtimeClock';
@@ -153,7 +156,9 @@ export function approachesInUseFor(state: SimulationState): string[] {
 }
 
 export function makeAtis(state: SimulationState, letter: string, startUtcMs: number | ((simSec: number) => number)): SimulatedAtis {
+  const utcMs = typeof startUtcMs === 'function' ? startUtcMs(state.clock.timeSec) : startUtcMs + state.clock.timeSec * 1000;
   return generateAtis({
+    ops: buildAtisOps(state, utcMs),
     approachesInUse: approachesInUseFor(state),
     airportName: airportCallName(state.airport),
     icao: state.airport.icao,
@@ -161,7 +166,7 @@ export function makeAtis(state: SimulationState, letter: string, startUtcMs: num
     variationDeg: state.airport.magneticVariationDeg,
     activeRunways: state.activeRunways,
     letter,
-    timeUtc: new Date(typeof startUtcMs === 'function' ? startUtcMs(state.clock.timeSec) : startUtcMs + state.clock.timeSec * 1000),
+    timeUtc: new Date(utcMs),
     elevationFt: state.airport.elevationFt,
     issuedAtSec: state.clock.timeSec,
   });
@@ -393,24 +398,32 @@ export function startSession(p: SessionParams): Session {
     if (disposed) return;
     clock.frame(t);
     const st = engine.getState();
-    // Real hourly ATIS cycle (HH:55Z): a new letter once an hour, on top of the weather-driven ones.
-    if (realTime && st.clock.speed > 0 && t - lastAtisCheck >= 1000) {
+    if (st.clock.speed > 0 && t - lastAtisCheck >= 1000) {
       lastAtisCheck = t;
-      const adv = hourlyAtisAdvance(atisSlotSeen, utcAt(st.clock.timeSec), atis.letter);
-      if (adv) {
-        atisSlotSeen = adv.slot;
-        reissueAtis('hourly update', adv.letter);
+      // Real hourly ATIS cycle (HH:55Z, JO 7110.65 2-9-2: a new recording on each new official observation): a new letter once an hour for simulated
+      // weather. Live weather has real observation times; its hourly METAR makes the letter (`atisUpdateReasons`: new weather observation), so the clock
+      // does not add a second one.
+      if (realTime) {
+        const adv = hourlyAtisAdvance(atisSlotSeen, utcAt(st.clock.timeSec), atis.letter);
+        if (adv) {
+          atisSlotSeen = adv.slot;
+          if (hourlySlotApplies(st.weather)) reissueAtis('hourly update', adv.letter);
+        }
       }
+      syncAirportOps();
     }
     if (p.runner) {
       for (const ev of p.runner.update()) {
         if (ev.kind === 'weather') {
           // The runner changed the weather: new ATIS if it matters. Runways are NOT changed for the player.
-          if (atisNeedsUpdate(atis, st.weather, st.activeRunways)) reissueAtis('weather change');
+          if (atisNeedsUpdate(atis, st.weather, st.activeRunways, opsNow())) reissueAtis('weather change');
           const rec = ev.recommendedRunways?.landing[0];
           hooks.onNotice('warn', `${ev.text}${rec ? ` The new wind favours runway ${rec}; change the runway configuration (Runways button) when ready.` : ''}`);
         } else if (ev.kind === 'emergency') {
           hooks.onNotice('warn', `${ev.declaration}: ${ev.text}`);
+        } else if (ev.kind === 'closure' || ev.kind === 'birds') {
+          hooks.onNotice('warn', ev.text);
+          syncAirportOps(); // new letter / runway change right away, not at the next 1 s check
         } else {
           hooks.onNotice('info', ev.text);
         }
@@ -436,6 +449,31 @@ export function startSession(p: SessionParams): Session {
   if (typeof requestAnimationFrame !== 'undefined') raf = requestAnimationFrame(frame);
 
   // ----- weather / ATIS ------------------------------------------------------------------------------------------
+  /** The airport state the ATIS reports (closures, RVR, runway condition, braking action, birds) at the current sim time. */
+  const opsNow = () => buildAtisOps(engine.getState(), utcAt(engine.getState().clock.timeSec));
+  /**
+   * Closures, braking action reports and bird activity change the airport (see `src/sim/airportOps.ts`). When the runway in use is closed the best open
+   * runway takes over (JO 7110.65 3-3-2: a closed runway is not assigned); the ATIS gets a new letter when its airport-state content changed
+   * (2-9-2: new or canceled NOTAMs, braking action worse than in the broadcast).
+   */
+  const syncAirportOps = () => {
+    const st = engine.getState();
+    const closedEnds = closedRunwayEnds(st);
+    if (closedEnds.length && [...st.activeRunways.landing, ...st.activeRunways.departing].some((e) => closedEnds.includes(e))) {
+      try {
+        const change = runwayChangeForWind(st.weather, st.activeRunways, st.airport, closedEnds);
+        if (change) {
+          engine.setActiveRunways({ departing: change.departing, landing: change.landing });
+          hooks.onNotice('warn', `The runway in use is closed (NOTAM): active runways changed to ${change.landing[0]}. Aircraft already inbound to the closed runway cannot be cleared to land on it.`);
+        }
+      } catch (err) {
+        hooks.onNotice('error', `No open runway is left to switch to (${err instanceof Error ? err.message : String(err)}).`);
+      }
+    }
+    const reasons = atisUpdateReasons(atis, st.weather, st.activeRunways, opsNow());
+    if (reasons.length) reissueAtis(reasons.join(', '));
+  };
+
   const reissueAtis = (reason: string, letter?: string) => {
     const st = engine.getState();
     atis = makeAtis(st, letter ?? nextAtisLetter(atis.letter), utcAt);
@@ -479,7 +517,7 @@ export function startSession(p: SessionParams): Session {
     getSpeed: () => engine.getState().clock.speed,
     setWeather(w) {
       const st = engine.getState();
-      const needs = atisNeedsUpdate(atis, w, st.activeRunways);
+      const needs = atisNeedsUpdate(atis, w, st.activeRunways, opsNow());
       engine.setWeather(w);
       engine.logEvent({
         kind: 'INFO', speaker: 'SYSTEM', severity: 'info',
@@ -490,7 +528,7 @@ export function startSession(p: SessionParams): Session {
     },
     setActiveRunways(cfg) {
       const st = engine.getState();
-      const needs = atisNeedsUpdate(atis, st.weather, cfg);
+      const needs = atisNeedsUpdate(atis, st.weather, cfg, opsNow());
       engine.setActiveRunways(cfg);
       if (needs) reissueAtis('runway change');
       hooks.onRev();

@@ -11,6 +11,7 @@ import type { Aircraft, TaxiNode, TaxiwayGraph, Vec2 } from './types';
 import { dist, headingDiff, headingToVec, ktToMps, mpsToKt, normHeading, vCross, vDot, vSub, vecToHeading } from './geo';
 import { activeClearance, advancePhase, emitEvent, getRuntime, perfOf, pilotSay, setPhase } from './context';
 import { spokenTaxiway } from '../radio/spoken';
+import { closedTaxiwayHoldCall } from '../radio/readback';
 import type { AircraftRuntime, SimContext } from './context';
 import { findRunwayEnd } from './runways';
 import { runwayCrossingsAlong } from './pathfinding';
@@ -136,6 +137,15 @@ function onRouteComplete(ctx: SimContext, ac: Aircraft, node: TaxiNode): void {
 function onHoldReached(ctx: SimContext, ac: Aircraft, rt: AircraftRuntime, node: TaxiNode): void {
   rt.stoppedAtNodeId = node.id;
   if (ac.phase === 'TAXIING' && node.kind === 'holding_position') setPhase(ctx, ac, 'HOLDING_SHORT', node.id);
+  if (rt.closedHold?.nodeId === node.id && !rt.calls.has(`closedTwy:${node.id}`)) {
+    // the taxiway ahead was closed after the taxi instruction: stopped, and the pilot asks for new instructions
+    rt.calls.add(`closedTwy:${node.id}`);
+    const twy = rt.closedHold.taxiway;
+    emitEvent(ctx, { kind: 'INFO', aircraftId: ac.id, callsign: ac.callsign, text: `${ac.callsign} stopped short of closed taxiway ${twy}`, severity: 'warning', speaker: 'SYSTEM', data: { closedTaxiway: twy } });
+    pilotSay(ctx, ac, closedTaxiwayHoldCall(ac, { airport: ctx.state.airport }, twy), { request: 'TAXI', closedTaxiway: twy });
+    ac.pendingRequest = { kind: 'TAXI', text: `holding short of taxiway ${twy} (closed), request taxi instructions`, sinceSec: ctx.state.clock.timeSec };
+    return;
+  }
   if (node.kind !== 'holding_position' && ac.route) {
     // Hold short of a taxiway: report it (the taxiway held short of is the one the route is about to join, not the one it arrived on).
     const graph = ctx.state.airport.taxiwayGraph;

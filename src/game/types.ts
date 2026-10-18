@@ -5,7 +5,7 @@
  * that the engine ignores; the UI may read them (`events`, `difficulty`, `careerStep`...). All of them are
  * plain JSON so a scenario survives structuredClone / persistence.
  */
-import type { CommandKind, Scenario, Weather } from '../sim/types';
+import type { ClosureKind, CommandKind, Scenario, Weather } from '../sim/types';
 
 /** A scripted occurrence at a scenario time. The UI applies them with `applyDueScenarioEvents` (scenarios/events.ts). */
 export type ScenarioEvent =
@@ -26,7 +26,24 @@ export type ScenarioEvent =
       /** Full pilot call, shown/spoken as that aircraft's transmission. */
       text: string;
     }
-  | { atSec: number; kind: 'message'; text: string };
+  | { atSec: number; kind: 'message'; text: string }
+  | {
+      atSec: number;
+      kind: 'closure';
+      /** `ident` is a runway end / pair or a taxiway designator. `durationSec` counts from the moment the closure is applied (omitted: closed for the rest of the session). */
+      closure: { kind: ClosureKind; ident: string; durationSec?: number; reason?: string };
+      /** Runways only: wait until no aircraft is on, cleared onto or on short final to the runway (an airport-operations inspection waits for a quiet time). */
+      quiet?: boolean;
+      text: string;
+    }
+  | {
+      atSec: number;
+      kind: 'birds';
+      /** Clause appended to "Bird activity in the vicinity of the airport", e.g. "flocks of small birds, altitude unknown" (JO 7110.65 2-1-23). */
+      detail: string;
+      durationSec: number;
+      text: string;
+    };
 
 /** Training step as stored on `Scenario.training.steps`, with the game-layer extras. */
 export interface TrainingStepSpec {

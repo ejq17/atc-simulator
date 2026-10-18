@@ -1,11 +1,13 @@
 import { useState } from 'react';
 import { useSimStore, recommendedRunways } from '../store/simStore';
+import { closedRunwayEnds } from '../../sim/airportOps';
 import { fetchLiveMetar } from '../../weather/liveWeather';
 import { WEATHER_PRESETS, WEATHER_PRESET_IDS, getPresetWeather } from '../../weather/presets';
 import type { WeatherPresetId } from '../../weather/presets';
 import { windText, altimeterText } from '../lib/format';
 import { Btn, Field, LABEL, SELECT } from '../components/ui';
 import { Drawer } from './Drawer';
+import { AirportStatusBlock } from '../components/AirportNotices';
 import { runwayEndWinds } from '../../sim/wind';
 import type { WindComponents } from '../../sim/wind';
 
@@ -23,7 +25,8 @@ export function WeatherPanel() {
   if (!session) return null;
   const st = session.engine.getState();
   const ends = st.airport.runways.flatMap((r) => r.ends.map((e) => e.id));
-  const rec = recommendedRunways(st.weather, st.airport);
+  const closedEnds = closedRunwayEnds(st);
+  const rec = recommendedRunways(st.weather, st.airport, closedRunwayEnds(st));
 
   const applyLive = async () => {
     setBusy(true);
@@ -56,6 +59,7 @@ export function WeatherPanel() {
           </table>
           {st.weather.rawMetar && <code className="break-words text-[11px] text-atc-muted">{st.weather.rawMetar}</code>}
         </section>
+        <AirportStatusBlock state={st} />
         <section className="flex flex-col gap-2">
           <Field label="Simulated weather preset">
             <div className="flex gap-2">
@@ -72,12 +76,12 @@ export function WeatherPanel() {
           <div className="grid grid-cols-2 gap-3">
             <Field label="Landing runway">
               <select className={SELECT} value={st.activeRunways.landing[0] ?? ''} onChange={(e) => setRwy('landing', e.target.value)} aria-label="Landing runway">
-                {ends.map((e) => (<option key={e} value={e}>{e}</option>))}
+                {ends.map((e) => (<option key={e} value={e}>{e}{closedEnds.includes(e) ? ' (closed)' : ''}</option>))}
               </select>
             </Field>
             <Field label="Departing runway">
               <select className={SELECT} value={st.activeRunways.departing[0] ?? ''} onChange={(e) => setRwy('departing', e.target.value)} aria-label="Departing runway">
-                {ends.map((e) => (<option key={e} value={e}>{e}</option>))}
+                {ends.map((e) => (<option key={e} value={e}>{e}{closedEnds.includes(e) ? ' (closed)' : ''}</option>))}
               </select>
             </Field>
           </div>

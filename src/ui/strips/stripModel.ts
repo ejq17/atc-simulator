@@ -122,6 +122,8 @@ export function markForClearance(c: Clearance): Pick<StripMark, 'text' | 'title'
       return { text: 'PAT', title: 'Enter the traffic pattern' };
     case 'RADAR_CONTACT':
       return { text: 'RC', title: 'Radar contact' };
+    case 'STAR':
+      return { text: c.descendVia ? 'DV' : 'STAR', title: c.descendVia ? 'Descend via the arrival' : 'Cleared on the arrival' };
     case 'EXIT_RUNWAY':
       return { text: c.destination === 'END' ? 'EXIT END' : `EXIT ${c.exitTaxiway ?? ''}`.trim(), title: `Exit the runway${c.exitTaxiway ? ` at ${c.exitTaxiway}` : c.destination === 'END' ? ' at the end' : ' at the next taxiway'}${c.turnDirection ? `, turn ${c.turnDirection}` : ''}` };
     case 'CANCEL_TAKEOFF':

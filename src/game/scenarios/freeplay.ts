@@ -18,6 +18,8 @@
  */
 import type { Airport, ControllerPositionId, Scenario, Vec2, Weather } from '../../sim/types';
 import type { FreePlayOptions } from '../index';
+import { closedEndsOf } from '../../sim/airportOps';
+import { buildAirportEvents } from './airportEvents';
 import { mulberry32 } from '../../sim/rng';
 import type { Rng } from '../../sim/rng';
 import { getPresetWeather, randomWeather, WEATHER_PRESET_IDS } from '../../weather/presets';
@@ -29,7 +31,7 @@ import { pickFlight, pickGaType, pickLeg, profileFor, profileTypes, resolveTypeS
 import type { Flight } from '../airportProfile';
 import { pickArrivalStart, pickParking } from '../placement';
 import type { AirbornePoint } from '../placement';
-import { arrivalProcedure, ifrArrivalSpawn, ifrDepartureSpawn } from '../ifr';
+import { arrivalProcedure, ifrArrivalSpawn, ifrDepartureSpawn, isTurbojet, starArrival } from '../ifr';
 import { findNavFix } from '../../sim/navigation';
 
 type Start = NonNullable<FreePlayOptions['startingScenario']>;
@@ -64,10 +66,11 @@ export function resolveWeather(w: FreePlayOptions['weather'], seed: number): Wea
 }
 
 /** Runway config for the weather. `jets` restricts the choice to ends the airport's reference airliner (KACY A320, KMHT B738) can depart from (engine performance data vs the declared runway length). */
-export function recommendConfig(airport: Airport, weather: Weather | 'live', jets: boolean): { departing: string[]; landing: string[] } {
+export function recommendConfig(airport: Airport, weather: Weather | 'live', jets: boolean, closedEnds: readonly string[] = []): { departing: string[]; landing: string[] } {
   const ends = airport.runways.flatMap((r) => r.ends.map((e) => ({ id: e.id, magneticHeadingDeg: e.magneticHeadingDeg })));
-  const usable = jets ? ends.filter((e) => runwayLongEnoughFor(airport, profileFor(airport.icao).referenceJet, e.id)) : ends;
-  const pool = usable.length ? usable : ends;
+  const open = ends.filter((e) => !closedEnds.includes(e.id)); // never a closed runway (JO 7110.65 3-3-2)
+  const usable = jets ? open.filter((e) => runwayLongEnoughFor(airport, profileFor(airport.icao).referenceJet, e.id)) : open;
+  const pool = usable.length ? usable : open;
   const w = weather === 'live' ? { windDirDeg: 0 as const, windSpeedKt: 0 } : weather;
   const rec = recommendRunways(w, pool, { preferredOrder: preferredEndOrder(airport, 'low'), variationDeg: airport.magneticVariationDeg });
   return { departing: [rec.primary], landing: [rec.primary] };
@@ -95,7 +98,9 @@ export function buildFreePlay(airport: Airport, options: FreePlayOptions = {}, i
   const gaFraction = ga && jets ? Math.min(1, Math.max(0, options.gaFraction ?? 0.5)) : ga ? 1 : 0;
 
   const weather = resolveWeather(options.weather, seed);
-  const active = options.activeRunways ?? recommendConfig(airport, weather, jets);
+  const closedEnds = closedEndsOf(airport, options.closures ?? []);
+  const requested = options.activeRunways;
+  const active = requested && ![...requested.landing, ...requested.departing].some((e) => closedEnds.includes(e)) ? requested : recommendConfig(airport, weather, jets, closedEnds);
   const maxAircraft = Math.max(1, Math.round(options.maxAircraft ?? dprof.max));
   const arrivalsPerHour = Math.max(0, options.arrivalsPerHour ?? Math.round(prof.arr * dprof.rate));
   const departuresPerHour = Math.max(0, options.departuresPerHour ?? Math.round(prof.dep * dprof.rate));
@@ -127,6 +132,8 @@ export function buildFreePlay(airport: Airport, options: FreePlayOptions = {}, i
     ...(options.ifrFlows !== undefined ? { ifrFlows: options.ifrFlows } : {}),
     ...(internal.ifrArrivals !== undefined ? { ifrArrivals: internal.ifrArrivals } : {}),
     ...(internal.ifrDepartures !== undefined ? { ifrDepartures: internal.ifrDepartures } : {}),
+    ...(options.closures?.length ? { closures: options.closures.map((c) => ({ ...c })) } : {}),
+    ...(options.airportEvents !== false ? { pilotRequests: { lights: true }, events: buildAirportEvents(airport, seed, { startUtcMs: options.startUtcMs, active, closures: options.closures }) } : {}),
   };
   return sc;
 }
@@ -234,7 +241,7 @@ export function initialAircraft(airport: Airport, rng: Rng, o: InitialOpts): Sce
     const f = flight(kind === 'ga');
     if (!f) return;
     const type = f.type;
-    if (kind === 'jet' && o.ifrArrivals && arrivalProcedure(airport, endId)) {
+    if (kind === 'jet' && o.ifrArrivals && ((isTurbojet(type) && starArrival(airport, endId)) || arrivalProcedure(airport, endId))) {
       const k = ifrCount.get(endId) ?? 0;
       const spec = ifrArrivalSpawn(airport, rng, { callsign: f.callsign, type, runwayEnd: endId, atSec: k * INITIAL_IFR_ARRIVAL_STAGGER_SEC });
       if (spec && spec.start.kind === 'at_fix') {
