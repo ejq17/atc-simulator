@@ -37,6 +37,8 @@ export interface HarnessOptions {
   reactionDelaySec?: [number, number];
   /** Airport to work (default: KACY). */
   airport?: Airport;
+  /** Pilot realism level of the scenario (src/sim/pilotBehaviour.ts); `pilotBehaviour` overrides its design values. */
+  pilotRealism?: Scenario['pilotRealism'];
   /** Make the engine refuse every AI command of these kinds (tests the AI's back-off). */
   rejectKinds?: ParsedCommand['kind'][];
   /**
@@ -80,7 +82,8 @@ export function createHarness(o: HarnessOptions): Harness {
       temperatureC: 15, dewpointC: 5, altimeterInHg: 29.92, phenomena: [], flightCategory: 'VFR',
     },
     activeRunways: o.activeRunways ?? { departing: ['13'], landing: ['13'] },
-    controllerPositions: ALL, playerPositions: o.player, spawns: o.spawns, pilotBehaviour: o.pilotBehaviour,
+    controllerPositions: ALL, playerPositions: o.player, spawns: o.spawns,
+    pilotBehaviour: o.pilotBehaviour, ...(o.pilotRealism ? { pilotRealism: o.pilotRealism } : {}),
   };
   const engine = createEngine({ airport: o.airport ?? kacy, scenario, readbackErrorRate: o.readbackErrorRate ?? 0, utcStartMs: Date.UTC(2026, 5, 1, 16, 0, 0) });
   const events: SimEvent[] = [];

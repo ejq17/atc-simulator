@@ -119,6 +119,7 @@ export function SetupScreen() {
   const [special, setSpecial] = useState<SpecialTrafficSelection>(() => resolveSpecialTraffic(prev?.icao ?? DEFAULT_AIRPORT_ICAO, prev?.freePlay.specialTraffic ?? defaultSpecialTraffic(prev?.icao ?? DEFAULT_AIRPORT_ICAO)));
   const [starting_, setStarting_] = useState<NonNullable<FreePlayOptions['startingScenario']>>(prev?.freePlay.startingScenario ?? 'mixed');
   const [difficulty, setDifficulty] = useState<NonNullable<FreePlayOptions['difficulty']>>(prev?.freePlay.difficulty ?? 'normal');
+  const [pilotRealism, setPilotRealism] = useState<NonNullable<FreePlayOptions['pilotRealism']>>(prev?.freePlay.pilotRealism ?? 'moderate');
   const [seedText, setSeedText] = useState(prev?.seed !== undefined ? String(prev.seed) : '');
   const [weatherKey, setWeatherKey] = useState<string>(prev ? (prev.weather.kind === 'preset' ? `preset:${prev.weather.id}` : prev.weather.kind) : 'live');
   const [closeRunway, setCloseRunway] = useState<string>('none');
@@ -217,6 +218,7 @@ export function SetupScreen() {
     const freePlay: FreePlayOptions = {
       ifrFlows,
       difficulty,
+      pilotRealism,
       aircraftCount,
       arrivalsPerHour: DENSITY[density].arrivalsPerHour,
       departuresPerHour: DENSITY[density].departuresPerHour,
@@ -377,8 +379,11 @@ export function SetupScreen() {
                       {STARTS.map((s) => (<option key={s.value} value={s.value}>{s.label}</option>))}
                     </select>
                   </Field>
-                  <Field label="Difficulty" hint="Harder = more pilot readback errors and tighter timing.">
+                  <Field label="Difficulty" hint="Harder = more traffic and a steeper ramp over time.">
                     <Segmented value={difficulty} onChange={setDifficulty} options={[{ value: 'easy', label: 'Easy' }, { value: 'normal', label: 'Normal' }, { value: 'hard', label: 'Hard' }]} />
+                  </Field>
+                  <Field label="Pilot realism" hint="Readback mistakes, slow or missed calls, blocked transmissions, student pilots, requests. Career steps ramp it up; training lessons are always clean.">
+                    <Segmented value={pilotRealism} onChange={setPilotRealism} options={[{ value: 'off', label: 'Off' }, { value: 'light', label: 'Light' }, { value: 'moderate', label: 'Moderate' }, { value: 'heavy', label: 'Heavy' }]} />
                   </Field>
                   <div className="col-span-2">
                     <span className={LABEL}>Aircraft types</span>

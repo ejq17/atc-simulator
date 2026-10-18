@@ -285,6 +285,22 @@ Checks run after the edits: `npx vitest run src/weather src/game/training.test.t
 | G-9 | "<callsign>, turn left on Bravo, continue to Charlie" / "continue taxiing via lima to mike" | `ruleContinueSegment`, `ai/phrase.ts` `progressiveStep` | 3-7-2 NOTE "Progressive instructions may include step-by-step directions and/or directional turns"; phrase "TAXI/CONTINUE TAXIING/PROCEED VIA (route), ... TO (location)". "turn left on" is the 3-10-9 turn phrase used on the ground; "continue to <taxiway>" without "taxiing" is shortened | "continue taxiing via ... to ..." correct; "continue to Charlie" non-standard |
 | G-10 | "..., at Lima, request next progressive taxi instructions." | `nextSegmentCall` | AIM 4-3-18 (progressive instructions) | plain language |
 
+## Pilot realism phrases (2026-10-18)
+
+| # | Phrase | Where | Source | Verdict |
+|---|---|---|---|---|
+| PR-1 | "<facility>, November seven two three echo juliet, ..." (initial contact) | `styleCall` (`radioDiscipline.ts`), `novemberCallsign` | 7110.65 2-4-20 gives "November" to the controller on initial contact; AIM 4-2-4 asks civil pilots for the type, model or manufacturer name (then "N" is dropped). The pilot habit of "November" is common. | non-standard pilot habit (rate `novemberInitialRate`) |
+| PR-2 | "..., Cessna three echo juliet" (abbreviated) | `abbreviatedCallsign` | AIM 4-2-4: prefix and last three digits/letters, only after communications are established and the controller did it; not with similar callsigns | correct |
+| PR-3 | "<facility>, Cessna seven two three echo juliet, student pilot, ..." | `styleCall` | AIM 4-2-4 "Dayton tower, Fleetwing One Two Three Four, student pilot." | correct |
+| PR-4 | "<facility>, Spirit four fifty one, with you, level five thousand, information alpha." | `styleCall` | none | non-standard (common airline habit) |
+| PR-5 | "..., level five thousand, with alpha." | `styleCall` | AIM 4-1-13 has "with information"; "with <letter>" is shorthand | non-standard |
+| PR-6 | "Atlantic City Ground, ..., ready to taxi, VFR to ..., request progressive taxi." | `readyToTaxiCall` (ground task; students at `progressiveTaxiRate`) | AIM 4-3-18 progressive taxi | plain language |
+| PR-7 | "Say again, <callsign>" / "Sorry, say again for <callsign>" | `buildSayAgain`, `conversation()` | P/CG SAY AGAIN | correct |
+| PR-8 | "Unable, we need a minute, <callsign>" then "..., ready for departure runway one three." | `notReadyForTakeoff`, `pilotInitiatedRequest` | "Unable" P/CG; the request is pilot language | plain language |
+| PR-9 | "request runway two two", "request short approach", "request the option", "request straight-in runway one three", "request to stay in the pattern for a few more", "request a three sixty for spacing", "request higher", "request direct <fix>", "we have the field in sight, request visual approach runway one three", "request taxi back to runway one three for departure" | `pilotRequests.ts`, `checkInCall` | none (pilot wording); the controller's answers are 3-8-1, 3-10-1, 3-10-11 phraseology | plain language |
+| PR-10 | "<callsign>, did you copy" / "unable" / "Roger, <callsign>" | `ruleDidYouCopy`, `ruleUnable`, `conversation()` | none; "UNABLE" is also the P/CG pilot term | plain language |
+| PR-11 | "[blocked]" | `RADIO_BLOCKED` event, transcript | not speech | engine marker |
+
 ## Traffic variety (2026-10-18: vehicles, helicopters, overhead maneuver, Class C transitions, flight training, service callsigns)
 
 Sources: docs/FAA-REFERENCES.md "Traffic variety". Phrases are produced in `src/ai/phrase.ts` (controller), `src/radio/specialCalls.ts` and `src/radio/readback.ts` (pilot / vehicle), parsed by `src/commands/rules-special.ts`.

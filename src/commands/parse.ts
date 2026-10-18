@@ -109,6 +109,8 @@ export function parse(text: string, ctx: ParseContext): ParseResult {
       issues: uniq([...cs.issues, ...multi, ...d.issues, ...missing, ...val.issues, ...(leftovers.get(p) ?? [])]),
     };
     if (!cs.callsign && cs.candidates.length > 0) cmd.callsignCandidates = cs.candidates.map((c) => c.callsign);
+    if (cs.callsign && cs.abbreviated) cmd.callsignAbbreviated = true;
+    if (placed.length > 1 && d.kind !== 'UNKNOWN') cmd.groupSize = placed.filter((x) => x.draft.kind !== 'UNKNOWN').length;
     return cmd;
   });
 

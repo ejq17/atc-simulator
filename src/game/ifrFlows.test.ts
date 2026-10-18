@@ -41,7 +41,7 @@ function simulate(sc: Scenario, sec: number): Recorded[] {
 function flowScenario(landing: string, departing = landing, over: Partial<Parameters<typeof game.buildFreePlay>[1]> = {}): Scenario {
   return game.buildFreePlay(airport, {
     seed: 17, weather: 'clear', aircraftCount: 0, difficulty: 'normal', arrivalsPerHour: 30, departuresPerHour: 24, gaFraction: 0.3, maxAircraft: 24,
-    activeRunways: { departing: [departing], landing: [landing] }, ifrFlows: true, ...over,
+    activeRunways: { departing: [departing], landing: [landing] }, ifrFlows: true, pilotRealism: 'off', ...over, // the flow tests script exact answers: clean pilots
   });
 }
 
@@ -204,7 +204,7 @@ describe('traffic generator IFR flows', () => {
 
   it('IFR arrivals and departures from the generator can be worked: clearance, taxi request and approach clearance are accepted', () => {
     for (const rwy of ['13', '31']) {
-      const sc = flowScenario(rwy, rwy, { aircraftCount: 0, arrivalsPerHour: 24, departuresPerHour: 20, seed: 23, gaFraction: 0.2 });
+      const sc = { ...flowScenario(rwy, rwy, { aircraftCount: 0, arrivalsPerHour: 24, departuresPerHour: 20, seed: 23, gaFraction: 0.2 }), pilotRealism: 'off' as const }; // scripted answers: clean pilots
       const e = createEngine({ airport, scenario: sc, readbackErrorRate: 0, trafficGenerator: game.createTrafficGenerator(sc, airport) });
       let gotClearance = 0;
       let gotApproach = 0;
@@ -315,7 +315,7 @@ describe('career steps 7, 9 and 11 include an IFR departure', () => {
   it('career 7: NKS329 goes through Clearance Delivery, Ground, Tower and Departure and is handled', () => {
     const sc = game.buildScenario('career-07-arrivals-departures', airport);
     // Isolate the IFR departure: the other aircraft are not needed for the flow.
-    const only = { ...sc, spawns: sc.spawns.filter((s) => s.callsign === 'NKS329').map((s) => ({ ...s, atSec: 0 })), traffic: undefined } as Scenario;
+    const only = { ...sc, pilotRealism: 'off', spawns: sc.spawns.filter((s) => s.callsign === 'NKS329').map((s) => ({ ...s, atSec: 0 })), traffic: undefined } as Scenario; // scripted calls: clean pilots
     const e = createEngine({ airport, scenario: only, readbackErrorRate: 0 });
     const ac = () => Object.values(e.getState().aircraft)[0];
     expect(runUntil(e, () => ac().pendingRequest?.kind === 'IFR_CLEARANCE', 30)).toBe(true);
@@ -419,7 +419,7 @@ describe('IFR objective checks', () => {
 
 function mini(spawns: Scenario['spawns'], over: Partial<Scenario> = {}) {
   const base = game.buildScenario('career-08-ifr', airport);
-  const sc = { ...base, id: 'ifr-mini', mode: 'career', spawns, objectives: [], traffic: undefined, weather: base.weather, controllerPositions: ['TWR', 'GND', 'CLNC', 'APP', 'DEP'], ...over } as Scenario;
+  const sc = { ...base, id: 'ifr-mini', mode: 'career', spawns, objectives: [], traffic: undefined, weather: base.weather, controllerPositions: ['TWR', 'GND', 'CLNC', 'APP', 'DEP'], pilotRealism: 'off', ...over } as Scenario;
   return createEngine({ airport, scenario: sc, readbackErrorRate: 0 });
 }
 const vcn = (callsign: string, atSec = 0): Scenario['spawns'][number] => ({

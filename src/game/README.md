@@ -240,6 +240,13 @@ Scripted tests pass `readbackErrorRate: 0`; with the default 8 % a pilot occasio
 * A session without a Ground position strands landed aircraft on the exit (the pilot switches to an unstaffed Ground frequency); career 8 therefore lists GND, and the free-play default positions for IFR flows list it too.
 * IFR flows in the opening population: Cessna arrivals are skipped when airline arrivals appear at fixes, and the later jets appear 270 s apart (a result of the engine's in-trail check, see above).
 
+## Pilot realism by scenario
+
+`Scenario.pilotRealism` is set by the catalogue (`scenarios/index.ts buildCatalogueScenario`): training lessons `off` (a lesson that sets the field itself keeps it), career steps 1-4 light, 5-8 moderate,
+9-12 heavy (`careerRealism`; step 11 is built on the free-play builder but still follows the ramp), anything else from its `Difficulty` (`realismForDifficulty`: easy light, normal moderate, hard heavy).
+Free play takes `FreePlayOptions.pilotRealism` (setup-screen selector "Pilot realism", default moderate). The traffic generator (`traffic.ts`) occasionally creates a flight whose callsign sounds like one
+on the airport (`similarCallsignRate`), otherwise it avoids sound-alikes. Scripted flow tests build their scenarios with `pilotRealism: 'off'`.
+
 ## Special traffic (`specialTraffic.ts`, `specialGenerator.ts`, `airportProfile.ts` `special`)
 
 Kinds: `helicopter` (USCG MH-65 at the helipads `USCG-1..4`), `military` (ANG F-16C from the `ANG-` ramp or arriving through the overhead maneuver), `transition` (VFR crossing the Class C), `training` (a share of the GA arrivals flies touch-and-go circuits), `vehicles` (runway / pavement inspections, errands). The setup screen has one checkbox per kind the airport offers (`availableSpecialKinds`; KACY all five, KMHT only `transition` and `vehicles`: no USCG / ANG unit and no sourced flight training there), passed as `FreePlayOptions.specialTraffic` and stored as `scenario.specialTraffic`. **Unset = none**: scripted scenarios, career and tests keep their traffic; the setup screen defaults to `defaultSpecialTraffic` (all offered kinds on).

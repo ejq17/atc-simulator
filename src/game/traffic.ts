@@ -29,6 +29,7 @@ import type { SpawnSpec, TrafficGenerator } from '../sim/traffic';
 import { createNullTrafficGenerator } from '../sim/traffic';
 import { mulberry32 } from '../sim/rng';
 import type { Rng } from '../sim/rng';
+import { resolvePilotBehaviour } from '../sim/pilotBehaviour';
 import { NM, callsignTail, randomNNumber, runwayLongEnoughFor } from './world';
 import { pickFlight, pickGaType, pickLeg, profileFor, resolveTypeSelection, usableAirlines } from './airportProfile';
 import type { Flight } from './airportProfile';
@@ -117,6 +118,7 @@ export function createTrafficGenerator(scenario: Scenario, airport: Airport, opt
   const departureFreq = towerOnly ? 'TWR' : 'GND';
 
   const profile = profileFor(icao);
+  const similarRate = resolvePilotBehaviour(scenario.pilotBehaviour, scenario.mode, scenario.pilotRealism).realism.similarCallsignRate;
   const specialSel = resolveSpecialTraffic(icao, gs.specialTraffic);
   const trainingShare = profileForSpecial(icao).special?.training?.gaShare ?? 0;
   const specialGen = createSpecialTrafficGenerator(gs, airport, options);
@@ -156,10 +158,15 @@ export function createTrafficGenerator(scenario: Scenario, airport: Airport, opt
     const localHour = options.densityAt ? localHourAt(simUtcMs(state)) : undefined;
     let last: Flight | undefined;
     for (let i = 0; i < 80; i++) {
-      const f: Flight | undefined = ga ? { callsign: randomNNumber(rng!), type: pickGaType(rng!, icao) } : pickFlight(rng!, icao, { allowedTypes, localHour });
+      let f: Flight | undefined = ga ? { callsign: randomNNumber(rng!), type: pickGaType(rng!, icao) } : pickFlight(rng!, icao, { allowedTypes, localHour });
       if (!f) return undefined;
+      // pilot realism: now and then a flight whose callsign sounds like one already on the airport (AIM 4-2-4 acknowledges that this happens;
+      // JO 7110.65 2-4-20 / 2-4-15 give the controller the tools). The random draws happen only when the rate is set.
+      const alike = similarRate > 0 && rng!() < similarRate ? soundAlike(f, ga, state) : undefined;
+      if (alike) f = alike;
       last = f;
-      if (used.has(f.callsign) || tails.has(callsignTail(f.callsign))) continue;
+      if (used.has(f.callsign)) continue;
+      if (!alike && tails.has(callsignTail(f.callsign))) continue;
       return f;
     }
     let cs: string;
@@ -167,6 +174,22 @@ export function createTrafficGenerator(scenario: Scenario, airport: Airport, opt
     do cs = ga ? `N${100 + ++counter}ZZ` : `${prefix}${9000 + ++counter}`;
     while (used.has(cs));
     return { ...last!, callsign: cs };
+  };
+  /** The flight with a callsign that shares its last two characters / digits with an active aircraft of the same kind; undefined when there is none. */
+  const soundAlike = (f: Flight, ga: boolean, state: Readonly<SimulationState>): Flight | undefined => {
+    const active = Object.values(state.aircraft).map((a) => a.callsign).filter((c) => (ga ? /^N\d/.test(c) : !/^N\d/.test(c)));
+    if (!active.length) return undefined;
+    const base = active[Math.min(active.length - 1, Math.floor(rng!() * active.length))];
+    if (ga) {
+      const m = /^N(\d{1,5})([A-Z]{1,2})$/.exec(base);
+      if (!m) return undefined;
+      const digits = String(1 + Math.floor(rng!() * 9)) + Array.from({ length: Math.max(0, m[1].length - 1) }, () => String(Math.floor(rng!() * 10))).join('');
+      return { ...f, callsign: `N${digits}${m[2]}` };
+    }
+    const m = /^([A-Z]{3})(\d{2,4})$/.exec(base);
+    if (!m || !f.entry || f.entry.icao3 !== m[1]) return undefined;
+    const lead = m[2].length > 2 ? String(1 + Math.floor(rng!() * 9)) : '';
+    return { ...f, callsign: `${m[1]}${lead}${m[2].slice(-2)}` };
   };
   const commit = (f: Flight): string => {
     used.add(f.callsign);

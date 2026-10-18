@@ -20,7 +20,10 @@ import { frequencyById, frequencyByMhz, frequencyForPosition, sameFrequency } fr
 import { findNavFix, fixPosition } from './navigation';
 import { findStar } from './star';
 import { assignSquawk } from './ifr';
-import { spokenCallsign as buildSpokenCallsign } from '../radio/spoken';
+import { pilotInitiatedRequest } from './pilotRequests';
+import { jitteredInterval } from './radioDiscipline';
+import { flyMisread } from './commandExecutor';
+import { spokenCallsign as buildSpokenCallsign, spokenRunway } from '../radio/spoken';
 import {
   approachCheckInCall, arrivalTowerCheckInCall, brakingActionCall, lightsRequestCall, checkInCall, clearOfRunwayCall, departureCheckInCall, establishedCall, finalCall, goAroundEstablishedCall,
   holdingShortCall, approachingHoldCall, holdingShortCrossingCall, ifrClearanceRequestCall, inboundCall, missedApproachCheckInCall, readyToTaxiCall, stoppedOnRunwayCall,
@@ -190,6 +193,10 @@ export function spawnFromSpec(ctx: SimContext, spec: SpawnSpec): Aircraft {
     flags: {},
     seed: Math.floor(rng() * 2147483647),
   };
+  // A student pilot: forced by the spawn, else a seeded share of light VFR aircraft (pilot realism studentShare). Own seeded draw: the sim's generator is untouched.
+  const student = spec.student ?? (spec.flightRules === 'VFR' && perf.category === 'light' && seeded01(ac.seed, 'student') < ctx.pilotBehaviour.realism.studentShare);
+  if (student) ac.student = true;
+  if (ctx.pilotBehaviour.realism.level !== 'off') ac.flags.inContact = false;
   const rt = newRuntime(now + 2 + rng() * 4);
   ctx.runtime.set(id, rt);
   if (spec.flightPlan) {
@@ -341,7 +348,18 @@ export function applyPendingFrequencyChanges(ctx: SimContext): void {
   const now = ctx.state.clock.timeSec;
   for (const ac of Object.values(ctx.state.aircraft)) {
     const rt = getRuntime(ctx, ac);
+    // an aircraft that went to a wrong frequency finds its way back
+    if (rt.returnFreq && now >= rt.returnFreq.atSec && !rt.pendingFreq) {
+      const back = rt.returnFreq;
+      rt.returnFreq = undefined;
+      ac.frequencyMhz = back.mhz;
+      ac.frequencyId = back.id;
+      rt.checkInAtSec = now + 1 + ctx.rng() * 1.5;
+      emitEvent(ctx, { kind: 'HANDOFF', aircraftId: ac.id, callsign: ac.callsign, severity: 'info', speaker: 'SYSTEM', frequencyMhz: back.mhz, text: `${ac.callsign} found the right frequency again (${back.mhz.toFixed(3)})`, data: { returnedFromWrongFrequency: true } });
+    }
     if (!rt.pendingFreq || now < rt.pendingFreq.atSec) continue;
+    // A frequency read back wrongly: the pilot waits for the controller's confirmation (until the error is corrected or has been scored as missed).
+    if (rt.readbackError?.kind === 'CONTACT_FREQUENCY') continue;
     // exit instruction + "contact Ground": the frequency changes once the aircraft is clear of the runway (JO 7110.65 3-10-9)
     if (rt.pendingFreq.afterClear && (ac.phase === 'LANDING' || ac.phase === 'ROLLOUT' || ac.occupyingRunways.length > 0)) continue;
     const { mhz, id, silent } = rt.pendingFreq;
@@ -418,7 +436,7 @@ function towerVocabularyCalls(ctx: SimContext, ac: Aircraft, rt: ReturnType<type
   // 3. Line up and wait for more than 90 seconds (3-9-4 NOTE): the pilot asks for intentions; the timer restarts after the call.
   if (ac.onGround && ac.phase === 'LINE_UP_AND_WAIT' && rt.lineUp?.aligned && ac.groundSpeedKt < 1 && !rt.takeoffCleared && !rt.aborting) {
     rt.luawSinceSec ??= now;
-    if (now - rt.luawSinceSec >= LUAW_LIMIT_SEC && g) {
+    if (now - rt.luawSinceSec >= (ctx.pilotBehaviour.realism.level === 'off' ? LUAW_LIMIT_SEC : jitteredInterval(ctx, ac, 'luaw', LUAW_LIMIT_SEC * 1.125, rt.callSeq, LUAW_LIMIT_SEC)) && g) {
       rt.luawSinceSec = now;
       pilotSay(ctx, ac, luawIntentionsCall(ac, env, g.end.id), { request: 'DEPARTURE', luawTimeout: true });
       ac.pendingRequest = { kind: 'DEPARTURE', text: `in position runway ${g.end.id} for more than 90 seconds, say intentions`, sinceSec: now };
@@ -430,7 +448,7 @@ function towerVocabularyCalls(ctx: SimContext, ac: Aircraft, rt: ReturnType<type
   }
 
   // 4. A pilot who did not report the ATIS code and was not given the numbers asks for wind and altimeter.
-  if (!rt.haveNumbers && !rt.numbersRequested && ac.pendingRequest && now - ac.pendingRequest.sinceSec >= ctx.pilotBehaviour.numbersRequestAfterSec
+  if (!rt.haveNumbers && !rt.numbersRequested && ac.pendingRequest && now - ac.pendingRequest.sinceSec >= jitteredInterval(ctx, ac, 'numbers', ctx.pilotBehaviour.numbersRequestAfterSec)
     && (ac.pendingRequest.kind === 'DEPARTURE' || ac.pendingRequest.kind === 'LANDING')
     && frequencyByMhz(airport, ac.frequencyMhz)?.position === 'TWR' && pilotNeedsNumbers(ac, ctx.pilotBehaviour.noAtisFraction)) {
     rt.numbersRequested = true;
@@ -440,6 +458,19 @@ function towerVocabularyCalls(ctx: SimContext, ac: Aircraft, rt: ReturnType<type
     return true;
   }
   return false;
+}
+
+/**
+ * A practising light-aircraft pilot who made a full stop in the pattern asks Ground to taxi back for another departure (realism request
+ * TAXI_BACK, seeded per aircraft). Returns the runway end, and makes the aircraft a departure again so that the taxi instruction to the runway is valid.
+ */
+function wantsTaxiBack(ctx: SimContext, ac: Aircraft, rt: ReturnType<typeof getRuntime>): string | undefined {
+  const rate = ctx.pilotBehaviour.realism.requests.TAXI_BACK;
+  if (rate <= 0 || rt.requestsDone.has('TAXI_BACK') || !ac.onGround || ac.flightRules !== 'VFR' || perfOf(ac).category !== 'light' || rt.landingOp === 'touch_and_go') return undefined;
+  if (seeded01(ac.seed, 'req:TAXI_BACK') >= rate || !ac.assignedRunwayEnd) return undefined;
+  rt.requestsDone.add('TAXI_BACK');
+  ac.isDeparture = true;
+  return ac.assignedRunwayEnd;
 }
 
 export function updatePilotRequests(ctx: SimContext): void {
@@ -457,12 +488,14 @@ export function updatePilotRequests(ctx: SimContext): void {
       emitEvent(ctx, {
         kind: 'READBACK_ERROR', aircraftId: ac.id, callsign: ac.callsign, severity: 'warning', speaker: 'SYSTEM',
         text: `Missed readback error from ${ac.callsign}: said "${rt.readbackError.spoken}", should be "${rt.readbackError.correct}"`,
-        data: { missed: true, correct: rt.readbackError.correct, spoken: rt.readbackError.spoken },
+        data: { missed: true, correct: rt.readbackError.correct, spoken: rt.readbackError.spoken, errorKind: rt.readbackError.errorKind, clearanceId: rt.readbackError.clearanceId, byPosition: rt.readbackError.byPosition },
       });
+      const missed = rt.readbackError;
       rt.readbackError = undefined;
       ac.flags.readbackErrorPending = false;
       ac.flags.readbackErrorClearanceId = undefined;
       if (ac.radioState === 'WAITING_FOR_READBACK') ac.radioState = 'IDLE';
+      flyMisread(ctx, ac, missed); // nobody corrected it: the aircraft does what it read back
     }
 
     if (ac.radioState === 'TRANSMITTING') continue;
@@ -480,6 +513,7 @@ export function updatePilotRequests(ctx: SimContext): void {
     if (specialPilotCalls(ctx, ac, rt, env)) continue;
 
     if (towerVocabularyCalls(ctx, ac, rt, env)) continue;
+    if (pilotInitiatedRequest(ctx, ac, rt)) continue;
 
     // Track standing still.
     if (ac.onGround && ac.groundSpeedKt < 0.1) rt.stillSince = rt.stillSince ?? now;
@@ -499,7 +533,7 @@ export function updatePilotRequests(ctx: SimContext): void {
         }
         continue;
       }
-      if (rt.taxiRequestAtSec === undefined || now < rt.taxiRequestAtSec) continue;
+      if (rt.taxiRequestAtSec === undefined || now < rt.taxiRequestAtSec || rt.readbackError?.kind === 'IFR_CLEARANCE') continue; // a faulty clearance readback is corrected first
       const gnd = frequencyForPosition(airport, 'GND');
       if (gnd && !sameFrequency(ac.frequencyMhz, gnd.mhz)) {
         ac.frequencyMhz = gnd.mhz;
@@ -527,9 +561,11 @@ export function updatePilotRequests(ctx: SimContext): void {
     // 1a. Airliner at its gate: asks for pushback first (and again if it is not approved).
     if (ac.phase === 'PARKED' && ac.isDeparture && rt.needsPushback && !rt.pushedBack) {
       const asked = rt.pushbackAskedAtSec;
-      if ((asked === undefined && now >= rt.firstCallAtSec) || (asked !== undefined && !ac.pendingRequest && now - asked >= gb.pushbackRepeatAfterSec)
-        || (asked !== undefined && ac.pendingRequest?.kind === 'PUSHBACK' && now - asked >= gb.pushbackRepeatAfterSec)) {
+      const repeatAfter = jitteredInterval(ctx, ac, 'pushback-repeat', gb.pushbackRepeatAfterSec * (1 + 0.5 * Math.min(4, Math.max(0, (rt.pushbackAsks ?? 1) - 1))), rt.pushbackAsks ?? 0) // asks again less and less often when nobody answers;
+      if ((asked === undefined && now >= rt.firstCallAtSec) || (asked !== undefined && !ac.pendingRequest && now - asked >= repeatAfter)
+        || (asked !== undefined && ac.pendingRequest?.kind === 'PUSHBACK' && now - asked >= repeatAfter)) {
         rt.pushbackAskedAtSec = now;
+        rt.pushbackAsks = (rt.pushbackAsks ?? 0) + 1;
         const parking = airport.parking.find((p) => dist(p.pos, ac.pos) < 5);
         pilotSay(ctx, ac, pushbackRequestCall(ac, env, parking, { atisLetter, repeat: asked !== undefined }), { request: 'PUSHBACK' });
         ac.pendingRequest = { kind: 'PUSHBACK', text: 'request pushback', sinceSec: now };
@@ -548,7 +584,7 @@ export function updatePilotRequests(ctx: SimContext): void {
         if (now >= rt.readyAtSec && !rt.calls.has('readyToTaxi')) {
           rt.calls.add('readyToTaxi');
           const parking = airport.parking.find((p) => dist(p.pos, pb.from) < 5);
-          const progressive = pilotUnfamiliar(ac, gb.unfamiliarFraction);
+          const progressive = pilotUnfamiliar(ac, gb.unfamiliarFraction, ctx.pilotBehaviour.realism.progressiveTaxiRate);
           rt.progressive = progressive;
           pilotSay(ctx, ac, readyToTaxiCall(ac, env, parking, { atisLetter, pushedBack: true, progressive }), { request: 'TAXI' });
           setPhase(ctx, ac, 'READY', 'engines started');
@@ -564,7 +600,7 @@ export function updatePilotRequests(ctx: SimContext): void {
       if (now >= rt.firstCallAtSec + lo + (hi - lo) * seeded01(ac.seed, 'ga-start')) {
         rt.calls.add('readyToTaxi');
         const parking = airport.parking.find((p) => dist(p.pos, ac.pos) < 5);
-        const progressive = pilotUnfamiliar(ac, gb.unfamiliarFraction);
+        const progressive = pilotUnfamiliar(ac, gb.unfamiliarFraction, ctx.pilotBehaviour.realism.progressiveTaxiRate);
         rt.progressive = progressive;
         pilotSay(ctx, ac, readyToTaxiCall(ac, env, parking, { atisLetter, progressive }), { request: 'TAXI' });
         setPhase(ctx, ac, 'READY');
@@ -721,10 +757,14 @@ export function updatePilotRequests(ctx: SimContext): void {
         } else {
           const taxiway = ac.route ? airport.taxiwayGraph.nodes[ac.route.nodeIds[ac.route.nodeIds.length - 1]].taxiways[0] : undefined;
           const onGround = frequencyByMhz(airport, ac.frequencyMhz)?.position === 'GND';
-          pilotSay(ctx, ac, ac.flags.training ? trainingClearCall(ac, env, taxiway) : clearOfRunwayCall(ac, env, g.end.id, taxiway) + (onGround ? ' Request taxi to parking.' : ''), { request: onGround ? 'TAXI' : 'FREQUENCY_CHANGE' });
-          ac.pendingRequest = onGround
-            ? { kind: 'TAXI', text: 'request taxi to parking', sinceSec: now }
-            : { kind: 'FREQUENCY_CHANGE', text: 'clear of runway, request frequency change', sinceSec: now };
+          const taxiBackEnd = onGround && !ac.flags.training ? wantsTaxiBack(ctx, ac, rt) : undefined;
+          pilotSay(ctx, ac, ac.flags.training ? trainingClearCall(ac, env, taxiway) : clearOfRunwayCall(ac, env, g.end.id, taxiway) + (taxiBackEnd ? ` Request taxi back to runway ${spokenRunway(taxiBackEnd)} for departure.` : onGround ? ' Request taxi to parking.' : ''), { request: onGround ? 'TAXI' : 'FREQUENCY_CHANGE' });
+          if (taxiBackEnd) ac.pendingRequest = { kind: 'TAXI', request: 'TAXI_BACK', runwayEnd: taxiBackEnd, text: `request taxi back to runway ${taxiBackEnd} for departure`, sinceSec: now };
+          else {
+            ac.pendingRequest = onGround
+              ? { kind: 'TAXI', text: 'request taxi to parking', sinceSec: now }
+              : { kind: 'FREQUENCY_CHANGE', text: 'clear of runway, request frequency change', sinceSec: now };
+          }
         }
         continue;
       }
@@ -771,8 +811,10 @@ export function updatePilotRequests(ctx: SimContext): void {
       }
       const wantsTaxi = ac.onGround && ac.phase === 'RUNWAY_EXIT' && pos === 'GND';
       const taxiway = ac.onGround && ac.route ? graph.nodes[ac.route.nodeIds[ac.route.nodeIds.length - 1]]?.taxiways[0] : undefined;
-      pilotSay(ctx, ac, checkInCall(ac, env, { taxiway, wantsTaxiToParking: wantsTaxi }), { checkIn: true });
-      if (wantsTaxi) ac.pendingRequest = { kind: 'TAXI', text: 'request taxi to parking', sinceSec: now };
+      const taxiBackEnd = wantsTaxi ? wantsTaxiBack(ctx, ac, rt) : undefined;
+      pilotSay(ctx, ac, checkInCall(ac, env, { taxiway, wantsTaxiToParking: wantsTaxi, taxiBackRunway: taxiBackEnd }), { checkIn: true });
+      if (taxiBackEnd) ac.pendingRequest = { kind: 'TAXI', request: 'TAXI_BACK', runwayEnd: taxiBackEnd, text: `request taxi back to runway ${taxiBackEnd} for departure`, sinceSec: now };
+      else if (wantsTaxi) ac.pendingRequest = { kind: 'TAXI', text: 'request taxi to parking', sinceSec: now };
       continue;
     }
   }

@@ -6,6 +6,8 @@ import { CAREER_SCENARIOS } from './career';
 import { TRAINING_SCENARIOS } from './training';
 import { buildFreePlay } from './freeplay';
 import type { ScenarioDef } from './common';
+import { realismForDifficulty } from '../../sim/pilotBehaviour';
+import type { PilotRealismLevel } from '../../sim/pilotBehaviour';
 
 type Start = NonNullable<FreePlayOptions['startingScenario']>;
 
@@ -68,11 +70,27 @@ export function defaultPlayerPositions(id: string): ControllerPositionId[] | und
   return p ? [...p] : undefined;
 }
 
+/** Career: steps 1-4 light, 5-8 moderate, 9-12 heavy (the catalogue has 12 steps). */
+export function careerRealism(step: number | undefined): PilotRealismLevel {
+  const s = step ?? 1;
+  return s <= 4 ? 'light' : s <= 8 ? 'moderate' : 'heavy';
+}
+
+/** Pilot realism of a catalogue scenario that does not set it: training lessons off, career by step, anything else from its Difficulty (easy light, normal moderate, hard heavy). */
+function realismFor(mode: GameScenario['mode'], careerStep: number | undefined, difficulty: GameScenario['difficulty']): PilotRealismLevel {
+  if (mode === 'training') return 'off';
+  if (mode === 'career') return careerRealism(careerStep);
+  return realismForDifficulty(difficulty);
+}
+
 export function buildCatalogueScenario(id: string, airport: Airport, options?: FreePlayOptions): GameScenario {
   const d = findScenarioDef(id);
   if (!d) throw new Error(`Unknown scenario "${id}"`);
   if (d.summary.airports && !d.summary.airports.includes(airport.icao)) throw new Error(`Scenario "${id}" is authored for ${d.summary.airports.join(', ')} only, not ${airport.icao}`);
   const sc = d.build(airport, options);
+  // career steps always ramp (step 11 is built on the free-play builder, whose default is moderate); a lesson may opt in to realism itself
+  if (d.summary.mode === 'career') sc.pilotRealism = careerRealism(d.summary.careerStep);
+  else sc.pilotRealism ??= realismFor(d.summary.mode, d.summary.careerStep, sc.difficulty);
   // Explicit option wins; otherwise a career/training scenario defaults to the position it is about (free play: all positions).
   const wanted = options?.playerPositions?.length ? [...new Set(options.playerPositions)] : d.summary.mode === 'free_play' ? undefined : defaultPlayerPositions(id);
   if (wanted) sc.playerPositions = wanted;

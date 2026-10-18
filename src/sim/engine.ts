@@ -11,6 +11,7 @@ import type {
 import { mulberry32 } from './rng';
 import { resolvePilotBehaviour } from './pilotBehaviour';
 import { emitEvent } from './context';
+import { flushScheduledSpeech } from './radioDiscipline';
 import { setSimulationEpoch } from './solar';
 import type { SimContext } from './context';
 import { executeCommand, validateCommand } from './commandExecutor';
@@ -60,6 +61,7 @@ const MAX_STEPS_PER_ADVANCE = 2000;
 export function createEngine(opts: EngineOptionsExt): SimulationEngine & SimulationEngineExtras {
   const { airport, scenario } = opts;
   const dt = opts.dtSec ?? 0.1;
+  const pilotBehaviour = resolvePilotBehaviour(scenario.pilotBehaviour, scenario.mode, scenario.pilotRealism);
   const rng = mulberry32(scenario.seed);
   const controllerPosition: ControllerPositionId = scenario.controllerPositions[0] ?? 'TWR';
   const weather: Weather = scenario.weather === 'live' ? { ...DEFAULT_WEATHER } : { ...scenario.weather };
@@ -95,11 +97,16 @@ export function createEngine(opts: EngineOptionsExt): SimulationEngine & Simulat
   setSimulationEpoch(state, opts.utcStartMs ?? Date.now());
   const ctx: SimContext = {
     state,
-    pilotBehaviour: resolvePilotBehaviour(scenario.pilotBehaviour, scenario.mode),
+    pilotBehaviour,
     rng,
     runtime: new Map(),
     onPilotTransmission: opts.onPilotTransmission,
-    readbackErrorRate: opts.readbackErrorRate ?? (scenario.mode === 'training' ? 0 : 0.08),
+    readbackErrorRate: opts.readbackErrorRate ?? (scenario.pilotRealism ? (pilotBehaviour.realism.level === 'off' ? 0 : pilotBehaviour.realism.digitErrorRate) : scenario.mode === 'training' ? 0 : 0.08),
+    scheduledSpeech: [],
+    speechSeq: 0,
+    frequencyUse: new Map(),
+    frequencyReserved: new Map(),
+    answerWindow: new Map(),
     eventSeq: 0,
     clearanceSeq: 0,
     aircraftSeq: 0,
@@ -131,6 +138,7 @@ export function createEngine(opts: EngineOptionsExt): SimulationEngine & Simulat
     processScheduledSpawns(ctx);
     for (const spec of generator.update(state)) spawnFromSpec(ctx, spec);
     applyPendingFrequencyChanges(ctx);
+    flushScheduledSpeech(ctx);
     updatePilotRequests(ctx);
     enforceClosuresOnRoutes(ctx);
     updateGroundMovement(ctx, dt);

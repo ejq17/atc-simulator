@@ -221,6 +221,15 @@ realised -> released, and everything the shared normaliser already fixes (NATO l
 * Conditional clauses ("behind the landing traffic", "after departure") are not modelled; their words show up as `unrecognised words`.
 * Two-letter taxiway names and runway designators with parallel suffixes are only lightly supported.
 
+## Pilot realism additions
+
+* `callsign.ts`: `AircraftRef.contacted` (set from `Aircraft.flags.inContact`, only with pilot realism): an abbreviated civil callsign ("three echo juliet", at least three characters, the
+  existing suffix rule) for an aircraft that has not called yet scores 0.25 lower and is not accepted (AIM 4-2-4: abbreviate only after communications are established). `CallsignResolution.abbreviated`
+  and `ParsedCommand.callsignAbbreviated` tell the engine that the controller abbreviated, so the pilot may too.
+* `ParsedCommand.groupSize`: the number of instructions in the transmission (set for multi-instruction transmissions); long ones draw "say again" at higher pilot realism.
+* New commands: `DID_YOU_COPY` ("did you copy", "do you copy", "how do you hear me"; the controller calls an aircraft that did not answer) and `UNABLE` ("unable", "request denied", "not approved"; swallows the rest
+  of the transmission, so "unable, traffic on the runway" is not read as instructions). Neither is an FAA phraseology item; they are plain controller language.
+
 ## Traffic variety grammar (`rules-special.ts`)
 
 `ruleAirTaxi` ("air taxi via alpha to the Coast Guard ramp", "hover taxi to Coast Guard helipad three"), `makeProceedRule` ("proceed on runway one three, report runway inspection complete" = PROCEED, "proceed on the taxiways", "proceed to runway ... via ..." = the taxi rule), `ruleHeliTakeoff` ("[pad,] make right turn for southeast departure, cleared for takeoff [from present position]"), `ruleHeliLand` ("make straight-in approach to Coast Guard helipad two, cleared to land"), `ruleOverhead` ("runway N, wind ..., pattern altitude N, right turns, report initial", "break at midfield, report break"), `ruleTrafficDirection` ("make right traffic", 3-10-1). Callsigns: "Coast Guard" and "Air Guard" are two-word telephony (`lexicon.ts` PHRASES) followed by 5 digits; "Airport <n> vehicle" (the word "airport" is a callsign only before a number); "flight of two / three / four" is dropped. "Proceed as requested" is deliberately not parsed (3-1-5 NOTE). Tests: `special.test.ts`.

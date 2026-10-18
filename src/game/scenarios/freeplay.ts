@@ -8,6 +8,8 @@
  *  aircraftCount    initial aircraft: parked departures + inbound arrivals that do not conflict at spawn.
  *  arrivalsPerHour / departuresPerHour / gaFraction / maxAircraft   continuous traffic (see ../traffic.ts).
  *  difficulty       easy | normal | hard: default rates, max aircraft and the intensity ramp over time.
+ *  pilotRealism     off | light | moderate | heavy (default moderate): readback errors, response timing, blocked calls, callsign habits, students and
+ *                   pilot requests (src/sim/pilotBehaviour.ts). Career steps override it (ramp), training lessons are off.
  *  aircraftTypes    subset of the airport's traffic types (airportProfile.ts; 'C172' stands for GA). Default: KACY ['C172', 'A320']; KMHT adds
  *                   B738, BCS3, E175, CRJ9, B752 and C208. A selection that allows nothing at the airport means "everything".
  *  startingScenario quiet | busy_departures | busy_arrivals | mixed: initial mix and default rates.
@@ -128,6 +130,7 @@ export function buildFreePlay(airport: Airport, options: FreePlayOptions = {}, i
     spawns,
     traffic: { enabled: true, arrivalsPerHour, departuresPerHour, gaFraction, maxAircraft },
     difficulty,
+    pilotRealism: options.pilotRealism ?? 'moderate',
     aircraftTypes: types,
     ...(options.specialTraffic ? { specialTraffic: { ...options.specialTraffic } } : {}),
     ...(options.ifrFlows !== undefined ? { ifrFlows: options.ifrFlows } : {}),

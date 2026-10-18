@@ -19,6 +19,7 @@ import { createGroundAgent } from './ground';
 import { createTowerAgent } from './tower';
 import { createApproachAgent, createDepartureAgent } from './approach';
 import { correctionAgent } from './corrections';
+import { requestAgent } from './requests';
 import { createSpecialAgent } from './special';
 import { coordinationAgent } from './coordination';
 
@@ -85,7 +86,7 @@ export function createAiControllers(opts: AiControllerOptions): AiControllers {
     const sharer = opts.playerPositions.find((pp) => freqsOf(airport, pp).some((f) => all.some((m) => sameMhz(f.mhz, m))));
     return {
       position,
-      agent: (v) => [...correctionAgent(v), ...coordinationAgent(v), ...agents[position](v)],
+      agent: (v) => [...correctionAgent(v), ...coordinationAgent(v), ...requestAgent(v), ...agents[position](v)],
       mem: newMemory(),
       usableMhz: usable,
       covered: usable.length === 0 && all.length > 0 ? `covered by the player's ${sharer ?? 'position'} (shared frequency)` : undefined,
@@ -143,7 +144,9 @@ export function createAiControllers(opts: AiControllerOptions): AiControllers {
     }
     const spoken = plan.phrase.spoken;
     const norm = spoken.toLowerCase().replace(/[,.]/g, '').replace(/\s+/g, ' ').trim();
-    const cmds = plan.cmds.map((c) => ({ ...c, rawText: spoken, normalizedText: norm, confidence: 1, issues: [] as string[] }));
+    // A pilot who asked to "say again" a long transmission hears it repeated slowly (no size mark), so it cannot be refused again.
+    const slow = rt.mem.notes.has(`slow:${plan.key}`);
+    const cmds = plan.cmds.map((c) => ({ ...c, rawText: spoken, normalizedText: norm, confidence: 1, issues: [] as string[], ...(plan.cmds.length > 1 && !slow ? { groupSize: plan.cmds.length } : {}) }));
     const tx: AiTransmission = {
       position: rt.position, frequencyMhz: ac.frequencyMhz, text: plan.phrase.text, spokenText: spoken,
       callsign: ac.callsign, timeSec: t, voiceId: VOICE[rt.position],
@@ -156,6 +159,7 @@ export function createAiControllers(opts: AiControllerOptions): AiControllers {
       const out = engine.applyCommand(cmds[i], o);
       if (out.status !== 'accepted') {
         accepted = false;
+        if (out.status === 'clarify' && cmds.length > 1) rt.mem.notes.set(`slow:${plan.key}`, t);
         break;
       }
     }

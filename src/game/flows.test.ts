@@ -10,7 +10,8 @@ import { accepted, run, runUntil, say } from './testkit';
 const airport = loadKacy();
 
 function start(id: string): SimulationEngine {
-  const sc = game.buildScenario(id, airport);
+  // These flows script exact calls: clean pilots (pilot realism has its own tests; every career step is built with it by default).
+  const sc = { ...game.buildScenario(id, airport), pilotRealism: 'off' as const };
   return createEngine({ airport, scenario: sc, readbackErrorRate: 0, trafficGenerator: game.createTrafficGenerator(sc, airport) });
 }
 const ac = (e: SimulationEngine, cs: string) => Object.values(e.getState().aircraft).find((a) => a.callsign === cs)!;

@@ -11,7 +11,7 @@ import {
   ruleApproach, ruleDirectFix, ruleIfrClearance, rulePosition, ruleRadarContact, ruleResumeNav,
 } from './rules-ifr';
 import {
-  ruleContact, ruleFiller, ruleRoute, ruleRunwayRef, ruleSayAgain, ruleUnsupported, ruleWind,
+  ruleContact, ruleDidYouCopy, ruleFiller, ruleRoute, ruleRunwayRef, ruleSayAgain, ruleUnable, ruleUnsupported, ruleWind,
 } from './rules-misc';
 import { ruleContinue, ruleGoAround, ruleLand, rulePushback, ruleTakeoff } from './rules-tower';
 import { ruleBirdAdvisory, ruleBrakingAdvisory, ruleRunwayLights, ruleRvr, ruleStar } from './rules-airport';
@@ -45,7 +45,7 @@ export function buildRules(ctx: Pick<ParseContext, 'fixes' | 'taxiways' | 'runwa
   const taxiRule = makeTaxiRule(ctx.taxiways, ctx.runwayEnds);
   return [
     ruleAirTaxi, makeProceedRule(taxiRule), ruleHeliTakeoff, ruleHeliLand, ruleOverhead, ruleTrafficDirection,
-    ruleAirportInfo, ruleWind, ruleSayAgain, ruleBirdAdvisory, ruleBrakingAdvisory, ruleRvr, ruleRunwayLights, ruleStar(ctx.arrivals ?? [], fixes), ruleTaxiIntoPosition, withLuawTraffic(ruleLineUp), ruleCancelTakeoff, ruleRadarServiceTerminated, ruleFrequencyApproved, ruleSquawk,
+    ruleAirportInfo, ruleWind, ruleDidYouCopy, ruleSayAgain, ruleUnable, ruleBirdAdvisory, ruleBrakingAdvisory, ruleRvr, ruleRunwayLights, ruleStar(ctx.arrivals ?? [], fixes), ruleTaxiIntoPosition, withLuawTraffic(ruleLineUp), ruleCancelTakeoff, ruleRadarServiceTerminated, ruleFrequencyApproved, ruleSquawk,
     ruleExitRunway, rulePatternInstruction, ruleReportPosition, ruleFollowTraffic, ruleTrafficAdvisory, ruleTakeoff, ruleLand, ruleHoldAtFix(fixes),
     ruleMissedApproach, ruleGoAround, rulePushback, ruleReadBackHold, ruleContinueSegment, ruleRadarContact(fixes), ruleResumeNav, makeClearedToParkingRule(ctx.taxiways, ctx.runwayEnds), ruleApproach, ruleDirectFix(fixes),
     ruleIfrClearance, ruleContact, makeHoldShortRule(ctx.runwayEnds), ruleHoldPosition, ruleCancel, ruleCross, makeContinueTaxiRule(ctx.taxiways, ctx.runwayEnds), makeTaxiRule(ctx.taxiways, ctx.runwayEnds),

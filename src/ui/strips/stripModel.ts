@@ -164,6 +164,8 @@ export interface StripFields {
   /** "C172/G": type and assumed equipment suffix. */
   typeEquip: string;
   flightRules: 'IFR' | 'VFR';
+  /** Flown by a student pilot (marker on the strip). */
+  student?: boolean;
   squawk?: string;
   origin: string;
   destination: string;
@@ -219,6 +221,7 @@ export function stripFieldsOf(ac: Aircraft): StripFields {
     callsign: ac.callsign,
     typeEquip: suffix ? `${ac.type}/${suffix}` : ac.type,
     flightRules: ac.flightRules,
+    ...(ac.student ? { student: true } : {}),
     squawk: ac.squawk ?? ac.flightPlan?.squawk,
     origin: ac.origin,
     destination: ac.destination,

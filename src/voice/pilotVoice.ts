@@ -28,6 +28,8 @@ export function createPilotVoice(options: PilotVoiceOptions): TransmissionQueue 
   const syncRadio = () => radio?.setEnabled(settings.get().radioEffectsEnabled);
   syncRadio();
 
+  let blockedTimer: ReturnType<typeof setTimeout> | null = null;
+
   const requestFor = (item: QueuedTransmission) => {
     const s = settings.get();
     return {
@@ -50,6 +52,16 @@ export function createPilotVoice(options: PilotVoiceOptions): TransmissionQueue 
       keysItself: () => tts.keysOnStart?.() ?? false,
       speak(item, keyUp) {
         if (!settings.get().ttsEnabled) return Promise.resolve();
+        if (item.kind === 'blocked') {
+          // two transmitters at once: no speech, a squeal through the radio chain (WebAudio only)
+          const sec = radio?.playBlocked() ?? 0;
+          return new Promise<void>((resolve) => {
+            blockedTimer = setTimeout(() => {
+              blockedTimer = null;
+              resolve();
+            }, sec * 1000);
+          });
+        }
         return tts.speak({
           ...requestFor(item),
           onKeyUp: keyUp,
@@ -57,9 +69,13 @@ export function createPilotVoice(options: PilotVoiceOptions): TransmissionQueue 
           onEnd: () => options.onSpeaking?.(false, item),
         });
       },
-      cancel: () => tts.cancel(),
+      cancel: () => {
+        if (blockedTimer) clearTimeout(blockedTimer);
+        blockedTimer = null;
+        tts.cancel();
+      },
       prepare: (item) => {
-        if (settings.get().ttsEnabled) tts.prepare?.(requestFor(item));
+        if (settings.get().ttsEnabled && item.kind !== 'blocked') tts.prepare?.(requestFor(item));
       },
     },
   });

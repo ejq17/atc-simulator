@@ -20,6 +20,11 @@ export interface RadioEffects {
   setMasterVolume(volume: number): void;
   playPttOpen(): void;
   playPttClose(): void;
+  /**
+   * Two transmitters keyed together: a heterodyne squeal (two close tones beating, gliding up) over a burst of noise, through the radio chain.
+   * WebAudio only. Returns the duration in seconds (0 when audio is unavailable or off).
+   */
+  playBlocked(): number;
   /** A short two-tone ring for a landline call between positions (WebAudio only, no file). */
   playLandline(): void;
   startStatic(): void;
@@ -42,6 +47,9 @@ export interface RadioEffectsOptions {
 function defaultFactory(): AudioContext | null {
   return getSharedAudioContext();
 }
+
+/** Length of the blocked-transmission squeal (matches `BLOCKED_SQUEAL_SEC` in the engine, src/sim/radioDiscipline.ts). */
+const BLOCKED_SQUEAL_SEC = 1.4;
 
 function distortionCurve(amount: number): Float32Array<ArrayBuffer> {
   const n = 1024;
@@ -194,6 +202,33 @@ export function createRadioEffects(options: RadioEffectsOptions = {}): RadioEffe
       const t = c.currentTime;
       tick(c, t, 900, 0.014, 0.4);
       noiseBurst(c, t + 0.008, 0.11, 0.45); // squelch tail
+    },
+    playBlocked() {
+      const c = ready();
+      if (!c || !chainIn) return 0;
+      const t = c.currentTime;
+      const dur = BLOCKED_SQUEAL_SEC;
+      const env = c.createGain();
+      env.gain.setValueAtTime(0, t);
+      env.gain.linearRampToValueAtTime(0.5, t + 0.03);
+      env.gain.setValueAtTime(0.5, t + dur - 0.15);
+      env.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+      env.connect(chainIn);
+      // two carriers a few tens of Hz apart: the beat is the familiar "eeeee" of two stations talking over each other
+      for (const [from, to, type] of [[950, 1250, 'sawtooth'], [985, 1310, 'square']] as const) {
+        const osc = c.createOscillator();
+        osc.type = type;
+        osc.frequency.setValueAtTime(from, t);
+        osc.frequency.linearRampToValueAtTime(to, t + dur);
+        const g = c.createGain();
+        g.gain.value = 0.5;
+        osc.connect(g);
+        g.connect(env);
+        osc.start(t);
+        osc.stop(t + dur + 0.02);
+      }
+      noiseBurst(c, t, dur, 0.25);
+      return dur;
     },
     playLandline() {
       const c = ready();

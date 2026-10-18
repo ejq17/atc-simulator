@@ -31,6 +31,8 @@ export interface FreePlayOptions {
   gaFraction?: number;                         // 0..1
   maxAircraft?: number;
   difficulty?: 'easy' | 'normal' | 'hard';
+  /** How imperfect the pilots are: off / light / moderate / heavy (src/sim/pilotBehaviour.ts). Free play only (career steps ramp with the step, training lessons are off); default moderate. */
+  pilotRealism?: import('../sim/pilotBehaviour').PilotRealismLevel;
   aircraftTypes?: string[];                    // e.g. ['C172','A320']
   /** Special traffic kinds (Coast Guard helicopters, ANG fighters, VFR transitions, flight training, airport vehicles): `scenario.specialTraffic`. Unset = none (the setup screen passes its checkboxes; its default is `defaultSpecialTraffic`). */
   specialTraffic?: Partial<import('./specialTraffic').SpecialTrafficSelection>;

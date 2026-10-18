@@ -250,6 +250,7 @@ export function createTowerAgent(): Agent {
         }
         continue;
       }
+      if (ac.pendingRequest?.request === 'NEED_MINUTE') continue; // "we need a minute": the pilot calls ready again
       const ready = ac.pendingRequest?.kind === 'DEPARTURE' || v.settled(ac) >= 8 || lined;
       if (!ready) continue;
       const k = `hold:${ac.id}`;

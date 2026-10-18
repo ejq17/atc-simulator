@@ -445,6 +445,12 @@ export interface PendingRequest {
   kind: 'TAXI' | 'PUSHBACK' | 'DEPARTURE' | 'LANDING' | 'FREQUENCY_CHANGE' | 'CROSSING' | 'PATTERN' | 'IFR_CLEARANCE' | 'APPROACH' | 'OTHER';
   text: string;
   sinceSec: number;
+  /** Which pilot-initiated request this is (pilotBehaviour.ts `PilotRequestCode`), for the controller / AI to answer. */
+  request?: import('./pilotBehaviour').PilotRequestCode;
+  /** Fix named by the request (DIRECT_FIX). */
+  fix?: string;
+  /** Runway end named by the request (RUNWAY_CHANGE, TAXI_BACK). */
+  runwayEnd?: string;
   /** TAXI: the pilot asked for progressive taxi instructions (JO 7110.65 3-7-2; AIM 4-3-18). */
   progressive?: boolean;
 }
@@ -505,23 +511,31 @@ export interface Aircraft {
   lastGoAroundSec?: number;
   history: Vec2[];                 // recent positions for trails
   voiceId: string;                 // which synthetic pilot voice
-  flags: { emergency?: boolean; holdingPosition?: boolean; /** Flight-training pilot (touch-and-go circuits, then "taxi back"). */ training?: boolean; /** Touch-and-go circuits left including the one being flown (training pilots). */ circuits?: number; /** Helicopter: parking id of the pad it flies to / wants to air taxi to. */ padId?: string; /** Vehicle task in progress (vehicles.ts). */ vehicleTask?: string; /** Parking id a vehicle returns to. */ vehicleHome?: string; /** VFR transition through the Class C (special.ts). */ transit?: boolean; /** Overhead maneuver stage: the aircraft is not cleared to land before the break. */ overhead?: 'INBOUND' | 'INITIAL' | 'BROKE'; readbackErrorPending?: boolean; /** The clearance that was misread back (so a correction re-issues it, not a later companion command). */ readbackErrorClearanceId?: string };
+  flags: { /** Pilot realism: the pilot has made at least one call (communications established, AIM 4-2-4). Unset without realism. */ inContact?: boolean; emergency?: boolean; holdingPosition?: boolean; /** Flight-training pilot (touch-and-go circuits, then "taxi back"). */ training?: boolean; /** Touch-and-go circuits left including the one being flown (training pilots). */ circuits?: number; /** Helicopter: parking id of the pad it flies to / wants to air taxi to. */ padId?: string; /** Vehicle task in progress (vehicles.ts). */ vehicleTask?: string; /** Parking id a vehicle returns to. */ vehicleHome?: string; /** VFR transition through the Class C (special.ts). */ transit?: boolean; /** Overhead maneuver stage: the aircraft is not cleared to land before the break. */ overhead?: 'INBOUND' | 'INITIAL' | 'BROKE'; readbackErrorPending?: boolean; /** The clearance that was misread back (so a correction re-issues it, not a later companion command). */ readbackErrorClearanceId?: string; /** What kind of mistake the pending readback error is (`ReadbackError.kind`: runway, heading, altitude, frequency, squawk, taxiway, pattern, callsign, no_readback). */ readbackErrorKind?: string };
   seed: number;
   /** Formation flight of this many aircraft handled as ONE aircraft (JO 7110.65 2-1-13: "Control formation flights as a single aircraft"). Undefined = single ship. */
   formation?: { size: number };
+
+  /** Flown by a student pilot: slower, wordier, asks for progressive taxi, says "student pilot" on initial contact (AIM 4-2-4). Read by the ground task. */
+  student?: boolean;
 }
 
 // ---------------------------------------------------------------------------
 // Commands (output of the parser, input to the engine)
 // ---------------------------------------------------------------------------
 
-export type CommandKind = ClearanceKind | 'SAY_AGAIN' | 'READ_BACK_HOLD' | 'UNKNOWN';
+/** SAY_AGAIN: the controller asks the pilot to repeat. DID_YOU_COPY: the controller calls an aircraft that has not answered. UNABLE: the controller denies a pilot request. READ_BACK_HOLD: see the hold-short readback challenge. */
+export type CommandKind = ClearanceKind | 'SAY_AGAIN' | 'DID_YOU_COPY' | 'UNABLE' | 'READ_BACK_HOLD' | 'UNKNOWN';
 
 export interface ParsedCommand {
   kind: CommandKind;
   /** Callsign as resolved against the active aircraft list (null if not resolved). */
   callsign: string | null;
   callsignCandidates?: string[];   // when ambiguous
+  /** The controller addressed the aircraft by an abbreviated callsign (AIM 4-2-4: prefix and last three characters). */
+  callsignAbbreviated?: boolean;
+  /** Number of instructions in the transmission this command came from (long transmissions draw "say again"). */
+  groupSize?: number;
   runwayEnd?: string;
   runwayId?: string;
   route?: string[];
@@ -679,7 +693,7 @@ export type SimEventKind =
   | 'TRANSMISSION' | 'COMMAND_ACCEPTED' | 'COMMAND_REJECTED' | 'CLARIFICATION'
   | 'PHASE_CHANGE' | 'RUNWAY_ENTERED' | 'RUNWAY_EXITED' | 'RUNWAY_INCURSION'
   | 'CONFLICT' | 'SEPARATION_VIOLATION' | 'GO_AROUND' | 'SPAWN' | 'DESPAWN'
-  | 'HANDOFF' | 'READBACK_ERROR' | 'SCENARIO' | 'INFO'
+  | 'HANDOFF' | 'READBACK_ERROR' | 'SCENARIO' | 'INFO' | 'RADIO_BLOCKED'
   /** A message on the coordination channel between positions (src/sim/coordination.ts), or a coordination error (`data.error`). */
   | 'COORDINATION';
 
@@ -733,6 +747,8 @@ export interface ScenarioAircraftSpawn {
     | { kind: 'airborne'; pos: Vec2; altitudeFt: number; headingDeg: number; speedKt: number; runwayEnd?: string; distanceNm?: number }
     | { kind: 'at_fix'; fix: string; altitudeFt: number; speedKt: number; route: string[]; runwayEnd?: string; star?: { procedureId: string; transition?: string } };
   isDeparture: boolean;
+  /** Flown by a student pilot (forces it; otherwise a seeded share of light VFR aircraft at higher pilot realism). */
+  student?: boolean;
   initialFrequencyId: string;
   initialRequest?: PendingRequest['kind'];
   /** IFR flight plan (destination, cruise, requested route). Departures without one are VFR. */
@@ -768,6 +784,8 @@ export interface Scenario {
   playerPositions?: ControllerPositionId[];
   /** Design values for the simulated pilots (ATIS reporting, visual acquisition, follow spacing); see `pilotBehaviour.ts`. Defaults when absent. */
   pilotBehaviour?: import('./pilotBehaviour').PilotBehaviourOverride;
+  /** How imperfect the pilots are (readback errors, timing, blocked calls, callsign habits, students, requests): off / light / moderate / heavy. Absent = the pre-realism behaviour (digit errors only). See pilotBehaviour.ts. */
+  pilotRealism?: import('./pilotBehaviour').PilotRealismLevel;
   /**
    * Coordination rules between positions (src/sim/coordination.ts). `crossingApprovalRequired`: Ground needs Tower's approval for an active runway
    * (JO 7110.65 3-1-3); `releasesRequired`: Tower needs a release from Departure/Approach for an IFR departure (LOA concept, 4-3-4). Both default on;

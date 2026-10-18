@@ -102,7 +102,7 @@ export interface SessionParams {
 
 /** Created before the engine so `onPilotTransmission` can reach the session once it exists. */
 export interface PilotSink {
-  handler: ((t: { aircraftId: string; callsign: string; text: string; frequencyMhz: number; voiceId: string }) => void) | null;
+  handler: ((t: { aircraftId: string; callsign: string; text: string; frequencyMhz: number; voiceId: string; blocked?: boolean }) => void) | null;
 }
 
 export function createPilotSink(): { sink: PilotSink; onPilotTransmission: NonNullable<Parameters<typeof createEngine>[0]['onPilotTransmission']> } {
@@ -281,6 +281,12 @@ export function startSession(p: SessionParams): Session {
     const mine = isPlayerFrequency(t.frequencyMhz);
     // Inaudible unless it is on a frequency the player works (or they chose to monitor everything); the engine already logged the text.
     if (!mine && !voiceSettings.get().monitorAll) return;
+    if (t.blocked) {
+      // Decided by the engine (RADIO_BLOCKED): two pilots keyed up together. Text log "[blocked]", the voice layer plays a squeal.
+      transcript.add({ text: '[blocked]', source: 'pilot' });
+      pilots.enqueue({ text: '[blocked]', voiceId: t.voiceId, frequencyMhz: t.frequencyMhz, volume: volumeFor(t.frequencyMhz), speaker: '[blocked]', callsign: t.callsign, kind: 'blocked' });
+      return;
+    }
     transcript.add({ text: `${t.callsign}: ${t.text}`, source: 'pilot' });
     pilots.enqueue({
       text: t.text, voiceId: t.voiceId, frequencyMhz: t.frequencyMhz, volume: volumeFor(t.frequencyMhz), speaker: t.callsign,

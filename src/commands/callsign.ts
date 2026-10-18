@@ -2,7 +2,16 @@ import { GA_PREFIXES, N_PREFIX_WORDS } from './lexicon';
 import { editDistance } from './normalize';
 import type { Token } from './tokens';
 
-export interface AircraftRef { callsign: string; spokenCallsign: string; type: string }
+export interface AircraftRef {
+  callsign: string;
+  spokenCallsign: string;
+  type: string;
+  /**
+   * Has communication with the aircraft been established (the pilot has called)? Only then may ATC abbreviate a civil callsign to the prefix and the
+   * last three characters (AIM 4-2-4); an abbreviation for an aircraft known NOT to have called scores below the accept threshold. Unset = not tracked.
+   */
+  contacted?: boolean;
+}
 
 export interface CallsignCandidate { callsign: string; score: number }
 
@@ -14,6 +23,8 @@ export interface CallsignResolution {
   /** Ranked candidates (score > 0.3). */
   candidates: CallsignCandidate[];
   ambiguous: boolean;
+  /** The controller used an abbreviated civil callsign (shorter than the full registration) for the resolved aircraft. */
+  abbreviated: boolean;
   /** A callsign-shaped phrase was found in the text. */
   mentioned: boolean;
   /** Token range [start, end) of the chosen mention. */
@@ -132,6 +143,7 @@ function scoreMention(m: Mention, ac: AircraftRef): number {
     else if (m.id.length >= 3 && m.id.length <= full.length && hamming(m.id, full.slice(-m.id.length)) === 1) s = m.id.length >= 4 ? 0.6 : 0.5;
     else if (m.id.length < 3 && full.endsWith(m.id)) s = 0.4;
     if (s > 0) s += prefixAdjust(m, ac);
+    if (s > 0 && m.id.length < full.length && ac.contacted === false) s -= 0.25; // AIM 4-2-4: no abbreviation before communications are established
   } else if (airline && m.airline) {
     if (m.airline !== airline[1]) s = 0;
     else if (m.id === airline[2]) s = 1;
@@ -181,7 +193,7 @@ function rank(m: Mention, aircraft: readonly AircraftRef[]): CallsignCandidate[]
 export function resolveCallsign(tokens: readonly Token[], aircraft: readonly AircraftRef[]): CallsignResolution {
   const mentions = findMentions(tokens);
   const empty: CallsignResolution = {
-    callsign: null, score: 0, candidates: [], ambiguous: false, mentioned: false,
+    callsign: null, score: 0, candidates: [], ambiguous: false, mentioned: false, abbreviated: false,
     span: null, otherCallsigns: [], issues: ['missing callsign'],
   };
   if (mentions.length === 0) return empty;
@@ -193,7 +205,7 @@ export function resolveCallsign(tokens: readonly Token[], aircraft: readonly Air
   const second = cands[1];
   const span = { start: m.start, end: m.end };
   const spoken = tokens.slice(m.start, m.end).map((t) => t.text).join(' ');
-  const base = { candidates: cands, mentioned: true, span, otherCallsigns: [] as string[] };
+  const base = { candidates: cands, mentioned: true, abbreviated: false, span, otherCallsigns: [] as string[] };
 
   if (!best) return { ...base, callsign: null, score: 0, ambiguous: false, issues: [`callsign not recognised: "${spoken}"`] };
 
@@ -212,5 +224,7 @@ export function resolveCallsign(tokens: readonly Token[], aircraft: readonly Air
     return { ...base, callsign: null, score: best.score, ambiguous: true,
       issues: [`ambiguous callsign: ${names.join(', ')}`] };
   }
-  return { ...base, callsign: best.callsign, score: best.score, ambiguous: false, issues: [] };
+  const reg = /^N(\d{1,5}[A-Z]{0,2})$/.exec(best.callsign.toUpperCase())?.[1];
+  const abbreviated = !!reg && !m.airline && m.id.length < reg.length;
+  return { ...base, callsign: best.callsign, score: best.score, ambiguous: false, abbreviated, issues: [] };
 }

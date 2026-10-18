@@ -70,7 +70,7 @@ describe('session', () => {
 
   it('scripted pilot calls reach the event log', () => {
     const { engine } = build('career-01-first-radio');
-    for (let i = 0; i < 100; i++) engine.step();
+    for (let i = 0; i < 400; i++) engine.step(); // the pilot keys up after a short seeded reaction time
     expect(engine.getState().events.some((e) => e.speaker === 'PILOT')).toBe(true);
   });
 });

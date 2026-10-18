@@ -11,7 +11,7 @@ import { accepted, run, runUntil, say } from './testkit';
 const airport = loadKacy();
 
 function start(id: string) {
-  const sc = game.buildScenario(id, airport);
+  const sc = { ...game.buildScenario(id, airport), pilotRealism: 'off' as const }; // scripted answers: clean pilots
   const engine = createEngine({ airport, scenario: sc, readbackErrorRate: 0, trafficGenerator: game.createTrafficGenerator(sc, airport) });
   return { sc, engine };
 }

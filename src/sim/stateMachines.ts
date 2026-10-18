@@ -28,7 +28,7 @@ export const ALLOWED_TRANSITIONS: Readonly<Record<FlightPhase, readonly FlightPh
   FINAL: ['LANDING', 'GO_AROUND', 'APPROACH'],
   LANDING: ['ROLLOUT', 'GO_AROUND', 'PATTERN', 'ARRIVED'], // ARRIVED: a helicopter that has landed on its helipad // PATTERN: touch-and-go / low approach / option into closed traffic (JO 7110.65 3-8-2)
   ROLLOUT: ['RUNWAY_EXIT', 'PATTERN'], // PATTERN: lift-off after the ground roll of a touch-and-go
-  RUNWAY_EXIT: ['TAXI_TO_PARKING'],
+  RUNWAY_EXIT: ['TAXI_TO_PARKING', 'TAXIING'], // TAXIING: "request taxi back" for another departure (pilot realism TAXI_BACK)
   TAXI_TO_PARKING: ['ARRIVED'],
   ARRIVED: [],
   // --- shared side branches ---

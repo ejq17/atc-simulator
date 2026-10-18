@@ -181,6 +181,57 @@ npm run build:airport -- KMHT           # regenerate an airport dataset from dat
 npx tsx scripts/build-kacy-airport.ts   # same as build-airport.ts KACY (kept)
 ```
 
+## Pilot realism
+
+Real frequencies are messier than a clean readback. The pilots now make mistakes, answer late, miss calls, key up over each other, abbreviate
+their callsigns, say "student pilot" and ask for things. How much is the **pilot realism** level: `off` / `light` / `moderate` / `heavy`.
+
+* Training lessons: `off` (a lesson can opt in with `Scenario.pilotRealism`). Career steps ramp with the step: 1-4 light, 5-8 moderate,
+  9-12 heavy. Free play: a "Pilot realism" selector on the setup screen, default moderate. Anything else with a `Difficulty`: easy = light,
+  normal = moderate, hard = heavy. A scenario without any level keeps the earlier behaviour (only the seeded runway / heading digit error, 8 %).
+* Everything is seeded from the aircraft seed (or the engine generator): the same seed gives the same mistakes, the same blocked calls, the
+  same event log. All rates are **design values** (the FAA text says what is correct, not how often pilots deviate) and live in one object,
+  `src/sim/pilotBehaviour.ts`; `Scenario.pilotBehaviour.realism` overrides single values.
+* Readback errors beyond the digit slip (JO 7110.65 2-4-3, 3-7-2, AIM 4-4-7 b): wrong altitude, frequency, squawk, hold-short left out, wrong
+  taxiway, pattern instruction misunderstood, no readback at all, and an aircraft with a similar callsign answering a clearance meant for
+  another (2-4-20, AIM 4-2-4). Re-issue the instruction (or "did you copy") to have it corrected within 20 s of the readback. **An uncorrected error is flown**: after the
+  window the aircraft does what it read back (taxis to the read-back runway or along the read-back route, turns to the read-back heading, climbs to the read-back altitude,
+  squawks the read-back code, enters the read-back pattern leg, switches to the read-back frequency and is lost for 60-120 s; a wrong-callsign answerer flies the clearance meant for the other aircraft)
+  and is scored as missed as before. Takeoff, line up, crossing and landing cannot wait: they are flown as read back at once (a pilot who cannot, queries), and the correction restores the right one. Safety and scoring see the real consequence.
+* Timing: seeded response delay (airline quickest, student slowest), a call that is simply missed (call again), "say again" on long
+  transmissions, and **blocked transmissions**: two pilots who key up together are both garbled (a heterodyne squeal, "[blocked]" in the log,
+  a `RADIO_BLOCKED` event) and retry after different delays.
+* Callsigns (AIM 4-2-4): "November" or the type word on first contact, "student pilot" for students, the abbreviated form (type word and the
+  last three characters, "Cessna three echo juliet") once you have used it, never with a similar callsign on the frequency. The parser accepts
+  the abbreviation for an aircraft that has called. Airline "with you" / "with Bravo" are marked non-standard.
+* Requests (answer with an ordinary command, or say "unable"): runway change, short approach, the option, straight-in, stay in the pattern,
+  "we need a minute" at the hold, a 360 for spacing, higher / lower, direct a fix, "field in sight, request visual", taxi back.
+
+Levels (design values):
+
+| Design value (`PilotRealism`, `src/sim/pilotBehaviour.ts`) | off | light | moderate | heavy |
+|---|---|---|---|---|
+| Runway / heading digit error (`digitErrorRate`) | 0 | 4 % | 8 % | 12 % |
+| Altitude (`altitudeErrorRate`), frequency, squawk | 0 | 2 % | 4 % | 7 % |
+| Hold-short omitted (`ground.holdShortOmitFraction`, ground task) | 0 | 4 % | 8 % | 12 % |
+| Wrong taxiway (`ground.taxiwayErrorShare` x digit rate, ground task) | 0 | 0.5 x | 0.5 x | 0.5 x |
+| Unfamiliar pilots, progressive taxi (`ground.unfamiliarFraction`) | 0 | 5 % | 10 % | 15 % |
+| Pattern instruction misunderstood (`patternMisunderstandRate`; x3 for students at moderate, heavy) | 0 | 3 % | 5 % | 8 % |
+| Similar-callsign aircraft answers (`wrongCallsignRate`, needs a similar callsign on the frequency) | 0 | 15 % | 30 % | 50 % |
+| No readback at all (`noReadbackRate`) | 0 | 2 % | 4 % | 7 % |
+| Response delay s, airline / GA / student (`responseDelaySec`) | 0 | 0.4-1.2 / 0.8-2.2 / 1.5-3.5 | 0.5-1.8 / 1-3.2 / 2-5 | 0.6-2.4 / 1.2-4 / 2.5-6.5 |
+| Call missed, needs a second call (`delayedResponseRate`) | 0 | 1.5 % | 3 % | 5 % |
+| "Say again" on a transmission of more than N instructions (`sayAgainRate`, `sayAgainMinCommands`; students x1.5 / 2 / 2) | 0 | 15 %, N=3 | 25 %, N=3 | 35 %, N=2 |
+| Key-up window in which two calls block each other (`blockWindowSec`) | n/a | 0.8 s | 1.2 s | 1.6 s |
+| GA pilots who open with "November" (`novemberInitialRate`) | 0 | 30 % | 40 % | 50 % |
+| Airline "with you" / "with Bravo" at check-in (`withYouRate`, `withBravoRate`) | 0 | 20 % / 20 % | 30 % / 30 % | 40 % / 40 % |
+| Light VFR aircraft flown by students (`studentShare`) | 0 | 10 % | 20 % | 30 % |
+| Student asks for progressive taxi (`progressiveTaxiRate`) | 0 | 40 % | 50 % | 60 % |
+| Sound-alike callsign generated for new traffic (`similarCallsignRate`) | 0 | 4 % | 10 % | 20 % |
+| Requests per eligible aircraft: runway change / short approach / option / straight-in / stay in pattern / need a minute / 360 / higher / direct / visual / taxi back | 0 | 4/4/5/6/10/3/3/5/6/10/5 % | 8/8/10/12/20/6/6/10/12/20/10 % | 14/14/18/20/30/12/10/18/20/35/20 % |
+
+Details: `src/sim/README.md` (Pilot realism), `docs/BEHAVIOUR-ACCURACY.md` R3, R4, R6-R14.
+
 ## Architecture
 
 See `docs/ARCHITECTURE.md` (module map and contracts) and `docs/PROGRESS.md`

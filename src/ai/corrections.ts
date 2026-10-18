@@ -4,12 +4,12 @@
  */
 import type { Aircraft, Clearance } from '../sim/types';
 import { mkCmd } from './core';
-import type { Agent, Plan } from './core';
+import type { Agent, AgentView, Plan } from './core';
 import * as say from './phrase';
 
 const RETRY_COOLDOWN_SEC = 8;
 
-function planFor(ac: Aircraft, clr: Clearance, parking: (id: string) => { id: string; category: string } | undefined): Pick<Plan, 'cmds' | 'phrase'> | undefined {
+function planFor(v: AgentView, ac: Aircraft, clr: Clearance, parking: (id: string) => { id: string; category: string } | undefined): Pick<Plan, 'cmds' | 'phrase'> | undefined {
   switch (clr.kind) {
     case 'TAKEOFF':
       return {
@@ -45,10 +45,38 @@ function planFor(ac: Aircraft, clr: Clearance, parking: (id: string) => { id: st
         cmds: [mkCmd('APPROACH', ac, { approachType: clr.approachType, runwayEnd: clr.runwayEnd, runwayId: clr.runwayId })],
         phrase: say.negative(say.clauses(say.callsign(ac), say.clearedApproach(clr.approachType ?? 'ILS', clr.runwayEnd ?? ''))),
       };
+    case 'ALTITUDE':
+      return {
+        cmds: [mkCmd('ALTITUDE', ac, { altitudeFt: clr.altitudeFt })],
+        phrase: say.negative(say.clauses(say.callsign(ac), say.descendMaintain(clr.altitudeFt ?? 0, ac.altitudeFt))),
+      };
+    case 'CONTACT_FREQUENCY': {
+      const id = clr.frequencyId ?? v.airport.frequencies.find((f) => clr.frequencyMhz !== undefined && Math.abs(f.mhz - clr.frequencyMhz) < 0.0005)?.id;
+      if (!id || clr.frequencyMhz === undefined) return undefined;
+      return {
+        cmds: [mkCmd('CONTACT_FREQUENCY', ac, { frequencyId: id, frequencyMhz: clr.frequencyMhz })],
+        phrase: say.negative(say.contact(ac, v.airport, id, clr.frequencyMhz)),
+      };
+    }
+    case 'CONTINUE_APPROACH':
+      return { cmds: [mkCmd('CONTINUE_APPROACH', ac)], phrase: say.negative(say.continueApproach(ac)) };
+    case 'GO_AROUND':
+      return { cmds: [mkCmd('GO_AROUND', ac)], phrase: say.negative(say.goAround(ac)) };
+    case 'SPEED':
+      return clr.speedKt !== undefined ? { cmds: [mkCmd('SPEED', ac, { speedKt: clr.speedKt })], phrase: say.negative(say.clauses(say.callsign(ac), say.reduceSpeed(clr.speedKt))) } : undefined;
+    case 'DIRECT_FIX':
+      return clr.fix ? { cmds: [mkCmd('DIRECT_FIX', ac, { fix: clr.fix })], phrase: say.negative(say.clauses(say.callsign(ac), say.direct(v.airport, clr.fix))) } : undefined;
+    case 'IFR_CLEARANCE':
+      return clr.ifr
+        ? { cmds: [mkCmd('IFR_CLEARANCE', ac, { ifr: clr.ifr })], phrase: say.negative(say.ifrClearance(ac, v.facility(ac), clr.ifr, v.airport)) }
+        : undefined;
     default:
       return undefined;
   }
 }
+
+/** The pilot gave no readback, or another aircraft answered: the instruction is simply repeated ("negative" only fits a wrong readback). */
+const PLAIN_REPEAT = new Set(['no_readback', 'callsign']);
 
 export const correctionAgent: Agent = (v) => {
   const plans: Plan[] = [];
@@ -57,8 +85,9 @@ export const correctionAgent: Agent = (v) => {
     const clr = (ac.flags.readbackErrorClearanceId ? ac.clearances.find((c) => c.id === ac.flags.readbackErrorClearanceId && c.byPosition === v.position) : undefined)
       ?? [...ac.clearances].reverse().find((c) => c.byPosition === v.position);
     if (!clr) continue;
-    const p = planFor(ac, clr, (id) => v.airport.parking.find((x) => x.id === id));
+    const p = planFor(v, ac, clr, (id) => v.airport.parking.find((x) => x.id === id));
     if (!p) continue;
+    if (PLAIN_REPEAT.has(ac.flags.readbackErrorKind ?? '')) p.phrase = { text: p.phrase.text.replace(/^negative, /, ''), spoken: p.phrase.spoken.replace(/^negative, /, '') };
     plans.push({
       key: `${ac.id}:fix:${clr.id}`, aircraftId: ac.id, callsign: ac.callsign, priority: 95, cooldownSec: RETRY_COOLDOWN_SEC,
       ...p, summary: `${ac.callsign} re-issue ${clr.kind} (wrong readback)`,

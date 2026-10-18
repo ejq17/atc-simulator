@@ -28,11 +28,14 @@ import { computeStopNodes } from './groundMovement';
 import { pushbackGeometry, pushbackStand, PUSH_DIRECTION_TOLERANCE_DEG } from './pushback';
 import { pilotUnfamiliar } from './pilotBehaviour';
 import { glideAltitudeFt, initiateGoAround } from './flightDynamics';
+import { seeded01 } from './rng';
 import { freeParkingCandidates, parkingOccupant, resolveParkingQuery } from './parkingResolver';
 import { assessClearanceSafety, recordUnsafeClearance } from './conflicts';
 import { crossingGate, releaseGate } from './coordination';
 import { frequencyById, frequencyByMhz, frequencyForPosition, hearsFrequency, formatMhz } from '../radio/frequencies';
 import { buildReadback, buildSayAgain, buildUnable, holdShortReadbackText, sayRouteCall } from '../radio/readback';
+import { asksSayAgain, givesNoReadback, missesCall, readbackRealism, wrongCallsignAnswerer } from './pilotRealism';
+import { reserveChannel, responseDelaySec } from './radioDiscipline';
 import { spokenRunway } from '../radio/spoken';
 import { SPEED_LIMIT_BELOW_10K_KT, lineUpTimeSec, patternAltitudeFt } from './performance';
 import { findNavFix, indexOfFix } from './navigation';
@@ -54,6 +57,8 @@ import {
 } from './towerCommands';
 
 const DUPLICATE_WINDOW_SEC = 5;
+/** Kinds that cannot wait for the correction window: the pilot acts on what he read back. */
+const IMMEDIATE_KINDS: ReadonlySet<ClearanceKind> = new Set<ClearanceKind>(['TAKEOFF', 'LINE_UP_AND_WAIT', 'CROSS_RUNWAY', 'LAND']);
 
 /** A controller position covers all of its frequencies (KACY Departure: south 124.6 and north 134.25 are one position, DEP). */
 function sameControllerPosition(airport: Airport, ac: Aircraft, position: ControllerPositionId): boolean {
@@ -136,6 +141,15 @@ function executeInner(ctx: SimContext, cmdInput: ParsedCommand, opts?: ExecOpts)
   const tid = opts?.transmissionId;
   if (!ctx.dryRun && (!tid || !ctx.loggedTransmissions.has(tid))) {
     if (tid) ctx.loggedTransmissions.add(tid);
+    // The controller is on the air for the length of his call: pilots listen, and answer after it (radioDiscipline.ts).
+    if (ctx.pilotBehaviour.realism.radioDiscipline) {
+      const k = ctrlFreq.toFixed(3);
+      const end = now + speechDurationSec(cmdIn.rawText);
+      ctx.frequencyUse.set(k, Math.max(ctx.frequencyUse.get(k) ?? 0, end));
+      // the channel is then expected to be taken by the pilot's answer (response time and a readback about as long as the call)
+      reserveChannel(ctx, k, end, 0, 3 + speechDurationSec(cmdIn.rawText));
+      ctx.answerWindow.set(k, { from: end, end: end + 3 + speechDurationSec(cmdIn.rawText) });
+    }
     emitEvent(ctx, {
       kind: 'TRANSMISSION', callsign: cmdIn.callsign ?? undefined, text: cmdIn.rawText, severity: 'info', speaker: 'ATC',
       frequencyMhz: ctrlFreq, aiPosition: opts?.aiPosition, data: { source: opts?.source, transmissionId: tid, normalized: cmdIn.normalizedText },
@@ -147,7 +161,7 @@ function executeInner(ctx: SimContext, cmdInput: ParsedCommand, opts?: ExecOpts)
       kind: 'CLARIFICATION', aircraftId: ac?.id, callsign: ac?.callsign ?? cmdIn.callsign ?? undefined, text: question, severity: 'info',
       speaker: 'SYSTEM', data: { commError, kind: cmdIn.kind },
     });
-    if (ac && hearsFrequency(ac, ctrlFreq)) pilotSay(ctx, ac, buildSayAgain(ac), { clarify: true });
+    if (ac && hearsFrequency(ac, ctrlFreq)) pilotSay(ctx, ac, buildSayAgain(ac), { clarify: true }, ctx.dryRun ? 0 : responseDelaySec(ctx, ac));
     return { status: 'clarify', question };
   };
   const reject = (ac: Aircraft | undefined, r: Reject, extra?: { unsafe?: boolean }): CommandOutcome => {
@@ -155,7 +169,7 @@ function executeInner(ctx: SimContext, cmdInput: ParsedCommand, opts?: ExecOpts)
       kind: 'COMMAND_REJECTED', aircraftId: ac?.id, callsign: ac?.callsign ?? cmdIn.callsign ?? undefined, text: r.reason, severity: 'warning',
       speaker: 'SYSTEM', data: { commError: !!r.commError, unsafe: !!extra?.unsafe, kind: cmdIn.kind },
     });
-    if (ac && r.pilot) pilotSay(ctx, ac, r.pilot, { rejection: true });
+    if (ac && r.pilot) pilotSay(ctx, ac, r.pilot, { rejection: true }, ctx.dryRun ? 0 : responseDelaySec(ctx, ac));
     return { status: 'rejected', reason: r.reason, pilotResponse: r.pilot, unsafe: extra?.unsafe };
   };
 
@@ -182,6 +196,8 @@ function executeInner(ctx: SimContext, cmdInput: ParsedCommand, opts?: ExecOpts)
     });
   }
 
+  if (cmdIn.callsignAbbreviated && !ctx.dryRun) rt.abbreviationOk = true; // AIM 4-2-4: the pilot may now use the abbreviated callsign
+
   if (cmdIn.kind === 'READ_BACK_HOLD') return readBackHold(ctx, ac, rt, cmdIn, position);
 
   // "Turn left on Bravo" is a runway exit on the landing roll but a progressive-taxi turn once the aircraft is taxiing (JO 7110.65 3-7-2, 3-10-9).
@@ -192,8 +208,24 @@ function executeInner(ctx: SimContext, cmdInput: ParsedCommand, opts?: ExecOpts)
   if (cmdIn.kind === 'SAY_AGAIN') {
     const text = rt.lastPilotText ?? buildSayAgain(ac);
     emitEvent(ctx, { kind: 'INFO', aircraftId: ac.id, callsign: ac.callsign, text: `${ac.callsign} repeats last transmission`, severity: 'info', speaker: 'SYSTEM' });
-    pilotSay(ctx, ac, text, { repeated: true });
+    pilotSay(ctx, ac, text, { repeated: true }, ctx.dryRun ? 0 : responseDelaySec(ctx, ac));
     return { status: 'rejected', reason: 'Say-again request: pilot repeated the last transmission.', pilotResponse: text };
+  }
+
+  // "(callsign), did you copy?" / "(callsign), unable" - conversation with the pilot, no clearance.
+  if (cmdIn.kind === 'DID_YOU_COPY' || cmdIn.kind === 'UNABLE') {
+    return conversation(ctx, ac, rt, cmdIn.kind, airport, ctx.dryRun ? 0 : responseDelaySec(ctx, ac));
+  }
+
+  // A pilot who missed the call (delayed response): nothing happens, the controller has to call again.
+  if (!ctx.dryRun) {
+    if (rt.unanswered) rt.unanswered = undefined; // this is the second call
+    else if (missesCall(ctx, ac, rt, cmdIn)) {
+      rt.unanswered = { sinceSec: now, kind: cmdIn.kind };
+      const question = `${ac.callsign} did not answer; call again.`;
+      emitEvent(ctx, { kind: 'INFO', aircraftId: ac.id, callsign: ac.callsign, text: `(hidden from pilot) ${ac.callsign} did not hear the call`, severity: 'info', speaker: 'SYSTEM', data: { noResponse: true } });
+      return { status: 'clarify', question };
+    }
   }
 
   // --- confidence + required entities --------------------------------------
@@ -207,24 +239,37 @@ function executeInner(ctx: SimContext, cmdInput: ParsedCommand, opts?: ExecOpts)
   if (missing.length) {
     return clarify(ac, `${ac.callsign}: missing ${missing.join(', ')}${cmdIn.confidence < 0.8 ? ' (confidence too low to assume)' : ''}.`, false);
   }
+  // Too much at once: the pilot asks for it again (nothing is done; the player's transmission stops at the first "clarify").
+  if (!ctx.dryRun && asksSayAgain(ctx, ac, rt, cmdIn)) {
+    return clarify(ac, `${ac.callsign} asks you to say again: ${cmdIn.groupSize} instructions in one transmission.`, false);
+  }
 
   const env: Env = { ctx, ac, rt, cmd, g, airport, now, position };
 
   // --- readback-error correction -------------------------------------------
   if (!ctx.dryRun && rt.readbackError && rt.readbackError.kind === (cmd.kind as string)) {
     const original = ac.clearances.find((c) => c.id === rt.readbackError!.clearanceId);
-    if (original && sameParams(original, cmd, g)) {
+    if (original && sameParams(rt.readbackError.flown && rt.readbackError.correctClr ? rt.readbackError.correctClr : original, cmd, g)) {
+      const rec = rt.readbackError;
+      if (rec.flown) {
+        const fix = PLANNERS[cmd.kind as ClearanceKind]?.(env);
+        if (fix && 'plan' in fix) {
+          Object.assign(original, fix.plan.patch);
+          fix.plan.commit(original);
+        }
+      }
       const rb = buildReadback(ac, original, { airport });
+      const delayCorr = responseDelaySec(ctx, ac);
       emitEvent(ctx, {
         kind: 'READBACK_ERROR', aircraftId: ac.id, callsign: ac.callsign, severity: 'info', speaker: 'SYSTEM',
         text: `Readback error from ${ac.callsign} corrected (said "${rt.readbackError.spoken}", correct "${rt.readbackError.correct}")`,
-        data: { corrected: true },
+        data: { corrected: true, errorKind: rt.readbackError.errorKind, clearanceId: rt.readbackError.clearanceId, byPosition: rt.readbackError.byPosition },
       });
       rt.readbackError = undefined;
       ac.flags.readbackErrorPending = false;
       ac.flags.readbackErrorClearanceId = undefined;
-      pilotSay(ctx, ac, rb.text, { correction: true });
-      ac.radioState = 'IDLE';
+      pilotSay(ctx, ac, rb.text, { correction: true }, delayCorr);
+      if (delayCorr <= 0 && !ctx.pilotBehaviour.realism.radioDiscipline) ac.radioState = 'IDLE';
       emitEvent(ctx, { kind: 'COMMAND_ACCEPTED', aircraftId: ac.id, callsign: ac.callsign, text: `${ac.callsign}: ${cmd.kind} re-issued (correction)`, severity: 'info', speaker: 'SYSTEM', data: { kind: cmd.kind, scored: false, correction: true } });
       return { status: 'accepted', clearance: original, readback: rb.text };
     }
@@ -243,6 +288,11 @@ function executeInner(ctx: SimContext, cmdInput: ParsedCommand, opts?: ExecOpts)
   if (!planner) return reject(ac, { reason: `Command ${cmd.kind} is not supported by the simulator.`, commError: false });
   const result = planner(env);
   if ('reject' in result) return reject(ac, result.reject);
+  // "Unable, we need a minute": cleared for takeoff but not ready (pilot request, pilotRealism requests.NEED_MINUTE).
+  if (cmd.kind === 'TAKEOFF' && !ctx.dryRun) {
+    const notReady = notReadyForTakeoff(env);
+    if (notReady) return reject(ac, notReady);
+  }
   // Wind / altimeter spoken with the instruction (JO 7110.65 3-9-1 / 3-10-1): the pilot has the numbers; wrong numbers are an improper instruction.
   if (cmd.info && cmd.kind !== 'AIRPORT_INFO') {
     const mm = noteAirportInfo(env);
@@ -274,7 +324,40 @@ function executeInner(ctx: SimContext, cmdInput: ParsedCommand, opts?: ExecOpts)
     byPosition: position,
     ...result.plan.patch,
   };
-  result.plan.commit(clr);
+  // --- what the pilot read back (computed before the commit: a time-critical instruction is flown as read back) ---
+  const gb = groundBehaviour(ctx);
+  const delay = responseDelaySec(ctx, ac);
+  let rb = buildReadback(ac, clr, {
+    airport, rng: ctx.rng, errorRate: ctx.readbackErrorRate, holdShortOmitFraction: gb.holdShortOmitFraction, taxiwayErrorShare: gb.taxiwayErrorShare, realism: readbackRealism(ctx, ac, clr.id),
+  });
+  // Pilot realism: no readback at all, or another aircraft with a similar callsign answers (7110.65 2-4-20, AIM 4-2-4).
+  let answerer: Aircraft | undefined;
+  const realismOn = ctx.pilotBehaviour.realism.level !== 'off';
+  if (rb.text && !rb.error && !rb.omittedHoldShort && realismOn) {
+    if (givesNoReadback(ctx, ac, rt, clr.kind)) {
+      rb = { text: '', error: { kind: 'no_readback', correct: 'a readback', spoken: '(no readback)' } };
+    } else {
+      answerer = wrongCallsignAnswerer(ctx, ac, rt, ctrlFreq);
+      if (answerer) {
+        const theirs = buildReadback(answerer, clr, { airport });
+        rb = { text: theirs.text, error: { kind: 'callsign', correct: ac.spokenCallsign, spoken: answerer.spokenCallsign } };
+      }
+    }
+  }
+  // A time-critical instruction (takeoff, line up, crossing, landing) is flown as the pilot read it back, at once; if he cannot (not at that
+  // runway) he queries and nothing happens. Other kinds are flown when the correction window ends (traffic.ts -> flyMisread).
+  let plan = result.plan;
+  let flown = false;
+  let correctClr: Clearance | undefined;
+  if (realismOn && rb.error?.wrong && IMMEDIATE_KINDS.has(clr.kind)) {
+    const wp = planMisread(ctx, ac, rt, clr, rb.error.wrong, position);
+    if ('reject' in wp) return reject(ac, { ...wp.reject, commError: false });
+    plan = wp.plan;
+    correctClr = { ...clr };
+    Object.assign(clr, wp.plan.patch);
+    flown = true;
+  }
+  plan.commit(clr);
   if (!ctx.currentAi) rt.playerTouched = true;
   const flagged = result.plan.flag;
   if (flagged) {
@@ -299,17 +382,23 @@ function executeInner(ctx: SimContext, cmdInput: ParsedCommand, opts?: ExecOpts)
     ac.flags.readbackErrorClearanceId = undefined;
   }
 
-  const gb = groundBehaviour(ctx);
-  const rb = buildReadback(ac, clr, { airport, rng: ctx.rng, errorRate: ctx.readbackErrorRate, holdShortOmitFraction: gb.holdShortOmitFraction, taxiwayErrorShare: gb.taxiwayErrorShare });
-  if (rb.text) pilotSay(ctx, ac, rb.text, { readback: true, clearanceId: clr.id });
+  if (rb.text) {
+    if (answerer) pilotSay(ctx, answerer, rb.text, { readback: true, clearanceId: clr.id, wrongCallsign: true, intendedCallsign: ac.callsign }, responseDelaySec(ctx, answerer));
+    else pilotSay(ctx, ac, rb.text, { readback: true, clearanceId: clr.id }, delay);
+  } else ac.radioState = rt.readbackError ? 'WAITING_FOR_READBACK' : 'IDLE'; // informational instruction (or no readback): nothing said
   if (rb.omittedHoldShort) markUnreadHoldShort(ctx, ac, rt, clr, rb.omittedHoldShort);
-  else ac.radioState = rt.readbackError ? 'WAITING_FOR_READBACK' : 'IDLE'; // informational instruction: no readback
   if (rb.error) {
-    rt.readbackError = { sinceSec: now, kind: cmd.kind as ReadbackErrorRecord['kind'], clearanceId: clr.id, correct: rb.error.correct, spoken: rb.error.spoken };
+    rt.readbackError = {
+      // no readback: the controller waits for the answer after his own call, so the window starts a few seconds after it ends
+      sinceSec: rb.error.kind === 'no_readback' ? Math.max(now, ctx.frequencyUse.get(ctrlFreq.toFixed(3)) ?? now) + 3 : now,
+      kind: cmd.kind as ReadbackErrorRecord['kind'], errorKind: rb.error.kind, clearanceId: clr.id, byPosition: position, correct: rb.error.correct, spoken: rb.error.spoken,
+      wrong: rb.error.wrong, flown, correctClr, answererId: answerer?.id,
+    };
     ac.flags.readbackErrorPending = true;
     ac.flags.readbackErrorClearanceId = clr.id;
+    ac.flags.readbackErrorKind = rb.error.kind;
     ac.radioState = 'WAITING_FOR_READBACK';
-    emitEvent(ctx, { kind: 'INFO', aircraftId: ac.id, callsign: ac.callsign, text: `(hidden from pilot) ${ac.callsign} misread back: ${rb.error.spoken} instead of ${rb.error.correct}`, severity: 'info', speaker: 'SYSTEM', data: { readbackError: true } });
+    emitEvent(ctx, { kind: 'INFO', aircraftId: ac.id, callsign: ac.callsign, text: `(hidden from pilot) ${ac.callsign} misread back: ${rb.error.spoken} instead of ${rb.error.correct}`, severity: 'info', speaker: 'SYSTEM', data: { readbackError: true, errorKind: rb.error.kind } });
   }
   if (cmd.kind === 'CONTACT_FREQUENCY' && rt.pendingFreq) rt.pendingFreq.atSec = now + speechDurationSec(rb.text) + 0.5;
 
@@ -428,9 +517,165 @@ function sameParams(clr: Clearance, cmd: ParsedCommand, g?: RunwayEndGeom): bool
     case 'TAXI':
     case 'TAXI_TO_PARKING':
       return (clr.destination ?? '') === (cmd.destination ?? '') && (clr.runwayEnd ?? '') === (g?.end.id ?? cmd.runwayEnd ?? '');
+    case 'ALTITUDE':
+      return clr.altitudeFt !== undefined && clr.altitudeFt === cmd.altitudeFt;
+    case 'CONTACT_FREQUENCY':
+      return (clr.frequencyMhz !== undefined && clr.frequencyMhz === cmd.frequencyMhz) || (!!clr.frequencyId && clr.frequencyId === cmd.frequencyId);
+    case 'SQUAWK':
+      return clr.squawk !== undefined && clr.squawk === cmd.squawk;
+    case 'IFR_CLEARANCE':
+      return !!clr.ifr && clr.ifr.destination === cmd.ifr?.destination;
+    case 'PATTERN_INSTRUCTION':
+      return (clr.destination ?? '') === (cmd.destination ?? '') && (clr.turnDirection ?? '') === (cmd.turnDirection ?? '');
+    case 'ENTER_PATTERN':
+      return clr.patternLeg === cmd.patternLeg && (!g || clr.runwayEnd === g.end.id);
+    case 'HOLD_SHORT':
+      return (clr.holdShort ?? []).join() === (cmd.holdShort ?? []).join();
+    case 'DIRECT_FIX':
+      return !!clr.fix && clr.fix === cmd.fix;
     default:
       return false;
   }
+}
+
+/**
+ * The plan of the clearance as the pilot understood it: the controller's clearance fields with the mistaken ones (`ReadbackError.wrong`) put in.
+ * Rejects when the pilot cannot do that (he is not at that runway, the route does not exist...): he queries instead.
+ */
+function planMisread(ctx: SimContext, ac: Aircraft, rt: AircraftRuntime, clr: Clearance, wrong: Record<string, unknown>, position: ControllerPositionId): PlanResult {
+  const airport = ctx.state.airport;
+  const base: ParsedCommand = {
+    kind: clr.kind, callsign: ac.callsign, confidence: 1, rawText: '', normalizedText: '', issues: [],
+    runwayEnd: clr.runwayEnd, runwayId: clr.runwayId, route: clr.route, holdShort: clr.holdShort, destination: clr.destination, headingDeg: clr.headingDeg,
+    turnDirection: clr.turnDirection, altitudeFt: clr.altitudeFt, speedKt: clr.speedKt, frequencyMhz: clr.frequencyMhz, frequencyId: clr.frequencyId,
+    patternLeg: clr.patternLeg, squawk: clr.squawk, fix: clr.fix, approachType: clr.approachType, exitTaxiway: clr.exitTaxiway, turnDegrees: clr.turnDegrees,
+  };
+  const c: ParsedCommand = { ...base, ...(wrong as Partial<ParsedCommand>) };
+  const w = wrong.runwayEnd as string | undefined;
+  if (w) {
+    c.runwayEnd = w;
+    c.runwayId = undefined;
+    if (clr.kind === 'TAXI' || clr.kind === 'TAXI_TO_PARKING') c.destination = `RWY${w}`;
+    if (clr.kind === 'CROSS_RUNWAY') {
+      const rw = findRunway(airport, w);
+      c.crossRunwayId = rw?.id ?? w;
+      c.runwayId = rw?.id ?? w;
+    }
+  }
+  if (wrong.frequencyMhz !== undefined) c.frequencyId = undefined;
+  const planner = PLANNERS[clr.kind];
+  if (!planner) return { reject: { reason: `${clr.kind} cannot be flown as misread`, commError: false } };
+  const { cmd, g } = normalizeCommand(airport, ac, c, true);
+  return planner({ ctx, ac, rt, cmd, g, airport, now: ctx.state.clock.timeSec, position });
+}
+
+/**
+ * An uncorrected readback error is flown: the correction window (20 s from the readback) ended, so the aircraft does what it read back
+ * (wrong runway taxi, heading, altitude, frequency, squawk, pattern, route; a wrong-callsign answerer flies the clearance meant for the other
+ * aircraft). The safety and scoring logic then sees the real consequence. A pilot who cannot do it queries. Only with pilot realism on.
+ */
+export function flyMisread(ctx: SimContext, ac: Aircraft, rec: ReadbackErrorRecord): void {
+  if (ctx.dryRun || ctx.pilotBehaviour.realism.level === 'off' || rec.flown) return;
+  const clr = ac.clearances.find((x) => x.id === rec.clearanceId);
+  if (!clr) return;
+  const now = ctx.state.clock.timeSec;
+  const note = (text: string, extra: Record<string, unknown> = {}) =>
+    emitEvent(ctx, { kind: 'INFO', aircraftId: ac.id, callsign: ac.callsign, text, severity: 'warning', speaker: 'SYSTEM', data: { flownReadbackError: true, errorKind: rec.errorKind, clearanceId: clr.id, ...extra } });
+  // the aircraft that answered for another one flies the clearance it read back
+  if (rec.errorKind === 'callsign') {
+    const other = rec.answererId ? ctx.state.aircraft[rec.answererId] : undefined;
+    if (!other) return;
+    const p = planMisread(ctx, other, getRuntime(ctx, other), clr, {}, clr.byPosition);
+    if ('plan' in p) {
+      p.plan.commit({ ...clr, ...p.plan.patch });
+      note(`${other.callsign} flies the ${clr.kind} meant for ${ac.callsign}`, { otherCallsign: other.callsign });
+    }
+    return;
+  }
+  const w = rec.wrong;
+  if (!w) return;
+  const rt = getRuntime(ctx, ac);
+  // IFR clearance items that no planner takes
+  if (clr.kind === 'IFR_CLEARANCE' && ac.flightPlan?.ifrClearance) {
+    const ic = ac.flightPlan.ifrClearance;
+    if (typeof w.ifrSquawk === 'string') { ac.squawk = w.ifrSquawk; ac.flightPlan.squawk = w.ifrSquawk; ic.squawk = w.ifrSquawk; }
+    if (typeof w.ifrAltitudeFt === 'number') ic.initialAltitudeFt = w.ifrAltitudeFt;
+    if (typeof w.ifrFrequencyMhz === 'number') ic.departureFrequencyMhz = w.ifrFrequencyMhz;
+    note(`${ac.callsign} flies its IFR clearance as read back (${rec.spoken} instead of ${rec.correct})`);
+    return;
+  }
+  const p = planMisread(ctx, ac, rt, clr, w, clr.byPosition);
+  if ('reject' in p) {
+    if (p.reject.pilot) pilotSay(ctx, ac, p.reject.pilot, { rejection: true });
+    note(`${ac.callsign} could not fly what it read back (${p.reject.reason}) and queries`);
+    return;
+  }
+  const wasMhz = clr.frequencyMhz;
+  const wasId = clr.frequencyId;
+  Object.assign(clr, p.plan.patch);
+  p.plan.commit(clr);
+  if (clr.kind === 'CONTACT_FREQUENCY' && rt.pendingFreq) {
+    // lost: on the wrong frequency until the pilot finds his way back (design value 60-120 s)
+    rt.pendingFreq.atSec = now;
+    rt.pendingFreq.silent = true;
+    if (wasMhz !== undefined) rt.returnFreq = { atSec: now + 60 + 60 * seeded01(ac.seed, `lost:${clr.id}`), mhz: wasMhz, id: wasId };
+  }
+  note(`${ac.callsign} flies what it read back (${rec.spoken} instead of ${rec.correct})`);
+}
+
+/** "Did you copy" / "unable" to a pilot (no clearance involved). */
+function conversation(ctx: SimContext, ac: Aircraft, rt: AircraftRuntime, kind: 'DID_YOU_COPY' | 'UNABLE', airport: Airport, delay: number): CommandOutcome {
+  const cs = ac.spokenCallsign;
+  if (ctx.dryRun) return { status: 'rejected', reason: 'Conversation with the pilot.' };
+  let text: string;
+  let reason: string;
+  if (kind === 'UNABLE') {
+    const req = ac.pendingRequest;
+    ac.pendingRequest = undefined;
+    text = `Roger, ${cs}`;
+    reason = req ? `Request denied: ${req.text}.` : 'Nothing was pending; pilot acknowledged.';
+    if (req?.request === 'TAXI_BACK') {
+      // back to an arrival that wants parking
+      ac.isDeparture = false;
+      ac.pendingRequest = { kind: 'TAXI', text: 'request taxi to parking', sinceSec: ctx.state.clock.timeSec };
+      text = `Roger, request taxi to parking, ${cs}`;
+    }
+    emitEvent(ctx, { kind: 'INFO', aircraftId: ac.id, callsign: ac.callsign, text: `${ac.callsign} request denied${req ? ` (${req.request ?? req.kind}: ${req.text})` : ''}`, severity: 'info', speaker: 'SYSTEM', data: { requestDenied: req?.request ?? req?.kind } });
+  } else if (rt.unanswered) {
+    rt.unanswered = undefined;
+    text = `Sorry, say again for ${cs}`;
+    reason = 'The pilot had missed the call and asks for it again.';
+  } else if (rt.readbackError?.errorKind === 'no_readback') {
+    const original = ac.clearances.find((c) => c.id === rt.readbackError!.clearanceId);
+    text = original ? buildReadback(ac, original, { airport }).text : `Affirm, ${cs}`;
+    emitEvent(ctx, { kind: 'READBACK_ERROR', aircraftId: ac.id, callsign: ac.callsign, severity: 'info', speaker: 'SYSTEM', text: `Missing readback from ${ac.callsign} obtained ("did you copy")`, data: { corrected: true, errorKind: 'no_readback' } });
+    rt.readbackError = undefined;
+    ac.flags.readbackErrorPending = false;
+    ac.flags.readbackErrorClearanceId = undefined;
+    reason = 'The pilot read the clearance back.';
+  } else if (rt.readbackError?.errorKind === 'callsign') {
+    text = `Say again for ${cs}`; // the aircraft the call was meant for never heard it
+    reason = 'The pilot did not hear a call: re-issue the instruction.';
+  } else {
+    text = `Affirm, ${cs}`;
+    reason = 'The pilot confirmed.';
+  }
+  pilotSay(ctx, ac, text, { clarify: kind === 'DID_YOU_COPY' && !!rt.unanswered, conversation: kind }, delay);
+  return { status: 'rejected', reason, pilotResponse: text };
+}
+
+/** Pilot request "we need a minute" (realism): the first takeoff clearance of a seeded share of aircraft is answered "unable". */
+function notReadyForTakeoff(env: Env): Reject | undefined {
+  const { ctx, ac, rt, now } = env;
+  const R = ctx.pilotBehaviour.realism;
+  if (rt.notReadyUntilSec !== undefined && now < rt.notReadyUntilSec) return { reason: `${ac.callsign} is not ready for departure yet (asked for a minute).`, commError: false };
+  if (!ac.onGround || rt.requestsDone.has('NEED_MINUTE') || R.requests.NEED_MINUTE <= 0) return undefined;
+  if (seeded01(ac.seed, 'req:NEED_MINUTE') >= R.requests.NEED_MINUTE) return undefined;
+  rt.requestsDone.add('NEED_MINUTE');
+  const [lo, hi] = R.needMinuteSec;
+  rt.notReadyUntilSec = now + lo + seeded01(ac.seed, 'needminute-len') * (hi - lo);
+  ac.pendingRequest = { kind: 'DEPARTURE', request: 'NEED_MINUTE', text: 'we need a minute at the hold', sinceSec: now };
+  return { reason: `${ac.callsign} is not ready for takeoff: "we need a minute".`, pilot: buildUnable(ac, 'we need a minute'), commError: false };
 }
 
 function describeClearance(c: Clearance): string {
@@ -706,7 +951,8 @@ function planTaxi(env: Env): PlanResult {
         rt.takeoffCleared = false;
         completeClearances(ctx, ac, ['TAXI', 'TAXI_TO_PARKING', 'HOLD_POSITION']);
         if (runwayEnd) ac.assignedRunwayEnd = runwayEnd;
-        if (arrivalPhases.includes(ac.phase)) setPhase(ctx, ac, 'TAXI_TO_PARKING');
+        if (ac.phase === 'RUNWAY_EXIT' && ac.isDeparture && runwayEnd) setPhase(ctx, ac, 'TAXIING', 'taxi back for departure'); // pilot realism TAXI_BACK
+        else if (arrivalPhases.includes(ac.phase)) setPhase(ctx, ac, 'TAXI_TO_PARKING');
         else if (ac.phase === 'HOLDING_SHORT') setPhase(ctx, ac, 'TAXIING', 'taxi instruction');
         else advancePhase(ctx, ac, 'TAXIING');
       },

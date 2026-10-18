@@ -25,10 +25,28 @@ export interface ReadbackEnv {
   holdShortOmitFraction?: number;
   /** Probability of a wrong taxiway in the route read back, as a share of `errorRate`. Default 0. */
   taxiwayErrorShare?: number;
+  /** Pilot realism (src/sim/pilotBehaviour.ts): more kinds of readback error, each with its own rate. Omitted = only the digit / taxiway / hold-short errors above. */
+  realism?: ReadbackRealism;
+}
+
+/**
+ * Readback error rates of one aircraft and a deterministic draw per (clearance, label) so the same seed makes the same mistakes
+ * without consuming the engine's shared random stream.
+ */
+export interface ReadbackRealism {
+  rand: (label: string) => number;
+  altitude: number;
+  frequency: number;
+  squawk: number;
+  /** Already multiplied by the student factor. */
+  pattern: number;
 }
 
 export interface ReadbackError {
-  kind: 'runway' | 'heading' | 'taxiway';
+  /** `callsign`, `no_readback` are produced by the command executor (another aircraft answers / nobody answers); the rest here. */
+  kind: 'runway' | 'heading' | 'taxiway' | 'altitude' | 'frequency' | 'squawk' | 'pattern' | 'callsign' | 'no_readback';
+  /** What the pilot understood, as `ParsedCommand` fields that replace the controller's (`runwayEnd`, `route`, `headingDeg`, `altitudeFt`, `frequencyMhz`, `squawk`, `patternLeg`, `destination`...; `ifrSquawk` / `ifrAltitudeFt` / `ifrFrequencyMhz` for an IFR clearance). An uncorrected error is flown (src/sim/readbackConsequence.ts). */
+  wrong?: Record<string, unknown>;
   /** What should have been read back, e.g. "runway 13" / "heading 270". */
   correct: string;
   /** What the pilot actually said, e.g. "runway 31" / "heading 260". */
@@ -112,13 +130,36 @@ function shouldErr(env: ReadbackEnv): boolean {
   return !!env.rng && (env.errorRate ?? 0) > 0 && env.rng() < (env.errorRate ?? 0);
 }
 
-function frequencyPhrase(c: Clearance, env: ReadbackEnv): string {
+/** One seeded draw: does the error of this label happen? */
+function roll(env: ReadbackEnv, label: string, rate: number | undefined): boolean {
+  return !!env.realism && !!rate && rate > 0 && env.realism.rand(label) < rate;
+}
+
+/** A different but plausible number: 1..3 steps of `step` up or down, never below `min`. */
+function nudged(value: number, step: number, min: number, env: ReadbackEnv, label: string): number {
+  const r = env.realism!;
+  const dir = r.rand(`${label}:dir`) < 0.5 ? -1 : 1;
+  const n = 1 + Math.floor(r.rand(`${label}:n`) * 3);
+  const v = value + dir * n * step;
+  return v >= min ? v : value + n * step;
+}
+
+/** One octal digit of a squawk code changed. */
+export function wrongSquawk(code: string, env: ReadbackEnv): string {
+  const r = env.realism!;
+  const i = Math.min(code.length - 1, Math.floor(r.rand('sq:pos') * code.length));
+  const d = Number(code[i]);
+  const nd = (d + 1 + Math.floor(r.rand('sq:d') * 6)) % 8;
+  return code.slice(0, i) + String(nd) + code.slice(i + 1);
+}
+
+function frequencyPhrase(c: Clearance, env: ReadbackEnv, overrideMhz?: number): string {
   const f = c.frequencyId ? frequencyById(env.airport, c.frequencyId) : c.frequencyMhz ? frequencyByMhz(env.airport, c.frequencyMhz) : undefined;
-  const mhz = c.frequencyMhz ?? f?.mhz;
+  const mhz = overrideMhz ?? c.frequencyMhz ?? f?.mhz;
   if (mhz === undefined) return 'frequency change';
   const word = f && f.position !== 'OTHER' ? positionWord(f.position) : '';
   // Ground control (121.6-121.99) is conventionally abbreviated: "Ground point niner".
-  const abbreviated = f?.position === 'GND' && mhz >= 121.6 && mhz < 122;
+  const abbreviated = f?.position === 'GND' && mhz >= 121.6 && mhz < 122 && overrideMhz === undefined;
   const freq = abbreviated ? spokenFrequencyDecimal(mhz) : spokenFrequency(mhz);
   return word ? `${word} ${freq}` : freq;
 }
@@ -135,7 +176,7 @@ export function buildReadback(aircraft: Aircraft, c: Clearance, env: ReadbackEnv
     if (!error && shouldErr(env)) {
       const w = wrongRunway(endId, env);
       if (w) {
-        error = { kind: 'runway', correct: `runway ${endId}`, spoken: `runway ${w}` };
+        error = { kind: 'runway', correct: `runway ${endId}`, spoken: `runway ${w}`, wrong: { runwayEnd: w } };
         return runwayRef(w);
       }
     }
@@ -174,7 +215,7 @@ export function buildReadback(aircraft: Aircraft, c: Clearance, env: ReadbackEnv
           if (pool.length) {
             const idx = Math.min(route.length - 1, Math.floor(seeded01(aircraft.seed, `twy-idx:${c.id}`) * route.length));
             const wrong = pool[Math.min(pool.length - 1, Math.floor(seeded01(aircraft.seed, `twy-wrong:${c.id}`) * pool.length))];
-            error = { kind: 'taxiway', correct: `via ${route.map(spokenTaxiway).join(', ')}`, spoken: `via ${route.map((t, k) => spokenTaxiway(k === idx ? wrong : t)).join(', ')}` };
+            error = { kind: 'taxiway', correct: `via ${route.map(spokenTaxiway).join(', ')}`, spoken: `via ${route.map((t, k) => spokenTaxiway(k === idx ? wrong : t)).join(', ')}`, wrong: { route: route.map((t, k) => (k === idx ? wrong : t)) } };
             route = route.map((t, k) => (k === idx ? wrong : t));
           }
         }
@@ -195,14 +236,23 @@ export function buildReadback(aircraft: Aircraft, c: Clearance, env: ReadbackEnv
         return 'Going around';
       case 'CONTINUE_APPROACH':
         return 'Continuing approach';
-      case 'CONTACT_FREQUENCY':
-        return frequencyPhrase(c, env);
+      case 'CONTACT_FREQUENCY': {
+        const right = frequencyPhrase(c, env);
+        const mhz = c.frequencyMhz ?? (c.frequencyId ? frequencyById(env.airport, c.frequencyId)?.mhz : undefined);
+        if (!error && mhz !== undefined && roll(env, 'freq', env.realism?.frequency)) {
+          const wrong = Math.round(nudged(Math.round(mhz * 10), 1, 1080, env, 'freq') ) / 10;
+          const bad = frequencyPhrase(c, env, wrong);
+          error = { kind: 'frequency', correct: right, spoken: bad, wrong: { frequencyMhz: wrong } };
+          return bad;
+        }
+        return right;
+      }
       case 'HEADING': {
         const h = c.headingDeg ?? 0;
         let spoken = spokenHeading(h);
         if (shouldErr(env)) {
           const wh = wrongHeading(h, env);
-          error = { kind: 'heading', correct: `heading ${spokenHeading(h)}`, spoken: `heading ${spokenHeading(wh)}` };
+          error = { kind: 'heading', correct: `heading ${spokenHeading(h)}`, spoken: `heading ${spokenHeading(wh)}`, wrong: { headingDeg: wh } };
           spoken = spokenHeading(wh);
         }
         const dir = c.turnDirection === 'left' ? 'Left heading' : c.turnDirection === 'right' ? 'Right heading' : 'Heading';
@@ -211,6 +261,11 @@ export function buildReadback(aircraft: Aircraft, c: Clearance, env: ReadbackEnv
       case 'ALTITUDE': {
         const target = c.altitudeFt ?? 0;
         const verb = Math.abs(target - aircraft.altitudeFt) < 100 ? 'Maintain' : target > aircraft.altitudeFt ? 'Climb and maintain' : 'Descend and maintain';
+        if (!error && roll(env, 'alt', env.realism?.altitude)) {
+          const wrong = nudged(target, 1000, 500, env, 'alt');
+          error = { kind: 'altitude', correct: spokenAltitude(target), spoken: spokenAltitude(wrong), wrong: { altitudeFt: wrong } };
+          return `${verb} ${spokenAltitude(wrong)}`;
+        }
         return `${verb} ${spokenAltitude(target)}`;
       }
       case 'SPEED':
@@ -219,12 +274,37 @@ export function buildReadback(aircraft: Aircraft, c: Clearance, env: ReadbackEnv
         const rwy = runwayRef(c.runwayEnd ?? c.runwayId ?? '');
         const leg =
           c.patternLeg === 'left_downwind' ? 'Left downwind' : c.patternLeg === 'right_downwind' ? 'Right downwind' : c.patternLeg === 'base' ? 'Base' : 'Straight in';
+        if (!error && roll(env, 'pat', env.realism?.pattern)) {
+          const options = ['Left downwind', 'Right downwind', 'Base', 'Straight in'].filter((o) => o !== leg);
+          const bad = options[Math.min(options.length - 1, Math.floor(env.realism!.rand('pat:pick') * options.length))];
+          error = { kind: 'pattern', correct: `${leg} runway ${rwy}`, spoken: `${bad} runway ${rwy}`, wrong: { patternLeg: { 'Left downwind': 'left_downwind', 'Right downwind': 'right_downwind', Base: 'base', 'Straight in': 'straight_in' }[bad] } };
+          return `${bad} runway ${rwy}`;
+        }
         return `${leg} runway ${rwy}`;
       }
       case 'PUSHBACK':
         return c.pushTailDeg !== undefined ? `Pushing back, tail ${cardinal(c.pushTailDeg)}` : c.pushFaceDeg !== undefined ? `Pushing back, facing ${cardinal(c.pushFaceDeg)}` : 'Pushing back';
-      case 'IFR_CLEARANCE':
+      case 'IFR_CLEARANCE': {
+        const ifr = c.ifr;
+        if (ifr && !error) {
+          if (roll(env, 'sq', env.realism?.squawk)) {
+            const bad = wrongSquawk(ifr.squawk, env);
+            error = { kind: 'squawk', correct: digitsSpoken(ifr.squawk), spoken: digitsSpoken(bad), wrong: { ifrSquawk: bad } };
+            return ifrClearanceReadback({ ...c, ifr: { ...ifr, squawk: bad } });
+          }
+          if (roll(env, 'alt', env.realism?.altitude)) {
+            const bad = nudged(ifr.initialAltitudeFt, 1000, 1000, env, 'alt');
+            error = { kind: 'altitude', correct: spokenAltitude(ifr.initialAltitudeFt), spoken: spokenAltitude(bad), wrong: { ifrAltitudeFt: bad } };
+            return ifrClearanceReadback({ ...c, ifr: { ...ifr, initialAltitudeFt: bad } });
+          }
+          if (roll(env, 'freq', env.realism?.frequency)) {
+            const bad = Math.round(nudged(Math.round(ifr.departureFrequencyMhz * 10), 1, 1080, env, 'freq')) / 10;
+            error = { kind: 'frequency', correct: spokenFrequency(ifr.departureFrequencyMhz), spoken: spokenFrequency(bad), wrong: { ifrFrequencyMhz: bad } };
+            return ifrClearanceReadback({ ...c, ifr: { ...ifr, departureFrequencyMhz: bad } });
+          }
+        }
         return ifrClearanceReadback(c);
+      }
       case 'APPROACH': {
         const rwy = runwaySpoken(c.runwayEnd ?? c.runwayId ?? '');
         return c.approachType === 'VISUAL' ? `Cleared visual approach runway ${rwy}` : `Cleared ${approachWord(c.approachType)} runway ${rwy} approach`;
@@ -259,8 +339,16 @@ export function buildReadback(aircraft: Aircraft, c: Clearance, env: ReadbackEnv
         const n = c.sequenceNumber !== undefined ? `Number ${numberWords(c.sequenceNumber)}, ` : '';
         return `Traffic in sight, ${n}will follow`;
       }
-      case 'PATTERN_INSTRUCTION':
-        return patternInstructionReadback(c);
+      case 'PATTERN_INSTRUCTION': {
+        const right = patternInstructionReadback(c);
+        if (!error && roll(env, 'pat', env.realism?.pattern)) {
+          const options = ['Extending downwind', 'Turning base', 'Short approach', 'Left three sixty'].filter((o) => o !== right);
+          const bad = options[Math.min(options.length - 1, Math.floor(env.realism!.rand('pat:pick') * options.length))];
+          error = { kind: 'pattern', correct: right, spoken: bad, wrong: bad === 'Extending downwind' ? { destination: 'EXTEND_DOWNWIND' } : bad === 'Turning base' ? { destination: 'TURN_BASE_NOW' } : bad === 'Short approach' ? { destination: 'SHORT_APPROACH' } : { destination: 'CIRCLE', turnDirection: 'left', turnDegrees: 360 } };
+          return bad;
+        }
+        return right;
+      }
       case 'REPORT_POSITION':
         return c.destination === 'REPORT_MIDFIELD_DOWNWIND'
           ? 'Will report midfield downwind'
@@ -269,8 +357,15 @@ export function buildReadback(aircraft: Aircraft, c: Clearance, env: ReadbackEnv
             : c.distanceNm !== undefined ? `Will report ${numberWords(c.distanceNm)} mile final` : 'Will report final';
       case 'FREQUENCY_CHANGE_APPROVED':
         return 'Frequency change approved, good day';
-      case 'SQUAWK':
-        return `Squawk ${digitsSpoken(c.squawk ?? '1200')}`;
+      case 'SQUAWK': {
+        const code = c.squawk ?? '1200';
+        if (!error && roll(env, 'sq', env.realism?.squawk)) {
+          const bad = wrongSquawk(code, env);
+          error = { kind: 'squawk', correct: digitsSpoken(code), spoken: digitsSpoken(bad), wrong: { squawk: bad } };
+          return `Squawk ${digitsSpoken(bad)}`;
+        }
+        return `Squawk ${digitsSpoken(code)}`;
+      }
       case 'PROCEED':
         return vehicleProceedReadback({ taxiways: c.destination === 'TAXIWAYS', runwayEnd: c.runwayEnd ?? c.runwayId ?? '', reportClear: c.reportClear, reportInspection: c.reportClear && c.destination === 'INSPECTION' });
       case 'AIR_TAXI':
@@ -507,11 +602,12 @@ export function requestFrequencyChangeCall(aircraft: Aircraft, env: ReadbackEnv)
 }
 
 /** Initial call after a frequency change (airborne: "level <altitude>", AIM 5-3-1). */
-export function checkInCall(aircraft: Aircraft, env: ReadbackEnv, o: { taxiway?: string; wantsTaxiToParking?: boolean } = {}): string {
+export function checkInCall(aircraft: Aircraft, env: ReadbackEnv, o: { taxiway?: string; wantsTaxiToParking?: boolean; taxiBackRunway?: string } = {}): string {
   const f = facility(aircraft, env);
   if (aircraft.onGround) {
     const at = o.taxiway ? `, at ${spokenTaxiway(o.taxiway)}` : '';
-    return `${f}, ${aircraft.spokenCallsign}${at}${o.wantsTaxiToParking ? ', request taxi to parking' : ''}.`;
+    const ask = o.taxiBackRunway ? `, request taxi back to runway ${runwayRef(o.taxiBackRunway)} for departure` : o.wantsTaxiToParking ? ', request taxi to parking' : '';
+    return `${f}, ${aircraft.spokenCallsign}${at}${ask}.`;
   }
   const alt = spokenAltitude(Math.round(aircraft.altitudeFt / 100) * 100);
   return `${f}, ${aircraft.spokenCallsign}, level ${alt}.`;

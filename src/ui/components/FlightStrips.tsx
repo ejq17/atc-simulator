@@ -106,6 +106,7 @@ function StripView({ strip, ac, board, startUtcMs, selected, owner, fresh, dropM
       <div className="flex items-baseline gap-2">
         <span className={`text-[13.5px] font-bold tracking-wide ${selected ? 'text-atc-cyan' : 'text-atc-text'} ${finished ? 'line-through decoration-atc-muted' : ''}`} data-testid="strip-callsign">{f.callsign}</span>
         <span className="text-[11px] text-atc-muted" data-testid="strip-type">{f.typeEquip}</span>
+        {f.student && <span className="border border-atc-amber/60 px-1 text-[9px] font-semibold leading-4 text-atc-amber" data-testid="strip-student" title="Student pilot (AIM 4-2-4)">STU</span>}
         <span className={`border px-1 text-[9.5px] font-semibold leading-4 ${f.flightRules === 'IFR' ? 'border-atc-cyan/60 text-atc-cyan' : 'border-atc-border text-atc-muted'}`} data-testid="strip-rules">{f.flightRules}</span>
         {strip.struck && <span className="border border-atc-green-dim px-1 font-sans text-[9px] font-semibold uppercase leading-4 tracking-wider text-atc-green">handled</span>}
         {strip.gone && <span className="border border-atc-border px-1 font-sans text-[9px] font-semibold uppercase leading-4 tracking-wider text-atc-muted">left</span>}

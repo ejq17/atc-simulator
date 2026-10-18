@@ -9,6 +9,9 @@ import { Panel } from './ui';
 
 const TONE_ORDER = ['alert', 'runway', 'hold', 'arrival', 'taxi', 'airborne', 'idle'] as const;
 
+/** No readback / another aircraft answered: the controller has to notice that by ear, so the strip does not flag them. */
+const HIDDEN_READBACK_KINDS: ReadonlySet<string> = new Set(['no_readback', 'callsign']);
+
 export function sortAircraft(list: Aircraft[]): Aircraft[] {
   return [...list].sort((a, b) => {
     const pa = a.pendingRequest ? 0 : 1;
@@ -61,9 +64,10 @@ export function AircraftPanel() {
                   <span className="text-[10.5px] text-atc-muted">{ac.isDeparture ? 'DEP' : 'ARR'}</span>
                   <span className={`text-[10px] font-semibold ${ac.flightRules === 'IFR' ? 'text-atc-cyan' : 'text-atc-muted'}`} data-testid="rules">{ac.flightRules}</span>
                   {ac.squawk && <span className="text-[10px] tabular-nums text-atc-muted" title="Transponder code">{ac.squawk}</span>}
+                  {ac.student && <span data-testid="student-badge" title="Student pilot: slower, wordier, may ask for progressive taxi (AIM 4-2-4)" className="border border-atc-amber/60 px-1 text-[9px] font-semibold leading-4 text-atc-amber">STU</span>}
                 </span>
                 <span className="flex items-center gap-1.5">
-                  {ac.flags.readbackErrorPending && (
+                  {ac.flags.readbackErrorPending && !HIDDEN_READBACK_KINDS.has(ac.flags.readbackErrorKind ?? '') && (
                     <span title="Readback error pending: re-issue the instruction" className="border border-atc-red px-1 text-[9px] font-semibold leading-4 text-atc-red">RB ERR</span>
                   )}
                   {aiPositionOf(state, controller, ac) && <span title={`With the AI ${aiPositionOf(state, controller, ac)!.position} controller: you cannot instruct it until it is handed to you`} className="border border-[#b79cff]/50 px-1 text-[9px] font-semibold leading-4 text-[#b79cff]" data-testid="ai-tag">AI</span>}

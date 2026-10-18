@@ -710,6 +710,44 @@ Tests: `coordination.test.ts` (22).
 * Spacing and timing: `projectArrival`, `timeToThreshold`, the intersecting-runway arrival check and the 3-10-3 landed-aircraft distance use the landing threshold (`displacedM`); pavement-end positions remain for takeoff, rollout and occupancy.
 * Known simplifications: no turbulence or wind shear, no vertical gust component.
 
+## Pilot realism (`pilotBehaviour.ts`, `pilotRealism.ts`, `radioDiscipline.ts`, `pilotRequests.ts`)
+
+`Scenario.pilotRealism` (`off` / `light` / `moderate` / `heavy`; absent = the earlier behaviour) selects a preset of `PilotRealism`, part of
+`PilotBehaviour.realism`; `Scenario.pilotBehaviour.realism` overrides single values (ignored at level `off`). The level also sets the ground task's
+rates (`ground.holdShortOmitFraction`, `taxiwayErrorShare`, `unfamiliarFraction`, `GROUND_RATES_BY_LEVEL`). Per-level table: README "Pilot realism". ALL
+RATES ARE DESIGN VALUES. Every draw is `seeded01(ac.seed, label)` (or the per-clearance label), never the shared generator, so switching realism on does not
+shift the rest of the simulation and the same seed replays the same log.
+
+* **Readback errors** (`radio/readback.ts`): runway / heading digit (the old error), altitude (+-1000 ft, also in an IFR clearance), frequency, squawk,
+  hold-short omitted and wrong taxiway (ground task), pattern instruction / entry misunderstood (x `studentPatternFactor` for students). One error per
+  readback, recorded in `AircraftRuntime.readbackError` (`errorKind`, `byPosition`) and `Aircraft.flags.readbackErrorKind`. The executor adds two more:
+  **no readback** (the pilot complies silently) and **wrong callsign** (`wrongCallsignAnswerer`: an aircraft with a similar callsign on the frequency reads
+  it back with its own callsign, the addressed pilot says nothing). An uncorrected error is **flown**: `ReadbackError.wrong` carries what the pilot understood; when the window ends (`traffic.ts` -> `commandExecutor.flyMisread`) the aircraft plans and commits that version through the normal planners (`planMisread`: taxi to the read-back runway or route, heading, altitude, squawk, pattern, direct), a wrong frequency is switched to and silent until `returnFreq` (60-120 s), a wrong-callsign answerer flies the clearance, a pilot who cannot do it queries. Time-critical kinds (`IMMEDIATE_KINDS`: takeoff, line up, crossing, landing) are flown as read back at once, and a correction restores the right one (`ReadbackErrorRecord.flown` / `correctClr`). Only with realism on. A correction is the same instruction again (`sameParams` knows altitude, frequency,
+  squawk, IFR clearance, pattern, hold short, direct fix) or `DID_YOU_COPY` (no readback: the pilot reads the clearance back). The 20 s window for a
+  missed error starts when the readback has been heard. A frequency or IFR-clearance readback error holds the frequency change / the taxi request until it is corrected or missed.
+* **Timing** (`radioDiscipline.ts`): `pilotSay(ctx, ac, text, data, delaySec)`. Without realism it speaks at once. With `radioDiscipline` a call is queued
+  `responseDelaySec` (crew class: airline / GA / student, base speed per aircraft + per-call share) plus `blockWindowSec` after keying. A call keyed while
+  another is on the air waits for it (waiting pilots queue behind each other). Two calls keyed on one frequency inside the window are **blocked**: a
+  `RADIO_BLOCKED` event, `onPilotTransmission({ blocked: true, text: '[blocked]' })` once, and each pilot retries after `blockRetryMinSec` + a seeded share
+  of `blockRetrySpreadSec`, at least `blockWindowSec` + 0.4 s apart (at most `MAX_BLOCK_RETRIES`). One aircraft never talks over itself. The voice layer only renders it.
+* **Missed calls and "say again"** (`pilotRealism.ts`, `commandExecutor.ts`): `delayedResponseRate` - the pilot did not hear: nothing is said or done, the
+  outcome is `clarify`, the next call to the aircraft is heard. `sayAgainRate` for a transmission with more than `sayAgainMinCommands` instructions
+  (`ParsedCommand.groupSize`, set by the parser and the AI): `clarify`, nothing executed. Safety instructions (go around, cancel takeoff, hold) are never missed.
+  New commands: `DID_YOU_COPY`, `UNABLE` (clears the pending request; a refused taxi-back makes the aircraft an arrival again). Not scored as errors.
+* **Callsigns and styles** (`radioDiscipline.ts styleCall`, `radio/callsigns.ts`): GA pilots open with "November" at `novemberInitialRate` (a per-aircraft habit), students
+  add "student pilot" to their initial call (first pilot call on a frequency; AIM 4-2-4), airline check-ins get ", with you" / "with Bravo" (non-standard), and after the
+  controller used an abbreviated callsign (`ParsedCommand.callsignAbbreviated` -> `AircraftRuntime.abbreviationOk`) GA pilots say the type word and the last three
+  characters, never with a similar callsign on the frequency. `Aircraft.student` (spawn `student`, else `studentShare` of light VFR aircraft) is also read by the ground task;
+  a student asks for progressive taxi at `progressiveTaxiRate` (`pilotUnfamiliar`). `Aircraft.flags.inContact` is set on the first call: the parser refuses an abbreviation for an aircraft that has not called.
+* **Requests** (`pilotRequests.ts`): see the table at the top of the file. A request is made at most once per aircraft, with a seeded draw against `requests[CODE]`,
+  once a second, and becomes `pendingRequest` with `request` (code), `fix` / `runwayEnd`. `NEED_MINUTE` is made in `commandExecutor.notReadyForTakeoff`: the first takeoff clearance of a
+  seeded share of aircraft is answered "unable, we need a minute" (`needMinuteSec`), then "ready for departure". `TAXI_BACK` makes the aircraft a departure again (phase `RUNWAY_EXIT -> TAXIING`).
+  "Unable" at a type limit (speed / ceiling) already existed (`planSpeed`, `planAltitude`).
+* AI controllers: `src/ai/requests.ts` answers requests, `corrections.ts` handles every error kind, and a transmission that drew a "say again" is repeated "slowly" (no size mark).
+
+Tests: `pilotRealism.test.ts`, `radioDiscipline.test.ts`, `pilotStyles.test.ts`, `pilotRequests.test.ts` (and `src/ai/pilotRealism.test.ts`, `src/commands/pilotRealism.test.ts`, `src/voice/blocked.test.ts`, `src/game/pilotRealism.test.ts`).
+Scripted tests that need exact pilot behaviour set `pilotRealism: 'off'` on the scenario.
+
 ## Traffic variety: helicopters, vehicles, fighters, VFR transits, training (`rotorcraft.ts`, `vehicles.ts`, `special.ts`, `specialCommands.ts`)
 
 New aircraft types (`performance.ts`): `H65` (`craft: 'rotorcraft'`), `F16` (`military`), `VEH` (`craft: 'vehicle'`); numbers and their sources in docs/REALISM-VERIFICATION.md section 9. Callsign tags `CGD#####` (spoken "Coast Guard ..."), `ANG#####` ("Air Guard ..."), `APT<n>` ("Airport <n> vehicle"); see docs/FAA-REFERENCES.md "Traffic variety". Spawns carry a `behavior` (`SpawnBehavior`, types.ts): `vehicle`, `transit`, `training`, `military`, `helicopter`; `spawnFromSpec` applies it (`initVehicle`, `initSpecial`).

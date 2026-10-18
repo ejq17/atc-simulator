@@ -21,8 +21,21 @@ export const EVENT_CAP = 2000;
 
 export interface ReadbackErrorRecord {
   sinceSec: number;
-  kind: 'TAKEOFF' | 'LAND' | 'LINE_UP_AND_WAIT' | 'TAXI' | 'TAXI_TO_PARKING' | 'CROSS_RUNWAY' | 'HEADING' | 'APPROACH';
+  /** The kind of the clearance that was misread (the controller corrects by re-issuing a command of this kind). */
+  kind: ClearanceKind;
+  /** What went wrong (`ReadbackError.kind` in radio/readback.ts); undefined = the pre-realism runway / heading digit error. */
+  errorKind?: string;
   clearanceId: string;
+  /** What the pilot understood (`ReadbackError.wrong`): flown when the window ends without a correction, or at once for time-critical kinds (`flown`). */
+  wrong?: Record<string, unknown>;
+  /** The wrong version was already put into effect (takeoff, line up, crossing, landing); a correction then restores the right one. */
+  flown?: boolean;
+  /** The controller's clearance before the wrong version was put in (compared with the re-issued instruction). */
+  correctClr?: Clearance;
+  /** Wrong-callsign answer: the aircraft that read the clearance back and will fly it if nobody corrects. */
+  answererId?: string;
+  /** The controller position that issued the clearance (who has to correct it). */
+  byPosition?: ControllerPositionId;
   correct: string;
   spoken: string;
 }
@@ -237,6 +250,32 @@ export interface AircraftRuntime {
   gustAirKt?: number;
   /** Seconds the effective (gusted) crosswind / tailwind has been over the type's limit on final. */
   windExceedSec?: number;
+  /** Calls made so far (seeds the per-call timing and style draws). */
+  callSeq: number;
+  /** Frequencies (3 decimals) on which the pilot has already spoken: the first pilot-initiated call on a new one is the initial contact. */
+  contacted: Set<string>;
+  /** The controller addressed this aircraft by an abbreviated callsign: its pilot may abbreviate too (AIM 4-2-4). */
+  abbreviationOk?: boolean;
+  /** The pilot missed the controller's call: nothing was done or said, a second call is needed (realism `delayedResponseRate`). */
+  unanswered?: { sinceSec: number; kind: string };
+  /** Pushback requests made so far (seeds the jitter of the next repeat). */
+  pushbackAsks?: number;
+  /** After a wrong frequency was flown: the pilot finds his way back to this frequency at this time. */
+  returnFreq?: { atSec: number; mhz: number; id?: string };
+  /** Last time the pilot looked for something to request (once a second). */
+  requestCheckedAtSec?: number;
+  /** Sim time of the aircraft's latest pilot-initiated request (cooldown). */
+  lastRequestAtSec?: number;
+  /** "We need a minute": the pilot is not ready for takeoff until this time. */
+  notReadyUntilSec?: number;
+  /** Pilot-initiated request codes already made or ruled out (one of each per aircraft). */
+  requestsDone: Set<string>;
+  /** Set when "request taxi back" was made: the next accepted taxi to a runway makes the aircraft a departure again. */
+  taxiBackFor?: string;
+  /** "Request to stay in the pattern" already answered for this circuit: the touch-and-go count flown. */
+  patternCircuits?: number;
+  /** Commands of one transmission that the pilot has asked to say again (by transmission id). */
+  sayAgainTx?: string;
   /** Helicopter state (rotorcraft.ts): lift-off, approach to a helipad, hover. */
   heli?: HeliRuntime;
   /** Airport vehicle task (vehicles.ts). */
@@ -253,6 +292,15 @@ export interface SimContext {
   runtime: Map<string, AircraftRuntime>;
   onPilotTransmission?: EngineOptions['onPilotTransmission'];
   readbackErrorRate: number;
+  /** Pilot calls waiting for their response delay / key-up window (radioDiscipline.ts). */
+  scheduledSpeech: import('./radioDiscipline').ScheduledSpeech[];
+  speechSeq: number;
+  /** Frequency (3 decimals) -> sim time at which the call now on it ends. */
+  frequencyUse: Map<string, number>;
+  /** Frequency -> sim time from / until which pilots queued on the channel will be on the air; a pilot who keys up before `from` cannot know about them (radioDiscipline.ts). */
+  /** Frequency -> the time in which the pilot addressed by the controller is expected to answer (others wait for it). */
+  answerWindow: Map<string, { from: number; end: number }>;
+  frequencyReserved: Map<string, { from: number; end: number }>;
   eventSeq: number;
   clearanceSeq: number;
   aircraftSeq: number;
@@ -307,6 +355,9 @@ export function newRuntime(firstCallAtSec: number): AircraftRuntime {
     depInstructed: false,
     passedFixes: new Set(),
     reports: [],
+    callSeq: 0,
+    contacted: new Set(),
+    requestsDone: new Set(),
   };
 }
 
@@ -341,31 +392,7 @@ export function emitEvent(ctx: SimContext, ev: Omit<SimEvent, 'id' | 'timeSec'>)
   return full;
 }
 
-/** Rough speaking time of a transmission (seconds). */
-export function speechDurationSec(text: string): number {
-  return 1 + text.split(/\s+/).length * 0.38;
-}
-
-/** A pilot "speaks": logs a TRANSMISSION event, updates radio state, notifies the voice layer. */
-export function pilotSay(ctx: SimContext, ac: Aircraft, text: string, data?: Record<string, unknown>): SimEvent {
-  if (ctx.dryRun) return { id: 'ev-dry', timeSec: ctx.state.clock.timeSec, kind: 'TRANSMISSION', text, severity: 'info', speaker: 'PILOT' };
-  const rt = getRuntime(ctx, ac);
-  const ev = emitEvent(ctx, {
-    kind: 'TRANSMISSION',
-    aircraftId: ac.id,
-    callsign: ac.callsign,
-    text,
-    severity: 'info',
-    frequencyMhz: ac.frequencyMhz,
-    speaker: 'PILOT',
-    data,
-  });
-  if (!data?.clarify) rt.lastPilotText = text;
-  rt.radioFreeAtSec = ctx.state.clock.timeSec + speechDurationSec(text);
-  ac.radioState = 'TRANSMITTING';
-  ctx.onPilotTransmission?.({ aircraftId: ac.id, callsign: ac.callsign, text, frequencyMhz: ac.frequencyMhz, voiceId: ac.voiceId, event: ev });
-  return ev;
-}
+export { pilotSay, speechDurationSec } from './radioDiscipline';
 
 /** Change phase through the explicit state machine (throws on an impossible transition). */
 export function setPhase(ctx: SimContext, ac: Aircraft, next: FlightPhase, note?: string): void {

@@ -74,7 +74,11 @@ export function controllerFrequencies(state: Pick<SimulationState, 'airport'>, s
   return out;
 }
 
-const refOf = (a: Aircraft): AircraftRef => ({ callsign: a.callsign, spokenCallsign: a.spokenCallsign, type: a.type });
+const refOf = (a: Aircraft): AircraftRef => ({
+  callsign: a.callsign, spokenCallsign: a.spokenCallsign, type: a.type,
+  // Pilot realism only: an aircraft that has not called yet cannot be addressed by an abbreviated callsign (AIM 4-2-4).
+  ...(a.flags.inContact !== undefined ? { contacted: a.flags.inContact } : {}),
+});
 
 export function taxiwayNames(state: Pick<SimulationState, 'airport'>): string[] {
   const g = state.airport.taxiwayGraph;
@@ -155,6 +159,9 @@ export function aiRefusal(callsign: string, position: ControllerPositionId, mhz:
 function describe(cmd: ParsedCommand): string {
   return `${cmd.kind.replace(/_/g, ' ').toLowerCase()}${cmd.callsign ? ` ${cmd.callsign}` : ''}`;
 }
+
+/** Commands that talk to the pilot (no clearance): the pilot's answer is not a refusal. */
+const CONVERSATION_KINDS: ReadonlySet<string> = new Set(['SAY_AGAIN', 'DID_YOU_COPY', 'UNABLE']);
 
 /**
  * "Cross runway 13 and turn right on Alpha" to an aircraft standing on a runway: the turn defines the route the crossing is part of, so it is
@@ -241,7 +248,7 @@ export function transmit(input: TransmitInput): TransmitResult {
   }
 
   const accepted = results.filter((r) => r.outcome.status === 'accepted');
-  const rejected = results.filter((r) => r.outcome.status === 'rejected' && r.command.kind !== 'SAY_AGAIN');
+  const rejected = results.filter((r) => r.outcome.status === 'rejected' && !CONVERSATION_KINDS.has(r.command.kind));
   let summary: TransmitSummary;
   let message: string;
   if (aiBlocked) {
@@ -258,7 +265,7 @@ export function transmit(input: TransmitInput): TransmitResult {
     summary = 'accepted';
     message = accepted.length
       ? `Issued: ${accepted.map((r) => describe(r.command)).join(', ')}`
-      : `Pilot repeated last transmission${results[0]?.command.callsign ? ` (${results[0].command.callsign})` : ''}.`;
+      : `Pilot answered${results[0]?.command.callsign ? ` (${results[0].command.callsign})` : ''}.`;
   }
   const offFrequency = !aiBlocked && rejected.some((r) => (r.outcome as Extract<CommandOutcome, { status: 'rejected' }>).reason.startsWith('Not on frequency'));
   const txMhz = results[0] && !aiBlocked ? frequencyForPosition(engine.getState().airport, results[0].position)?.mhz : undefined;

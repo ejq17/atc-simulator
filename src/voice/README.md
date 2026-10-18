@@ -398,3 +398,11 @@ default mode first, then `audioSource: 'track'`) to hear them and the aircraft t
 `QueuedTransmission.channel: 'radio' | 'landline'` (default radio). The session enqueues an AI controller's call to another position as `channel: 'landline'` (on the player's first frequency so it is always audible); the queue plays
 `radio.playLandline()` (two short 440 + 480 Hz rings through the radio chain, no files) instead of the PTT-open click and plays no close click. The voice controller has a second hold-to-talk binding (`landline: { key }`,
 `VoiceSettings.landlineKey`, default `KeyL`, `VoiceController.landlinePtt`); a transmission made with it has `TransmissionMeta.channel = 'landline'`, which the session routes to the landline parser. Tests: `landline.test.ts`.
+
+## Blocked transmissions (pilot realism)
+
+When two pilots key up on one frequency at the same time the **engine** decides (`RADIO_BLOCKED` event, deterministic, `src/sim/radioDiscipline.ts`) and tells the session with
+`onPilotTransmission({ blocked: true, text: '[blocked]' })`. The session writes "[blocked]" into the transcript and queues a `QueuedTransmission` with `kind: 'blocked'`; `createPilotVoice`
+plays it with `RadioEffects.playBlocked()` (WebAudio only: two detuned sawtooth / square oscillators gliding up with a noise burst through the radio chain, 1.4 s = `BLOCKED_SQUEAL_SEC`, no audio file)
+instead of speech. A controller who keys up over the squeal cuts it and it is dropped (`blocked_stepped_on`), never retried: the engine schedules the pilots' own retries. A pilot call that the
+controller steps on is still re-queued as before. Tests: `blocked.test.ts`.

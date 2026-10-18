@@ -46,6 +46,24 @@ export const ruleSayAgain: Rule = (t, i) => {
   return cmdHit(skipWords(t, j, ['please', 'callsign']), makeDraft('SAY_AGAIN'));
 };
 
+/** "did you copy", "do you copy", "how do you hear me": the controller calls an aircraft that has not answered. */
+export const ruleDidYouCopy: Rule = (t, i) => {
+  let j = seq(t, i, 'did|do you copy|read');
+  if (j < 0) j = seq(t, i, 'how do you hear|copy');
+  if (j < 0) return null;
+  return cmdHit(skipWords(t, j, ['me', 'that', 'please', 'callsign']), makeDraft('DID_YOU_COPY'));
+};
+
+/**
+ * "unable" / "request denied" / "not approved": the controller declines a pilot request. The words after it are the explanation
+ * ("unable, traffic on a two mile final", "unable closed traffic") and are not read as instructions.
+ */
+export const ruleUnable: Rule = (t, i) => {
+  const j = seq(t, i, 'unable') >= 0 ? i + 1 : seq(t, i, 'request denied') >= 0 ? i + 2 : seq(t, i, 'not approved') >= 0 ? i + 2 : -1;
+  if (j < 0) return null;
+  return cmdHit(t.length, makeDraft('UNABLE'));
+};
+
 /** "wind calm", "wind two one zero at eight [gusts 15]" -> information only */
 export const ruleWind: Rule = (t, i) => {
   if (!isOneOf(t, i, ['wind', 'winds'])) return null;

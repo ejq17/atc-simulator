@@ -145,6 +145,14 @@ rejected commands still log an ATC line); no dry-run validation call; READY airc
 apart against the 30 m GROUND_PROXIMITY alert; landings on 22 exit onto hold B-1 and must re-cross 4/22; ENTER_PATTERN right after a
 go-around can put the aircraft straight on final.
 
+## Pilot realism
+
+`requests.ts` (priority 55, ahead of the routine clearances) answers `Aircraft.pendingRequest.request`: runway change (landing clearance if the runway is an active landing runway and safe, else unable),
+short approach, the option, straight-in, stay in the pattern (touch-and-go or "make full stop"), a 360 for spacing, higher / lower, direct, visual approach (unless another arrival is close ahead), and
+taxi back (like a departure asking for taxi). Unsafe or unknown: `UNABLE`. `corrections.ts` re-issues every kind of faulty or missing readback (altitude, frequency, squawk, IFR clearance, direct fix, runway,
+taxi...); without "negative" for a missing readback or a wrong-callsign answer. A multi-instruction transmission that drew "say again" or no answer is repeated without the size mark ("slowly").
+`tower.ts` leaves an aircraft that asked for a minute alone until it calls ready.
+
 ## Special traffic (`special.ts`)
 
 One agent per position (`createSpecialAgent('GND' | 'TWR' | 'APP')`, added in `controllers.ts`) for the aircraft tuned to it:

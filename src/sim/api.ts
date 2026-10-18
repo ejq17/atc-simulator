@@ -51,5 +51,8 @@ export interface EngineOptions {
   scenario: Scenario;
   dtSec?: number;              // default 0.1
   /** Called whenever a pilot "speaks" so the voice layer can synthesise it. */
-  onPilotTransmission?: (t: { aircraftId: string; callsign: string; text: string; frequencyMhz: number; voiceId: string; event: SimEvent }) => void;
+  onPilotTransmission?: (t: { aircraftId: string; callsign: string; text: string; frequencyMhz: number; voiceId: string; event: SimEvent;
+    /** A blocked transmission (two pilots keyed up together, RADIO_BLOCKED): `text` is "[blocked]" and the voice layer plays a squeal instead of speech. */
+    blocked?: boolean;
+  }) => void;
 }

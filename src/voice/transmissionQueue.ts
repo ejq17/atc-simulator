@@ -23,6 +23,11 @@ export interface QueuedTransmission {
   /** Callsign (pilots) or position (controllers) that seeds the voice and radio character. Defaults to `speaker`, then `voiceId`. */
   callsign?: string;
   speakerKind?: 'airline' | 'ga' | 'controller';
+  /**
+   * `blocked`: two pilots keyed up together (decided by the engine, RADIO_BLOCKED). Not speech: the speaker plays a squeal for it. A blocked
+   * item that is stepped on by the controller is dropped, never retried (the engine schedules the pilots' own retries).
+   */
+  kind?: 'speech' | 'blocked';
   /** Distance of the transmitting aircraft from the airport, nautical miles. Far = weak and scratchy. Omitted = clear. */
   distanceNm?: number;
 }
@@ -44,7 +49,7 @@ export type TransmissionEvent =
   | { type: 'start'; item: QueuedTransmission }
   | { type: 'end'; item: QueuedTransmission }
   | { type: 'stepped_on'; item: QueuedTransmission; attempt: number }
-  | { type: 'dropped'; item: QueuedTransmission; reason: 'wrong_frequency' | 'too_many_retries' | 'cleared' | 'audio_off' };
+  | { type: 'dropped'; item: QueuedTransmission; reason: 'wrong_frequency' | 'too_many_retries' | 'cleared' | 'audio_off' | 'blocked_stepped_on' };
 
 export interface TransmissionQueueOptions {
   speaker: TransmissionSpeaker;
@@ -203,6 +208,10 @@ export function createTransmissionQueue(opts: TransmissionQueueOptions): Transmi
     if (speakTimer) clearTimeout(speakTimer);
     speakTimer = null;
     opts.speaker.cancel();
+    if (e.item.kind === 'blocked') {
+      emit({ type: 'dropped', item: e.item, reason: 'blocked_stepped_on' });
+      return;
+    }
     e.steppedOn += 1;
     if (e.steppedOn > maxRetries) {
       emit({ type: 'dropped', item: e.item, reason: 'too_many_retries' });
