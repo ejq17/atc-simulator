@@ -572,11 +572,12 @@ function planMisread(ctx: SimContext, ac: Aircraft, rt: AircraftRuntime, clr: Cl
   const airport = ctx.state.airport;
   const base: ParsedCommand = {
     kind: clr.kind, callsign: ac.callsign, confidence: 1, rawText: '', normalizedText: '', issues: [],
-    runwayEnd: clr.runwayEnd, runwayId: clr.runwayId, route: clr.route, holdShort: clr.holdShort, destination: clr.destination, headingDeg: clr.headingDeg,
+    runwayEnd: clr.runwayEnd, runwayId: clr.runwayId, route: clr.route, holdShort: clr.holdShort, destination: clr.destination, headingDeg: clr.headingDeg, ...(clr.kind === 'TAKEOFF' && clr.headingDeg !== undefined ? { departureHeading: clr.headingDeg } : {}),
     turnDirection: clr.turnDirection, altitudeFt: clr.altitudeFt, speedKt: clr.speedKt, frequencyMhz: clr.frequencyMhz, frequencyId: clr.frequencyId,
     patternLeg: clr.patternLeg, squawk: clr.squawk, fix: clr.fix, approachType: clr.approachType, exitTaxiway: clr.exitTaxiway, turnDegrees: clr.turnDegrees,
   };
   const c: ParsedCommand = { ...base, ...(wrong as Partial<ParsedCommand>) };
+  if (clr.kind === 'TAKEOFF' && typeof wrong.headingDeg === 'number') c.departureHeading = wrong.headingDeg;
   const w = wrong.runwayEnd as string | undefined;
   if (w) {
     c.runwayEnd = w;
@@ -1268,6 +1269,18 @@ function planLineUp(env: Env): PlanResult {
   };
 }
 
+/** The departure heading of a takeoff clearance (JO 7110.65 5-8-2): remembered at the clearance, flown from 400 ft AGL (flightDynamics.ts). */
+function departureHeadingPlan(env: Env): { patch: Partial<Clearance>; set: () => void } | { reject: Reject } {
+  const { cmd, rt, airport } = env;
+  const h = cmd.departureHeading;
+  if (h === undefined) return { patch: {}, set: () => { rt.departureHeading = undefined; } };
+  if (!(h >= 0 && h <= 360)) return unable(env, `Invalid departure heading ${h}.`, 'say again the heading');
+  return {
+    patch: { headingDeg: h, turnDirection: cmd.turnDirection },
+    set: () => { rt.departureHeading = { trueDeg: magneticToTrue(h, airport.magneticVariationDeg), turn: cmd.turnDirection }; },
+  };
+}
+
 function planTakeoff(env: Env): PlanResult {
   const { ac, rt, ctx, now } = env;
   const g = env.g!;
@@ -1284,6 +1297,8 @@ function planTakeoff(env: Env): PlanResult {
   // IFR departure released by Departure/Approach before the takeoff clearance when that is a separate position (coordination.ts).
   const releaseG = releaseGate(ctx, ac, env.position);
   if (releaseG.refuse) return { reject: { reason: releaseG.refuse, commError: false } };
+  const dh = departureHeadingPlan(env);
+  if ('reject' in dh) return dh;
   if (ac.phase === 'LINE_UP_AND_WAIT') {
     if (ac.assignedRunwayEnd !== g.end.id) {
       return unable(env, `${ac.callsign} is lined up on runway ${ac.assignedRunwayEnd}, not ${g.end.id}.`, `we're lined up on runway ${ac.assignedRunwayEnd}`);
@@ -1293,10 +1308,11 @@ function planTakeoff(env: Env): PlanResult {
     if (lenErr) return lenErr;
     return {
       plan: {
-        patch: { runwayEnd: g.end.id, runwayId: g.runway.id },
+        patch: { runwayEnd: g.end.id, runwayId: g.runway.id, ...dh.patch },
         flag,
         commit: () => {
           releaseG.commit();
+          dh.set();
           rt.takeoffCleared = true;
           rt.rollAtSec = now + 2.5;
           setPhase(ctx, ac, 'CLEARED_FOR_TAKEOFF');
@@ -1313,10 +1329,11 @@ function planTakeoff(env: Env): PlanResult {
   if (lenErr) return lenErr;
   return {
     plan: {
-      patch: { runwayEnd: g.end.id, runwayId: g.runway.id },
+      patch: { runwayEnd: g.end.id, runwayId: g.runway.id, ...dh.patch },
       flag,
       commit: () => {
         releaseG.commit();
+        dh.set();
         // from the hold: the roll starts after the line-up (taxi onto the runway and turn), not 2.5 s after the clearance
         let pathM = 0;
         let prev = ac.pos;

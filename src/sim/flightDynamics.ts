@@ -1441,7 +1441,17 @@ function stepAirborne(ctx: SimContext, ac: Aircraft, dt: number): void {
     const speed = ac.target.speedKt ?? defaultSpeedKt(ac, perf, agl);
     guid = { desiredHeading: ac.target.headingDeg ?? ac.headingDeg, altTargetFt: ac.target.altitudeFt, speedKt: speed, forceDir: rt.turnDirection };
   }
-  if (ac.phase === 'INITIAL_CLIMB' && agl >= 400) setPhase(ctx, ac, 'DEPARTURE');
+  if (ac.phase === 'INITIAL_CLIMB' && agl >= 400) {
+    setPhase(ctx, ac, 'DEPARTURE');
+    // The departure heading given with the takeoff clearance (JO 7110.65 5-8-2) is flown from here: the runway heading until 400 ft AGL (AIM 5-2-9: departures climb to 400 ft above the departure end elevation before the initial turn)
+    // (the point where an IFR "fly runway heading" departure also becomes a departure; DESIGN VALUE, no safe-altitude figure in the text).
+    if (rt.departureHeading) {
+      ac.target.headingDeg = rt.departureHeading.trueDeg;
+      rt.navMode = 'HEADING';
+      rt.turnDirection = rt.departureHeading.turn;
+      rt.departureHeading = undefined;
+    }
+  }
 
   // Heading: bank builds smoothly toward the commanded turn rate.
   let err = headingDiff(ac.headingDeg, guid.desiredHeading);

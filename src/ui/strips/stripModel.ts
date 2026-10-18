@@ -82,8 +82,11 @@ export function markForClearance(c: Clearance): Pick<StripMark, 'text' | 'title'
     }
     case 'LINE_UP_AND_WAIT':
       return { text: 'LUAW', title: `Line up and wait${rwy ? `, runway ${rwy}` : ''}` };
-    case 'TAKEOFF':
-      return { text: `CTO ${rwy}`.trim(), title: `Cleared for takeoff${rwy ? `, runway ${rwy}` : ''}` };
+    case 'TAKEOFF': {
+      // the departure heading given with the clearance (JO 7110.65 5-8-2) shows on the strip: "CTO 13 L270" / "CTO 13 H180"
+      const hd = c.headingDeg !== undefined && c.runwayEnd ? `${c.turnDirection === 'left' ? 'L' : c.turnDirection === 'right' ? 'R' : 'H'}${String(Math.round(c.headingDeg)).padStart(3, '0')}` : '';
+      return { text: `CTO ${rwy}${hd ? ` ${hd}` : ''}`.trim(), title: `Cleared for takeoff${rwy ? `, runway ${rwy}` : ''}${hd ? `, ${c.turnDirection ? `turn ${c.turnDirection} ` : ''}fly heading ${String(Math.round(c.headingDeg!)).padStart(3, '0')} after takeoff` : ''}` };
+    }
     case 'HOLD_SHORT': {
       const where = runwayNum(c.holdShort?.[0] ?? c.runwayEnd ?? c.runwayId);
       return { text: `H/S ${where}`.trim(), title: `Hold short of ${where ? `runway ${where}` : 'the runway'}` };

@@ -215,6 +215,7 @@ export function planCancelTakeoff(env: Env): PlanResult {
       flag,
       commit: () => {
         rt.takeoffCleared = false;
+        rt.departureHeading = undefined;
         rt.rollAtSec = undefined;
         completeClearances(ctx, ac, ['TAKEOFF']);
         if (rolling) rt.aborting = true;

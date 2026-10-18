@@ -224,6 +224,8 @@ describe('clearance abbreviations', () => {
     expect(m(clr('APPROACH', { runwayEnd: '13', approachType: 'ILS' }))).toBe('C 13');
     expect(m(clr('LINE_UP_AND_WAIT', { runwayEnd: '13' }))).toBe('LUAW');
     expect(m(clr('TAKEOFF', { runwayEnd: '13' }))).toBe('CTO 13');
+    expect(m(clr('TAKEOFF', { runwayEnd: '13', headingDeg: 270, turnDirection: 'left' }))).toBe('CTO 13 L270'); // departure heading with the clearance (5-8-2)
+    expect(m(clr('TAKEOFF', { runwayEnd: '13', headingDeg: 180 }))).toBe('CTO 13 H180');
     expect(m(clr('LAND', { runwayEnd: '22' }))).toBe('CTL 22');
     expect(m(clr('LAND', { runwayEnd: '4', holdShort: ['13/31'] }))).toBe('LAHSO 13');
     expect(m(clr('CROSS_RUNWAY', { runwayId: '13/31' }))).toBe('X 13/31');

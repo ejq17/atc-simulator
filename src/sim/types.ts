@@ -546,6 +546,8 @@ export interface ParsedCommand {
   crossRunwayId?: string;
   destination?: string;
   headingDeg?: number;             // magnetic
+  /** TAKEOFF: heading to fly after liftoff, magnetic (JO 7110.65 5-8-2 departure instruction given with the takeoff clearance); `turnDirection` is the turn to it. */
+  departureHeading?: number;
   turnDirection?: 'left' | 'right';
   altitudeFt?: number;
   speedKt?: number;

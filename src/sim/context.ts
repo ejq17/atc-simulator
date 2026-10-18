@@ -192,6 +192,8 @@ export interface AircraftRuntime {
   /** Moving from the holding position onto the runway centreline. */
   lineUp?: { holdNodeId: string; runwayNodeId: string; runwayEnd: string; aligned: boolean };
   takeoffCleared: boolean;
+  /** Heading (TRUE) and turn to fly once the departure is 400 ft AGL (AIM 5-2-9 initial-turn point), from the takeoff clearance (JO 7110.65 5-8-2 INITIAL HEADING); until then the runway heading. */
+  departureHeading?: { trueDeg: number; turn?: 'left' | 'right' };
   /** When the takeoff roll begins after clearance (pilot reaction time). */
   rollAtSec?: number;
   /** Runway end for which a landing clearance is currently held. */

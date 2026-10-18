@@ -95,12 +95,33 @@ export function assemble(elements: Element[], tokenCount: number, preConsumed: r
       prev.end = p.end;
       continue;
     }
-    // "runway one three, fly runway heading, cleared for takeoff": the departure heading is part of the takeoff clearance (3-9-10 example, IFR
-    // departure); a separate HEADING would be refused on the ground. The takeoff keeps the words, so the pilot reads back once.
-    if (prev && prev.draft.kind === 'HEADING' && prev.draft.fields.destination === 'RUNWAY_HEADING' && p.draft.kind === 'TAKEOFF') {
+    // Departure instruction with the takeoff clearance (JO 7110.65 5-8-2: the heading, with its turn direction, is issued with the clearance and
+    // flown after takeoff): "fly heading one eight zero, runway one three, cleared for takeoff", "turn left heading two seven zero, cleared for
+    // takeoff runway 13" and "cleared for takeoff runway 13, turn right heading zero niner zero" are ONE TAKEOFF command with `departureHeading`
+    // (a separate HEADING would be refused on the ground), read back once. "fly runway heading" adds nothing: the takeoff already follows it.
+    const hdg = (d: PlacedDraft | undefined) => d && d.draft.kind === 'HEADING' && !d.draft.unknownIds ? d : undefined;
+    const before = hdg(prev);
+    if (before && p.draft.kind === 'TAKEOFF' && (before.draft.fields.destination === 'RUNWAY_HEADING' || before.draft.fields.headingDeg !== undefined)) {
       merged.pop();
-      p.start = Math.min(p.start, prev.start);
-      p.draft.issues.push(...prev.draft.issues);
+      p.start = Math.min(p.start, before.start);
+      p.draft.issues.push(...before.draft.issues);
+      p.draft.nonstandard += before.draft.nonstandard;
+      if (before.draft.fields.headingDeg !== undefined) {
+        p.draft.fields.departureHeading = before.draft.fields.headingDeg;
+        if (before.draft.fields.turnDirection) p.draft.fields.turnDirection = before.draft.fields.turnDirection;
+      }
+    }
+    const after = hdg(p);
+    if (after && prev && prev.draft.kind === 'TAKEOFF' && prev.draft.fields.departureHeading === undefined
+      && (after.draft.fields.destination === 'RUNWAY_HEADING' || after.draft.fields.headingDeg !== undefined)) {
+      if (after.draft.fields.headingDeg !== undefined) {
+        prev.draft.fields.departureHeading = after.draft.fields.headingDeg;
+        if (after.draft.fields.turnDirection) prev.draft.fields.turnDirection = after.draft.fields.turnDirection;
+      }
+      prev.draft.issues.push(...after.draft.issues);
+      prev.draft.nonstandard += after.draft.nonstandard;
+      prev.end = p.end;
+      continue;
     }
     merged.push(p);
   }

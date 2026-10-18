@@ -189,6 +189,19 @@ export function buildReadback(aircraft: Aircraft, c: Clearance, env: ReadbackEnv
       case 'TAKEOFF':
         // Helicopter takeoff from a helipad / taxiway / present position (JO 7110.65 3-11-2; AIM 4-3-17: "CLEARED FOR TAKEOFF FROM (taxiway, helipad, runway number, etc.)")
         if (!c.runwayEnd && !c.runwayId) return `Cleared for takeoff${c.destination ? ` from ${helipadWords(env, c.destination)}` : ' from present position'}${c.turnDirection ? `, make ${c.turnDirection} turn` : ''}`;
+        // Departure heading with the takeoff clearance (JO 7110.65 5-8-2): read back first, as it is given ("Heading one eight zero, runway one three,
+        // cleared for takeoff"); AIM 4-4-7 b lists headings and runway assignments among the elements to read back. A digit slip is drawn before the
+        // runway's, so the one error per readback can fall on the heading.
+        if (c.headingDeg !== undefined && c.runwayEnd) {
+          let spoken = spokenHeading(c.headingDeg);
+          if (!error && shouldErr(env)) {
+            const wh = wrongHeading(c.headingDeg, env);
+            error = { kind: 'heading', correct: `heading ${spokenHeading(c.headingDeg)}`, spoken: `heading ${spokenHeading(wh)}`, wrong: { headingDeg: wh } };
+            spoken = spokenHeading(wh);
+          }
+          const dir = c.turnDirection === 'left' ? 'Left heading' : c.turnDirection === 'right' ? 'Right heading' : 'Heading';
+          return `${dir} ${spoken}, runway ${runwaySpoken(c.runwayEnd ?? c.runwayId ?? '')}, cleared for takeoff`;
+        }
         return `Runway ${runwaySpoken(c.runwayEnd ?? c.runwayId ?? '')}, cleared for takeoff`;
       case 'LAND':
         if (!c.runwayEnd && !c.runwayId && c.destination) return `Cleared to land ${helipadWords(env, c.destination)}`; // helicopter landing clearance (3-11-6)
