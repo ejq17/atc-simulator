@@ -21,6 +21,7 @@ import { findRunway, findRunwayEnd, alongCross, normalizeRunwayEndId } from './r
 import type { RunwayEndGeom } from './runways';
 import { findTaxiRoute, nearestNode, neighborIds, runwayCrossingsAlong, shortestDistances } from './pathfinding';
 import type { TaxiRoute } from './pathfinding';
+import { stoppedOnRunway, runwayChainPosition } from './runwayStop';
 import { pickRunwayHold, runwayHoldCandidates, runwayRemainingM, takeoffRunM } from './holdSelection';
 import { spokenTaxiway } from '../radio/spoken';
 import { computeStopNodes } from './groundMovement';
@@ -49,7 +50,7 @@ import { airTaxiPlan, holdDispatch, landDispatch, planOverhead, takeoffDispatch 
 import { isRotorcraft } from './rotorcraft';
 import {
   luawTrafficIssue, noteAirportInfo, planAirportInfo, planCancelTakeoff, planExitRunway, planFollowTraffic, planFrequencyApproved, planLandingHoldShort, planPatternInstruction,
-  planReportPosition, planSquawk, planTrafficAdvisory,
+  planReportPosition, planSquawk, planStoppedExit, planTrafficAdvisory, releaseRunwayStop,
 } from './towerCommands';
 
 const DUPLICATE_WINDOW_SEC = 5;
@@ -163,7 +164,7 @@ function executeInner(ctx: SimContext, cmdInput: ParsedCommand, opts?: ExecOpts)
     if (cmdIn.callsignCandidates && cmdIn.callsignCandidates.length > 1) {
       return clarify(undefined, `Which aircraft? ${cmdIn.callsignCandidates.join(' or ')}`, false);
     }
-    return clarify(undefined, 'No callsign recognised. Say the aircraft callsign.', true);
+    return clarify(undefined, `No callsign recognised${cmdIn.rawText ? ` in "${cmdIn.rawText}"` : ''}. Say the aircraft callsign.`, true);
   }
   const ac = Object.values(state.aircraft).find((a) => a.callsign.toUpperCase() === cmdIn.callsign!.toUpperCase());
   if (!ac) return clarify(undefined, `No aircraft "${cmdIn.callsign}" is on the airport or in the area.`, true);
@@ -512,15 +513,20 @@ function planTaxi(env: Env): PlanResult {
   if (!ac.onGround) return unable(env, `${ac.callsign} is airborne; cannot taxi.`, "we're airborne");
   const departurePhases = ['PARKED', 'PUSHBACK', 'READY', 'TAXIING', 'HOLDING_SHORT'];
   const arrivalPhases = ['RUNWAY_EXIT', 'TAXI_TO_PARKING'];
-  if (!departurePhases.includes(ac.phase) && !arrivalPhases.includes(ac.phase)) {
+  // Stopped on a runway (a landing that found no exit it could make, or a rejected takeoff): taxiable, the route starts at the runway.
+  const stoppedOnRwy = stoppedOnRunway(ctx, ac);
+  if (stoppedOnRwy && cmd.segment && cmd.route?.length && !cmd.destination) return planStoppedExit(env);
+  if (!stoppedOnRwy && !departurePhases.includes(ac.phase) && !arrivalPhases.includes(ac.phase)) {
     return unable(env, `${ac.callsign} is in phase ${ac.phase}; a taxi instruction cannot be executed now.`, ac.phase === 'ARRIVED' ? "we're parked" : 'not able to taxi now');
   }
   if (ac.phase === 'PUSHBACK' && !rt.pushback?.stoppedAtSec) return unable(env, `${ac.callsign} is still being pushed back.`, "we're still pushing back", false);
   if (ac.phase === 'PARKED' && rt.needsPushback && !rt.pushedBack) {
     return unable(env, `${ac.callsign} is at its gate and needs a pushback before it can taxi; approve the pushback first (the pilot asks "request pushback").`, "we're still at the gate, we need a pushback first", false);
   }
-  const start = currentStartNode(env);
+  const chain = stoppedOnRwy ? runwayChainPosition(ctx, ac) : undefined;
+  const start = chain ? (chain.ahead ?? chain.at ?? chain.behind) : currentStartNode(env);
   if (!start) return unable(env, `${ac.callsign} is not on the taxiway system.`, "we're not on a taxiway");
+  const runwayTravel = stoppedOnRwy && chain ? [chain.g.runway.id] : undefined;
   // NOTAM closures: a closed taxiway is never part of a route (JO 7110.65 3-3-1: airport conditions the controller knows of are issued; a
   // clearance onto a closed surface is refused), a taxi to a closed runway's hold is refused.
   const closedTwy = closedTaxiways(ctx.state);
@@ -619,25 +625,30 @@ function planTaxi(env: Env): PlanResult {
     const ids = walkTarget.nodeIds;
     best = { route: { nodeIds: ids, taxiways: [segTurn!.taxiway.toUpperCase()], lengthM: 0, runwayCrossings: [], edgeIds: [] }, target: ids[ids.length - 1] };
   }
-  for (const attempt of walkTarget ? [] : viaAttempts(via)) {
-    // Only a taxiway that merely meets the destination (named as "where it ends": "runway 31 via bravo kilo") may be dropped.
-    if (attempt !== via) {
-      const dropped = via.find((v, k) => attempt[k] !== v) ?? via[via.length - 1];
-      const ends = runwayG ? runwayHoldCandidates(airport, runwayG, attempt[attempt.length - 1], closedTwy).map((h) => h.id) : targets;
-      if (!ends.some((id) => touchesTarget(dropped, id))) continue;
-    }
-    if (runwayG) {
-      const r = pickRunwayHold(airport, searchStart.id, runwayG, attempt, closedTwy);
-      if (r.pick) best = { route: r.pick.route, target: r.pick.hold.id };
-      else if (!why) why = r.reason ?? '';
-    } else {
-      for (const t of targets) {
-        const res = findTaxiRoute(graph, searchStart.id, t, { via: attempt, avoidRunways: true, allowedRunwayIds: allRunwayIds(airport), avoidTaxiways: closedTwy });
-        if (res.route && (!best || res.route.lengthM < best.route.lengthM)) best = { route: res.route, target: t };
-        else if (!res.route && !why) why = res.reason ?? '';
+  // A stopped aircraft first tries the node ahead of it, then (turning around, back-taxi) the one behind it.
+  const starts: TaxiNode[] = stoppedOnRwy && chain ? [...new Set([start, ...(chain.at ? [chain.at] : []), ...(chain.behind ? [chain.behind] : [])])] : [searchStart];
+  for (const from of walkTarget ? [] : starts) {
+    for (const attempt of viaAttempts(via)) {
+      // Only a taxiway that merely meets the destination (named as "where it ends": "runway 31 via bravo kilo") may be dropped.
+      if (attempt !== via) {
+        const dropped = via.find((v, k) => attempt[k] !== v) ?? via[via.length - 1];
+        const ends = runwayG ? runwayHoldCandidates(airport, runwayG, attempt[attempt.length - 1], closedTwy).map((h) => h.id) : targets;
+        if (!ends.some((id) => touchesTarget(dropped, id))) continue;
       }
+      if (runwayG) {
+        const r = pickRunwayHold(airport, from.id, runwayG, attempt, closedTwy);
+        if (r.pick) best = { route: r.pick.route, target: r.pick.hold.id };
+        else if (!why) why = r.reason ?? '';
+      } else {
+        for (const t of targets) {
+          const res = findTaxiRoute(graph, from.id, t, { via: attempt, avoidRunways: true, allowedRunwayIds: allRunwayIds(airport), avoidTaxiways: closedTwy, runwayTravelIds: runwayTravel });
+          if (res.route && (!best || res.route.lengthM < best.route.lengthM)) best = { route: res.route, target: t };
+          else if (!res.route && !why) why = res.reason ?? '';
+        }
+      }
+      if (best) { usedVia = attempt; break; }
     }
-    if (best) { usedVia = attempt; break; }
+    if (best) break;
   }
   if (!best) {
     return unable(env, `Invalid taxi route for ${ac.callsign}${via.length ? ` via ${via.join(', ')}` : ''}: ${why}.`, `that route isn't available`);
@@ -686,6 +697,7 @@ function planTaxi(env: Env): PlanResult {
         }
         ac.route = { nodeIds: route.nodeIds, taxiways: route.taxiways, stopAtNodeIds: [...stops], progressIndex: 0 };
         rt.unreadHoldShort = undefined;
+        if (stoppedOnRwy) releaseRunwayStop(ctx, ac);
         rt.segmentTurn = cmd.segment && segTurn?.dir ? { dir: segTurn.dir, taxiway: segTurn.taxiway, atSec: now } : undefined;
         rt.stoppedAtNodeId = undefined;
         rt.closedHold = undefined; // a new taxi instruction (planned around the closure) replaces the route that ran into it
@@ -849,12 +861,24 @@ function planCross(env: Env): PlanResult {
       break;
     }
   }
+  // An aircraft taxiing along a runway meets the intersecting runway at a runway node, not at a hold line.
+  let atIntersection = false;
+  if (holdIdx < 0) {
+    for (let i = from; i < route.nodeIds.length; i++) {
+      const n = graph.nodes[route.nodeIds[i]];
+      if (n.kind === 'runway' && n.runwayIds?.includes(rw.id)) {
+        holdIdx = i;
+        atIntersection = true;
+        break;
+      }
+    }
+  }
   if (holdIdx < 0) return unable(env, `${ac.callsign} is not holding short of or approaching runway ${rw.id} on its route.`, `we're not approaching runway ${rw.id}`);
-  const standing = rt.stoppedAtNodeId === route.nodeIds[holdIdx];
+  const standing = atIntersection ? ac.groundSpeedKt < 1 : rt.stoppedAtNodeId === route.nodeIds[holdIdx];
   if (!standing && routeDistanceTo(env, holdIdx) > CROSS_APPROACH_M) {
     return unable(env, `${ac.callsign} is still ${Math.round(routeDistanceTo(env, holdIdx))} m from runway ${rw.id}.`, `we're not at runway ${rw.id} yet`);
   }
-  if (!runwayCrossingsAlong(graph, route.nodeIds.slice(holdIdx)).includes(rw.id)) {
+  if (!atIntersection && !runwayCrossingsAlong(graph, route.nodeIds.slice(holdIdx)).includes(rw.id)) {
     return unable(env, `The current route of ${ac.callsign} does not continue across runway ${rw.id}; issue a new taxi instruction.`, `our route doesn't cross runway ${rw.id}`);
   }
   // JO 7110.65 3-1-3: Ground needs local control's approval for an active runway (coordination.ts).

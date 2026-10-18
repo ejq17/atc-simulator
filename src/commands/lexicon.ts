@@ -58,6 +58,8 @@ export const PHRASES: readonly { words: readonly string[]; to: PhraseTarget }[] 
   // Service callsigns of JO 7110.65 2-4-20 ("Coast Guard Six One Three Two Seven", "Air Guard One Three Five Eight Six")
   { words: ['coast', 'guard'], to: { text: 'CGD', kind: 'airline' } },
   { words: ['air', 'guard'], to: { text: 'ANG', kind: 'airline' } },
+  { words: ['air', 'national', 'guard'], to: { text: 'ANG', kind: 'airline' } },
+  { words: ['national', 'guard'], to: { text: 'ANG', kind: 'airline' } },
   // Formation calls ("flight of two") are part of the callsign, not an instruction or a number (JO 7110.65 2-1-13)
   { words: ['flight', 'of', 'two'], to: { text: '' } },
   { words: ['flight', 'of', 'three'], to: { text: '' } },
@@ -74,6 +76,12 @@ export const PHRASES: readonly { words: readonly string[]; to: PhraseTarget }[] 
   { words: ['park', 'yee'], to: { text: 'parking' } },
   { words: ['park', 'ee'], to: { text: 'parking' } },
   { words: ['be', 'a'], to: { text: 'via' } },
+  // Renderings of "via" heard in a real KACY session ("taxi to runway 4 be on November Papa Delta Alpha", "be in November", "V a November")
+  { words: ['be', 'on'], to: { text: 'via' } },
+  { words: ['be', 'in'], to: { text: 'via' } },
+  { words: ['bee', 'a'], to: { text: 'via' } },
+  { words: ['v', 'a'], to: { text: 'via' } },
+  { words: ['tax', 'in'], to: { text: 'taxi to' } },
   // Whisper / Web Speech renderings of ground instructions heard in real sessions
   { words: ['hold', 'shore'], to: { text: 'hold short' } },
   { words: ['whole', 'chore'], to: { text: 'hold short' } },
@@ -104,13 +112,18 @@ export const ALIASES = rec<readonly string[]>({
   tackty: ['taxi'], taxie: ['taxi'], taxity: ['taxi'], taxituary: ['taxi', 'to', 'runway'], vietnam: ['via', 'november'],
   taxitu: ['taxi', 'to'], tax: ['taxi'], access: ['taxi'], mic: ['mike'], alima: ['via', 'lima'], holdshore: ['hold', 'short'],
   taxa: ['taxi'], chaxi: ['taxi'], taxee: ['taxi'], vialima: ['via', 'lima'], aravo: ['bravo'], baravo: ['bravo'],
+  // more renderings from the same KACY session: "limo Romeo" (lima), "aplha" (alpha), "been November" (via November)
+  limo: ['lima'], aplha: ['alpha'], been: ['via'],
 });
 
 /**
- * "via a Lima": STT writes the article "a" for the second half of "via". Only a lower-case raw "a" between "via" and a
- * spelled NATO word is dropped (a typed taxiway "via A C" or "via a l" is untouched).
+ * "via a Lima", "on an Alpha": STT writes an article for the second half of "via" / inserts one after a preposition. Only a lower-case
+ * raw "a" / "an" between such a preposition and a spelled NATO word is dropped (a typed taxiway "via A C" or "via a l" is untouched).
  */
 export const VIA_ARTICLE = 'a';
+export const ARTICLES: ReadonlySet<string> = new Set(['a', 'an']);
+/** Words after which a spoken article before a NATO word is noise ("on an Alpha"). "via a" is the original case. */
+export const ARTICLE_AFTER: ReadonlySet<string> = new Set(['via', 'on', 'at', 'onto']);
 
 /** Core instruction words an unknown, near-miss word may be corrected to (see `fuzzyCorrect` in normalize.ts). */
 export const FUZZY_KEYWORDS: readonly string[] = [

@@ -6,7 +6,7 @@
  * 3-10-11 (closed traffic), 3-10-1 / 3-9-1 (landing / departure information), 7-6-11 (squawk VFR, frequency change approved),
  * 5-2-1 (squawk), 3-9-4 (LUAW traffic information). See docs/FAA-REFERENCES.md and docs/PHRASEOLOGY-AUDIT.md.
  */
-import { cmdHit, fillerHit, makeDraft, type Draft, type Rule } from './draft';
+import { cmdHit, fillerHit, makeDraft, type Draft, type Hit, type Rule } from './draft';
 import { parseOneTaxiway } from './entities';
 import { intAt, isOneOf, seq, skipWords, txt, type Toks } from './match';
 import type { AirportInfo, TrafficRef } from '../sim/types';
@@ -22,11 +22,30 @@ const EXIT_VERBS = ['turn', 'exit', 'vacate', 'leave', 'take'];
  * "turn left at Charlie". Also "exit [the runway] [left|right] [at] Charlie" and "continue to the end" (not in 7110.65: flagged non-standard).
  * "turn left heading 270" is not an exit (the heading rule takes it).
  */
-export const ruleExitRunway: Rule = (t, i) => {
+export const ruleExitRunway: Rule = (t, i) => exitRule(t, i, true);
+
+function exitRule(t: Toks, i: number, allowLead: boolean): Hit | null {
   let j = i;
   let ifAble = false;
   const able = seq(t, j, 'if able');
   if (able >= 0) { ifAble = true; j = able; }
+  // "continue down [the] runway [22]" / "continue along the runway", alone or in front of an exit instruction ("..., turn right on Alpha"):
+  // the aircraft rolls on along the runway to the turnoff. Not in 7110.65 (3-10-9 has "turn left/right (taxiway)" only): flagged non-standard.
+  if (allowLead && isOneOf(t, j, ['continue', 'proceed', 'roll'])) {
+    const k0 = skipWords(t, j + 1, ['down', 'along', 'on', 'the']);
+    if (k0 > j + 1 && txt(t, k0) === 'runway') {
+      let k = k0 + 1;
+      if (intAt(t, k) !== null && /^\d{1,2}$/.test(t[k].text)) k++;
+      const rest = exitRule(t, k, false);
+      if (rest && rest.body.type === 'cmd') {
+        rest.body.draft.nonstandard++;
+        return rest;
+      }
+      const d = makeDraft('EXIT_RUNWAY', { destination: 'END' });
+      d.nonstandard++;
+      return cmdHit(k, d);
+    }
+  }
   // "continue to the end [of the runway]" / "continue on to the end" / "roll to the end"
   const end = seq(t, j, 'continue|proceed|roll on? to the end of? the? runway?');
   if (end >= 0) {
@@ -51,6 +70,7 @@ export const ruleExitRunway: Rule = (t, i) => {
   let side: 'left' | 'right' | undefined;
   if (isOneOf(t, j, ['left', 'right'])) { side = txt(t, j) as 'left' | 'right'; j++; }
   if (isOneOf(t, j, ['heading', 'base', 'downwind', 'final', 'traffic']) || intAt(t, j) !== null) return null;
+  j = skipWords(t, j, ['at', 'the']); // "turn right at the next taxiway"
   const next = txt(t, j) === 'next';
   if (next) j = skipWords(t, j + 1, ['taxiway', 'intersection', 'exit']);
   j = skipWords(t, j, ['at', 'on', 'onto', 'via', 'the', 'taxiway']);
@@ -64,7 +84,7 @@ export const ruleExitRunway: Rule = (t, i) => {
   if (!tw && !next) d.fields.destination = 'NEXT';
   if (next) d.fields.destination = 'NEXT';
   return cmdHit(j, d);
-};
+}
 
 // ---------------------------------------------------------------------------
 // Cancel takeoff clearance (3-9-11)

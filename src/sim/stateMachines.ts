@@ -17,7 +17,7 @@ export const ALLOWED_TRANSITIONS: Readonly<Record<FlightPhase, readonly FlightPh
   READY: ['TAXIING'],
   TAXIING: ['HOLDING_SHORT', 'LINE_UP_AND_WAIT', 'CLEARED_FOR_TAKEOFF', 'PARKED'],
   HOLDING_SHORT: ['TAXIING', 'LINE_UP_AND_WAIT', 'CLEARED_FOR_TAKEOFF'],
-  LINE_UP_AND_WAIT: ['CLEARED_FOR_TAKEOFF'],
+  LINE_UP_AND_WAIT: ['CLEARED_FOR_TAKEOFF', 'TAXIING'], // TAXIING: told to taxi off the runway (a rejected takeoff stopped on it, JO 7110.65 3-9-11)
   CLEARED_FOR_TAKEOFF: ['TAKEOFF_ROLL', 'LINE_UP_AND_WAIT'], // LINE_UP_AND_WAIT: takeoff clearance cancelled (JO 7110.65 3-9-11)
   TAKEOFF_ROLL: ['INITIAL_CLIMB', 'LINE_UP_AND_WAIT'], // rejected takeoff, stopped on the runway
   INITIAL_CLIMB: ['DEPARTURE', 'PATTERN'],

@@ -19,7 +19,7 @@
  * - The parse context carries every fix and navaid (`fixes`) so "proceed direct Cedar Lake / MAYBN" resolves.
  * - Processing stops at the first `clarify` (the controller must repeat), but not at a `rejected` command.
  */
-import { parseTransmission } from '../../commands';
+import { looksLikeLandline, parseTransmission } from '../../commands';
 import type { AircraftRef, FixInfo } from '../../commands';
 import type { SimulationEngine } from '../../sim/api';
 import type { Aircraft, CommandOutcome, ControllerPositionId, ParsedCommand, SimulationState } from '../../sim/types';
@@ -156,6 +156,21 @@ function describe(cmd: ParsedCommand): string {
   return `${cmd.kind.replace(/_/g, ' ').toLowerCase()}${cmd.callsign ? ` ${cmd.callsign}` : ''}`;
 }
 
+/**
+ * "Cross runway 13 and turn right on Alpha" to an aircraft standing on a runway: the turn defines the route the crossing is part of, so it is
+ * issued first (the crossing clearance needs a route to cross on). Anywhere else the spoken order is kept.
+ */
+function crossAfterExit(commands: ParsedCommand[], state: SimulationState): ParsedCommand[] {
+  const out = [...commands];
+  for (let i = 0; i + 1 < out.length; i++) {
+    const [a, b] = [out[i], out[i + 1]];
+    if (a.kind !== 'CROSS_RUNWAY' || a.route?.length || b.kind !== 'EXIT_RUNWAY' || !a.callsign || a.callsign !== b.callsign) continue;
+    const ac = findAircraft(state, a.callsign);
+    if (ac && ac.onGround && ac.groundSpeedKt < 1 && ac.occupyingRunways.length > 0 && (!ac.route || ac.route.progressIndex >= ac.route.nodeIds.length)) { out[i] = b; out[i + 1] = a; i++; }
+  }
+  return out;
+}
+
 export interface TransmitInput {
   engine: SimulationEngine;
   text: string;
@@ -170,6 +185,14 @@ export function transmit(input: TransmitInput): TransmitResult {
   const transmissionId = input.transmissionId ?? nextTransmissionId();
   const empty = (message: string): TransmitResult => ({ transmissionId, text, source, commands: [], results: [], summary: 'empty', message });
   if (!text) return empty('Nothing to transmit.');
+
+  // A call that starts with a position name and asks for a coordination ("Tower, cross runway four at Bravo with Spirit ten thirty three") is for
+  // another controller, never a clearance to the aircraft named in it. The session routes it to the landline; this is the safety net.
+  if (looksLikeLandline(text)) {
+    const message = `That sounds like a landline call to another position, not an instruction to an aircraft (heard "${text}"); nothing was sent. Use the landline key or start with the aircraft callsign.`;
+    engine.logEvent({ kind: 'CLARIFICATION', text: message, severity: 'info', speaker: 'SYSTEM' });
+    return { ...empty(message), summary: 'clarify', clarification: message };
+  }
 
   const state = engine.getState();
   const all = Object.values(state.aircraft);
@@ -187,13 +210,15 @@ export function transmit(input: TransmitInput): TransmitResult {
   }
 
   if (parsed.commands.length === 0) {
-    engine.logEvent({ kind: 'CLARIFICATION', text: 'No instruction recognised in that transmission.', severity: 'info', speaker: 'SYSTEM' });
-    return { ...empty('No instruction recognised.'), summary: 'clarify', clarification: 'No instruction recognised in that transmission.' };
+    const heard = `No instruction recognised in that transmission (heard "${text}").`;
+    engine.logEvent({ kind: 'CLARIFICATION', text: heard, severity: 'info', speaker: 'SYSTEM' });
+    return { ...empty('No instruction recognised.'), summary: 'clarify', clarification: heard };
   }
 
   const results: CommandResult[] = [];
   let clarification: string | undefined;
   let aiBlocked: TransmitResult['aiBlocked'];
+  parsed = { ...parsed, commands: crossAfterExit(parsed.commands, engine.getState()) };
   for (const command of parsed.commands) {
     const target = findAircraft(engine.getState(), command.callsign);
     const withAi = aiPositionOf(engine.getState(), controller, target);

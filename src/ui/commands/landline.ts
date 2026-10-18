@@ -79,9 +79,10 @@ export function transmitLandline(input: LandlineInput): LandlineResult {
     runwayEnds: state.airport.runways.flatMap((r) => r.ends.map((e) => e.id)),
     taxiways: taxiwayNames(state),
     fixes: fixList(state),
+    playerPositions: controller.positions,
   });
   if (cmd.kind === 'UNKNOWN' || cmd.confidence < 0.6) {
-    return fail('clarify', `Landline call not understood${cmd.issues.length ? ` (${cmd.issues.join('; ')})` : ''}. Say "<position>, <your position>, <message>": for example "Tower, Ground, cross runway one three at Alpha with Cessna ...".`, cmd);
+    return fail('clarify', `Landline call not understood: heard "${text}"${cmd.issues.length ? ` (${cmd.issues.join('; ')})` : ''}. Say "<position>, <your position>, <message>" (your own position may be left out when you work only one): for example "Tower, cross runway one three at Alpha with Cessna ...".`, cmd);
   }
 
   const mine = controller.positions;

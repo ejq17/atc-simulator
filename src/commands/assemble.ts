@@ -82,5 +82,20 @@ export function assemble(elements: Element[], tokenCount: number, preConsumed: r
     return !(before && before.draft.kind === p.draft.kind
       && JSON.stringify(before.draft.fields) === JSON.stringify(p.draft.fields));
   });
-  return { drafts, consumed };
+  // "taxi to runway 4 <words the grammar could not read>, hold short of runway 4": the hold short belongs to the taxi instruction (3-7-2), which is
+  // read back once. (When the route is understood the taxi rule takes the hold short itself.)
+  const merged: PlacedDraft[] = [];
+  for (const p of drafts) {
+    const prev = merged[merged.length - 1];
+    const hold = p.draft.fields.holdShort;
+    if (prev && p.draft.kind === 'HOLD_SHORT' && hold?.length && !p.draft.unknownIds && (prev.draft.kind === 'TAXI' || prev.draft.kind === 'TAXI_TO_PARKING') && !prev.draft.fields.segment) {
+      prev.draft.fields.holdShort = [...new Set([...(prev.draft.fields.holdShort ?? []), ...hold])];
+      prev.draft.issues.push(...p.draft.issues);
+      prev.draft.nonstandard += p.draft.nonstandard;
+      prev.end = p.end;
+      continue;
+    }
+    merged.push(p);
+  }
+  return { drafts: merged, consumed };
 }

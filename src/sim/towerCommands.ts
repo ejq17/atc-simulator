@@ -19,6 +19,9 @@ import { MAX_BRAKE_FACTOR, holdShortStopAlong, replanRollout, runwayExits, start
 import { seeded01 } from './rng';
 import { digitsSpoken, spokenRunway, spokenTaxiway } from '../radio/spoken';
 import { projectArrival } from './runwayTiming';
+import { stoppedExitOptions, stoppedOnRunway } from './runwayStop';
+import { computeStopNodes } from './groundMovement';
+import { routeSegmentTaxiways } from './pathfinding';
 
 /** `Aircraft.frequencyMhz` of an aircraft that has left every ATC frequency ("frequency change approved", JO 7110.65 7-6-11). The dataset has no advisory frequency for these airports, so none is invented. */
 export const NO_FREQUENCY_MHZ = 0;
@@ -37,6 +40,7 @@ const landingPhases = ['FINAL', 'LANDING', 'ROLLOUT'];
 
 export function planExitRunway(env: Env): PlanResult {
   const { ac, rt, cmd, airport, ctx } = env;
+  if (stoppedOnRunway(ctx, ac)) return planStoppedExit(env);
   if (!landingPhases.includes(ac.phase)) {
     return unable(env, `${ac.callsign} (${ac.phase}) is not landing; a runway exit instruction applies on final or during the landing roll.`, ac.onGround ? "we're already clear of the runway" : "we're not landing yet", false);
   }
@@ -74,6 +78,60 @@ export function planExitRunway(env: Env): PlanResult {
       },
     },
   };
+}
+
+/**
+ * "Turn right at Alpha" / "continue to the end" / "turn left at the next taxiway" to an aircraft that is STOPPED on the runway (it found no exit it
+ * could make, or rejected its takeoff): it taxis along the runway to the turnoff the instruction names (JO 7110.65 3-10-9 wording, 3-7-2 for the
+ * taxi). The runway stays occupied until the aircraft is clear; an intersecting runway on the way needs its own crossing clearance (3-1-3, 3-7-2):
+ * the aircraft stops short of the intersection until it has one.
+ */
+export function planStoppedExit(env: Env): PlanResult {
+  const { ac, rt, cmd, ctx, airport } = env;
+  const graph = airport.taxiwayGraph;
+  const want = { taxiway: cmd.exitTaxiway ?? (cmd.segment ? cmd.route?.[0] : undefined), side: cmd.turnDirection, toEnd: cmd.destination === 'END', next: cmd.destination === 'NEXT' };
+  const all = stoppedExitOptions(ctx, ac);
+  if (!all.length) return unable(env, `${ac.callsign} is stopped on runway ${ac.occupyingRunways[0]} with no turnoff ahead of it; taxi it with a route.`, "we don't see an exit ahead of us");
+  let pool = all;
+  const twy = want.taxiway?.toUpperCase();
+  if (twy) {
+    pool = pool.filter((o) => o.taxiway.toUpperCase() === twy || (graph.nodes[o.exitNodeId]?.taxiways ?? []).some((t) => t.toUpperCase() === twy));
+    if (!pool.length) return unable(env, `There is no taxiway ${want.taxiway} ahead of ${ac.callsign} on runway ${ac.occupyingRunways[0]}.`, `we don't see taxiway ${spokenTaxiway(want.taxiway!)} ahead of us`);
+  }
+  if (want.side) {
+    const bySide = pool.filter((o) => o.side === want.side);
+    if (!bySide.length) return unable(env, `Taxiway ${want.taxiway ?? 'exit'} is not to the ${want.side} of ${ac.callsign} ahead on runway ${ac.occupyingRunways[0]}.`, `we can't turn ${want.side} ${twy ? `on ${spokenTaxiway(want.taxiway!)} ` : ''}here`);
+    pool = bySide;
+  }
+  const pick = want.toEnd ? pool[pool.length - 1] : pool[0];
+  const nodeIds = pick.nodeIds;
+  return {
+    plan: {
+      patch: { exitTaxiway: pick.taxiway || undefined, turnDirection: want.side, destination: want.toEnd ? 'END' : want.next ? 'NEXT' : undefined },
+      commit: () => {
+        const stops = new Set(computeStopNodes(graph, nodeIds, ac.runwayAuthorizations));
+        stops.add(pick.holdNodeId);
+        ac.route = { nodeIds, taxiways: routeSegmentTaxiways(graph, nodeIds).filter((t): t is string => !!t && !t.startsWith('RWY')).slice(-1), stopAtNodeIds: [...stops], progressIndex: 0 };
+        releaseRunwayStop(ctx, ac);
+        rt.stoppedAtNodeId = undefined;
+      },
+    },
+  };
+}
+
+/** The aircraft that was stopped on the runway is under way again: forget the stopped state so it reports "clear of the runway" at the end of its route. */
+export function releaseRunwayStop(ctx: SimContext, ac: Aircraft): void {
+  const rt = getRuntime(ctx, ac);
+  rt.calls.delete('stoppedOnRunway');
+  rt.calls.delete('clear');
+  rt.lineUp = undefined;
+  rt.takeoffCleared = false;
+  rt.luawSinceSec = undefined;
+  ac.flags.holdingPosition = false;
+  // The runways the aircraft stands on are its own to leave (it may be in an intersection): the safety net must not freeze it there.
+  for (const rid of ac.occupyingRunways) if (!ac.runwayAuthorizations.includes(rid)) ac.runwayAuthorizations.push(rid);
+  if (ac.phase === 'ROLLOUT') setPhase(ctx, ac, 'RUNWAY_EXIT', 'taxi instruction');
+  else if (ac.phase === 'LINE_UP_AND_WAIT') setPhase(ctx, ac, 'TAXIING', 'taxi off the runway');
 }
 
 /** "Hold short of runway N" during the landing roll or on final: the rollout stops short of that intersecting runway (3-10-9, 3-10-4). */

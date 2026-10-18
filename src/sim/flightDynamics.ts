@@ -7,7 +7,7 @@
  */
 import { rotorOwnsMotion } from './rotorcraft';
 import { trainingCircuitDone } from './special';
-import type { Aircraft, AircraftPerformance, FlightPhase, Vec2 } from './types';
+import type { Aircraft, AircraftPerformance, FlightPhase, TaxiNode, Vec2 } from './types';
 import {
   clamp, deg2rad, dist, ftToM, headingDiff, headingToVec, ktToMps, mpsToKt, mToFt, mToNm, nmToM, normHeading, pointInPolygon, rad2deg,
   vAdd, vDot, vScale, vSub, vecToHeading, bearingDeg, magneticToTrue,
@@ -272,16 +272,24 @@ const RUNWAY_END_STOP_MARGIN_M = 60;
 
 /** Where (m along `g`) an intersecting runway's surface begins, if it is ahead of `fromAlong`. */
 export function intersectionStartAlong(ctx: SimContext, g: RunwayEndGeom, fromAlong: number, onlyRunwayId?: string): number | undefined {
-  let best: number | undefined;
+  return intersectionSpanAlong(ctx, g, fromAlong, onlyRunwayId)?.start;
+}
+
+/** The first intersecting runway ahead of `fromAlong`: where its surface begins and ends along `g` (m). */
+export function intersectionSpanAlong(ctx: SimContext, g: RunwayEndGeom, fromAlong: number, onlyRunwayId?: string): { start: number; end: number; runwayId: string } | undefined {
+  let best: { start: number; end: number; runwayId: string } | undefined;
   for (const other of crossingRunways(ctx.state.airport, g.runway.id)) {
     if (onlyRunwayId && other.id !== onlyRunwayId) continue;
-    for (let s = Math.max(0, fromAlong); s <= g.lengthM; s += 10) {
+    const insideAt = (s: number): boolean => {
       const c = vAdd(g.end.threshold, vScale(g.dir, s));
-      const inside = [-20, 0, 20].some((lat) => pointInPolygon(vAdd(c, vScale(g.right, lat)), other.polygon));
-      if (inside) {
-        if (best === undefined || s < best) best = s;
-        break;
-      }
+      return [-20, 0, 20].some((lat) => pointInPolygon(vAdd(c, vScale(g.right, lat)), other.polygon));
+    };
+    for (let s = Math.max(0, fromAlong); s <= g.lengthM; s += 10) {
+      if (!insideAt(s)) continue;
+      let e = s;
+      while (e + 10 <= g.lengthM && insideAt(e + 10)) e += 10;
+      if (!best || s < best.start) best = { start: s, end: e, runwayId: other.id };
+      break;
     }
   }
   return best;
@@ -299,6 +307,8 @@ const TAXI_DECEL_PLAN_FOR_EXIT = 0.9;
 export interface RolloutPlan {
   exitNodeId?: string;
   holdNodeId?: string;
+  /** Taxiway nodes between the exit node and the hold node when the hold line does not touch the runway node (extended exit). */
+  viaNodeIds?: string[];
   exitSpeedMps: number;
   /** Braking rate (m/s^2) the plan needs (never above the maximum). */
   brakeMps2: number;
@@ -310,22 +320,72 @@ export interface RolloutPlan {
   unableReason?: string;
 }
 
-/** Exits of the runway: the runway node, its position along `g`, and the hold-line nodes with the side of the runway they lie on (JO 7110.65 3-10-9). */
-export interface RunwayExit { id: string; along: number; taxiways: string[]; holds: { id: string; side: 'left' | 'right'; taxiways: string[] }[] }
+/**
+ * Exits of the runway: the runway node, its position along `g`, and the hold-line nodes with the side of the runway they lie on (JO 7110.65 3-10-9).
+ * `via` is set for a hold line that does not touch the runway node: the taxiway nodes between the two (see `extended` below).
+ */
+export interface RunwayExit { id: string; along: number; taxiways: string[]; holds: { id: string; side: 'left' | 'right'; taxiways: string[]; via?: string[] }[]; extended?: boolean }
 
-export function runwayExits(ctx: SimContext, g: RunwayEndGeom): RunwayExit[] {
+/** Longest taxiway path (m) from a runway node to its hold line for a turnoff whose hold line does not touch the runway node. */
+const EXTENDED_EXIT_MAX_M = 450;
+/** A turnoff leaves the runway at most this far (degrees) from the landing direction; larger angles lead back toward the threshold. */
+const EXIT_MAX_ANGLE_DEG = 100;
+
+/**
+ * Exits of the runway. With `extended`, runway nodes where a taxiway leaves the runway but whose hold line is a few hundred metres down that
+ * taxiway (the data has no hold node touching the runway node there, e.g. taxiway A at the 22 end of KACY runway 4) are included too, if the
+ * turnoff leads forward. They are a second choice for a landing rollout (`chooseExit`) and are what a stopped aircraft can still reach.
+ */
+export function runwayExits(ctx: SimContext, g: RunwayEndGeom, extended = false): RunwayExit[] {
   const graph = ctx.state.airport.taxiwayGraph;
   const out: RunwayExit[] = [];
   for (const id of Object.keys(graph.nodes)) {
     const n = graph.nodes[id];
     if (n.kind !== 'runway' || n.runwayId !== g.runway.id) continue;
-    const holds = neighborIds(graph, id)
+    const holds: RunwayExit['holds'] = neighborIds(graph, id)
       .filter((h) => graph.nodes[h].kind === 'holding_position' && graph.nodes[h].runwayId === g.runway.id)
       .map((h) => ({ id: h, side: (vDot(vSub(graph.nodes[h].pos, n.pos), g.right) > 0 ? 'right' : 'left') as 'left' | 'right', taxiways: graph.nodes[h].taxiways }));
-    if (!holds.length) continue;
+    if (!holds.length) {
+      if (!extended) continue;
+      const far = holdBeyondTaxiway(ctx, g, n);
+      if (!far) continue;
+      out.push({ id, along: alongCross(g, n.pos).along, taxiways: n.taxiways, holds: [far], extended: true });
+      continue;
+    }
     out.push({ id, along: alongCross(g, n.pos).along, taxiways: n.taxiways, holds });
   }
   return out.sort((a, b) => a.along - b.along || (a.id < b.id ? -1 : 1));
+}
+
+/** The hold line of `g`'s runway reached from runway node `n` along taxiway edges only (no runway node on the way), if one lies within EXTENDED_EXIT_MAX_M and the turnoff leads forward. */
+function holdBeyondTaxiway(ctx: SimContext, g: RunwayEndGeom, n: TaxiNode): RunwayExit['holds'][number] | undefined {
+  const graph = ctx.state.airport.taxiwayGraph;
+  const edges = graph.edges.filter((e) => !e.taxiway.toUpperCase().startsWith('RWY'));
+  type Item = { id: string; d: number; path: string[] };
+  const queue: Item[] = [{ id: n.id, d: 0, path: [] }];
+  const seen = new Set<string>([n.id]);
+  for (let qi = 0; qi < queue.length; qi++) {
+    const cur = queue[qi];
+    for (const e of edges) {
+      if (e.from !== cur.id && e.to !== cur.id) continue;
+      if (e.oneWay && e.to === cur.id) continue;
+      const nextId = e.from === cur.id ? e.to : e.from;
+      const nx = graph.nodes[nextId];
+      if (!nx || seen.has(nextId) || nx.kind === 'runway' || nx.kind === 'parking') continue;
+      const d = cur.d + e.lengthM;
+      if (d > EXTENDED_EXIT_MAX_M) continue;
+      seen.add(nextId);
+      const path = [...cur.path, nextId];
+      if (nx.kind === 'holding_position' && nx.runwayId === g.runway.id) {
+        const first = graph.nodes[path[0]];
+        const angle = Math.abs(headingDiff(g.headingDeg, bearingDeg(n.pos, first.pos)));
+        if (angle > EXIT_MAX_ANGLE_DEG) continue;
+        return { id: nextId, side: vDot(vSub(nx.pos, n.pos), g.right) > 0 ? 'right' : 'left', taxiways: nx.taxiways, via: path.slice(0, -1) };
+      }
+      queue.push({ id: nextId, d, path });
+    }
+  }
+  return undefined;
 }
 
 const sameTwy = (list: readonly string[], twy: string): boolean => list.some((x) => x.toUpperCase() === twy.toUpperCase());
@@ -342,15 +402,17 @@ function chooseExit(ctx: SimContext, ac: Aircraft, g: RunwayEndGeom, tdAlong: nu
   const normal = ktToMps(perf.decelKtPerSec);
   const maxBrake = normal * MAX_BRAKE_FACTOR;
   const stopLimit = Math.min(lahsoStopAlong ?? Infinity, holdShortAlong ?? Infinity);
-  const cands: { id: string; along: number; holds: string[]; exitRow: RunwayExit }[] = [];
+  type Cand = { id: string; along: number; holds: string[]; exitRow: RunwayExit };
+  const cands: Cand[] = [];
+  const extCands: Cand[] = [];
   // A runway exit taxiway that is closed (NOTAM, marked with a yellow X: AC 150/5370-2G 2.18.2.1) is not used.
-  for (const row of runwayExits(ctx, g)) {
+  for (const row of runwayExits(ctx, g, true)) {
     const open = row.holds.filter((h) => !h.taxiways.some((t) => closedTwy.has(t.toUpperCase())));
-    if (open.length) cands.push({ id: row.id, along: row.along, holds: open.map((h) => h.id), exitRow: row });
+    if (open.length) (row.extended ? extCands : cands).push({ id: row.id, along: row.along, holds: open.map((h) => h.id), exitRow: row });
   }
   // Land and hold short (LAHSO) / "hold short of runway N" after landing: only exits before the hold-short point can be used, otherwise stop at it.
   if (Number.isFinite(stopLimit)) {
-    for (let i = cands.length - 1; i >= 0; i--) if (cands[i].along > stopLimit) cands.splice(i, 1);
+    for (const list of [cands, extCands]) for (let i = list.length - 1; i >= 0; i--) if (list[i].along > stopLimit) list.splice(i, 1);
   }
   // The hold on the side from which parking is closest by taxi WITHOUT crossing any runway (`shortestDistances` never uses runway
   // surfaces): cost = Infinity when every side needs a runway crossing (re-crossing the landing or an intersecting runway).
@@ -373,7 +435,7 @@ function chooseExit(ctx: SimContext, ac: Aircraft, g: RunwayEndGeom, tdAlong: nu
   // lead onto a hold beyond which the aircraft must cross a runway again (if none exists the first exit is used: the aircraft
   // stops at the hold and asks for the crossing). With an exit instruction (`pool`) the controller's choice wins: the first exit of
   // the pool the aircraft can make, the cost preference is not applied.
-  const evaluate = (limit: number, pool: typeof cands = cands, instructed = false, holdIds?: (c: (typeof cands)[number]) => readonly string[] | undefined): RolloutPlan | undefined => {
+  const evaluate = (limit: number, pool: Cand[] = cands, instructed = false, holdIds?: (c: Cand) => readonly string[] | undefined): RolloutPlan | undefined => {
     let firstAny: RolloutPlan | undefined;
     for (const c of pool) {
       const d = c.along - tdAlong;
@@ -385,7 +447,8 @@ function chooseExit(ctx: SimContext, ac: Aircraft, g: RunwayEndGeom, tdAlong: nu
       const vC = exitSpeedMps(angle, dist(from, to));
       const aReq = vTd > vC ? (vTd * vTd - vC * vC) / (2 * d) : 0;
       if (aReq <= limit) {
-        const plan: RolloutPlan = { exitNodeId: c.id, holdNodeId: hold, exitSpeedMps: vC, brakeMps2: Math.max(aReq, 0.5 * normal) };
+        const via = c.exitRow.holds.find((h) => h.id === hold)?.via;
+        const plan: RolloutPlan = { exitNodeId: c.id, holdNodeId: hold, ...(via ? { viaNodeIds: via } : {}), exitSpeedMps: vC, brakeMps2: Math.max(aReq, 0.5 * normal) };
         if (instructed || Number.isFinite(cost)) return plan;
         firstAny ??= plan;
       }
@@ -393,14 +456,20 @@ function chooseExit(ctx: SimContext, ac: Aircraft, g: RunwayEndGeom, tdAlong: nu
     return firstAny;
   };
   if (exit && (exit.taxiway || exit.toEnd || exit.next || exit.side)) {
-    let pool = cands;
+    const all = [...cands, ...extCands].sort((a, b) => a.along - b.along);
+    let pool = all;
     let why = '';
-    if (exit.toEnd) pool = cands.length ? [cands[cands.length - 1]] : [];
+    if (exit.toEnd) {
+      // "Continue to the end": the last ordinary exit ahead; the turnoffs whose hold line lies down the taxiway count only when no ordinary exit is left ahead.
+      const ahead = cands.filter((c) => c.along - tdAlong >= 20);
+      const lastPool = ahead.length ? cands : all;
+      pool = lastPool.length ? [lastPool[lastPool.length - 1]] : [];
+    }
     if (exit.taxiway) {
       pool = pool.filter((c) => sameTwy(c.exitRow.taxiways, exit.taxiway!) || c.exitRow.holds.some((h) => sameTwy(h.taxiways, exit.taxiway!)));
       if (!pool.length) why = `no exit on taxiway ${exit.taxiway} ahead of the aircraft on runway ${g.runway.id}`;
     }
-    const holdsFor = (c: (typeof cands)[number]): readonly string[] | undefined => {
+    const holdsFor = (c: Cand): readonly string[] | undefined => {
       let hs = c.exitRow.holds;
       if (exit.side) hs = hs.filter((h) => h.side === exit.side);
       if (exit.taxiway) {
@@ -423,15 +492,28 @@ function chooseExit(ctx: SimContext, ac: Aircraft, g: RunwayEndGeom, tdAlong: nu
   }
   const plan = evaluate(normal) ?? evaluate(maxBrake);
   if (plan) return plan;
+  // No ordinary exit within reach: a turnoff whose hold line is further down its taxiway (e.g. taxiway A at the far end of KACY runway 4) is
+  // the next choice; the aircraft slows to the exit speed and rolls on to it instead of stopping on the runway.
+  const ext = evaluate(normal, [...cands, ...extCands].sort((a, b) => a.along - b.along)) ?? evaluate(maxBrake, [...cands, ...extCands].sort((a, b) => a.along - b.along));
+  if (ext) return ext;
   // No exit within reach: stop on the remaining runway, short of an intersection and of the end.
+  const halfLen = (perf.lengthM * (ac.formation?.size ?? 1)) / 2;
   const natural = tdAlong + (vTd * vTd) / (2 * normal);
-  const inter = intersectionStartAlong(ctx, g, tdAlong);
-  const stopTarget = Math.min(
-    natural, g.lengthM - RUNWAY_END_STOP_MARGIN_M, stopLimit,
-    inter !== undefined ? inter - INTERSECTION_HOLD_MARGIN_M - perf.lengthM / 2 : Infinity,
-  );
+  const span = intersectionSpanAlong(ctx, g, tdAlong);
+  let stopTarget = Math.min(natural, g.lengthM - RUNWAY_END_STOP_MARGIN_M, stopLimit);
+  if (span) {
+    const shortOf = span.start - INTERSECTION_HOLD_MARGIN_M - halfLen;
+    const canStopShort = shortOf - tdAlong > 1 && (vTd * vTd) / (2 * (shortOf - tdAlong)) <= maxBrake;
+    if (canStopShort) stopTarget = Math.min(stopTarget, shortOf);
+    else if (stopTarget > span.start - halfLen && stopTarget < span.end + halfLen) {
+      // The aircraft cannot stop short of the intersection: never stop IN it (both runways blocked); roll through and stop clear of it.
+      stopTarget = Math.min(span.end + INTERSECTION_HOLD_MARGIN_M + halfLen, g.lengthM - RUNWAY_END_STOP_MARGIN_M);
+    }
+    stopTarget = Math.min(stopTarget, stopLimit);
+  }
   const room = Math.max(1, stopTarget - tdAlong);
-  return { exitSpeedMps: 0, brakeMps2: clamp((vTd * vTd) / (2 * room), normal, maxBrake), stopAlongM: stopTarget };
+  const aStop = (vTd * vTd) / (2 * room);
+  return { exitSpeedMps: 0, brakeMps2: clamp(aStop, 0.5 * normal, maxBrake), stopAlongM: stopTarget };
 }
 
 /** The exit the default rollout plan would take for an aircraft already rolling out: its taxiway and the side of the runway (what the tower names in an exit instruction). */
@@ -596,7 +678,7 @@ function stepRollout(ctx: SimContext, ac: Aircraft, dt: number): void {
       ac.pos = { x: exitNode.pos.x, y: exitNode.pos.y };
       step = 0;
       const hold = rt.rollout.holdNodeId!;
-      ac.route = { nodeIds: [exitNode.id, hold], taxiways: graph.nodes[hold].taxiways.slice(0, 1), stopAtNodeIds: [hold], progressIndex: 1 };
+      ac.route = { nodeIds: [exitNode.id, ...(rt.rollout.viaNodeIds ?? []), hold], taxiways: graph.nodes[hold].taxiways.slice(0, 1), stopAtNodeIds: [hold], progressIndex: 1 };
       ac.groundSpeedKt = mpsToKt(v);
       ac.airspeedKt = ac.groundSpeedKt;
       rt.rollout = undefined;

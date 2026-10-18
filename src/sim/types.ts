@@ -81,6 +81,8 @@ export interface TaxiNode {
   taxiways: string[];
   /** For holding_position / runway nodes: which runway (e.g. "13/31"). */
   runwayId?: string;
+  /** For runway nodes where two runways cross: every runway whose surface the node lies on (`runwayId` is one of them). */
+  runwayIds?: string[];
   /** For holding_position: which runway end it protects when departing (e.g. "13"). */
   protectsRunwayEnd?: string;
   /** For parking nodes: human name (e.g. "GA Ramp 3", "Gate 2"). */

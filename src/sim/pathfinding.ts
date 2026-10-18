@@ -20,6 +20,11 @@ export interface RouteOptions {
   runwayPenaltyM?: number;
   /** Taxiway designators (any case) that are closed (NOTAM, `airportOps.closedTaxiways`): their edges are never used. */
   avoidTaxiways?: Iterable<string>;
+  /**
+   * Runway ids whose centreline travel edges (taxiway "RWYx/y") the route may use without naming them in `via`: an aircraft stopped on
+   * that runway taxis along it to a turnoff (JO 7110.65 3-7-2 allows runway use as part of a taxi route; the route still avoids every other runway).
+   */
+  runwayTravelIds?: string[];
 }
 
 export interface TaxiRoute {
@@ -127,7 +132,7 @@ function edgeAllowed(edge: TaxiEdge, opts: RouteOptions, viaSet: Set<string>, av
     const avoid = opts.avoidRunways ?? true;
     if (avoid && !(opts.allowedRunwayIds ?? []).some((r) => up(r) === up(edge.onRunwayId!))) return false;
   }
-  if (isRunwayTravel(edge.taxiway) && !viaSet.has(up(edge.taxiway))) return false;
+  if (isRunwayTravel(edge.taxiway) && !viaSet.has(up(edge.taxiway)) && !(edge.onRunwayId && (opts.runwayTravelIds ?? []).some((r) => up(r) === up(edge.onRunwayId!)))) return false;
   return true;
 }
 

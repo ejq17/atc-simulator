@@ -129,6 +129,21 @@ export function exitAndContact(ac: Aircraft, airport: Airport, taxiway: string, 
   return clauses(callsign(ac), words('turn', side, 'at', twy), words('contact', word, frequency(airport, mhz, f?.id)));
 }
 
+/**
+ * "N1AA, cross runway 13, turn right at Alpha, contact Ground point niner": the answer to an aircraft stopped on the runway (exit instruction
+ * 3-10-9, crossing of the intersecting runway 3-7-2 / 3-1-3, then the frequency change).
+ */
+export function stoppedExit(ac: Aircraft, airport: Airport, taxiway: string, side: 'left' | 'right', crosses: string[], contact?: { frequencyId: string; mhz: number }): Phrase {
+  const f = contact ? frequencyById(airport, contact.frequencyId) ?? frequencyByMhz(airport, contact.mhz) : undefined;
+  const word = f && f.position !== 'OTHER' && f.position !== 'ATIS' ? positionWord(f.position).toLowerCase() : 'next controller';
+  return clauses(
+    callsign(ac),
+    ...crosses.map((r) => words('cross runway', rwy(r))),
+    words('turn', side, 'at', taxiwayList([taxiway])),
+    contact ? words('contact', word, frequency(airport, contact.mhz, f?.id)) : undefined,
+  );
+}
+
 /** "N1AA, wind 130 at 8, altimeter 3010" (3-9-1 / 3-10-1: wind and altimeter for a pilot who did not report the ATIS). */
 export function airportInfo(ac: Aircraft, dirDeg: number | undefined, speedKt: number, altimeterInHg: number): Phrase {
   const alt = String(Math.round(altimeterInHg * 100));

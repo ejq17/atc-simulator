@@ -153,6 +153,10 @@ far from the spelling.
 * **Taxiway + digit**: "alpha 2", "alpha alpha 2" (A, A2) was already handled by `parseTaxiways`; unchanged.
 * **Dropped-digit flight number** (`callsign.ts`): heard "Spirit 43" is accepted as NKS483 at score 0.8 only when exactly one active aircraft of that airline has the heard digits plus one more digit, in order, AND no other active aircraft of that airline is within edit distance 2 of the heard digits (NKS487 vs 43 -> stays "callsign not recognised").
 
+* **Session lines (2026-10-18)**: "be on / be in / bee a / V a" -> `via` (phrases), "been" -> `via`, "limo" -> lima, "aplha" -> alpha, "tax in" -> `taxi to`; a lower-case raw "a" / "an" after via / on / at / onto before a NATO word is dropped ("on an Alpha"); "air national guard" and "national guard" -> ANG; "airport vehicle one" -> "airport one" (the vehicle word is dropped between `airport` and a number, so both word orders give APT1).
+* **Runway exit with a lead-in** (`ruleExitRunway`): "continue down [the] runway [22]" before an exit instruction is part of it (one `EXIT_RUNWAY`, non-standard: 3-10-9 has only "turn left/right (taxiway)"); alone it is the exit at the end (`destination: 'END'`); "turn right at the next taxiway" is `NEXT`. For an aircraft standing on a runway `transmit.ts` issues the exit before a preceding bare "cross runway N" so the crossing has a route.
+* **One taxi, one hold short** (`assemble.ts`): a non-progressive TAXI directly followed by a HOLD_SHORT (the route words could not be read) takes the hold short, so the pilot reads back once.
+
 ### Numbers and punctuation
 
 A comma/period/semicolon after a raw word now ends a spoken-number run, so "Spirit four fifty one, four miles"
@@ -197,9 +201,11 @@ returns one `LandlineCommand` (`kind`, `to`, `from`, `callsign`, `runwayId` / `r
 | ... point out approved / unable / traffic observed | `POINT_OUT_APPROVED`, `POINT_OUT_UNABLE`, `TRAFFIC_OBSERVED` | 5-4-3 |
 | ... traffic, ... / anything else between two positions | `TRAFFIC`, `TEXT` (confidence capped at 0.75) | non-standard |
 
+The calling position may be left out when the player works exactly one position (`LandlineContext.playerPositions`): "Tower, cross runway four at Bravo with Spirit ten thirty three" is that position calling Tower; "with", "for" or nothing may precede the callsign, which may also come first ("Tower, Spirit ten thirty three, request to cross ..."). `looksLikeLandline` is true for two position names, and for ONE position name followed by "cross ... runway", "point out" or "release": a controller addresses aircraft by callsign, so such a transmission on the radio path goes to the landline parser (and `transmit()` refuses to execute it as a clearance).
+
 Whether a call asks or answers follows the direction: Ground to Tower with "cross runway ..." is the request, Tower to Ground the authorisation. Confidence = 0.97, x0.55 per missing item (runway, callsign, positions), x0.45 when a position is missing,
 x0.9 non-standard, x0.85 per unknown runway / taxiway; below 0.6 the pipeline asks for a repeat (like the radio path). STT repairs: tour / power -> tower, grounds / round -> ground, departures, enable -> unable, standby, pointed out / point-out,
-realised -> released, and everything the shared normaliser already fixes (NATO letters, spoken numbers, `november seven two three ...`). Tests: `landline.test.ts` (28). The resolution to engine calls is in `src/ui/commands/landline.ts`.
+realised -> released, and everything the shared normaliser already fixes (NATO letters, spoken numbers, `november seven two three ...`). Tests: `landline.test.ts` (28), `sessionBugs.test.ts` (the session lines). The resolution to engine calls is in `src/ui/commands/landline.ts`.
 
 ## Extending
 

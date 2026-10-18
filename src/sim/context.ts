@@ -186,7 +186,7 @@ export interface AircraftRuntime {
   /** `afterClear`: the change happens only once the aircraft is clear of the runway (exit instruction + "contact Ground", 3-10-9). */
   pendingFreq?: { atSec: number; mhz: number; id?: string; afterClear?: boolean; silent?: boolean };
   readbackError?: ReadbackErrorRecord;
-  rollout?: { exitNodeId?: string; holdNodeId?: string; exitSpeedMps: number; brakeMps2: number; stopAlongM?: number; honoured?: boolean; unableReason?: string };
+  rollout?: { exitNodeId?: string; holdNodeId?: string; viaNodeIds?: string[]; exitSpeedMps: number; brakeMps2: number; stopAlongM?: number; honoured?: boolean; unableReason?: string };
   pattern?: PatternState;
   radioFreeAtSec: number;
   lastPilotText?: string;

@@ -1,6 +1,6 @@
 import {
   AIRLINES, ALIASES, DISFLUENCIES, FACILITIES, FILLERS, FUZZY_KEYWORDS, FUZZ_PROTECTED, GA_PREFIXES, HOMOPHONE_DIGITS, FOXTROT_FUSED, FOXTROT_WORDS, KEEP_WORDS, N_PREFIX_WORDS,
-  NATO, PHRASES, TAXIWAY_CONTEXT, TOWER_MISHEARD, VIA_ARTICLE,
+  NATO, PHRASES, TAXIWAY_CONTEXT, TOWER_MISHEARD, ARTICLES, ARTICLE_AFTER,
 } from './lexicon';
 import { digitValue, evaluateNumberWords, numberWordClass } from './numbers';
 import type { NormalizedText, Token, TokenKind } from './tokens';
@@ -41,6 +41,7 @@ export function normalize(raw: string, opts: NormalizeOptions = {}): NormalizedT
   items = applyPhrases(items);
   items = applyAliases(items);
   items = dropViaArticle(items, rawWords);
+  items = dropVehicleWord(items);
   const lead = new Set<string>([...airlines.keys(), ...GA_PREFIXES.keys(), 'november', 'delta']);
   items = foxtrotDrift(items, known, lead, opts);
   items = repairNato(items, known, lead);
@@ -102,13 +103,16 @@ function applyAliases(items: Item[]): Item[] {
   });
 }
 
-/** "via a Lima" -> "via Lima": the STT article "a" (lower-case in the raw text) before a spelled NATO word is part of "via". */
+/**
+ * "via a Lima" -> "via Lima", "on an Alpha" -> "on Alpha": the STT article (lower-case in the raw text) between a route preposition and a
+ * spelled NATO word is noise. For "via" it is the second half of the word, so it is merged into it.
+ */
 function dropViaArticle(items: Item[], rawWords: readonly string[]): Item[] {
   const out: Item[] = [];
   items.forEach((it, k) => {
     const prev = out[out.length - 1];
     const next = items[k + 1];
-    if (!it.pre && it.w === VIA_ARTICLE && rawWords[it.rawStart] === VIA_ARTICLE && prev && !prev.pre && prev.w === 'via'
+    if (!it.pre && ARTICLES.has(it.w) && rawWords[it.rawStart] === it.w && prev && (!prev.pre || prev.pre === 'word') && ARTICLE_AFTER.has(prev.w)
       && next && !next.pre && NATO.has(next.w)) {
       out[out.length - 1] = { ...prev, rawEnd: it.rawEnd, ...(it.brk ? { brk: true } : {}) };
       return;
@@ -116,6 +120,12 @@ function dropViaArticle(items: Item[], rawWords: readonly string[]): Item[] {
     out.push(it);
   });
   return out;
+}
+
+/** "airport vehicle one" -> "airport one": the vehicle form spoken in either order (AC 150/5210-20A has "Airport 21 vehicle"). */
+function dropVehicleWord(items: Item[]): Item[] {
+  return items.filter((it, k) => !(!it.pre && it.w === 'vehicle' && items[k - 1]?.w === 'airport' && !items[k - 1].pre
+    && items[k + 1] !== undefined && !items[k + 1].pre && (numberWordClass(items[k + 1].w) !== null || /^\d+$/.test(items[k + 1].w))));
 }
 
 /** Levenshtein edit distance. */

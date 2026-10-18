@@ -612,6 +612,13 @@ instructions ("stopped on runway ..., unable to exit, request taxi instructions"
 ~1,284 / 1,601 ft): C172 13 exits at 2,017 ft, clear 14 s after touchdown; C172 31 2,200 ft / 17 s; C172 4 3,397 ft / 49 s; C172 22 2,748 ft
 / 31 s; A320 13 4,444 ft / 25 s; A320 31 5,557 ft / 34 s; A320 4 3,397 ft (taxiway B, braking ~7.8 kt/s) / 17 s; A320 22 6,101 ft / 38 s.
 
+### Turnoffs down a taxiway, no stop in an intersection, aircraft stopped on a runway (session fixes)
+
+* `runwayExits(ctx, g, extended)`: with `extended`, a runway node where a taxiway leaves but whose hold line is a few hundred metres down that taxiway (KACY runway 4 at the 22 end: R4-22-05 -> T0320 ... -> HP4-22-A-2) is an exit with `via` nodes (forward-leading, <= 450 m, no runway node on the way). `chooseExit` uses these only after the ordinary exits failed at normal and maximum braking, and for an exit instruction ("turn right at A", "continue to the end" = the last ordinary exit ahead, else the last turnoff). `RolloutPlan.viaNodeIds` is added to the exit route.
+* No exit reachable: stop short of an intersecting runway only if the braking allows it; otherwise roll through and stop clear of it (`intersectionSpanAlong`). The formation size lengthens the margins. The F16 numbers stay UNVERIFIED design values (140 kt touchdown, 5 kt/s): the cause of the stuck flight was the missing far-end turnoff plus the infeasible stop, not the figures.
+* `runwayStop.ts`: `stoppedOnRunway` (stopped on a runway in ROLLOUT / RUNWAY_EXIT, or LINE_UP_AND_WAIT after a rejected takeoff), `runwayChainPosition` (where it stands among the runway nodes), `stoppedExitOptions` (turnoffs ahead with the route to the hold line and the runways crossed). `planTaxi` starts a stopped aircraft's route at the node ahead (`RouteOptions.runwayTravelIds` lets it use only its own runway's centreline edges); `planStoppedExit` (EXIT_RUNWAY / progressive "turn right on A") plans the route to the turnoff; `planCross` accepts a runway intersection node as the crossing point. The ground-movement safety net holds the aircraft short of the intersecting runway until it is authorised; `releaseRunwayStop` clears the stopped state, authorises the runways it stands on (it may be in an intersection) and moves LINE_UP_AND_WAIT to TAXIING.
+* AI Tower (`src/ai/tower.ts`) answers "stopped on runway, unable to exit": EXIT_RUNWAY to the nearest turnoff ahead, CROSS_RUNWAY for each intersecting runway it crosses (only when `assessClearanceSafety` says safe), CONTACT_FREQUENCY to Ground.
+
 ## Phraseology audit (docs/PHRASEOLOGY-AUDIT.md)
 
 Applied in `src/radio`: R-F1 ("Clearance Delivery"), R-B1 (taxi readback "Runway one three, taxi via ..."), R-B2 / R-B2b / R-B2c (IFR

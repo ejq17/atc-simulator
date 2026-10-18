@@ -395,7 +395,8 @@ describe('9. runway exits avoid a re-crossing when they can', () => {
     for (const rwy of ['4', '22', '13', '31']) for (const type of ['C172', 'A320']) for (const td of [250, 390, 600, 800]) {
       const g = findRunwayEnd(kacy, rwy)!;
       const plan = predictRolloutPlan(st, type, g, td, ktToMps(type === 'C172' ? 55 : 130));
-      if (plan.holdNodeId) expect(cost(kacy, plan.holdNodeId), `${type} ${rwy} td ${td}`).toBeLessThan(Infinity);
+      // (a turnoff chosen only because no ordinary exit is within reach, `viaNodeIds`, may lead into a pocket that needs a crossing: it still beats stopping on the runway)
+      if (plan.holdNodeId && !plan.viaNodeIds) expect(cost(kacy, plan.holdNodeId), `${type} ${rwy} td ${td}`).toBeLessThan(Infinity);
     }
   });
 

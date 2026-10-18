@@ -54,6 +54,11 @@ export interface LandlineCommand {
 
 export interface LandlineContext {
   aircraft: AircraftRef[];
+  /**
+   * The positions the player works. With exactly one, the calling position need not be said: "Tower, cross runway four at Bravo with Spirit
+   * ten thirty three" is Ground (or whichever position the player works) calling Tower.
+   */
+  playerPositions?: ControllerPositionId[];
   runwayEnds?: string[];
   taxiways?: string[];
   fixes?: { id: string; name?: string; spoken?: string }[];
@@ -115,11 +120,20 @@ function readPositions(tokens: readonly Token[]): { to?: ControllerPositionId; f
   return { to, from, next: i };
 }
 
-/** Does this text start like a landline call ("Tower, Ground, ...")? A radio call to an aircraft never starts with two position names. */
+/**
+ * Does this text start like a landline call ("Tower, Ground, ...")? A radio call to an aircraft never starts with two position names, nor with one
+ * position name followed by a coordination request ("Tower, cross runway four at Bravo with Spirit ten thirty three", "Departure, release ...",
+ * "Approach, point out ..."): the controller addresses aircraft by callsign, so a position name first is a call to another controller.
+ */
 export function looksLikeLandline(text: string): boolean {
   const n = normalize(text);
-  const r = readPositions(repaired(n.tokens));
-  return r.to !== undefined && r.from !== undefined && r.to !== r.from;
+  const tokens = repaired(n.tokens);
+  const r = readPositions(tokens);
+  if (r.to !== undefined && r.from !== undefined && r.to !== r.from) return true;
+  if (r.to === undefined) return false;
+  const body = tokens.slice(r.next);
+  const crossesRunway = body.some((t) => t.kind === 'word' && t.text === 'cross') && body.some((t) => t.kind === 'word' && t.text === 'runway');
+  return crossesRunway || hasWord(body, 'pointout', 'release', 'released');
 }
 
 function entities(body: Token[], ctx: LandlineContext): { runwayEnd?: string; runwayId?: string; point?: string; issues: string[] } {
@@ -168,6 +182,8 @@ export function parseLandline(text: string, ctx: LandlineContext): LandlineComma
   const norm = normalize(text, { extraAirlines: deriveAirlines(ctx.aircraft), protectedWords: protectedWords({ aircraft: ctx.aircraft, fixes: ctx.fixes }), taxiways: ctx.taxiways, runwayEnds: ctx.runwayEnds });
   const tokens = repaired(norm.tokens);
   const pos = readPositions(tokens);
+  // A player who works one position needs not say it: the called position is the only other one named.
+  if (pos.to && !pos.from && ctx.playerPositions?.length === 1 && ctx.playerPositions[0] !== pos.to) pos.from = ctx.playerPositions[0];
   const issues: string[] = [];
   let nonStandard = false;
   const base = (over: Partial<LandlineCommand>): LandlineCommand => ({

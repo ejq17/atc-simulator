@@ -16,6 +16,7 @@ import { frequencyForPosition } from '../radio/frequencies';
 import { KT_TO_MPS, trueToMagnetic } from '../sim/geo';
 import { predictedExit } from '../sim/flightDynamics';
 import { describeTraffic, luawTraffic } from '../sim/towerCommands';
+import { stoppedExitOptionsFor } from '../sim/runwayStop';
 import { getPerformance } from '../sim/performance';
 import { holdTooShort } from '../sim/holdSelection';
 import { hasActive, lastClearance, mkCmd } from './core';
@@ -209,6 +210,9 @@ export function crossingWaiting(v: AgentView, g: RunwayEndGeom, exceptId: string
 }
 
 const stationary = (ac: Aircraft): boolean => ac.groundSpeedKt < 1;
+/** A departure that rejected its takeoff and stands on the runway asking what to do (JO 7110.65 3-9-11). */
+const stoppedAfterReject = (ac: Aircraft): boolean =>
+  ac.isDeparture && ac.onGround && ac.groundSpeedKt < 1 && ac.occupyingRunways.length > 0 && ac.pendingRequest?.kind === 'DEPARTURE' && /rejected takeoff/.test(ac.pendingRequest.text);
 const isLinedUp = (ac: Aircraft): boolean => ac.phase === 'LINE_UP_AND_WAIT';
 
 function atDepartureHold(v: AgentView, ac: Aircraft, g: RunwayEndGeom): boolean {
@@ -228,6 +232,7 @@ export function createTowerAgent(): Agent {
       if (!ac.isDeparture || !ac.onGround || ac.radioState === 'TRANSMITTING' || isVehicleType(ac.type) || isRotorcraftType(ac.type)) continue;
       const g = findRunwayEnd(airport, ac.assignedRunwayEnd);
       if (!g) continue;
+      if (stoppedAfterReject(ac)) continue; // stopped on the runway after a cancelled takeoff: taxied off below, never re-cleared from where it stands
       const waiting = ac.phase === 'HOLDING_SHORT' && atDepartureHold(v, ac, g);
       const lined = ac.phase === 'LINE_UP_AND_WAIT' && stationary(ac) && ac.occupyingRunways.includes(g.runway.id);
       if (!waiting && !lined) continue;
@@ -383,6 +388,34 @@ export function createTowerAgent(): Agent {
           });
           continue;
         }
+      }
+
+      // An arrival stopped on the runway ("unable to exit, request taxi instructions"): the nearest turnoff ahead, across the intersecting runway
+      // when that is clear, and the frequency change, as after a normal landing (JO 7110.65 3-10-9, 3-7-2, 3-1-3). Departures are held meanwhile (runway occupied).
+      if ((!ac.isDeparture && ac.onGround && ac.groundSpeedKt < 1 && ac.occupyingRunways.length > 0 && pending === 'OTHER' && /stopped on runway/.test(ac.pendingRequest?.text ?? '')) || stoppedAfterReject(ac)) {
+        const gnd = v.staffed.has('GND') ? frequencyForPosition(airport, 'GND') : undefined;
+        let issued = false;
+        for (const o of stoppedExitOptionsFor(state, ac)) {
+          const crossCmds = o.crosses.map((rid) => mkCmd('CROSS_RUNWAY', ac, { crossRunwayId: rid, runwayId: rid }));
+          if (!crossCmds.every((c) => safe(c))) continue;
+          plans.push({
+            key: `${ac.id}:stopped-exit:${o.holdNodeId}`, aircraftId: ac.id, callsign: ac.callsign, priority: 57, cooldownSec: 20,
+            cmds: [mkCmd('EXIT_RUNWAY', ac, { exitTaxiway: o.taxiway, turnDirection: o.side }), ...crossCmds, ...(gnd ? [mkCmd('CONTACT_FREQUENCY', ac, { frequencyId: gnd.id })] : [])],
+            phrase: say.stoppedExit(ac, airport, o.taxiway, o.side, o.crosses, gnd ? { frequencyId: gnd.id, mhz: gnd.mhz } : undefined),
+            summary: `${ac.callsign} stopped on the runway: ${o.crosses.length ? `cross runway ${o.crosses.join(', ')}, ` : ''}turn ${o.side} at ${o.taxiway}`,
+          });
+          issued = true;
+          break;
+        }
+        if (!issued) {
+          // no turnoff ahead: a taxi with a route from where it stands (the engine searches ahead first, then back-taxi)
+          plans.push({
+            key: `${ac.id}:stopped-taxi`, aircraftId: ac.id, callsign: ac.callsign, priority: 57, cooldownSec: 20,
+            cmds: [mkCmd('TAXI_TO_PARKING', ac, { destination: 'RAMP' })], phrase: say.taxiToParking(ac, { id: 'RAMP', category: 'ga' }, [], []),
+            summary: `${ac.callsign} stopped on the runway, no turnoff ahead: taxi to the ramp`,
+          });
+        }
+        continue;
       }
 
       // Departures that are airborne: handoff to Departure (IFR: the sector frequency of the clearance).
