@@ -30,6 +30,7 @@ export const PANEL_META: Record<PanelId, PanelMeta> = {
   details: m('details', 'Details', [260, 140], [460, 640], { mobile: 'aircraft' }),
   comms: m('comms', 'Comms', [300, 140], [620, 480], { mobile: 'comms' }),
   alerts: m('alerts', 'Alerts', [260, 60], [680, 160], { mobile: 'comms' }),
+  landline: m('landline', 'Landline', [300, 160], [620, 460], { mobile: 'comms' }),
   radio: m('radio', 'Radio', [300, 220], [460, 520], { mobile: 'radio' }),
   charts: m('charts', 'Charts', [360, 300], [1100, 820]),
   navaids: m('navaids', 'Navaids', [320, 260], [760, 720]),

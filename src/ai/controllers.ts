@@ -8,6 +8,7 @@
  * commands of one transmission share a `transmissionId`, which makes the engine log exactly ONE ATC event per transmission.
  */
 import type { AiControllerOptions, AiControllers, AiTransmission } from './index';
+import type { SimulationEngineExtras } from '../sim/engineExtras';
 import type { Aircraft, ControllerPositionId, SimulationState } from '../sim/types';
 import { mulberry32 } from '../sim/rng';
 import { facilityCallName, hearsFrequency } from '../radio/frequencies';
@@ -18,6 +19,7 @@ import { createGroundAgent } from './ground';
 import { createTowerAgent } from './tower';
 import { createApproachAgent, createDepartureAgent } from './approach';
 import { correctionAgent } from './corrections';
+import { coordinationAgent } from './coordination';
 
 export const DEFAULT_REACTION_DELAY_SEC: [number, number] = [2, 6];
 /** Minimum spacing between two transmissions of the same position. */
@@ -78,13 +80,20 @@ export function createAiControllers(opts: AiControllerOptions): AiControllers {
     const sharer = opts.playerPositions.find((pp) => freqsOf(airport, pp).some((f) => all.some((m) => sameMhz(f.mhz, m))));
     return {
       position,
-      agent: (v) => [...correctionAgent(v), ...agents[position](v)],
+      agent: (v) => [...correctionAgent(v), ...coordinationAgent(v), ...agents[position](v)],
       mem: newMemory(),
       usableMhz: usable,
       covered: usable.length === 0 && all.length > 0 ? `covered by the player's ${sharer ?? 'position'} (shared frequency)` : undefined,
       seq: 0,
     };
   });
+
+  // Who works what decides which coordination rules apply (a person working both positions of a pair coordinates with himself).
+  // An AI position that is covered by the player's shared frequency (KACY Approach/Departure) is the player's too.
+  const coveredByPlayer = runtimes.filter((rt) => rt.covered).map((rt) => rt.position);
+  (engine as SimulationEngineExtras).coordination?.setStaffing(
+    [...opts.playerPositions, ...coveredByPlayer], opts.positions.filter((p) => !coveredByPlayer.includes(p)),
+  );
 
   let lastSec = -1;
   let busy = false;
@@ -109,6 +118,24 @@ export function createAiControllers(opts: AiControllerOptions): AiControllers {
     const ac = Object.values(state.aircraft).find((a) => a.id === plan.aircraftId);
     if (!ac) return;
     const tid = `ai-${rt.position}-${++rt.seq}`;
+    if (plan.coord) {
+      // A landline call: made through the coordination channel; the message it logged is what the AI "says".
+      const api = (engine as SimulationEngineExtras).coordination;
+      const msg = api ? plan.coord.run(api) : undefined;
+      const m = rt.mem;
+      m.lastTxAt = t;
+      m.lastSummary = plan.summary;
+      m.lastSummaryAt = t;
+      m.recent.set(plan.key, t);
+      if (plan.once) m.done.add(plan.key);
+      if (msg) {
+        opts.onTransmission?.({
+          position: rt.position, frequencyMhz: ac.frequencyMhz, text: msg.text, spokenText: msg.spoken || msg.text, callsign: ac.callsign, timeSec: t,
+          voiceId: VOICE[rt.position], channel: 'landline', toPosition: plan.coord.to,
+        });
+      }
+      return;
+    }
     const spoken = plan.phrase.spoken;
     const norm = spoken.toLowerCase().replace(/[,.]/g, '').replace(/\s+/g, ' ').trim();
     const cmds = plan.cmds.map((c) => ({ ...c, rawText: spoken, normalizedText: norm, confidence: 1, issues: [] as string[] }));

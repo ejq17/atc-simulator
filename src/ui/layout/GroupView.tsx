@@ -2,6 +2,7 @@ import { useSimStore } from '../store/simStore';
 import { useLayoutStore } from '../store/layoutStore';
 import { Popover, MenuHeading, MenuItem } from '../components/Popover';
 import { PanelFrameContext } from '../components/ui';
+import { useLandlineWaiting } from '../components/LandlinePanel';
 import { PANEL_COMPONENTS, PANEL_HINT } from './panelRegistry';
 import { REGION_IDS, REGION_LABEL } from './layoutModel';
 import type { PanelGroup, PanelId, RegionId } from './layoutModel';
@@ -16,6 +17,7 @@ export function useAlertCount(): { count: number; critical: boolean } {
 
 export function TabLabel({ id }: { id: PanelId }) {
   const alerts = useAlertCount();
+  const waiting = useLandlineWaiting();
   const title = metaOf(id).title;
   const key = id === 'surface' ? '1' : id === 'radar' ? '2' : id === 'tower' ? '3' : undefined;
   return (
@@ -25,6 +27,7 @@ export function TabLabel({ id }: { id: PanelId }) {
       {id === 'alerts' && alerts.count > 0 && (
         <span className={`ml-1.5 inline-block min-w-4 px-1 text-center text-[9.5px] leading-4 ${alerts.critical ? 'atc-blink bg-atc-red text-atc-bg' : 'bg-atc-amber text-atc-bg'}`}>{alerts.count}</span>
       )}
+      {id === 'landline' && waiting > 0 && <span data-testid="landline-badge" className="atc-blink ml-1.5 inline-block min-w-4 bg-atc-amber px-1 text-center text-[9.5px] leading-4 text-atc-bg">{waiting}</span>}
     </>
   );
 }

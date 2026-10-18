@@ -24,7 +24,7 @@ engine.subscribe((s) => { runner.update(); training?.update(s); if (game.isScena
 | `world.ts` | KACY helpers: runway-end geometry (TRUE heading, sin/cos from the threshold), holds, taxi-route planning that mirrors the engine, crossing detection, parking pools (GA ramp/FBO for light types incl. the C208, gates for airliners, the cargo apron for B752/B763/A306 when the airport has one), callsign generators (`randomAirlineCallsign(rng, icao?)` draws from the airport profile), `bearingTo` (neighbours of the session airport's profile). |
 | `airportProfile.ts` | Airport traffic profiles keyed by ICAO: weighted airline entries (`icao3`, telephony, types, weight, destinations with cruise altitudes, flight-number range, `hours` 'day'/'night'/'any'), VFR neighbour table (lat/lon + spoken name), GA type variants, reference jet. KACY = Spirit 80 / American 20, A320 only (unchanged); KMHT = Southwest B738, Breeze BCS3, American regionals (PSA CRJ9, Piedmont/Republic E175), American A320, United Express (SkyWest E175, GoJet CRJ9), UPS/FedEx B752 (night bank), Wiggins C208 (day bank), Sun Country, GA C172/PA28. `pickFlight`, `pickLeg`, `resolveTypeSelection`. |
 | `scenarios/career.ts` | The 12 career steps. |
-| `scenarios/training.ts` | 9 training lessons (8 and 9 are IFR). |
+| `scenarios/training.ts` | 10 training lessons (8 and 9 are IFR; 10 teaches the crossing coordination between Ground and Tower). |
 | `ifr.ts` | IFR flows (also `starArrival` / `starArrivalSpawn` for KMHT's ROZZE TWO, `isTurbojet`): `arrivalProcedure(airport, runwayEnd)` (ILS 13 -> CARYL/VCN, ILS 31 -> STEVV, RNAV 22 -> KOPCE, RNAV 4 -> JEDOB, read from the data), `ifrFlightPlan`, `ifrArrivalSpawn`, `ifrDepartureSpawn`, `resolveIfrFlows`. |
 | `scenarios/freeplay.ts` | `buildFreePlay`, weather/runway resolution (closed runways excluded), initial population, setup closures. |
 | `scenarios/airportEvents.ts` | Seeded free-play airport events: runway inspection, taxiway closure, bird activity (`buildAirportEvents`, `closableTaxiways`, `birdActivityProbability`). |
@@ -170,7 +170,7 @@ aircraft normally (it still makes the engine's own inbound call) and the runner 
 
 `Scenario.objectives[].check` strings are evaluated by `evaluateCheck(state, check)` (`objectives.ts` header lists them all): `cmd:KIND:CS`, `takeoff:CS`, `landed:CS`,
 `vacated:CS` (left the landing runway, not merely the intersecting one), `parked:CS`, `taxied:CS`, `holding_short:CS`, `crossing_request:CS`, `crossed:CS:13/31`, `handoff:CS`,
-`go_around:CS`, `landed_before:A:B`, `handled:>=N`, `score:>=N`, `no_incursions`, `no_unsafe`, `no_separation`, `no_conflicts`, `active_runway:31`, `always`.
+`go_around:CS`, `landed_before:A:B`, `handled:>=N`, `score:>=N`, `coord:KIND:CS` (a landline message of that kind about CS: `CROSS_REQUEST`, `CROSS_APPROVED`, `CROSS_COMPLETE`, `RELEASE_REQUEST`, `RELEASED`, `ROLLING`, `POINT_OUT` ...), `no_coordination_errors`, `no_incursions`, `no_unsafe`, `no_separation`, `no_conflicts`, `active_runway:31`, `always`.
 IFR checks: `handled:CS` (a callsign instead of a number: that aircraft was handled - IFR departures count after handoff, an altitude/direct instruction and leaving the area), `approach:CS` (an `APPROACH` was accepted without
 `commError`/`unsafe`: a clearance flagged for intercept angle or inside the FAF does not count, a corrected one does), `established:CS` (the pilot's "established ILS runway ..." call, or FINAL reached after an accepted approach clearance), `ifr_request:CS` (the pilot called Clearance Delivery),
 `ifr_clearance:CS` (`IFR_CLEARANCE` accepted), `departed_ifr:CS` (took off with an IFR clearance and a `HANDOFF` to a DEP/APP frequency followed).
@@ -197,7 +197,7 @@ Only paragraphs in `references.ts` are cited. Each was confirmed on 2026-10-16 o
 ## Debrief and career
 
 `buildDebrief(state, startedAtSec = 0)`: grade A >= 90, B >= 80, C >= 70, D >= 60, else F; any runway incursion caps at C. `improvements` are derived from the counters and events
-(unsafe takeoff/line-up/landing/crossing/intersecting-runway clearances with the right paragraph, incursions, separation, missed readbacks, communication errors by cause, go-arounds without clearance, waits, unfinished objectives).
+(unsafe takeoff/line-up/landing/crossing/intersecting-runway clearances with the right paragraph, incursions, separation, missed readbacks, communication errors by cause, coordination errors (an unapproved crossing: 3-1-3 / 3-1-4; an IFR takeoff without a release: 4-3-4), go-arounds without clearance, waits, unfinished objectives).
 IFR advice: approach clearances refused (training) or flagged (other modes) for the intercept angle (5-9-2, 5-9-1), inside / intercepting inside the FAF (5-9-4, 5-9-1, 4-8-1), not heading for the course or the course > 10 nm ahead, a route that does not join the procedure; an approach clearance that
 put an aircraft within 3 nm in trail (no paragraph cited: the 3 nm is a simplification); takeoff without an IFR clearance (4-2-1, 4-3-2); an IFR departure still on Tower more than 2 minutes after takeoff (`IFR_DEPARTURE_HANDOFF_LIMIT_SEC`).
 `timeline` = warnings/critical + command accepted/rejected + clarifications + handoffs + go-arounds + scenario events, times relative to `startedAtSec`. `completed` = all objectives
@@ -206,10 +206,17 @@ put an aircraft within 3 nm in trail (no paragraph cited: the 3 nm is a simplifi
 every storage access is try/caught and falls back to an in-memory copy (Node, private windows).
 `isScenarioComplete`: all (non-guard) objectives done, `durationSec` elapsed, or the engine flagged completion (not for free play).
 
+## Training lesson 10: crossing coordination (`train-10-coordination`)
+
+The player works Ground (`DEFAULT_PLAYER_POSITIONS`), an AI controller works Tower, 13 and 22 are active and Cessna N60DX must cross 13/31 on its way to 22. Steps: taxi (hold short of 13), wait for the crossing request,
+ask Tower on the landline (check `coord:CROSS_REQUEST:N60DX`; the prompt shows the phrase and the three ways to say it), wait for the approval (`coord:CROSS_APPROVED:N60DX`), cross (`CROSS_RUNWAY`; refused
+with the 3-1-3 reason before the approval), watch the crossing (`crossed:N60DX:13/31`; the engine posts the completion). References 3-1-3, 3-1-4, 3-7-2, 3-1-12. `coordinationLesson.test.ts` completes it in the real engine with the real AI Tower.
+Objectives: asked, crossed, `no_coordination_errors`.
+
 ## Tests
 
 `npm test -- src/game` - `airportProfile.test.ts` (KACY unchanged, KMHT airlines/destinations/neighbour bearings, performance entries vs the JSON, cargo parking, generator at KMHT, parser callsigns), catalogue/spawn validation and a 120 s engine run of every scenario, 10-minute robustness run, scripted career steps 1 and 3 (and 2, 4, 5, 6, 12) through `parseTransmission` (`testkit.ts` passes `ctx.fixes` from `airport.navaids`),
-all 9 training lessons completed in the engine (`ifrCareer.test.ts`: lessons 8 and 9 use the example transmissions printed in their prompts, plus refusal paths), career step 8 played end to end (Approach, Tower, Ground), traffic generator rules over 30 simulated minutes,
+all 10 training lessons completed in the engine (lesson 10 in `coordinationLesson.test.ts`; coordination scoring, objectives and debrief in `coordinationScoring.test.ts`) (`ifrCareer.test.ts`: lessons 8 and 9 use the example transmissions printed in their prompts, plus refusal paths), career step 8 played end to end (Approach, Tower, Ground), traffic generator rules over 30 simulated minutes,
 `ifrFlows.test.ts` (IFR flows for landing runways 13, 31, 22 and 4: fixes, altitudes, 90 s / 5 nm / 3.5 nm spacing, Cessnas stay VFR, determinism, positions-based defaults and `ifrFlows: false`, generated aircraft worked through the parser without unsafe approach clearances, free play with `ifrFlows`, career 7 IFR departure through Clearance Delivery, Ground, Tower and Departure to `handled:`, the new objective checks on fabricated logs, debrief advice for each IFR mistake), free play options, objectives, debrief, career persistence (fake `localStorage`), scenario events.
 Scripted tests pass `readbackErrorRate: 0`; with the default 8 % a pilot occasionally misreads a clearance and the controller has to correct it.
 

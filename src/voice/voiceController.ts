@@ -20,6 +20,8 @@ export interface TransmissionMeta {
   source: 'speech' | 'typed';
   /** True when the final transcript never arrived and the last partial was used. */
   usedPartial: boolean;
+  /** 'landline' when the landline key (or mode) was used: the text is a coordination call, not a radio call. */
+  channel?: 'radio' | 'landline';
 }
 
 export interface VoiceStatusEvent {
@@ -38,6 +40,8 @@ export interface VoiceControllerOptions {
   providers?: Partial<Record<SttProviderId, SpeechRecognitionProvider>>;
   /** Push-to-talk binding. `false` = no key listeners; drive via beginTransmission()/endTransmission(). */
   ptt?: { key: string; mode: PttMode; debounceMs?: number } | false;
+  /** Second key for landline calls (hold). Absent = none. */
+  landline?: { key: string; debounceMs?: number };
   /** How long to wait for the final transcript after PTT release. Default 2500 ms. */
   finalTimeoutMs?: number;
   /** Keep the mic open briefly after release so the last syllable is not clipped. Default 150 ms. */
@@ -48,6 +52,8 @@ export interface VoiceControllerOptions {
 export interface VoiceController {
   readonly status: VoiceStatus;
   readonly ptt: PushToTalk | null;
+  /** The landline key binding (null without one). */
+  readonly landlinePtt: PushToTalk | null;
   getProviderId(): SttProviderId;
   /** Switch recognition provider. Resolves to whether it is usable (status becomes 'unsupported' if not). */
   setProvider(id: SttProviderId): Promise<boolean>;
@@ -78,6 +84,7 @@ interface Session {
   startPromise: Promise<void>;
   timer: ReturnType<typeof setTimeout> | null;
   stopRequested: boolean;
+  channel: 'radio' | 'landline';
 }
 
 export function createVoiceController(options: VoiceControllerOptions): VoiceController {
@@ -148,6 +155,7 @@ export function createVoiceController(options: VoiceControllerOptions): VoiceCon
       providerId: s.provider.id === 'none' ? 'typed' : s.provider.id,
       source: 'speech',
       usedPartial,
+      channel: s.channel,
     });
   }
 
@@ -181,7 +189,7 @@ export function createVoiceController(options: VoiceControllerOptions): VoiceCon
     else finish(s, s.provider.placeholderPartial === s.partial ? '' : s.partial, true);
   }
 
-  function beginTransmission() {
+  function beginTransmission(channel: 'radio' | 'landline' = 'radio') {
     if (disposed) return;
     if (session && (session.phase === 'starting' || session.phase === 'listening')) return;
     if (session && session.phase === 'processing') flush(session); // new key-down supersedes the wait
@@ -198,6 +206,7 @@ export function createVoiceController(options: VoiceControllerOptions): VoiceCon
       startPromise: Promise.resolve(),
       timer: null,
       stopRequested: false,
+      channel,
     };
     session = s;
     lastPartial = '';
@@ -264,15 +273,21 @@ export function createVoiceController(options: VoiceControllerOptions): VoiceCon
           key: pttConfig.key,
           mode: pttConfig.mode,
           debounceMs: pttConfig.debounceMs,
-          onStart: beginTransmission,
+          onStart: () => beginTransmission('radio'),
           onEnd: () => void endTransmission(),
         });
+
+  const landlinePtt =
+    !options.landline || typeof window === 'undefined'
+      ? null
+      : createPushToTalk({ key: options.landline.key, mode: 'hold', debounceMs: options.landline.debounceMs, onStart: () => beginTransmission('landline'), onEnd: () => void endTransmission() });
 
   return {
     get status() {
       return status;
     },
     ptt,
+    landlinePtt,
     getProviderId: () => providerId,
     async setProvider(id) {
       if (session && session.phase !== 'done') {
@@ -316,7 +331,7 @@ export function createVoiceController(options: VoiceControllerOptions): VoiceCon
         usedPartial: false,
       });
     },
-    beginTransmission,
+    beginTransmission: () => beginTransmission('radio'),
     endTransmission: () => void endTransmission(),
     isTransmitting: () => transmitting,
     onStatusChange(l) {
@@ -334,6 +349,7 @@ export function createVoiceController(options: VoiceControllerOptions): VoiceCon
     dispose() {
       disposed = true;
       ptt?.destroy();
+      landlinePtt?.destroy();
       void currentProvider().dispose?.().catch(() => undefined);
       if (session) {
         clearTimer(session);

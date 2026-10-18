@@ -30,6 +30,10 @@ import type { SpeechSynthesisProvider, TranscriptLog, TransmissionQueue, VoiceCo
 import { createRenderBuffer } from '../display/renderBuffer';
 import type { RenderBuffer } from '../display/renderBuffer';
 import { controllerFrequencies, transmit } from '../commands/transmit';
+import { looksLikeLandline, transmitLandline } from '../commands/landline';
+import type { LandlineResult } from '../commands/landline';
+import type { CoordAnswer } from '../../sim/coordination';
+import type { SimulationEngineExtras } from '../../sim/engineExtras';
 import type { ControllerSetup, TransmitResult } from '../commands/transmit';
 import { voiceSettings } from './voiceSettings';
 import { aiPositionsFor } from '../lib/positions';
@@ -46,6 +50,8 @@ export interface SessionHooks {
   onPartial(text: string): void;
   onTransmitting(on: boolean): void;
   onTransmitResult(r: TransmitResult): void;
+  /** The result of a landline call (typed, or by voice with the landline key / mode). */
+  onLandlineResult?(r: LandlineResult): void;
   onTraining(step: TrainingStepState | null): void;
   onAtis(atis: SimulatedAtis): void;
   onScenarioComplete(): void;
@@ -126,6 +132,15 @@ export interface Session {
   audioInfo(): { supported: boolean; voices: number };
   setController(setup: ControllerSetup): void;
   submit(text: string, source: 'voice' | 'typed'): TransmitResult;
+  /** A landline call to another position ("Tower, Ground, cross runway ..."): parsed as coordination phraseology. */
+  submitLandline(text: string, source: 'voice' | 'typed'): LandlineResult;
+  /** Landline mode: spoken / typed transmissions are landline calls (calls that start with two position names always are). */
+  getLandlineMode(): boolean;
+  setLandlineMode(on: boolean): void;
+  /** The panel buttons: answer a request waiting for one of the player's positions. `afterAircraftId`: "behind the landing ...". */
+  answerRequest(requestId: string, answer: CoordAnswer, o?: { afterAircraftId?: string; reason?: string }): void;
+  /** The panel button: take an approval back. */
+  rescindRequest(requestId: string, reason?: string): void;
   setSpeed(speed: number): void;
   getSpeed(): number;
   setWeather(w: Weather): void;
@@ -280,6 +295,18 @@ export function startSession(p: SessionParams): Session {
   let lastAiTick = -1;
   let inAi = false;
   const onAiTransmission = (t: AiTransmission) => {
+    if (t.channel === 'landline') {
+      // A call between positions: audible when it is for a position the player works (or "Monitor all"), through the landline ring.
+      const forMe = !!t.toPosition && controller.positions.includes(t.toPosition);
+      if (!forMe && !voiceSettings.get().monitorAll) return;
+      transcript.add({ text: `${t.position} (AI) > ${t.toPosition}: ${t.text}`, source: 'ai' });
+      const own = playerFrequencies();
+      pilots.enqueue({
+        text: t.spokenText || t.text, voiceId: t.voiceId, frequencyMhz: own[0] ?? engine.getState().controllerFrequencyMhz, volume: forMe ? 1 : MONITOR_ALL_VOLUME,
+        speaker: `${t.position} (AI)`, channel: 'landline', priority: 1,
+      });
+      return;
+    }
     const mine = isPlayerFrequency(t.frequencyMhz);
     if (!mine && !voiceSettings.get().monitorAll) return;
     transcript.add({ text: `${t.position} (AI): ${t.text}`, source: 'ai' });
@@ -294,6 +321,8 @@ export function startSession(p: SessionParams): Session {
     ai = null;
     const positions = aiEnabled ? aiPositionsFor(p.scenario.controllerPositions, controller.positions) : [];
     controller = { positions: controller.positions, aiPositions: positions };
+    // Who works what decides which coordination rules apply; createAiControllers sets it itself when an AI exists.
+    (engine as SimulationEngine & SimulationEngineExtras).coordination?.setStaffing([...controller.positions], positions);
     if (positions.length === 0) return;
     try {
       ai = makeAi({
@@ -313,7 +342,21 @@ export function startSession(p: SessionParams): Session {
   const strips = createStripBoard({ startUtcMs: utcAt });
   strips.update(engine.getState());
 
-  const submit = (text: string, source: 'voice' | 'typed', confidence?: number): TransmitResult => {
+  let landlineMode = false;
+  const submitLandline = (text: string, source: 'voice' | 'typed', confidence?: number): LandlineResult => {
+    transcript.add({ text: `landline: ${text}`, source: source === 'voice' ? 'speech' : 'typed', confidence });
+    const r = transmitLandline({ engine, text, source, controller });
+    strips.update(engine.getState());
+    hooks.onLandlineResult?.(r);
+    hooks.onRev();
+    return r;
+  };
+  const submit = (text: string, source: 'voice' | 'typed', confidence?: number, channel: 'radio' | 'landline' = 'radio'): TransmitResult => {
+    if (channel === 'landline' || landlineMode || looksLikeLandline(text)) {
+      const lr = submitLandline(text, source, confidence);
+      // the radio panel's result line: a landline call is not an aircraft instruction
+      return { transmissionId: `ll-${Date.now().toString(36)}`, text, source, commands: [], results: [], summary: lr.summary === 'done' ? 'accepted' : lr.summary === 'clarify' ? 'clarify' : lr.summary === 'empty' ? 'empty' : 'rejected', message: `Landline: ${lr.message}`, clarification: lr.summary === 'clarify' ? lr.message : undefined };
+    }
     transcript.add({ text, source: source === 'voice' ? 'speech' : 'typed', confidence });
     const r = transmit({ engine, text, source, controller });
     for (const res of r.results) {
@@ -338,7 +381,8 @@ export function startSession(p: SessionParams): Session {
     voice = createVoiceController({
       providerId: s.providerId,
       ptt: { key: s.pttKey, mode: s.pttMode },
-      onTransmission: (text, meta) => submit(text, meta.source === 'typed' ? 'typed' : 'voice', meta.confidence),
+      landline: { key: s.landlineKey },
+      onTransmission: (text, meta) => submit(text, meta.source === 'typed' ? 'typed' : 'voice', meta.confidence, meta.channel),
     });
     voice.onTransmittingChange((on) => {
       pilots.setControllerTransmitting(on);
@@ -355,6 +399,7 @@ export function startSession(p: SessionParams): Session {
     unsubSettings = voiceSettings.subscribe((next) => {
       voice?.ptt?.setKey(next.pttKey);
       voice?.ptt?.setMode(next.pttMode);
+      voice?.landlinePtt?.setKey(next.landlineKey);
       if (next.providerId !== lastProvider) {
         lastProvider = next.providerId;
         void voice?.setProvider(next.providerId);
@@ -510,6 +555,24 @@ export function startSession(p: SessionParams): Session {
       hooks.onRev();
     },
     submit: (text, source) => submit(text, source),
+    submitLandline: (text, source) => submitLandline(text, source),
+    getLandlineMode: () => landlineMode,
+    setLandlineMode(on) {
+      landlineMode = on;
+      hooks.onRev();
+    },
+    answerRequest(requestId, answer, o) {
+      const req = engine.getState().coordination?.requests.find((r) => r.id === requestId);
+      const api = (engine as SimulationEngine & SimulationEngineExtras).coordination;
+      if (req && api) api.respond(requestId, answer, { by: req.to, source: 'player', afterAircraftId: o?.afterAircraftId, reason: o?.reason });
+      hooks.onRev();
+    },
+    rescindRequest(requestId, reason) {
+      const req = engine.getState().coordination?.requests.find((r) => r.id === requestId);
+      const api = (engine as SimulationEngine & SimulationEngineExtras).coordination;
+      if (req && api) api.rescind(requestId, { by: req.to, source: 'player', reason });
+      hooks.onRev();
+    },
     setSpeed(speed) {
       clock.setSpeed(speed);
       hooks.onRev();

@@ -4,7 +4,7 @@
  */
 
 export const PANEL_IDS = [
-  'surface', 'radar', 'tower', 'list', 'strips', 'details', 'comms', 'alerts', 'radio', 'charts', 'navaids', 'atis', 'weather', 'settings',
+  'surface', 'radar', 'tower', 'list', 'strips', 'details', 'comms', 'alerts', 'landline', 'radio', 'charts', 'navaids', 'atis', 'weather', 'settings',
 ] as const;
 export type PanelId = (typeof PANEL_IDS)[number];
 
@@ -43,14 +43,14 @@ const g = (tabs: PanelId[], active: PanelId = tabs[0]): PanelGroup => ({ tabs, a
 export function presetRegions(id: PresetId): Regions {
   switch (id) {
     case 'tower-cab':
-      return { main: [g(['tower', 'surface', 'radar'])], right: [g(['strips', 'list']), g(['details'])], bottom: [g(['radio'])] };
+      return { main: [g(['tower', 'surface', 'radar'])], right: [g(['strips', 'list']), g(['details'])], bottom: [g(['radio', 'landline'])] };
     case 'ground':
-      return { main: [g(['surface', 'radar', 'tower'])], right: [g(['list', 'strips'])], bottom: [g(['comms', 'alerts']), g(['radio'])] };
+      return { main: [g(['surface', 'radar', 'tower'])], right: [g(['list', 'strips'])], bottom: [g(['comms', 'alerts', 'landline']), g(['radio'])] };
     case 'tracon':
-      return { main: [g(['radar', 'surface', 'tower'])], right: [g(['strips', 'list']), g(['details'])], bottom: [g(['radio'])] };
+      return { main: [g(['radar', 'surface', 'tower'])], right: [g(['strips', 'list']), g(['details'])], bottom: [g(['radio', 'landline'])] };
     case 'everything':
     default:
-      return { main: [g(['surface', 'radar', 'tower'])], right: [g(['list', 'strips']), g(['details'])], bottom: [g(['comms', 'alerts']), g(['radio'])] };
+      return { main: [g(['surface', 'radar', 'tower'])], right: [g(['list', 'strips']), g(['details'])], bottom: [g(['comms', 'alerts', 'landline']), g(['radio'])] };
   }
 }
 
@@ -120,7 +120,7 @@ function insert(l: LayoutState, id: PanelId, region: RegionId, makeActive = true
 export const HOME_REGION: Record<PanelId, RegionId> = {
   surface: 'main', radar: 'main', tower: 'main',
   list: 'right', strips: 'right', details: 'right',
-  comms: 'bottom', alerts: 'bottom', radio: 'bottom',
+  comms: 'bottom', alerts: 'bottom', landline: 'bottom', radio: 'bottom',
   charts: 'main', navaids: 'right', atis: 'right', weather: 'right', settings: 'right',
 };
 

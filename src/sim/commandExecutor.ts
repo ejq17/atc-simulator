@@ -27,6 +27,7 @@ import { computeStopNodes } from './groundMovement';
 import { glideAltitudeFt, initiateGoAround } from './flightDynamics';
 import { freeParkingCandidates, parkingOccupant, resolveParkingQuery } from './parkingResolver';
 import { assessClearanceSafety, recordUnsafeClearance } from './conflicts';
+import { crossingGate, releaseGate } from './coordination';
 import { frequencyById, frequencyByMhz, frequencyForPosition, hearsFrequency, formatMhz } from '../radio/frequencies';
 import { buildReadback, buildSayAgain, buildUnable } from '../radio/readback';
 import { spokenRunway } from '../radio/spoken';
@@ -716,10 +717,14 @@ function planCross(env: Env): PlanResult {
   if (!runwayCrossingsAlong(graph, route.nodeIds.slice(holdIdx)).includes(rw.id)) {
     return unable(env, `The current route of ${ac.callsign} does not continue across runway ${rw.id}; issue a new taxi instruction.`, `our route doesn't cross runway ${rw.id}`);
   }
+  // JO 7110.65 3-1-3: Ground needs local control's approval for an active runway (coordination.ts).
+  const gate = crossingGate(env.ctx, ac, env.position, rw);
+  if (gate.refuse) return { reject: { reason: gate.refuse, commError: false } };
   return {
     plan: {
       patch: { runwayId: raw },
       commit: () => {
+        gate.commit();
         if (!ac.runwayAuthorizations.includes(rw.id)) ac.runwayAuthorizations.push(rw.id);
         route.stopAtNodeIds = route.stopAtNodeIds.filter((id) => graph.nodes[id].runwayId !== rw.id);
         ac.flags.holdingPosition = false;
@@ -810,6 +815,9 @@ function planTakeoff(env: Env): PlanResult {
     if (ctx.state.scenario.mode === 'training') return unable(env, msg, "we don't have our IFR clearance yet");
     flag = msg;
   }
+  // IFR departure released by Departure/Approach before the takeoff clearance when that is a separate position (coordination.ts).
+  const releaseG = releaseGate(ctx, ac, env.position);
+  if (releaseG.refuse) return { reject: { reason: releaseG.refuse, commError: false } };
   if (ac.phase === 'LINE_UP_AND_WAIT') {
     if (ac.assignedRunwayEnd !== g.end.id) {
       return unable(env, `${ac.callsign} is lined up on runway ${ac.assignedRunwayEnd}, not ${g.end.id}.`, `we're lined up on runway ${ac.assignedRunwayEnd}`);
@@ -822,6 +830,7 @@ function planTakeoff(env: Env): PlanResult {
         patch: { runwayEnd: g.end.id, runwayId: g.runway.id },
         flag,
         commit: () => {
+          releaseG.commit();
           rt.takeoffCleared = true;
           rt.rollAtSec = now + 2.5;
           setPhase(ctx, ac, 'CLEARED_FOR_TAKEOFF');
@@ -841,6 +850,7 @@ function planTakeoff(env: Env): PlanResult {
       patch: { runwayEnd: g.end.id, runwayId: g.runway.id },
       flag,
       commit: () => {
+        releaseG.commit();
         // from the hold: the roll starts after the line-up (taxi onto the runway and turn), not 2.5 s after the clearance
         let pathM = 0;
         let prev = ac.pos;

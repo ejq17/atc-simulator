@@ -8,6 +8,7 @@
  *             - 10 * separationViolations
  *             -  5 * missedReadbackErrors
  *             -  2 * communicationErrors
+ *             -  3 * coordinationErrors
  *             +  2 * correctClearances
  *             +  5 * aircraftHandled )
  *
@@ -20,6 +21,8 @@
  *   CONFLICT event with data.alertKind = UNSAFE_CLEARANCE -> unsafeInstructions (also when prevented in training)
  *   READBACK_ERROR event with data.missed          -> missedReadbackErrors
  *   COMMAND_REJECTED / CLARIFICATION with data.commError -> communicationErrors
+ *   COORDINATION event with data.error             -> coordinationErrors (a crossing or an IFR takeoff authorised without the approval / release
+ *                                                     of 7110.65 3-1-3 / 4-3-4; free play and career only, training refuses)
  *   COMMAND_ACCEPTED with data.scored              -> correctClearances (+ request wait statistics)
  *   COMMAND_ACCEPTED with data.commError           -> communicationErrors (accepted but improper: takeoff without an IFR
  *                                                     clearance, approach clearance with an improper intercept)
@@ -38,6 +41,8 @@ export const SCORE_WEIGHTS = {
   separationViolation: -10,
   missedReadbackError: -5,
   communicationError: -2,
+  /** Design value: a little heavier than a garbled call, far lighter than a safety event. */
+  coordinationError: -3,
   correctClearance: 2,
   aircraftHandled: 5,
 } as const;
@@ -49,6 +54,7 @@ export function newScoreCard(): ScoreCard {
     aircraftHandled: 0,
     correctClearances: 0,
     communicationErrors: 0,
+    coordinationErrors: 0,
     runwayIncursions: 0,
     separationViolations: 0,
     unsafeInstructions: 0,
@@ -69,6 +75,7 @@ export function computeScore(card: ScoreCard): number {
     w.separationViolation * card.separationViolations +
     w.missedReadbackError * card.missedReadbackErrors +
     w.communicationError * card.communicationErrors +
+    w.coordinationError * (card.coordinationErrors ?? 0) +
     w.correctClearance * card.correctClearances +
     w.aircraftHandled * card.aircraftHandled;
   return Math.max(0, Math.min(100, raw));
@@ -109,6 +116,9 @@ export function applyEventToScore(ctx: SimContext, ev: SimEvent): void {
         s.averageWaitSec = ws.totalSec / ws.count;
         s.totalDelaySec = ws.delaySec;
       }
+      break;
+    case 'COORDINATION':
+      if (d.error && !ev.aiPosition) s.coordinationErrors = (s.coordinationErrors ?? 0) + 1;
       break;
     case 'DESPAWN':
       // once an AI controller is active an aircraft is "handled" only if the player gave it an accepted instruction

@@ -20,6 +20,8 @@ export interface RadioEffects {
   setMasterVolume(volume: number): void;
   playPttOpen(): void;
   playPttClose(): void;
+  /** A short two-tone ring for a landline call between positions (WebAudio only, no file). */
+  playLandline(): void;
   startStatic(): void;
   stopStatic(): void;
   /** Entry node of the radio chain, for routing cloud TTS through it. Null if WebAudio is unavailable. */
@@ -192,6 +194,28 @@ export function createRadioEffects(options: RadioEffectsOptions = {}): RadioEffe
       const t = c.currentTime;
       tick(c, t, 900, 0.014, 0.4);
       noiseBurst(c, t + 0.008, 0.11, 0.45); // squelch tail
+    },
+    playLandline() {
+      const c = ready();
+      if (!c || !chainIn) return;
+      const t = c.currentTime;
+      // two short bursts of a 440 + 480 Hz pair (a telephone ring), softer than the PTT clicks
+      for (const start of [0, 0.32]) {
+        for (const f of [440, 480]) {
+          const osc = c.createOscillator();
+          osc.type = 'sine';
+          osc.frequency.value = f;
+          const env = c.createGain();
+          env.gain.setValueAtTime(0, t + start);
+          env.gain.linearRampToValueAtTime(0.18, t + start + 0.02);
+          env.gain.setValueAtTime(0.18, t + start + 0.2);
+          env.gain.linearRampToValueAtTime(0.0001, t + start + 0.24);
+          osc.connect(env);
+          env.connect(chainIn);
+          osc.start(t + start);
+          osc.stop(t + start + 0.26);
+        }
+      }
     },
     startStatic() {
       wantStatic = true;

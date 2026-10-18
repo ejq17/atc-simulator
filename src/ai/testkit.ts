@@ -5,6 +5,8 @@ import type { SimulationEngine } from '../sim/api';
 import type {
   Aircraft, Airport, CommandOutcome, ControllerPositionId, GameMode, ParsedCommand, Scenario, ScenarioAircraftSpawn, SimEvent,
 } from '../sim/types';
+import { awaitingAnswer, releaseNeeded, validApproval } from '../sim/coordination';
+import type { SimulationEngineExtras } from '../sim/engineExtras';
 import { createAiControllers } from './index';
 import type { AiControllers, AiTransmission } from './index';
 
@@ -37,6 +39,12 @@ export interface HarnessOptions {
   airport?: Airport;
   /** Make the engine refuse every AI command of these kinds (tests the AI's back-off). */
   rejectKinds?: ParsedCommand['kind'][];
+  /**
+   * A scripted human on the player's positions answers landline requests: 'approve' (default) approves every request `answerAfterSec` (default 3)
+   * seconds after it was made; false leaves them unanswered (tests of the coordination itself answer or ignore them).
+   */
+  humanAnswers?: 'approve' | false;
+  answerAfterSec?: number;
 }
 
 export interface Harness {
@@ -44,7 +52,10 @@ export interface Harness {
   ai: AiControllers;
   /** Every event ever emitted (the engine keeps only the last 2000). */
   events: SimEvent[];
+  /** Radio transmissions (one ATC event each). */
   transmissions: AiTransmission[];
+  /** Landline calls the AI made (coordination channel). */
+  landline: AiTransmission[];
   outcomes: AiOutcome[];
   now(): number;
   find(callsign: string): Aircraft | undefined;
@@ -54,6 +65,8 @@ export interface Harness {
   say(position: ControllerPositionId, c: ParsedCommand): CommandOutcome;
   pilotTexts(callsign?: string): string[];
   atc(position?: ControllerPositionId): SimEvent[];
+  /** A scripted human Tower: true when `ac` may be cleared for takeoff now (no release needed, or one is current); otherwise the release is requested and false returned. */
+  towerMayDepart(ac: Aircraft): boolean;
 }
 
 export function createHarness(o: HarnessOptions): Harness {
@@ -70,6 +83,7 @@ export function createHarness(o: HarnessOptions): Harness {
   const engine = createEngine({ airport: o.airport ?? kacy, scenario, readbackErrorRate: o.readbackErrorRate ?? 0, utcStartMs: Date.UTC(2026, 5, 1, 16, 0, 0) });
   const events: SimEvent[] = [];
   const transmissions: AiTransmission[] = [];
+  const landline: AiTransmission[] = [];
   const outcomes: AiOutcome[] = [];
   let lastSeq = 0;
   const harvest = () => {
@@ -100,10 +114,19 @@ export function createHarness(o: HarnessOptions): Harness {
   };
   const controllers = createAiControllers({
     engine: spied, airport: o.airport ?? kacy, positions: ai, playerPositions: o.player, seed: o.aiSeed ?? o.seed ?? 4242,
-    reactionDelaySec: o.reactionDelaySec, onTransmission: (t) => transmissions.push(t),
+    reactionDelaySec: o.reactionDelaySec, onTransmission: (t) => (t.channel === 'landline' ? landline : transmissions).push(t),
   });
+  const humanAnswers = o.humanAnswers ?? 'approve';
+  const api = (engine as SimulationEngineExtras).coordination;
   engine.subscribe((s) => {
     controllers.update(s);
+    if (humanAnswers && api) {
+      for (const pos of s.coordination?.human ?? o.player) {
+        for (const r of awaitingAnswer(s, pos)) {
+          if (r.status === 'pending' && s.clock.timeSec - r.lastAskSec >= (o.answerAfterSec ?? 3)) api.respond(r.id, 'approve', { by: pos, source: 'player' });
+        }
+      }
+    }
     harvest();
   });
   harvest();
@@ -112,7 +135,7 @@ export function createHarness(o: HarnessOptions): Harness {
     for (let i = 0; i < n; i++) engine.step();
   };
   const h: Harness = {
-    engine, ai: controllers, events, transmissions, outcomes,
+    engine, ai: controllers, events, transmissions, landline, outcomes,
     now: () => engine.getState().clock.timeSec,
     find: (cs) => Object.values(engine.getState().aircraft).find((a) => a.callsign === cs),
     run(seconds, perSecond) {
@@ -130,6 +153,13 @@ export function createHarness(o: HarnessOptions): Harness {
       return pred();
     },
     say: (position, c) => engine.applyCommand(c, { position, source: 'typed' }),
+    towerMayDepart(ac) {
+      const st = engine.getState();
+      const dep = releaseNeeded(st, 'TWR', ac);
+      if (!dep || validApproval(st, 'RELEASE', ac.id)) return true;
+      api?.request({ topic: 'RELEASE', from: 'TWR', to: dep, aircraftId: ac.id, source: 'player' });
+      return false;
+    },
     pilotTexts: (cs) => events.filter((e) => e.kind === 'TRANSMISSION' && e.speaker === 'PILOT' && (!cs || e.callsign === cs)).map((e) => e.text),
     atc: (position) => events.filter((e) => e.kind === 'TRANSMISSION' && e.speaker === 'ATC' && e.aiPosition !== undefined && (!position || e.aiPosition === position)),
   };

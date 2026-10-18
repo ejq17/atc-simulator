@@ -14,6 +14,9 @@ export interface AiTransmission {
   callsign?: string;
   timeSec: number;
   voiceId: string;         // distinct from pilot voices
+  /** 'landline': a call to another position (coordination), not a radio transmission; `toPosition` is who it is for. Default 'radio'. */
+  channel?: 'radio' | 'landline';
+  toPosition?: ControllerPositionId;
 }
 
 export interface AiControllerOptions {

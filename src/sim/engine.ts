@@ -20,6 +20,7 @@ import { updateFlightDynamics } from './flightDynamics';
 import { updateRunwayOccupancy } from './runwayOccupancy';
 import { detectConflicts } from './conflicts';
 import { newScoreCard, updateScoring } from './scoring';
+import { coordInform, coordRequest, coordRescind, coordRespond, newCoordinationState, updateCoordination } from './coordination';
 import {
   applyPendingFrequencyChanges, processScheduledSpawns, removeAircraft as removeFromCtx, spawnFromSpec, updateLifecycle, updatePilotRequests,
 } from './traffic';
@@ -81,6 +82,7 @@ export function createEngine(opts: EngineOptionsExt): SimulationEngine & Simulat
     scenario,
     score: newScoreCard(),
     seed: scenario.seed,
+    coordination: newCoordinationState(scenario),
     ops: newAirportOps(),
   };
   for (const c of scenario.closures ?? []) {
@@ -133,6 +135,7 @@ export function createEngine(opts: EngineOptionsExt): SimulationEngine & Simulat
     updateRunwayOccupancy(ctx);
     detectConflicts(ctx);
     updateLifecycle(ctx);
+    updateCoordination(ctx);
     announceClosureChanges(ctx);
     if (state.ops.birds && state.clock.timeSec >= state.ops.birds.untilSec) state.ops.birds = undefined;
     updateScoring(ctx);
@@ -225,6 +228,34 @@ export function createEngine(opts: EngineOptionsExt): SimulationEngine & Simulat
       const ev = emitEvent(ctx, event);
       notify();
       return ev;
+    },
+    coordination: {
+      request(input) {
+        const r = coordRequest(ctx, input);
+        notify();
+        return r;
+      },
+      respond(id, answer, o) {
+        const r = coordRespond(ctx, id, answer, o);
+        notify();
+        return r;
+      },
+      rescind(id, o) {
+        const r = coordRescind(ctx, id, o);
+        notify();
+        return r;
+      },
+      inform(input) {
+        const m = coordInform(ctx, input);
+        notify();
+        return m;
+      },
+      setStaffing(human, ai) {
+        const c = state.coordination!;
+        c.human = [...new Set(human)];
+        c.staffed = [...new Set([...human, ...(ai ?? scenario.controllerPositions.filter((p) => !human.includes(p)))])];
+        notify();
+      },
     },
     addClosure(spec, source = 'player') {
       const r = addClosureToState(state, spec, source);

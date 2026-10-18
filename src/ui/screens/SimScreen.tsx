@@ -60,10 +60,15 @@ function useShortcuts() {
 /** Push-to-talk key events must also reach the voice controller while a pop-out has focus. */
 function usePttInPopouts() {
   const ptt = useSimStore((s) => s.session?.voice?.ptt);
+  const landline = useSimStore((s) => s.session?.voice?.landlinePtt);
   useEffect(() => {
     if (!ptt) return;
-    return onEachWindow((win) => (win === window ? undefined : ptt.attachTarget(win)));
-  }, [ptt]);
+    return onEachWindow((win) => {
+      if (win === window) return undefined;
+      const offs = [ptt.attachTarget(win), landline?.attachTarget(win)];
+      return () => offs.forEach((off) => off?.());
+    });
+  }, [ptt, landline]);
 }
 
 export function SimScreen() {

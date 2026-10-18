@@ -213,6 +213,13 @@ zero", "frequency change approved", wind and altimeter with a clearance, line up
 660+ parser tests in `src/commands`. Positions: Clearance Delivery,
 Ground, Tower, Approach/Departure, or any combination.
 
+**Coordination between positions.** The positions you do not work are run by AI controllers, and the positions talk to each other the way a cab does over the
+landline: Ground asks Tower before crossing an active runway (JO 7110.65 3-1-3: "cross runway one three at Alpha"), Tower asks Departure to release an IFR
+departure ("Spirit four fifty one released", 4-3-4, a letter-of-agreement setting in the simulator), Departure and Approach point aircraft out to each other (5-4-3),
+and "rolling" / "going around" are passed on. When an AI controller needs something from you, the **Landline** panel rings (Approve / Unable / Stand by,
+"approve behind the landing ..."); to call another position hold **L** (configurable) or type "Tower, Ground, cross runway one three at Alpha with Cessna ...". Authorising a
+crossing or an IFR takeoff without the approval is refused in training and scored as a coordination error (-3) in free play. If you work both positions of a pair there is nobody to call.
+
 ## Layout
 
 ```

@@ -171,14 +171,15 @@ The aircraft always executes the clearance that was actually issued.
 
 ```
 score = clamp(0, 100, 100 - 25*incursions - 15*unsafe - 10*separation - 5*missedReadbacks
-                        - 2*commErrors + 2*correctClearances + 5*aircraftHandled)
+                        - 2*commErrors - 3*coordinationErrors + 2*correctClearances + 5*aircraftHandled)
 ```
 
 * incursion: `RUNWAY_INCURSION` event; unsafe: `CONFLICT` event with `alertKind = UNSAFE_CLEARANCE` (also when
   training refused it); separation: `SEPARATION_VIOLATION` (ground or airborne proximity);
   commErrors: rejected/clarified commands flagged `commError` (wrong frequency, unknown callsign, aircraft not
   in a position to comply); correct: accepted safe clearance; handled: arrival shut down at parking, or
-  departure that left the area after a CONTACT_FREQUENCY handoff.
+  departure that left the area after a CONTACT_FREQUENCY handoff; coordinationErrors: `COORDINATION` events with `data.error` made by the player (a crossing or an IFR takeoff authorised
+  without the approval / release below; free play and career only, training refuses). The weight 3 is a design value.
 * `averageWaitSec` = mean age of a pilot request when answered; `totalDelaySec` = sum of waits above 60 s.
 * `scenarioCompleted` when `durationSec` elapsed or all scripted traffic has been handled.
 
@@ -645,6 +646,27 @@ frequencies and `procedures[].fixes` that exist in `navaids` (warnings only). In
 for every runway end a `holding_position` node (runwayId set, optional `protectsRunwayEnd`) adjacent to a
 `runway` node; exits = `runway` nodes adjacent to a `holding_position` of the same runway; edges on a runway
 surface carry `onRunwayId`; parking nodes of kind `parking`; GND/TWR frequencies.
+
+## Coordination between positions (`coordination.ts`, `state.coordination`)
+
+A typed message channel between controller positions, replayable and deterministic (ids are counters, times are sim seconds, nothing random). `state.coordination`
+= `{ requests, messages, human, staffed }`; every message is also a `COORDINATION` `SimEvent` (`data.msgKind`, `from`, `to`, `requestId`, `standard`), so a session replays from the log.
+
+* **Requests** (`CoordRequest`): topic `CROSSING` (runway id, point), `RELEASE`, `POINT_OUT` (position text, altitude); status `pending -> standby | approved | denied`, `approved -> used | expired | rescinded`, `used -> completed`.
+  A repeated request for the same aircraft / runway is the same request with `asks + 1` (a repeat inside 5 s is ignored); a request nobody answers is dropped (`expired`) 240 s after the last ask.
+* **Messages** (`CoordMessage`): `CROSS_REQUEST / APPROVED / UNABLE / STANDBY / RESCINDED / COMPLETE`, `RELEASE_REQUEST / RELEASED / HOLD_FOR_RELEASE / RELEASE_STANDBY`, `POINT_OUT / POINT_OUT_APPROVED / POINT_OUT_UNABLE / TRAFFIC_OBSERVED`,
+  `ROLLING`, `GOING_AROUND`, `TRAFFIC`, `TEXT`, each with `text` (digits), `spoken` (words), `standard` (the FAA's wording, 7110.65 3-1-3 / 4-3-4 / 5-4-3) and the `reference`. `describeMessage` builds them.
+* **API** (`engine.coordination`, `engineExtras.ts`): `request`, `respond(id, 'approve' | 'deny' | 'standby', { by, source, afterAircraftId?, reason? })`, `rescind`, `inform`, `setStaffing(human, ai)`.
+  The Landline panel, the landline parser (`src/commands/landline.ts`, `src/ui/commands/landline.ts`) and the AI (`src/ai/coordination.ts`) all use it; `source` is `player | ai | system`.
+* **Who is staffed**: `setStaffing(human, ai)`; default = every position of `scenario.controllerPositions` staffed, `scenario.playerPositions` (default all) human. A person working both positions of a pair coordinates
+  with himself (`sameController`): no rule, no message. An unstaffed position is never waited for.
+* **Rules** (`crossingGate`, `releaseGate`, called by `planCross` and `planTakeoff`):
+  * CROSS_RUNWAY issued as GND on a runway of the active configuration (`runwayIsActive`) needs Tower's current approval for that aircraft and runway (JO 7110.65 3-1-3). Training refuses (no pilot readback, not a communication error) with the reason and the paragraph; free play and career accept and emit a `COORDINATION` event with `data.error` (+1 coordination error, -3 points). An approval with `afterAircraftId` ("behind the landing X") is not usable until X is on the ground, clear of the runway and not rolling out (`afterAircraftClear`).
+  * TAKEOFF issued as TWR to an IFR departure needs a current release from Departure (Approach when no Departure is staffed) unless the same person works both, or `Scenario.coordination.releasesRequired === false` (LOA concept, 4-3-4). Same consequences.
+  * Lifetimes (`COORDINATION_DESIGN`, design values, not FAA numbers): crossing approval 60 s (restarts while a "behind the landing X" approval waits for X), release 120 s, open request 240 s, AI re-ask 30 s, duplicate window 5 s, crossing closed anyway 180 s after use, point-out geometry 4 nm, release spacing 45 s.
+  * `updateCoordination` (once per tick): expires stale approvals / requests and aircraft that left, and when the crossed aircraft has left the runway marks the request `completed` and posts `CROSS_COMPLETE` as `system` (3-1-3: the ground controller advises Tower, verbally or by visual aid; the engine is the visual aid).
+* Not modelled: vehicles, runway changes and intersection departures announced to Tower (3-1-4), radar handoffs between sectors, delegated airspace for point outs (information only).
+Tests: `coordination.test.ts` (22).
 
 ## Known limitations
 

@@ -12,6 +12,9 @@
  * Tower vocabulary additions (2-1-21, 3-1-6, 3-8-2, 3-9-1, 3-9-11, 3-10-1, 3-10-11, 5-2-1, 7-2-1, 7-6-11) were confirmed on 2026-10-18 by fetching the
  * FAA web edition (chapters 2, 3, 5, 7) and reading the paragraph heading and phraseology on the page.
  *
+ * Coordination additions (3-1-4, 4-3-4, 5-4-3, 5-4-7; 3-1-3 text and phraseology re-read) were confirmed on 2026-10-18 from the FAA web edition (chapter 3 section 1, chapter 4 section 3,
+ * chapter 5 section 4, fetched with a browser User-Agent).
+ *
  * Phraseology audit additions (2-1-17, 2-4-17, 2-4-19, 2-9-3, 3-9-3, 4-3-3, 5-7-2) were confirmed on 2026-10-17 from the pages
  * saved under data/sources/raw/phraseology/ (see docs/PHRASEOLOGY-AUDIT.md).
  */
@@ -39,6 +42,10 @@ export const REFERENCES = {
   '2-4-20': ref('2-4-20', 'Aircraft Identification', 'chap2_section_4'),
   '2-9-3': ref('2-9-3', 'Content', 'chap2_section_9'),
   '3-1-3': ref('3-1-3', 'Use of Active Runways', 'chap3_section_1'),
+  '3-1-4': ref('3-1-4', 'Coordination Between Local and Ground Controllers', 'chap3_section_1'),
+  '4-3-4': ref('4-3-4', 'Departure Release, Hold for Release, Release Times, Departure Restrictions, and Clearance Void Times', 'chap4_section_3'),
+  '5-4-3': ref('5-4-3', 'Methods', 'chap5_section_4'),
+  '5-4-7': ref('5-4-7', 'Point Out', 'chap5_section_4'),
   '3-1-12': ref('3-1-12', 'Visually Scanning Runways', 'chap3_section_1'),
   '3-1-6': ref('3-1-6', 'Traffic Information', 'chap3_section_1'),
   '3-8-2': ref('3-8-2', 'Touch-and-Go or Stop-and-Go or Low Approach', 'chap3_section_8'),

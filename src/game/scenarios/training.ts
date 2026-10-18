@@ -436,4 +436,67 @@ export const TRAINING_SCENARIOS: ScenarioDef[] = [
         durationSec: 900,
       };
     }),
+
+  // ---------------------------------------------------------------- 10
+  def('train-10-coordination', 'Training 10: Crossing coordination with Tower', 4, 10, 'As Ground, ask AI Tower for approval before crossing the active runway 13/31, then cross.', 'communication procedures, coordination and runway safety',
+    (airport, o) => {
+      const plan = planDepartureTaxi(airport, 'GA-3', '22', ['A']);
+      if (!plan || !plan.crossings.some((c) => c.runwayId === '13/31')) throw new Error('train-10: route does not cross 13/31');
+      return {
+        id: 'train-10-coordination', name: 'Training 10: Crossing coordination with Tower', mode: 'training', seed: o?.seed ?? 210,
+        description: 'You are Ground; an AI controller works Tower. Cessna N60DX (GA ramp 3) wants runway 22 and its route via Alpha crosses runway 13/31, which is active. ' +
+          'Ground may not authorise that crossing until local control has approved it: ask on the landline (Landline panel, or hold L, or type the call in the box), wait for the answer, then cross.',
+        weather: calm(), activeRunways: { departing: ['13', '22'], landing: ['13'] }, controllerPositions: GROUND_AND_TOWER,
+        spawns: [parkedDeparture('N60DX', 'C172', 'GA-3', 0)],
+        objectives: [
+          { id: 'asked', text: 'Ask Tower for the crossing', check: 'coord:CROSS_REQUEST:N60DX' },
+          { id: 'crossed', text: 'N60DX crosses runway 13/31', check: 'crossed:N60DX:13/31' },
+          { id: 'clean', text: 'No coordination errors', check: 'no_coordination_errors' },
+        ],
+        training: {
+          steps: [
+            {
+              id: 'taxi', callsign: 'N60DX', expectCommand: 'TAXI', reference: refTexts('3-7-2', '2-4-3'),
+              prompt: 'N60DX asks to taxi. State runway 22 first, give it a route via alpha, and tell it to hold short of runway 13.',
+              example: 'Cessna six zero delta x-ray, runway two two, taxi via alpha, hold short of runway one three.',
+              explanation: 'The route crosses runway 13/31, so the aircraft is told to hold short of it (3-7-2). Whether it may cross is a separate decision, and for an active runway it is not Ground\'s alone.',
+              mistakes: ['No hold-short instruction for the runway you do not want it to enter yet.'],
+            },
+            {
+              id: 'wait-report', callsign: 'N60DX', check: 'crossing_request:N60DX', reference: refText('3-7-2'),
+              prompt: 'Wait for N60DX to taxi up to the runway 13/31 hold line at Alpha and report.',
+              explanation: 'The aircraft stops at the hold line and asks to cross. Do not tell it to cross yet.',
+              mistakes: ['Telling it to cross before Tower has approved: in training the simulator refuses, in free play it scores a coordination error.'],
+            },
+            {
+              id: 'ask-tower', callsign: 'N60DX', check: 'coord:CROSS_REQUEST:N60DX', reference: refText('3-1-3'),
+              prompt: 'Runway 13/31 is active, so ask Tower for approval on the landline, naming the runway and the point (the taxiway) where the aircraft will cross. Hold L and say it, or type it in the radio box, or use the Landline panel.',
+              example: 'Tower, Ground, cross runway one three at alpha with Cessna six zero delta x-ray.',
+              explanation: 'Ground control must obtain approval from local control before authorizing an aircraft or a vehicle to cross or use any portion of an active runway, and the coordination must include the point or intersection where the operation will occur (3-1-3). The order does not prescribe the wording of the request, so the simulator accepts plain words; the answer from Tower uses the prescribed form, "cross (runway) at (point)".',
+              mistakes: ['Leaving out the runway or the point.', 'Calling Tower on the aircraft\'s radio frequency instead of the landline: pilots do not relay coordination.'],
+            },
+            {
+              id: 'wait-approval', callsign: 'N60DX', check: 'coord:CROSS_APPROVED:N60DX', reference: refTexts('3-1-3', '3-1-4'),
+              prompt: 'Wait for Tower\'s answer. The aircraft stays at the hold line. If Tower says it is unable and will call back, keep holding.',
+              explanation: 'Tower answers "cross runway one three at alpha" when the runway is free, or tells you it is unable and will call back when an arrival or a departure is using the runway. The approval is only good for a short time and Tower can take it back ("hold short, traffic on final"). Local and ground controllers exchange information as necessary for the safe and efficient use of the runways (3-1-4).',
+              mistakes: ['Crossing the aircraft while Tower has said stand by.', 'Using an approval that has expired.'],
+            },
+            {
+              id: 'cross', callsign: 'N60DX', expectCommand: 'CROSS_RUNWAY', reference: refTexts('3-1-3', '3-7-2'),
+              prompt: 'Tower approved. Now tell N60DX to cross runway 13 at alpha.',
+              example: 'Cessna six zero delta x-ray, cross runway one three at alpha.',
+              explanation: 'The instruction to the pilot names the runway and where to cross. It is yours to give only inside Tower\'s approval; if Tower said "behind the landing ...", wait until that aircraft has cleared the runway.',
+              mistakes: ['"Taxi across" or "proceed across".', 'Crossing in front of the arrival Tower told you to wait for.'],
+            },
+            {
+              id: 'wait-cross', callsign: 'N60DX', check: 'crossed:N60DX:13/31', reference: refTexts('3-1-3', '3-1-12'),
+              prompt: 'Watch N60DX cross. Ground must advise Tower when the coordinated runway operation is complete: the simulator does it for you when the whole aircraft is clear.',
+              explanation: '3-1-3 requires the ground controller to advise the local controller when the coordinated runway operation is complete, verbally or through visual aids. Until then Tower treats the runway as in use by your crossing.',
+              mistakes: ['Forgetting that Tower is waiting for the "crossing complete".'],
+            },
+          ] satisfies TrainingStepSpec[],
+        },
+        durationSec: 1200,
+      };
+    }),
 ];

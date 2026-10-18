@@ -192,6 +192,24 @@ export function buildImprovements(state: SimulationState, events: SimEvent[]): s
     );
   }
 
+  if ((s.coordinationErrors ?? 0) > 0) {
+    const errs = events.filter((e) => e.kind === 'COORDINATION' && e.data?.error);
+    const crossings = errs.filter((e) => e.data?.rule === 'crossing');
+    const releases = errs.filter((e) => e.data?.rule === 'release');
+    if (crossings.length) {
+      out.push(
+        `${plural(crossings.length, 'runway crossing')} (${names(crossings.map((e) => e.callsign))}) authorised without Tower's approval: ground control must obtain approval from local control before authorizing an aircraft or a vehicle to cross or use any portion of an active runway, ` +
+        `and the coordination includes the point or intersection; local control answers "cross (runway) at (point)", and Ground tells Tower when the crossing is complete ${cite('3-1-3', '3-1-4')}. Use the Landline panel (or the landline key) before you say "cross".`,
+      );
+    }
+    if (releases.length) {
+      out.push(
+        `${plural(releases.length, 'IFR takeoff clearance')} (${names(releases.map((e) => e.callsign))}) was issued without a release from Departure/Approach. With a separate Departure position the release comes first ("(aircraft) released"); ` +
+        `the requirement itself comes from the letter of agreement ${cite('4-3-4')}.`,
+      );
+    }
+  }
+
   if (s.communicationErrors > 0) {
     const bad = events.filter((e) => (e.kind === 'COMMAND_REJECTED' || e.kind === 'CLARIFICATION') && e.data?.commError);
     const notOnFreq = bad.filter((e) => /not on frequency/i.test(e.text)).length;

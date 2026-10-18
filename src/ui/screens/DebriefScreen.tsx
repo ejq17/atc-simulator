@@ -74,6 +74,7 @@ export function DebriefScreen() {
             <Counter label="Aircraft handled" value={sc.aircraftHandled} />
             <Counter label="Correct clearances" value={sc.correctClearances} />
             <Counter label="Communication errors" value={sc.communicationErrors} bad={sc.communicationErrors > 0} />
+            <Counter label="Coordination errors" value={sc.coordinationErrors ?? 0} bad={(sc.coordinationErrors ?? 0) > 0} />
             <Counter label="Runway incursions" value={sc.runwayIncursions} bad={sc.runwayIncursions > 0} />
             <Counter label="Separation violations" value={sc.separationViolations} bad={sc.separationViolations > 0} />
             <Counter label="Unsafe instructions" value={sc.unsafeInstructions} bad={sc.unsafeInstructions > 0} />

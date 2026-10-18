@@ -194,7 +194,8 @@ function LocalModelControls() {
 
 export function VoiceSettingsForm({ compact = false }: { compact?: boolean }) {
   const s = useVoiceSettings();
-  const [capturing, setCapturing] = useState(false);
+  const [capturing, setCapturingKey] = useState<'ptt' | 'landline' | null>(null);
+  const setCapturing = (on: boolean) => setCapturingKey(on ? 'ptt' : null);
   const avail = useProviderAvailability(s.providerId);
   const note = STT_PROVIDER_NOTES[s.providerId];
 
@@ -204,7 +205,8 @@ export function VoiceSettingsForm({ compact = false }: { compact?: boolean }) {
       e.preventDefault();
       e.stopPropagation();
       if (e.key === 'Escape') return setCapturing(false);
-      voiceSettings.update({ pttKey: e.code && e.code !== 'Unidentified' ? e.code : e.key });
+      const key = e.code && e.code !== 'Unidentified' ? e.code : e.key;
+      voiceSettings.update(capturing === 'landline' ? { landlineKey: key } : { pttKey: key });
       setCapturing(false);
     };
     return addWindowListener('keydown', onKey, true);
@@ -231,8 +233,13 @@ export function VoiceSettingsForm({ compact = false }: { compact?: boolean }) {
         </div>
         <div className="grid grid-cols-2 gap-3">
           <Field label="Push-to-talk key">
-            <Btn onClick={() => setCapturing(true)} tone={capturing ? 'amber' : 'default'} aria-label="Change push-to-talk key">
-              {capturing ? 'Press a key… (Esc)' : <>Key: <Kbd>{keyLabel(s.pttKey)}</Kbd></>}
+            <Btn onClick={() => setCapturing(true)} tone={capturing === 'ptt' ? 'amber' : 'default'} aria-label="Change push-to-talk key">
+              {capturing === 'ptt' ? 'Press a key… (Esc)' : <>Key: <Kbd>{keyLabel(s.pttKey)}</Kbd></>}
+            </Btn>
+          </Field>
+          <Field label="Landline key (hold)" hint="Calls to the other positions, e.g. “Tower, Ground, cross runway one three at Alpha with Cessna …”.">
+            <Btn onClick={() => setCapturingKey('landline')} tone={capturing === 'landline' ? 'amber' : 'default'} aria-label="Change landline key">
+              {capturing === 'landline' ? 'Press a key… (Esc)' : <>Key: <Kbd>{keyLabel(s.landlineKey)}</Kbd></>}
             </Btn>
           </Field>
           <Field label="PTT mode">

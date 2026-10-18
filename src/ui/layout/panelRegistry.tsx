@@ -8,6 +8,7 @@ import { FlightStrips } from '../components/FlightStrips';
 import { AircraftDetails } from '../components/AircraftDetails';
 import { CommsLog } from '../components/CommsLog';
 import { AlertsStrip } from '../components/AlertsStrip';
+import { LandlinePanel } from '../components/LandlinePanel';
 import { RadioPanel } from '../components/RadioPanel';
 import { ChartsPanel } from '../drawers/ChartsDrawer';
 import { NavaidsPanel } from '../drawers/NavaidsDrawer';
@@ -44,6 +45,7 @@ export const PANEL_COMPONENTS: Record<PanelId, ComponentType> = {
   details: DetailsPanel,
   comms: CommsLog,
   alerts: AlertsPanel,
+  landline: LandlinePanel,
   radio: RadioPanel,
   charts: ChartsPanel,
   navaids: NavaidsPanel,

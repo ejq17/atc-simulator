@@ -21,6 +21,8 @@ export interface VoiceSettings {
   whisperDevice: WhisperDeviceChoice;
   pttKey: string;
   pttMode: PttMode;
+  /** Second push-to-talk key: while held, the transmission is a landline call to another position (coordination). `KeyboardEvent.code`. */
+  landlineKey: string;
   /** "Pilot voice engine": the browser's own speech synthesis, or the on-device neural voice (Kokoro) played through the radio chain. */
   ttsEngine: TtsEngineId;
   /** The one-time "realistic radio voices available" notice was dismissed (or its Enable button used). */
@@ -46,6 +48,7 @@ export const DEFAULT_VOICE_SETTINGS: Readonly<VoiceSettings> = Object.freeze({
   whisperDevice: 'auto',
   pttKey: 'Space',
   pttMode: 'hold',
+  landlineKey: 'KeyL',
   ttsEngine: 'browser',
   neuralNoticeDismissed: false,
   neuralDevice: 'auto',
@@ -72,6 +75,7 @@ export function sanitizeVoiceSettings(raw: unknown): VoiceSettings {
     whisperModel: WHISPER_MODEL_CHOICES.includes(r.whisperModel as WhisperModelChoice) ? (r.whisperModel as WhisperModelChoice) : d.whisperModel,
     whisperDevice: WHISPER_DEVICE_CHOICES.includes(r.whisperDevice as WhisperDeviceChoice) ? (r.whisperDevice as WhisperDeviceChoice) : d.whisperDevice,
     pttKey: typeof r.pttKey === 'string' && r.pttKey.length > 0 && r.pttKey.length <= 32 ? r.pttKey : d.pttKey,
+    landlineKey: typeof r.landlineKey === 'string' && r.landlineKey.length > 0 && r.landlineKey.length <= 32 ? r.landlineKey : d.landlineKey,
     pttMode: r.pttMode === 'toggle' || r.pttMode === 'hold' ? r.pttMode : d.pttMode,
     ttsEngine: TTS_ENGINE_IDS.includes(r.ttsEngine as TtsEngineId) ? (r.ttsEngine as TtsEngineId) : d.ttsEngine,
     neuralDevice: NEURAL_DEVICE_CHOICES.includes(r.neuralDevice as NeuralDeviceChoice) ? (r.neuralDevice as NeuralDeviceChoice) : d.neuralDevice,

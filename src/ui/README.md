@@ -11,6 +11,8 @@ src/ui/store/
   layoutStore.ts        panel layout (persisted) + pop-out windows; see "Panels, layout and pop-out windows"
   voiceSettings.ts      the persisted voice settings store + hook
 src/ui/commands/transmit.ts   text -> parseTransmission -> engine.applyCommand (voice AND typed)
+src/ui/commands/landline.ts   text -> parseLandline -> engine.coordination.request / respond / rescind / inform (the landline)
+src/ui/lib/landline.ts        pure view model of the Landline panel (incoming, asked, given, log, quick requests)
 src/ui/display/
   surfaceRenderer.ts / radarRenderer.ts   pure Canvas 2D drawing (stub-context testable)
   surfaceStatic.ts      taxiway label placement, runway numbers, hold marks (per airport, cached)
@@ -20,7 +22,7 @@ src/ui/strips/stripModel.ts   pure strip board model (bays, print / move on hand
 src/ui/layout/         panel system: layoutModel.ts (pure model, presets, persistence format), panelMeta.ts (ids, titles, minimum sizes), panelRegistry.tsx
                         (id -> component), Workspace.tsx (desktop regions), GroupView.tsx (tabbed frame), MobileShell.tsx (phone), LayoutMenu.tsx,
                         PopoutHost.tsx / popupWindow.ts (pop-out windows), windows.ts (window registry), PopupNotices.tsx
-src/ui/components/      TopBar, AircraftPanel, AircraftDetails, FlightStrips (the board), RadioPanel, CommsLog, AlertsStrip, Banners, VoiceSettingsForm, SpeakerIcon
+src/ui/components/      TopBar, AircraftPanel, AircraftDetails, FlightStrips (the board), RadioPanel, LandlinePanel, CommsLog, AlertsStrip, Banners, VoiceSettingsForm, SpeakerIcon
 src/ui/drawers/         Charts (ChartViewer), Navaids (NavaidPanel), Settings, ATIS, Weather and runways
 src/ui/screens/         SetupScreen, SimScreen, DebriefScreen
 src/ui/lib/             format.ts (data-block and heading/time formatting), geom.ts, provenance.ts, voiceStatus.ts,
@@ -31,7 +33,7 @@ src/ui/references.ts    verified JO 7110.65 paragraph table (mirror of docs/FAA-
 
 ## Panels, layout and pop-out windows (`ui/layout/`)
 
-**Registry.** `PANEL_IDS` = `surface radar tower list strips details comms alerts radio charts navaids atis weather settings`. `panelMeta.ts` gives each an id, title, minimum
+**Registry.** `PANEL_IDS` = `surface radar tower list strips details comms alerts landline radio charts navaids atis weather settings`. `panelMeta.ts` gives each an id, title, minimum
 size, default pop-out size, home region and phone section; `panelRegistry.tsx` maps the id to its component. Every panel component reads the shared zustand stores (or the
 session's engine) directly, so it renders identically in a docked tab, a pop-out window and a drawer. Inside a frame a `Panel` drops its own title (`PanelFrameContext`) and keeps only a slim readout row.
 
@@ -63,6 +65,20 @@ main window unloads and when the session ends.
 * **Reopen windows.** The geometry (`x, y, w, h`) and home region of each open pop-out is saved. After a reload (or a new session) the panels are docked as usual and a notice offers **Reopen windows** (also in the Layout
   menu), because browsers refuse to open windows without a click. Browsers usually allow about one pop-up per click, so with several windows press it again for the rest.
 * **Popup blocker.** `window.open` returning null shows the `popup-blocked` notice (allow pop-ups for this site and try again); the panel stays where it was.
+
+## Landline panel (`components/LandlinePanel.tsx`, `lib/landline.ts`, `commands/landline.ts`)
+
+Panel id `landline`, in the bottom row next to Comms / Alerts (Ground, Everything presets) or with Radio (Tower cab, TRACON); on a phone in the Comms section. Its tab shows an amber badge with the number of requests waiting for the player
+(`landline-badge`), and an AI call for the player rings through the controller voice path (`AiTransmission.channel: 'landline'` -> `QueuedTransmission.channel`, a two-tone ring instead of the PTT clicks; `radioEffects.playLandline`,
+WebAudio only). Sections: **Waiting for you** (`landline-incoming`: who asks what; Approve / Unable / Stand by, labelled Released / Hold for release for a departure release and Point out approved / Unable for a point out;
+for a crossing a "behind the landing ..." select with **Approve after** for arrivals inbound; **Take back** for an approval or release you gave that nobody used), **You asked** (`landline-outgoing`: status pill per request - waiting, stand by, approved with seconds left, unable,
+taken back, expired - plus one-click requests for aircraft that wait for a call you have not made: an aircraft at a hold line asking to cross, an IFR departure ready without a release), the **Log** (`landline-log`, "Mine" / "All calls", AI calls violet,
+plain-words wording tagged "plain"), a typed call box (`landline-input`) and the **Landline mode** toggle.
+
+* **Talking.** Hold the landline key (default `L`, `voiceSettings.landlineKey`, changed in Settings next to the PTT key; works in pop-out windows) and speak, or toggle Landline mode (everything spoken / typed goes to the landline),
+  or just start a call with two position names - "Tower, Ground, ..." in the typed box or by voice is always a landline call (`looksLikeLandline`). The result line of the Radio panel says "Landline: ...".
+* **Session API** (`session.ts`): `submitLandline(text, source)`, `getLandlineMode / setLandlineMode`, `answerRequest(id, answer, { afterAircraftId })`, `rescindRequest(id)`; the hook `onLandlineResult`. The session tells the engine who is human / AI (`coordination.setStaffing`).
+* The AI's landline speech is audible only when it is for a position you work (or "Monitor all frequencies", quieter); it is in the transcript as `TWR (AI) > GND: ...`.
 
 ## Responsive shell
 

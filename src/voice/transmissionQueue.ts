@@ -18,6 +18,8 @@ export interface QueuedTransmission {
   volume?: number;
   /** Who is talking, for the UI's "speaking" lamp and the debug log: a pilot callsign or "TWR (AI)". */
   speaker?: string;
+  /** 'landline': a call between controller positions (coordination), played with a ring instead of PTT clicks. Default 'radio'. */
+  channel?: 'radio' | 'landline';
   /** Callsign (pilots) or position (controllers) that seeds the voice and radio character. Defaults to `speaker`, then `voiceId`. */
   callsign?: string;
   speakerKind?: 'airline' | 'ga' | 'controller';
@@ -47,7 +49,7 @@ export type TransmissionEvent =
 export interface TransmissionQueueOptions {
   speaker: TransmissionSpeaker;
   /** Optional radio clicks around each pilot call. */
-  radio?: { playPttOpen(): void; playPttClose(): void };
+  radio?: { playPttOpen(): void; playPttClose(): void; playLandline?(): void };
   onEvent?: (e: TransmissionEvent) => void;
   monitoredFrequencyMhz?: number;
   /** Several monitored frequencies at once (a controller working Tower + Ground hears both). Wins over `monitoredFrequencyMhz`. */
@@ -156,11 +158,13 @@ export function createTransmissionQueue(opts: TransmissionQueueOptions): Transmi
     speaking = next;
     const myGen = ++generation;
     emit({ type: 'start', item: next.item });
+    const landline = next.item.channel === 'landline';
     let keyed = false;
     const keyUp = () => {
       if (keyed || myGen !== generation) return;
       keyed = true;
-      opts.radio?.playPttOpen();
+      if (landline) opts.radio?.playLandline?.();
+      else opts.radio?.playPttOpen();
     };
     if (!(opts.speaker.keysItself?.() ?? false)) keyUp();
     if (speakTimer) clearTimeout(speakTimer);
@@ -171,7 +175,7 @@ export function createTransmissionQueue(opts: TransmissionQueueOptions): Transmi
       generation++;
       speaking = null;
       opts.speaker.cancel();
-      opts.radio?.playPttClose();
+      if (!landline) opts.radio?.playPttClose();
       emit({ type: 'end', item: next.item });
       blockedUntil = now() + gapMs;
       schedule(gapMs);
@@ -184,7 +188,7 @@ export function createTransmissionQueue(opts: TransmissionQueueOptions): Transmi
         if (speakTimer) clearTimeout(speakTimer);
         speakTimer = null;
         speaking = null;
-        opts.radio?.playPttClose();
+        if (!landline) opts.radio?.playPttClose();
         emit({ type: 'end', item: next.item });
         blockedUntil = now() + gapMs;
         schedule(gapMs);

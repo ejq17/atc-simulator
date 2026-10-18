@@ -13,7 +13,7 @@ import { rawSlice, type NormalizedText, type Token } from './tokens';
 import { validateFields } from './validate';
 
 /** Spoken airline names found in the active aircraft ("Foo twelve" for FOO12) -> ICAO prefix. */
-function deriveAirlines(aircraft: readonly AircraftRef[]): Record<string, string> {
+export function deriveAirlines(aircraft: readonly AircraftRef[]): Record<string, string> {
   const out: Record<string, string> = {};
   for (const ac of aircraft) {
     const code = /^([A-Z]{3})\d/.exec(ac.callsign.toUpperCase())?.[1];
@@ -24,7 +24,7 @@ function deriveAirlines(aircraft: readonly AircraftRef[]): Record<string, string
 }
 
 /** Words of the active callsigns and fixes: never fuzz-corrected into instruction words. */
-function protectedWords(ctx: ParseContext): ReadonlySet<string> {
+export function protectedWords(ctx: ParseContext): ReadonlySet<string> {
   const words = new Set<string>();
   const add = (s: string | undefined) => { for (const w of (s ?? '').toLowerCase().match(/[a-z]+/g) ?? []) words.add(w); };
   for (const ac of ctx.aircraft) add(ac.spokenCallsign);

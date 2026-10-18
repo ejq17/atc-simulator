@@ -45,7 +45,7 @@ export function createPilotVoice(options: PilotVoiceOptions): TransmissionQueue 
     monitoredFrequencyMhz: options.monitoredFrequencyMhz,
     monitoredFrequenciesMhz: options.monitoredFrequenciesMhz,
     onEvent: options.onEvent,
-    radio: radio ? { playPttOpen: () => radio.playPttOpen(), playPttClose: () => radio.playPttClose() } : undefined,
+    radio: radio ? { playPttOpen: () => radio.playPttOpen(), playPttClose: () => radio.playPttClose(), playLandline: () => radio.playLandline() } : undefined,
     speaker: {
       keysItself: () => tts.keysOnStart?.() ?? false,
       speak(item, keyUp) {

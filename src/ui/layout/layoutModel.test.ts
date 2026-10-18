@@ -29,11 +29,11 @@ describe('layout presets', () => {
     expect(where(l, 'strips')).toBe('right');
     expect(where(l, 'radio')).toBe('bottom');
   });
-  it('Everything is the original layout: three displays, list + strips + details, comms + alerts, radio', () => {
+  it('Everything is the original layout: three displays, list + strips + details, comms + alerts + landline, radio', () => {
     const l = presetLayout('everything');
     expect(l.regions.main[0].tabs).toEqual(['surface', 'radar', 'tower']);
     expect(l.regions.right.map((g) => g.tabs)).toEqual([['list', 'strips'], ['details']]);
-    expect(l.regions.bottom.map((g) => g.tabs)).toEqual([['comms', 'alerts'], ['radio']]);
+    expect(l.regions.bottom.map((g) => g.tabs)).toEqual([['comms', 'alerts', 'landline'], ['radio']]);
     expect(l).toEqual(defaultLayout());
   });
   it('every preset shows each panel at most once and always has a display', () => {
@@ -51,15 +51,15 @@ describe('moving and hiding panels', () => {
     expect(where(l, 'comms')).toBe('right');
     expect(l.regions.right[0].tabs).toContain('comms');
     expect(l.regions.right[0].active).toBe('comms');
-    expect(l.regions.bottom[0].tabs).toEqual(['alerts']);
+    expect(l.regions.bottom[0].tabs).toEqual(['alerts', 'landline']);
   });
   it('drops a group that becomes empty and repairs the active tab', () => {
     let l = movePanel(defaultLayout(), 'radio', 'main');
     expect(l.regions.bottom).toHaveLength(1);
     l = hidePanel(l, 'comms');
-    expect(l.regions.bottom[0].tabs).toEqual(['alerts']);
+    expect(l.regions.bottom[0].tabs).toEqual(['alerts', 'landline']);
     expect(l.regions.bottom[0].active).toBe('alerts');
-    l = hidePanel(l, 'alerts');
+    l = hidePanel(hidePanel(l, 'alerts'), 'landline');
     expect(l.regions.bottom).toEqual([]);
   });
   it('hides and shows panels; hidden ones are listed', () => {

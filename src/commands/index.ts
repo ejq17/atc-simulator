@@ -18,3 +18,6 @@ export type { NormalizedText, Token } from './tokens';
 export function parseTransmission(text: string, ctx: ParseContext): ParseResult {
   return parse(text, ctx);
 }
+
+export { parseLandline, looksLikeLandline } from './landline';
+export type { LandlineCommand, LandlineContext, LandlineKind } from './landline';

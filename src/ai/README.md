@@ -74,6 +74,7 @@ fly runway heading, cleared for takeoff".
 | `controllers.ts` | `createAiControllers`: scheduling, reaction delay, transmit, status. |
 | `core.ts` | `Plan`, `AgentView`, memory, `mkCmd`. |
 | `clnc.ts` `ground.ts` `tower.ts` `approach.ts` (APP and DEP) `corrections.ts` | The agents. |
+| `coordination.ts` | Landline answers, rescinds, announcements and point outs (see "Coordination"). |
 | `world.ts` | Read-only world queries: ETA, taxi planning (mirrors `commandExecutor.planTaxi`), hold queues, opposing traffic. |
 | `phrase.ts` | ATC phraseology, each phrase as `text` (digits) and `spokenText` (words); callsign first. |
 | `testkit.ts`, `ai.test.ts` | Harness (real engine + KACY, seeded) and the scenarios below. |
@@ -91,10 +92,30 @@ fly runway heading, cleared for takeoff".
    commands backed off >= 10 s, no clearance the engine would refuse.
 Also: spacing (published hold, speed reduction), missed-approach recovery, readback-error corrections in career mode, no-player run, VFR departure.
 
+## Coordination (landline calls between positions)
+
+The agents also work the coordination channel of `src/sim/coordination.ts` (the engine API `engine.coordination`; messages are logged as `COORDINATION`
+events and delivered to the voice layer as `AiTransmission` with `channel: 'landline'` and `toPosition`, never as radio transmissions, never with an
+ATC `TRANSMISSION` event). `ai/coordination.ts` holds the answering side and runs for every AI position; Ground and Tower do the asking because
+they know when the aircraft is ready. The same reaction delay (2-6 s, never sooner than 3 s after the position's previous call) applies.
+
+| Position | Asks | Answers / announces |
+|---|---|---|
+| **GND** | A crossing of an *active* runway when Tower is a separate controller (`crossingNeedsApproval`): "Tower, Ground, request cross runway 4 at Bravo with Cessna ...", once the aircraft stands at the hold line; repeated every 30 s while nobody answers (`reaskIntervalSec`); nothing while the answer is "stand by". The aircraft keeps holding short. Crosses only inside the approval (60 s), and after the aircraft Tower named. When Tower does not exist, or one person works both, Ground decides alone as before. | - |
+| **TWR** | A release for an IFR departure when its takeoff clearance would otherwise be issued and a separate Departure (or Approach) exists: "Departure, Tower, request release Spirit four fifty one"; repeated every 30 s; the takeoff clearance follows the answer. | Crossing requests: "cross runway N at X" when `runwayInUse` and the engine's `assessClearanceSafety` say the runway is free; "cross ..., behind the landing Y" when exactly one arrival inside the window is cleared to land and no second arrival is within 150 s behind it; otherwise "unable, traffic on a two mile final, I'll call you back" (stand-by; the approval follows when the runway is free). **Rescinds** an unused approval when traffic comes inside the window ("hold short runway 4, traffic on final, disregard the crossing") or when the aircraft it waits for goes around. Announces "<callsign> rolling runway N" to the release position and "<callsign> going around" to Approach for IFR aircraft. |
+| **DEP / APP** | Point outs: Departure points a departure out to Approach when it climbs within 4 nm / 3,000 ft of an inbound arrival, Approach points a missed approach out to Departure ("Approach, Departure, point out, two miles west of Cedar Lake, Spirit four fifty one, 3000"). Only when the two positions are different people. | Release requests: "<callsign> released"; "hold for release, missed approach in progress" while an IFR missed approach is flying; "stand by for release" when another departure was released less than 45 s ago (the release follows). Point outs: "point out approved". |
+
+A request that nobody answers never deadlocks: the aircraft holds, the asker repeats the call at the interval, an unanswered request is dropped after 240 s and
+asked afresh, an approval that runs out (60 s crossing, 120 s release) is asked for again. Positions covered by the player's shared frequency (KACY Approach /
+Departure when the player works either) count as the player's for coordination: requests to them wait for the player's answer in the Landline panel.
+`createAiControllers` tells the engine who is human and who is AI (`engine.coordination.setStaffing`). Tests: `coordination.test.ts` (answers, timing, re-asks, rescind,
+release flow, point out, determinism); the existing flows (`ai.test.ts`, `kmht.test.ts`) use `humanAnswers` / `towerMayDepart` in `testkit.ts` for the scripted human.
+
 ## Known simplifications
 
-* No inter-position coordination call: Ground decides crossings alone (it does look at the intersecting runway and at arrivals that
-  are cleared or on final); Tower holds landing clearances while someone waits to cross. If the player is Tower, Ground still owns crossings.
+* Coordination covers runway crossings, IFR departure releases, point outs and the "rolling" / "going around" calls only (see "Coordination"
+  above). Ground does not announce a runway change or an intersection departure to Tower (3-1-4); Tower still holds landing clearances back
+  for up to a few seconds while someone waits at a hold line (`crossingWaiting`), on top of answering the crossing request.
 * Tower hands departures to Departure as soon as they are airborne (400 ft AGL); VFR departures go to Departure too (the engine has no
   "frequency change approved" instruction and only counts a VFR departure as handled after a `CONTACT_FREQUENCY`).
 * Approach hands arrivals to Tower when they are established (the sim's FINAL, inside 8 nm), not after the FAF, because that is when

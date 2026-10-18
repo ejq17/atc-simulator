@@ -6,6 +6,7 @@ import { keyLabel } from '../lib/voiceStatus';
 import { MOBILE_SECTIONS, panelsOfSection } from './panelMeta';
 import type { MobileSection } from './panelMeta';
 import { TabbedPanels, useAlertCount } from './GroupView';
+import { useLandlineWaiting } from '../components/LandlinePanel';
 
 /** Large push-to-talk target for the phone layout, shown above the tab bar on every section except Radio (which has its own). */
 function PttDock() {
@@ -49,6 +50,7 @@ export function MobileShell() {
   const activeMap = useUiStore((s) => s.mobileActive);
   const setActive = useUiStore((s) => s.setMobileActive);
   const alerts = useAlertCount();
+  const waiting = useLandlineWaiting();
   const tabs = panelsOfSection(section);
   const active = activeMap[section] && tabs.includes(activeMap[section]!) ? activeMap[section]! : tabs[0];
   return (
@@ -70,6 +72,7 @@ export function MobileShell() {
           >
             {sec.label}
             {sec.id === 'comms' && alerts.count > 0 && <span className={`absolute right-2 top-1.5 min-w-4 px-1 text-[9.5px] leading-4 text-atc-bg ${alerts.critical ? 'atc-blink bg-atc-red' : 'bg-atc-amber'}`}>{alerts.count}</span>}
+            {sec.id === 'comms' && waiting > 0 && alerts.count === 0 && <span className="atc-blink absolute right-2 top-1.5 min-w-4 bg-atc-amber px-1 text-[9.5px] leading-4 text-atc-bg">{waiting}</span>}
           </button>
         ))}
       </nav>

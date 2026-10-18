@@ -22,6 +22,9 @@
  *   ifr_clearance:CS       an IFR clearance (IFR_CLEARANCE) was accepted for CS
  *   departed_ifr:CS        CS took off with an IFR clearance and was handed to Departure (APP/DEP frequency) after takeoff
  *   score:>=N              score.score
+ *   coord:KIND:CS          a coordination message of that kind (CROSS_REQUEST, CROSS_APPROVED, CROSS_COMPLETE, RELEASE_REQUEST, RELEASED, ROLLING, POINT_OUT, ...) about CS
+ *                          was sent on the landline (src/sim/coordination.ts), by anyone
+ *   no_coordination_errors no runway crossing or IFR takeoff was authorised without the approval / release the order requires (7110.65 3-1-3, 4-3-4)
  *   no_incursions | no_unsafe | no_separation | no_conflicts
  *   active_runway:31       the active runway configuration lists runway end 31 for both landing and departing
  *   always                 trivially true
@@ -104,6 +107,9 @@ function indexOf(state: SimulationState): EventIndex {
           if (landedOn.get(cs) === d.runwayId) put(`vacated:${cs}`, e.timeSec);
         }
         break;
+      case 'COORDINATION':
+        if (typeof d.msgKind === 'string') put(`coord:${d.msgKind}:${cs}`, e.timeSec);
+        break;
       case 'DESPAWN':
         if (d.handled) put(`handled:${cs}`, e.timeSec);
         break;
@@ -136,7 +142,7 @@ const num = (s: string | undefined): number | undefined => {
 
 const KNOWN = new Set([
   'cmd', 'takeoff', 'landed', 'vacated', 'parked', 'taxied', 'holding_short', 'crossing_request', 'crossed', 'handoff', 'go_around',
-  'landed_before', 'handled', 'approach', 'established', 'ifr_request', 'ifr_clearance', 'departed_ifr', 'score', 'no_incursions', 'no_unsafe', 'no_separation', 'no_conflicts', 'active_runway', 'always',
+  'landed_before', 'handled', 'approach', 'established', 'ifr_request', 'ifr_clearance', 'departed_ifr', 'score', 'coord', 'no_coordination_errors', 'no_incursions', 'no_unsafe', 'no_separation', 'no_conflicts', 'active_runway', 'always',
 ]);
 
 export function isKnownCheck(check: string): boolean {
@@ -208,6 +214,10 @@ export function evaluateCheck(state: SimulationState, check: string): boolean {
       const n = num(parts[1]) ?? 0;
       return s.score >= n;
     }
+    case 'coord':
+      return facts.has(`coord:${parts[1]?.toUpperCase()}:${parts[2]?.toUpperCase()}`);
+    case 'no_coordination_errors':
+      return (s.coordinationErrors ?? 0) === 0;
     case 'no_incursions':
       return s.runwayIncursions === 0;
     case 'no_unsafe':

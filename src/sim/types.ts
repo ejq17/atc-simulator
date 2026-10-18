@@ -629,7 +629,9 @@ export type SimEventKind =
   | 'TRANSMISSION' | 'COMMAND_ACCEPTED' | 'COMMAND_REJECTED' | 'CLARIFICATION'
   | 'PHASE_CHANGE' | 'RUNWAY_ENTERED' | 'RUNWAY_EXITED' | 'RUNWAY_INCURSION'
   | 'CONFLICT' | 'SEPARATION_VIOLATION' | 'GO_AROUND' | 'SPAWN' | 'DESPAWN'
-  | 'HANDOFF' | 'READBACK_ERROR' | 'SCENARIO' | 'INFO';
+  | 'HANDOFF' | 'READBACK_ERROR' | 'SCENARIO' | 'INFO'
+  /** A message on the coordination channel between positions (src/sim/coordination.ts), or a coordination error (`data.error`). */
+  | 'COORDINATION';
 
 export interface SimEvent {
   id: string;
@@ -702,6 +704,12 @@ export interface Scenario {
   playerPositions?: ControllerPositionId[];
   /** Design values for the simulated pilots (ATIS reporting, visual acquisition, follow spacing); see `pilotBehaviour.ts`. Defaults when absent. */
   pilotBehaviour?: import('./pilotBehaviour').PilotBehaviourOverride;
+  /**
+   * Coordination rules between positions (src/sim/coordination.ts). `crossingApprovalRequired`: Ground needs Tower's approval for an active runway
+   * (JO 7110.65 3-1-3); `releasesRequired`: Tower needs a release from Departure/Approach for an IFR departure (LOA concept, 4-3-4). Both default on;
+   * neither applies when one person works both positions or the other position does not exist.
+   */
+  coordination?: { crossingApprovalRequired?: boolean; releasesRequired?: boolean };
   spawns: ScenarioAircraftSpawn[];
   /** Continuous traffic generation settings (free play). */
   traffic?: { enabled: boolean; arrivalsPerHour: number; departuresPerHour: number; gaFraction: number; maxAircraft: number };
@@ -718,6 +726,8 @@ export interface ScoreCard {
   aircraftHandled: number;
   correctClearances: number;
   communicationErrors: number;
+  /** Runway crossings / IFR takeoffs authorised without the coordination the order requires (3-1-3, 4-3-4); see scoring.ts. */
+  coordinationErrors?: number;
   runwayIncursions: number;
   separationViolations: number;
   unsafeInstructions: number;
@@ -751,6 +761,8 @@ export interface SimulationState {
   score: ScoreCard;
   seed: number;
   selectedAircraftId?: string;
+  /** Coordination channel between positions (requests, approvals, message log). Always present once the engine created the state. */
+  coordination?: import('./coordination').CoordinationState;
   /** Airport operating state: closures, braking action reports, bird activity, runway light settings (src/sim/airportOps.ts). */
   ops: AirportOps;
 }

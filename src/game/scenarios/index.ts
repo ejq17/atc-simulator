@@ -60,6 +60,7 @@ export const DEFAULT_PLAYER_POSITIONS: Readonly<Record<string, readonly Controll
   'train-06-pattern': ['TWR'],
   'train-07-go-around': ['TWR'],
   'train-09-approach': ['APP', 'DEP'],
+  'train-10-coordination': ['GND'],
 };
 
 export function defaultPlayerPositions(id: string): ControllerPositionId[] | undefined {

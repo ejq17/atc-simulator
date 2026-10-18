@@ -7,6 +7,8 @@ import type {
   Aircraft, Airport, ClearanceKind, CommandKind, ControllerPositionId, ParsedCommand, RadioFrequency, SimulationState,
 } from '../sim/types';
 import type { Phrase } from './phrase';
+import type { CoordMessage } from '../sim/coordination';
+import type { CoordinationApi } from '../sim/engineExtras';
 import { hearsFrequency } from '../radio/frequencies';
 
 export interface Plan {
@@ -24,6 +26,11 @@ export interface Plan {
   cooldownSec?: number;
   /** Short status line, e.g. "NKS451 cleared for takeoff runway 13". */
   summary: string;
+  /**
+   * A landline call to another position instead of a radio transmission (`cmds` is then empty and `phrase` unused): `run` makes the
+   * coordination call and returns the message it logged, which is what the AI "says" (AiTransmission.channel 'landline').
+   */
+  coord?: { to: ControllerPositionId; run(api: CoordinationApi): CoordMessage | undefined };
 }
 
 /** Per-agent bookkeeping that survives between evaluations. */

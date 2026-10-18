@@ -392,3 +392,9 @@ default mode first, then `audioSource: 'track'`) to hear them and the aircraft t
   ```
 * The Deepgram temp-token subprotocol and the nova-3/nova-2 fallback were verified against documentation and fake sockets, not a live account.
 * Real aviation frequencies are never used: all radio is simulated inside the app.
+
+## Landline channel (coordination)
+
+`QueuedTransmission.channel: 'radio' | 'landline'` (default radio). The session enqueues an AI controller's call to another position as `channel: 'landline'` (on the player's first frequency so it is always audible); the queue plays
+`radio.playLandline()` (two short 440 + 480 Hz rings through the radio chain, no files) instead of the PTT-open click and plays no close click. The voice controller has a second hold-to-talk binding (`landline: { key }`,
+`VoiceSettings.landlineKey`, default `KeyL`, `VoiceController.landlinePtt`); a transmission made with it has `TransmissionMeta.channel = 'landline'`, which the session routes to the landline parser. Tests: `landline.test.ts`.

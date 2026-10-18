@@ -9,6 +9,7 @@
 import type { Aircraft } from '../sim/types';
 import { assessClearanceSafety, departureTrailConflict, landedDistanceExceptionApplies, precedingArrivalBlockers } from '../sim/conflicts';
 import { projectArrival, timeToThreshold } from '../sim/runwayTiming';
+import { COORDINATION_DESIGN, findOpenRequest, releaseNeeded, validApproval } from '../sim/coordination';
 import { findRunwayEnd, isOnFinal } from '../sim/runways';
 import type { RunwayEndGeom } from '../sim/runways';
 import { frequencyForPosition } from '../radio/frequencies';
@@ -234,7 +235,27 @@ export function createTowerAgent(): Agent {
       const takeoff = mkCmd('TAKEOFF', ac, { runwayEnd: g.end.id, runwayId: g.runway.id });
       const slack = releaseSlackSec(v, g, ac, isLinedUp(ac));
       const ifr = ac.flightPlan?.flightRules === 'IFR';
-      if (safe(takeoff) && slack >= 0 && !(ifr && !ac.flightPlan?.ifrClearance && state.scenario.mode === 'training')) {
+      const relPos = releaseNeeded(state, 'TWR', ac);
+      const takeoffOk = safe(takeoff) && slack >= 0 && !(ifr && !ac.flightPlan?.ifrClearance && state.scenario.mode === 'training');
+      if (takeoffOk && relPos && !validApproval(state, 'RELEASE', ac.id)) {
+        // The takeoff would be possible, but Departure/Approach has not released the aircraft (LOA concept, 7110.65 4-3-4): ask, and keep
+        // asking every reask interval until it is answered. The aircraft simply stays at the hold line meanwhile.
+        const open = findOpenRequest(state, 'RELEASE', ac.id);
+        if (!open || (open.status === 'pending' && v.now - open.lastAskSec >= COORDINATION_DESIGN.reaskIntervalSec)) {
+          plans.push({
+            key: `${ac.id}:rel-ask:${open?.id ?? 'new'}:${open?.asks ?? 0}`, aircraftId: ac.id, callsign: ac.callsign, priority: 79, cmds: [],
+            phrase: { text: '', spoken: '' }, cooldownSec: 20, summary: `${ac.callsign}: asking ${relPos} for the release`,
+            coord: {
+              to: relPos,
+              run: (api) => {
+                const req = api.request({ topic: 'RELEASE', from: 'TWR', to: relPos, aircraftId: ac.id, runwayId: g.runway.id, source: 'ai' });
+                const msgs = state.coordination?.messages ?? [];
+                return req ? [...msgs].reverse().find((m) => m.requestId === req.id) : undefined;
+              },
+            },
+          });
+        }
+      } else if (takeoffOk) {
         plans.push({
           key: `${ac.id}:takeoff`, aircraftId: ac.id, callsign: ac.callsign, priority: 80, cmds: [takeoff],
           phrase: say.clearedForTakeoff(ac, g.end.id, ifr), cooldownSec: 20,

@@ -2,13 +2,15 @@
  * Ground control: taxi instructions for departures (full-length entry of the active runway, hold-short of every
  * crossed runway), runway crossings, the handoff to Tower, and taxi-to-parking for arrivals that were handed over by Tower.
  *
- * Simplification (documented in README.md): Ground owns runway crossings and decides alone whether the crossed runway is
- * about to be used; there is no inter-position coordination call to Tower. The engine's own safety check (crossing in front
- * of a departure, an arrival inside 3 nm, an occupied runway) is applied on top of the stricter rule below.
+ * Runway crossings: when the runway is active and Tower is a separate controller (JO 7110.65 3-1-3) Ground asks Tower over the landline,
+ * waits for the answer (the aircraft keeps holding short), and crosses inside Tower's approval, after the landing aircraft it names if any
+ * (coordination.ts, ai/coordination.ts). Otherwise (nobody works Tower, or one person works both) Ground decides alone with the stricter
+ * rule below. The engine's own safety check (crossing in front of a departure, an arrival inside 3 nm, an occupied runway) always applies.
  */
 import type { Aircraft } from '../sim/types';
 import { assessClearanceSafety } from '../sim/conflicts';
-import { findRunwayEnd } from '../sim/runways';
+import { findRunway, findRunwayEnd } from '../sim/runways';
+import { COORDINATION_DESIGN, afterAircraftClear, crossingNeedsApproval, crossingPointFor, findOpenRequest, validApproval } from '../sim/coordination';
 import { frequencyForPosition } from '../radio/frequencies';
 import { hasActive, lastClearance, mkCmd } from './core';
 import type { Agent, AgentView, Plan } from './core';
@@ -134,6 +136,35 @@ export function createGroundAgent(store: ClearanceStore): Agent {
         const rid = hold?.runwayId;
         if (!rid) continue;
         const cmd = mkCmd('CROSS_RUNWAY', ac, { crossRunwayId: rid, runwayId: rid });
+        const rw = findRunway(airport, rid);
+        if (rw && crossingNeedsApproval(state, 'GND', rw)) {
+          // JO 7110.65 3-1-3: ask local control, wait for the answer (the aircraft keeps holding short), cross inside the approval.
+          const approval = validApproval(state, 'CROSSING', ac.id, rid);
+          if (approval) {
+            if (!afterAircraftClear(state, approval) || !assessClearanceSafety(state, cmd).safe) continue;
+            plans.push({
+              key: `${ac.id}:cross:${rid}`, aircraftId: ac.id, callsign: ac.callsign, priority: 60, cmds: [cmd],
+              phrase: say.crossRunway(ac, rid), summary: `${ac.callsign} cross runway ${rid} (Tower approved)`,
+            });
+            continue;
+          }
+          const open = findOpenRequest(state, 'CROSSING', ac.id, rid);
+          if (open && (open.status === 'standby' || v.now - open.lastAskSec < COORDINATION_DESIGN.reaskIntervalSec)) continue; // waiting for Tower
+          const point = crossingPointFor(state, ac, rid);
+          plans.push({
+            key: `${ac.id}:co-ask:${rid}:${open?.asks ?? 0}`, aircraftId: ac.id, callsign: ac.callsign, priority: 58, cmds: [],
+            phrase: { text: '', spoken: '' }, summary: `${ac.callsign}: ${open ? 'asking Tower again' : 'asking Tower'} to cross runway ${rid}`,
+            coord: {
+              to: 'TWR',
+              run: (api) => {
+                const req = api.request({ topic: 'CROSSING', from: 'GND', to: 'TWR', aircraftId: ac.id, runwayId: rid, point, source: 'ai' });
+                const msgs = state.coordination?.messages ?? [];
+                return req ? [...msgs].reverse().find((m) => m.requestId === req.id) : undefined;
+              },
+            },
+          });
+          continue;
+        }
         if (runwayInUse(v, rid, ac.id) || !assessClearanceSafety(state, cmd).safe) continue;
         plans.push({
           key: `${ac.id}:cross:${rid}`, aircraftId: ac.id, callsign: ac.callsign, priority: 60, cmds: [cmd],

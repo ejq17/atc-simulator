@@ -33,7 +33,7 @@ function towerPlayer(h: Harness) {
       const p = ac.pendingRequest?.kind;
       if (ac.isDeparture && ac.onGround && p === 'DEPARTURE') {
         const c = cmd('TAKEOFF', ac.callsign, { runwayEnd: '35' });
-        if (safe(h, c) && aircraft(h).every((o) => o.isDeparture || o.onGround || finalNm(o) > 4)) h.say('TWR', c);
+        if (safe(h, c) && aircraft(h).every((o) => o.isDeparture || o.onGround || finalNm(o) > 4) && h.towerMayDepart(ac)) h.say('TWR', c);
       } else if (!ac.isDeparture && !ac.onGround && p === 'LANDING' && finalNm(ac) < 4) {
         const c = cmd('LAND', ac.callsign, { runwayEnd: '35' });
         if (safe(h, c)) h.say('TWR', c);

@@ -174,6 +174,31 @@ A missing callsign can never exceed 0.40, so the engine's "below threshold =>
 clarify" rule handles it. Suggested engine threshold: execute at >= 0.70.
 Constants live in `confidence.ts` and `callsign.ts` (`CALLSIGN_ACCEPT`).
 
+## Landline (coordination) phraseology (`landline.ts`, `parseLandline`)
+
+A landline call is "<called position>, <calling position>, <message>" and is parsed separately from radio calls (a radio call starts with a callsign; `looksLikeLandline` is true when the text starts with two
+position names, so the typed box and the voice path route it without a mode). `parseLandline(text, { aircraft, runwayEnds, taxiways, fixes })` reuses the normaliser, callsign matcher and the runway / taxiway readers and
+returns one `LandlineCommand` (`kind`, `to`, `from`, `callsign`, `runwayId` / `runwayEnd`, `point`, `afterCallsign`, `positionText`, `altitudeFt`, `text`, `confidence`, `nonStandard`, `issues`).
+
+| Phrasing | `kind` | Standard? |
+|---|---|---|
+| Tower, Ground, [request [to]] cross runway one three at Alpha with Cessna ... | `REQUEST_CROSS` (Ground calling) | request wording is not prescribed (non-standard, 0.9) |
+| Ground, Tower, cross runway one three at Alpha | `APPROVE` | 3-1-3 phraseology CROSS (runway) AT (point/intersection) |
+| ... cross ... behind / after the landing Spirit [four fifty one] | `APPROVE` + `afterCallsign` | non-standard |
+| cross approved, approved, unable, hold short [runway N], stand by / standby, unable ..., I'll call you back | `APPROVE`, `UNABLE`, `HOLD_SHORT`, `STANDBY` ("call you back" wins over "unable") | non-standard |
+| Tower, Ground, Cessna ... across runway one three / crossing complete | `CROSS_COMPLETE` | non-standard |
+| Departure, Tower, release Spirit four fifty one | `REQUEST_RELEASE` | non-standard |
+| Tower, Departure, Spirit four fifty one released / release approved | `RELEASED` | 4-3-4 "(aircraft identification) RELEASED" |
+| ... hold for release | `HOLD_FOR_RELEASE` | 4-3-4 |
+| ... rolling / going around / on the go | `ROLLING`, `GOING_AROUND` | non-standard |
+| [Approach, Departure,] point out, two miles west of Cedar Lake, three thousand, Cessna ... | `POINT_OUT` (`positionText` as spoken, `altitudeFt` = first round number of 3+ digits; the two positions may be left out) | 5-4-3 |
+| ... point out approved / unable / traffic observed | `POINT_OUT_APPROVED`, `POINT_OUT_UNABLE`, `TRAFFIC_OBSERVED` | 5-4-3 |
+| ... traffic, ... / anything else between two positions | `TRAFFIC`, `TEXT` (confidence capped at 0.75) | non-standard |
+
+Whether a call asks or answers follows the direction: Ground to Tower with "cross runway ..." is the request, Tower to Ground the authorisation. Confidence = 0.97, x0.55 per missing item (runway, callsign, positions), x0.45 when a position is missing,
+x0.9 non-standard, x0.85 per unknown runway / taxiway; below 0.6 the pipeline asks for a repeat (like the radio path). STT repairs: tour / power -> tower, grounds / round -> ground, departures, enable -> unable, standby, pointed out / point-out,
+realised -> released, and everything the shared normaliser already fixes (NATO letters, spoken numbers, `november seven two three ...`). Tests: `landline.test.ts` (28). The resolution to engine calls is in `src/ui/commands/landline.ts`.
+
 ## Extending
 
 * **New word / alias**: add to `lexicon.ts` (airlines, GA prefixes, STT fixes in `ALIASES`, multi-word `PHRASES`, `FILLERS`).
