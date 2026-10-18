@@ -30,6 +30,10 @@ export function missingRequired(d: Draft): string[] {
     case 'HOLD_AT_FIX': return f.hold?.fix ? [] : ['missing holding fix'];
     case 'DIRECT_FIX': return f.fix ? [] : ['missing fix'];
     case 'IFR_CLEARANCE': return f.ifr?.destination ? [] : ['missing destination airport'];
+    case 'TRAFFIC_ADVISORY':
+    case 'FOLLOW_TRAFFIC': return f.traffic ? [] : ['missing traffic description'];
+    case 'SQUAWK': return f.squawk ? [] : ['missing squawk code'];
+    case 'AIRPORT_INFO': return f.info && (f.info.calm || f.info.windDirDeg !== undefined || f.info.altimeterInHg !== undefined) ? [] : ['missing wind or altimeter'];
     default: return [];
   }
 }

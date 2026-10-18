@@ -9,6 +9,9 @@
  * IFR additions (4-2-1, 4-3-2, 4-8-1, 5-9-1, 5-9-2, 5-9-4) were confirmed the same way on 2026-10-16 (chapter 4 sections 2, 3 and 8, chapter 5
  * section 9, fetched with a browser User-Agent; headings read from the page, edition JO 7110.65BB).
  *
+ * Tower vocabulary additions (2-1-21, 3-1-6, 3-8-2, 3-9-1, 3-9-11, 3-10-1, 3-10-11, 5-2-1, 7-2-1, 7-6-11) were confirmed on 2026-10-18 by fetching the
+ * FAA web edition (chapters 2, 3, 5, 7) and reading the paragraph heading and phraseology on the page.
+ *
  * Phraseology audit additions (2-1-17, 2-4-17, 2-4-19, 2-9-3, 3-9-3, 4-3-3, 5-7-2) were confirmed on 2026-10-17 from the pages
  * saved under data/sources/raw/phraseology/ (see docs/PHRASEOLOGY-AUDIT.md).
  */
@@ -29,6 +32,7 @@ function ref(para: string, title: string, page: string): FaaReference {
 
 export const REFERENCES = {
   '2-1-17': ref('2-1-17', 'Radio Communications', 'chap2_section_1'),
+  '2-1-21': ref('2-1-21', 'Traffic Advisories', 'chap2_section_1'),
   '2-4-3': ref('2-4-3', 'Pilot Acknowledgment/Read Back', 'chap2_section_4'),
   '2-4-17': ref('2-4-17', 'Numbers Usage', 'chap2_section_4'),
   '2-4-19': ref('2-4-19', 'Facility Identification', 'chap2_section_4'),
@@ -36,6 +40,15 @@ export const REFERENCES = {
   '2-9-3': ref('2-9-3', 'Content', 'chap2_section_9'),
   '3-1-3': ref('3-1-3', 'Use of Active Runways', 'chap3_section_1'),
   '3-1-12': ref('3-1-12', 'Visually Scanning Runways', 'chap3_section_1'),
+  '3-1-6': ref('3-1-6', 'Traffic Information', 'chap3_section_1'),
+  '3-8-2': ref('3-8-2', 'Touch-and-Go or Stop-and-Go or Low Approach', 'chap3_section_8'),
+  '3-9-1': ref('3-9-1', 'Departure Information', 'chap3_section_9'),
+  '3-9-11': ref('3-9-11', 'Cancellation of Takeoff Clearance', 'chap3_section_9'),
+  '3-10-1': ref('3-10-1', 'Landing Information', 'chap3_section_10'),
+  '3-10-11': ref('3-10-11', 'Closed Traffic', 'chap3_section_10'),
+  '5-2-1': ref('5-2-1', 'Assignment Criteria', 'chap5_section_2'),
+  '7-2-1': ref('7-2-1', 'Visual Separation', 'chap7_section_2'),
+  '7-6-11': ref('7-6-11', 'Termination of Service', 'chap7_section_6'),
   '4-2-1': ref('4-2-1', 'Clearance Items', 'chap4_section_2'),
   '4-3-2': ref('4-3-2', 'Departure Clearances', 'chap4_section_3'),
   '4-3-3': ref('4-3-3', 'Abbreviated Departure Clearance', 'chap4_section_3'),

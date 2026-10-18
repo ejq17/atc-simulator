@@ -308,8 +308,8 @@ export const TRAINING_SCENARIOS: ScenarioDef[] = [
         steps: [
           {
             id: 'line-up', callsign: 'N723EJ', expectCommand: 'LINE_UP_AND_WAIT', reference: refText('3-9-4'),
-            prompt: 'Line up N723EJ on runway 13 (Spirit 451 is 5 nm out and you intend to depart the Cessna first).',
-            example: 'Cessna seven two three echo juliet, runway one three, line up and wait.',
+            prompt: 'Line up N723EJ on runway 13 (Spirit 451 is 5 nm out and you intend to depart the Cessna first). Tell it about the landing traffic within 6 miles.',
+            example: 'Cessna seven two three echo juliet, runway one three, line up and wait. Traffic, an Airbus three twenty, five mile final.',
             explanation: 'Line up and wait is for an imminent departure, and the aircraft in position is told about landing traffic within about 6 miles (for example "traffic, a Boeing 737, six mile final"). Once an aircraft is in position, the same runway cannot also be given to a landing aircraft (without the safety logic used at some facilities), so you must make the departure happen or send the arrival around.',
             mistakes: [MISTAKE_CONDITIONAL],
           },

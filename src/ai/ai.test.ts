@@ -153,7 +153,7 @@ describe('(1) Ground-only player: AI Clearance, Tower, Approach and Departure wo
       'American two twelve, contact tower one two zero point three',
       'American two twelve, continue approach',
       'American two twelve, runway one three, cleared to land',
-      'American two twelve, contact ground point niner',
+      'American two twelve, turn right at alpha, contact ground point niner',
     ]);
     const positions = h.atc().filter((e) => e.callsign === 'AAL212').map((e) => e.aiPosition);
     expect(positions).toEqual(['APP', 'APP', 'APP', 'TWR', 'TWR', 'TWR']);
@@ -250,7 +250,7 @@ describe('(3) Approach-only player: AI Tower, Ground and Clearance Delivery hand
     expect(texts(atcAi(h, 'AAL212', 'TWR'))).toEqual([
       'American two twelve, continue approach',
       'American two twelve, runway one three, cleared to land',
-      'American two twelve, contact ground point niner',
+      'American two twelve, turn right at alpha, contact ground point niner',
     ]);
     const clearedTo = (cs: string) => atcAi(h, cs, 'TWR').find((e) => /cleared to land/.test(e.text))!.timeSec;
     const takeoff = atcAi(h, 'NKS451', 'TWR').find((e) => /cleared for takeoff/.test(e.text))!.timeSec;
@@ -389,7 +389,7 @@ describe('behaviour details', () => {
       'APP: American two twelve, cleared ILS runway one three approach',
       'APP: American two twelve, contact tower one two zero point three',
       'TWR: American two twelve, runway one three, cleared to land',
-      'TWR: American two twelve, contact ground point niner',
+      'TWR: American two twelve, turn right at alpha, contact ground point niner',
     ]);
     const bad = h.events.filter((e) => ['CONFLICT', 'RUNWAY_INCURSION', 'SEPARATION_VIOLATION'].includes(e.kind));
     expect(bad).toEqual([]);

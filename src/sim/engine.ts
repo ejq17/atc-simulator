@@ -9,6 +9,7 @@ import type {
   Aircraft, Atis, CommandOutcome, ControllerPositionId, ParsedCommand, Scenario, SimEvent, SimulationState, Weather,
 } from './types';
 import { mulberry32 } from './rng';
+import { resolvePilotBehaviour } from './pilotBehaviour';
 import { emitEvent } from './context';
 import { setSimulationEpoch } from './solar';
 import type { SimContext } from './context';
@@ -83,6 +84,7 @@ export function createEngine(opts: EngineOptionsExt): SimulationEngine & Simulat
   setSimulationEpoch(state, opts.utcStartMs ?? Date.now());
   const ctx: SimContext = {
     state,
+    pilotBehaviour: resolvePilotBehaviour(scenario.pilotBehaviour),
     rng,
     runtime: new Map(),
     onPilotTransmission: opts.onPilotTransmission,

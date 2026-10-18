@@ -261,7 +261,35 @@ export type ClearanceKind =
   | 'RESUME_OWN_NAVIGATION'// "resume own navigation" after vectors
   | 'RADAR_CONTACT'        // "radar contact" (informational; marks the aircraft as identified)
   | 'HOLD_AT_FIX'          // "hold at SMITS as published" / "hold east of SMITS on the 090 radial, right turns, one minute legs"
-  | 'MISSED_APPROACH';     // "execute missed approach" / "go around, fly the published missed approach"
+  | 'MISSED_APPROACH'      // "execute missed approach" / "go around, fly the published missed approach"
+  // Tower vocabulary (JO 7110.65 3-10-9, 3-9-11, 3-1-6, 3-8-1, 3-10-11, 7-6-11, 5-2-1; see docs/FAA-REFERENCES.md)
+  | 'EXIT_RUNWAY'         // "turn left at Charlie" / "exit right Bravo" / "continue to the end" (+ optional "hold short of runway N")
+  | 'CANCEL_TAKEOFF'      // "cancel takeoff clearance" / "abort takeoff"
+  | 'TRAFFIC_ADVISORY'    // "traffic, Cessna two-mile final"
+  | 'FOLLOW_TRAFFIC'      // "number two, follow the Skyhawk on base"
+  | 'PATTERN_INSTRUCTION' // destination EXTEND_DOWNWIND | TURN_BASE_NOW | SHORT_APPROACH | CIRCLE | CLOSED_TRAFFIC
+  | 'REPORT_POSITION'     // destination REPORT_MIDFIELD_DOWNWIND | REPORT_BASE | REPORT_FINAL (+ distanceNm)
+  | 'FREQUENCY_CHANGE_APPROVED' // "squawk VFR, frequency change approved"
+  | 'SQUAWK'              // "squawk 1200" / "squawk VFR"
+  | 'AIRPORT_INFO';       // "wind one three zero at eight, altimeter three zero one zero"
+
+/** Traffic described by the controller ("Cessna two-mile final", "the Skyhawk on base"). */
+export interface TrafficRef {
+  /** Spoken description words before the position clause, lower case ("cessna", "boeing 737", "skyhawk"); may be empty. */
+  desc: string;
+  position?: 'final' | 'base' | 'downwind' | 'upwind' | 'crosswind' | 'departing' | 'in_position' | 'on_runway' | 'ahead';
+  side?: 'left' | 'right';
+  distanceNm?: number;
+}
+
+/** Surface wind / altimeter given by the controller (JO 7110.65 3-9-1, 3-10-1); wind direction is magnetic as spoken. */
+export interface AirportInfo {
+  calm?: boolean;
+  windDirDeg?: number;
+  windSpeedKt?: number;
+  windGustKt?: number;
+  altimeterInHg?: number;
+}
 
 export interface HoldingInstruction {
   fix: string;
@@ -318,6 +346,17 @@ export interface Clearance {
   frequencyMhz?: number;
   frequencyId?: string;
   patternLeg?: 'left_downwind' | 'right_downwind' | 'straight_in' | 'base';
+  /** Tower vocabulary fields (see the matching ParsedCommand fields). */
+  exitTaxiway?: string;
+  ifAble?: boolean;
+  traffic?: TrafficRef;
+  sequenceNumber?: number;
+  distanceNm?: number;
+  turnDegrees?: number;
+  squawk?: string;
+  info?: AirportInfo;
+  /** TRAFFIC_ADVISORY / FOLLOW_TRAFFIC: what the pilot answered ("traffic in sight", "looking for traffic", "negative contact"). */
+  trafficResponse?: 'in_sight' | 'looking' | 'negative';
   /** IFR / radar fields. */
   approachType?: ApproachType;
   fix?: string;                    // DIRECT_FIX target
@@ -415,6 +454,17 @@ export interface ParsedCommand {
   frequencyMhz?: number;
   frequencyId?: string;
   patternLeg?: Clearance['patternLeg'];
+  exitTaxiway?: string;
+  ifAble?: boolean;
+  traffic?: TrafficRef;
+  sequenceNumber?: number;
+  distanceNm?: number;
+  turnDegrees?: number;
+  squawk?: string;
+  info?: AirportInfo;
+  /** CANCEL_TAKEOFF: the controller gave a reason ("traffic on the runway"). LINE_UP_AND_WAIT: traffic information was issued with it (3-9-4). */
+  reason?: string;
+  trafficAdvised?: boolean;
   approachType?: ApproachType;
   fix?: string;
   ifr?: Partial<IfrClearanceDetails>;
@@ -546,6 +596,8 @@ export interface Scenario {
   controllerPositions: ControllerPositionId[];
   /** Positions the human player works; every other position in `controllerPositions` is worked by an AI controller. Defaults to all. */
   playerPositions?: ControllerPositionId[];
+  /** Design values for the simulated pilots (ATIS reporting, visual acquisition, follow spacing); see `pilotBehaviour.ts`. Defaults when absent. */
+  pilotBehaviour?: import('./pilotBehaviour').PilotBehaviourOverride;
   spawns: ScenarioAircraftSpawn[];
   /** Continuous traffic generation settings (free play). */
   traffic?: { enabled: boolean; arrivalsPerHour: number; departuresPerHour: number; gaFraction: number; maxAircraft: number };

@@ -17,16 +17,16 @@ export const ALLOWED_TRANSITIONS: Readonly<Record<FlightPhase, readonly FlightPh
   TAXIING: ['HOLDING_SHORT', 'LINE_UP_AND_WAIT', 'CLEARED_FOR_TAKEOFF', 'PARKED'],
   HOLDING_SHORT: ['TAXIING', 'LINE_UP_AND_WAIT', 'CLEARED_FOR_TAKEOFF'],
   LINE_UP_AND_WAIT: ['CLEARED_FOR_TAKEOFF'],
-  CLEARED_FOR_TAKEOFF: ['TAKEOFF_ROLL'],
-  TAKEOFF_ROLL: ['INITIAL_CLIMB'],
+  CLEARED_FOR_TAKEOFF: ['TAKEOFF_ROLL', 'LINE_UP_AND_WAIT'], // LINE_UP_AND_WAIT: takeoff clearance cancelled (JO 7110.65 3-9-11)
+  TAKEOFF_ROLL: ['INITIAL_CLIMB', 'LINE_UP_AND_WAIT'], // rejected takeoff, stopped on the runway
   INITIAL_CLIMB: ['DEPARTURE', 'PATTERN'],
   DEPARTURE: ['PATTERN', 'HOLDING'],
   // --- arrival ---
   INBOUND: ['APPROACH', 'FINAL', 'PATTERN', 'HOLDING'],
   APPROACH: ['FINAL', 'INBOUND', 'PATTERN', 'HOLDING', 'GO_AROUND'],
   FINAL: ['LANDING', 'GO_AROUND', 'APPROACH'],
-  LANDING: ['ROLLOUT', 'GO_AROUND'],
-  ROLLOUT: ['RUNWAY_EXIT'],
+  LANDING: ['ROLLOUT', 'GO_AROUND', 'PATTERN'], // PATTERN: touch-and-go / low approach / option into closed traffic (JO 7110.65 3-8-2)
+  ROLLOUT: ['RUNWAY_EXIT', 'PATTERN'], // PATTERN: lift-off after the ground roll of a touch-and-go
   RUNWAY_EXIT: ['TAXI_TO_PARKING'],
   TAXI_TO_PARKING: ['ARRIVED'],
   ARRIVED: [],

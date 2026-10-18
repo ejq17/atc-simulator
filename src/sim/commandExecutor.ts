@@ -30,7 +30,7 @@ import { assessClearanceSafety, recordUnsafeClearance } from './conflicts';
 import { frequencyById, frequencyByMhz, frequencyForPosition, hearsFrequency, formatMhz } from '../radio/frequencies';
 import { buildReadback, buildSayAgain, buildUnable } from '../radio/readback';
 import { spokenRunway } from '../radio/spoken';
-import { SPEED_LIMIT_BELOW_10K_KT, lineUpTimeSec } from './performance';
+import { SPEED_LIMIT_BELOW_10K_KT, lineUpTimeSec, patternAltitudeFt } from './performance';
 import { findNavFix, indexOfFix } from './navigation';
 import { effectiveComponents, exceedsLimits } from './wind';
 import { startHold } from './holding';
@@ -38,6 +38,10 @@ import { publishedHoldFor } from './missedApproach';
 import { assessApproach, ceilingFt } from './approach';
 import { isDaylight, simUtcMs } from './solar';
 import { buildIfrClearance } from './ifr';
+import {
+  luawTrafficIssue, noteAirportInfo, planAirportInfo, planCancelTakeoff, planExitRunway, planFollowTraffic, planFrequencyApproved, planLandingHoldShort, planPatternInstruction,
+  planReportPosition, planSquawk, planTrafficAdvisory,
+} from './towerCommands';
 
 const DUPLICATE_WINDOW_SEC = 5;
 
@@ -50,20 +54,20 @@ export const IFR_TAXI_REQUEST_DELAY_SEC = 15;
 const TAKEOFF_NEAR_HOLD_M = 100;
 const CROSS_APPROACH_M = 600;
 
-interface Reject {
+export interface Reject {
   reason: string;
   pilot?: string;
   commError?: boolean;
 }
-interface Plan {
+export interface Plan {
   patch: Partial<Clearance>;
   commit: (clr: Clearance) => void;
   /** The instruction is flyable but improper (non-training modes accept it): scored as a communication error, not as a correct clearance. */
   flag?: string;
 }
-type PlanResult = { plan: Plan } | { reject: Reject };
+export type PlanResult = { plan: Plan } | { reject: Reject };
 
-interface Env {
+export interface Env {
   ctx: SimContext;
   ac: Aircraft;
   rt: AircraftRuntime;
@@ -74,7 +78,7 @@ interface Env {
   position: ControllerPositionId;
 }
 
-const unable = (env: Env, reason: string, phrase: string, commError = true): { reject: Reject } => ({
+export const unable = (env: Env, reason: string, phrase: string, commError = true): { reject: Reject } => ({
   reject: { reason, pilot: buildUnable(env.ac, phrase), commError },
 });
 
@@ -219,6 +223,11 @@ function executeInner(ctx: SimContext, cmdIn: ParsedCommand, opts?: ExecOpts): C
   if (!planner) return reject(ac, { reason: `Command ${cmd.kind} is not supported by the simulator.`, commError: false });
   const result = planner(env);
   if ('reject' in result) return reject(ac, result.reject);
+  // Wind / altimeter spoken with the instruction (JO 7110.65 3-9-1 / 3-10-1): the pilot has the numbers; wrong numbers are an improper instruction.
+  if (cmd.info && cmd.kind !== 'AIRPORT_INFO') {
+    const mm = noteAirportInfo(env);
+    if (mm && !result.plan.flag) result.plan.flag = `information does not match the current observation: ${mm} (JO 7110.65 3-9-1 / 3-10-1)`;
+  }
 
   // --- safety ---------------------------------------------------------------
   const assessment = assessClearanceSafety(state, { ...cmd, callsign: ac.callsign });
@@ -359,6 +368,7 @@ function commandKey(ac: Aircraft, c: ParsedCommand): string {
     ac.id, c.kind, c.runwayEnd ?? '', c.runwayId ?? '', (c.route ?? []).join('>'), (c.holdShort ?? []).join(','), c.crossRunwayId ?? '',
     c.destination ?? '', c.headingDeg ?? '', c.turnDirection ?? '', c.altitudeFt ?? '', c.speedKt ?? '', c.frequencyMhz ?? '', c.frequencyId ?? '', c.patternLeg ?? '',
     c.approachType ?? '', c.fix ?? '', c.ifr ? JSON.stringify(c.ifr) : '', c.hold ? JSON.stringify(c.hold) : '',
+    c.exitTaxiway ?? '', c.ifAble ?? '', c.traffic ? JSON.stringify(c.traffic) : '', c.sequenceNumber ?? '', c.distanceNm ?? '', c.turnDegrees ?? '', c.squawk ?? '', c.info ? JSON.stringify(c.info) : '',
   ].join('|');
 }
 
@@ -620,6 +630,8 @@ export function taxiwayStopNode(graph: TaxiwayGraph, nodeIds: readonly string[],
 
 function planHoldPosition(env: Env): PlanResult {
   const { ac } = env;
+  // "Stop" / "hold position" to an aircraft that has been cleared for takeoff or is rolling is a cancellation of the takeoff clearance (JO 7110.65 3-9-11).
+  if (ac.phase === 'CLEARED_FOR_TAKEOFF' || ac.phase === 'TAKEOFF_ROLL') return planCancelTakeoff(env);
   if (!ac.onGround) return unable(env, `${ac.callsign} is airborne; "hold position" applies to ground traffic.`, "we're airborne");
   return { plan: { patch: {}, commit: () => { ac.flags.holdingPosition = true; } } };
 }
@@ -627,6 +639,9 @@ function planHoldPosition(env: Env): PlanResult {
 function planHoldShort(env: Env): PlanResult {
   const { ac, cmd, airport } = env;
   const graph = airport.taxiwayGraph;
+  // during the landing roll / on final: stop short of the intersecting runway (JO 7110.65 3-10-9, 3-10-4)
+  const landingHold = planLandingHoldShort(env);
+  if (landingHold) return landingHold;
   if (!ac.onGround) return unable(env, `${ac.callsign} is airborne; "hold short" applies to ground traffic.`, "we're airborne");
   const refs = cmd.holdShort?.length ? cmd.holdShort : [cmd.crossRunwayId ?? cmd.runwayId ?? cmd.runwayEnd!];
   const rws: Runway[] = [];
@@ -751,12 +766,19 @@ function planLineUp(env: Env): PlanResult {
   }
   const entry = planRunwayEntry(env, g);
   if ('reject' in entry) return entry;
+  // JO 7110.65 3-9-4: traffic information to the aircraft authorised to line up and wait (closest traffic within 6 miles for the same runway).
+  const trafficIssue = luawTrafficIssue(env, g);
+  if (trafficIssue && ctx.state.scenario.mode === 'training') {
+    return { reject: { reason: `Not issued (training mode): ${trafficIssue}.`, commError: true } };
+  }
   return {
     plan: {
       patch: { runwayEnd: g.end.id, runwayId: g.runway.id },
+      flag: trafficIssue,
       commit: () => {
         applyRunwayEntry(env, g, entry.hold, entry.entry, entry.nodeIds);
         rt.takeoffCleared = false;
+        rt.luawSinceSec = undefined;
         setPhase(ctx, ac, 'LINE_UP_AND_WAIT', `runway ${g.end.id}`);
       },
     },
@@ -949,7 +971,7 @@ function goAroundNotStabilised(env: Env, g: RunwayEndGeom): string | undefined {
 }
 
 function planLand(env: Env): PlanResult {
-  const { ac, rt, ctx } = env;
+  const { ac, rt, ctx, cmd } = env;
   const g = env.g!;
   if (ac.onGround) return unable(env, `${ac.callsign} is on the ground.`, "we're on the ground");
   const ok = ['INBOUND', 'APPROACH', 'FINAL', 'PATTERN', 'GO_AROUND', 'LANDING'];
@@ -975,10 +997,13 @@ function planLand(env: Env): PlanResult {
   if ('reject' in lahso) return lahso;
   return {
     plan: {
-      patch: { runwayEnd: g.end.id, runwayId: g.runway.id, ...(lahso.holdShort ? { holdShort: [lahso.holdShort] } : {}) },
+      patch: { runwayEnd: g.end.id, runwayId: g.runway.id, destination: cmd.destination, ...(lahso.holdShort ? { holdShort: [lahso.holdShort] } : {}) },
       flag: lahso.flag,
       commit: () => {
         rt.lahso = lahso.rollout;
+        // 7110.65 3-8-1: full stop, touch-and-go, stop-and-go, low approach, or the pilot's option
+        rt.landingOp = cmd.destination === 'touch_and_go' ? 'touch_and_go' : cmd.destination === 'low_approach' ? 'low_approach'
+          : cmd.destination === 'stop_and_go' ? 'stop_and_go' : cmd.destination === 'option' ? 'option' : 'full_stop';
         if (ac.assignedRunwayEnd !== g.end.id) {
           ac.assignedRunwayEnd = g.end.id;
           rt.decisionDone = false;
@@ -1114,9 +1139,12 @@ function planSpeed(env: Env): PlanResult {
 
 function planContact(env: Env): PlanResult {
   const { ac, rt, cmd, airport, now } = env;
-  if (['CLEARED_FOR_TAKEOFF', 'TAKEOFF_ROLL', 'LANDING', 'ROLLOUT'].includes(ac.phase)) {
+  if (['CLEARED_FOR_TAKEOFF', 'TAKEOFF_ROLL'].includes(ac.phase)) {
     return unable(env, `${ac.callsign} (${ac.phase}) cannot change frequency now.`, "we're busy at the moment");
   }
+  // On final / during the landing roll the aircraft complies with the exit instruction first and changes frequency once clear of the runway
+  // (JO 7110.65 3-10-9 example: "turn right next taxiway, cross runway two one, contact ground point seven").
+  const afterClear = ac.phase === 'LANDING' || ac.phase === 'ROLLOUT';
   let mhz = cmd.frequencyMhz;
   let id = cmd.frequencyId;
   const named = id ? frequencyById(airport, id) : undefined;
@@ -1141,14 +1169,14 @@ function planContact(env: Env): PlanResult {
     plan: {
       patch: { frequencyMhz: finalMhz, frequencyId: finalId },
       commit: () => {
-        rt.pendingFreq = { atSec: now + 3, mhz: finalMhz, id: finalId };
+        rt.pendingFreq = { atSec: now + 3, mhz: finalMhz, id: finalId, afterClear };
       },
     },
   };
 }
 
 function planPattern(env: Env): PlanResult {
-  const { ac, rt, cmd, ctx } = env;
+  const { ac, rt, cmd, ctx, airport } = env;
   const g = env.g!;
   if (ac.onGround) return unable(env, `${ac.callsign} is on the ground.`, "we're on the ground");
   if (!['INBOUND', 'APPROACH', 'GO_AROUND', 'DEPARTURE', 'INITIAL_CLIMB', 'PATTERN'].includes(ac.phase)) {
@@ -1176,7 +1204,12 @@ function planPattern(env: Env): PlanResult {
             rt.navMode = 'HEADING';
           }
         } else {
-          rt.pattern = { leg: leg === 'base' ? 'BASE' : 'DOWNWIND', side: leg === 'right_downwind' ? 'right' : 'left', runwayEnd: g.end.id };
+          // A go-around or departure still low and near the runway starts on the upwind leg (AIM 4-3-3: climb straight ahead beyond the departure
+          // end and within 300 ft of pattern altitude before the crosswind turn); anything else joins downwind / base.
+          const low = leg !== 'base' && (ac.phase === 'GO_AROUND' || (['INITIAL_CLIMB', 'DEPARTURE'].includes(ac.phase) && ac.altitudeFt < patternAltitudeFt(perfOf(ac), g.elevationFt, airport.trafficPatternAltitudeFt) - 300));
+          const side = leg === 'right_downwind' ? 'right' : 'left';
+          rt.pattern = { leg: leg === 'base' ? 'BASE' : low ? 'UPWIND' : 'DOWNWIND', side, runwayEnd: g.end.id };
+          if (low) rt.closedTraffic = { side };
           if (ac.phase !== 'PATTERN') setPhase(ctx, ac, 'PATTERN', leg);
         }
       },
@@ -1465,4 +1498,13 @@ const PLANNERS: Partial<Record<ClearanceKind, (env: Env) => PlanResult>> = {
   SPEED: planSpeed,
   ENTER_PATTERN: planPattern,
   PUSHBACK: planPushback,
+  EXIT_RUNWAY: planExitRunway,
+  CANCEL_TAKEOFF: planCancelTakeoff,
+  TRAFFIC_ADVISORY: planTrafficAdvisory,
+  FOLLOW_TRAFFIC: planFollowTraffic,
+  PATTERN_INSTRUCTION: planPatternInstruction,
+  REPORT_POSITION: planReportPosition,
+  FREQUENCY_CHANGE_APPROVED: planFrequencyApproved,
+  SQUAWK: planSquawk,
+  AIRPORT_INFO: planAirportInfo,
 };

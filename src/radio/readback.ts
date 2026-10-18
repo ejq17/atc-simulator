@@ -196,6 +196,30 @@ export function buildReadback(aircraft: Aircraft, c: Clearance, env: ReadbackEnv
         return holdReadback(env.airport, c);
       case 'MISSED_APPROACH':
         return 'Executing the published missed approach';
+      case 'EXIT_RUNWAY':
+        return exitReadback(c);
+      case 'CANCEL_TAKEOFF':
+        return 'Cancelling takeoff clearance, stopping';
+      case 'TRAFFIC_ADVISORY':
+        return c.trafficResponse === 'in_sight' ? 'Traffic in sight' : c.trafficResponse === 'looking' ? 'Looking for traffic' : 'Negative contact';
+      case 'FOLLOW_TRAFFIC': {
+        const n = c.sequenceNumber !== undefined ? `Number ${numberWords(c.sequenceNumber)}, ` : '';
+        return `Traffic in sight, ${n}will follow`;
+      }
+      case 'PATTERN_INSTRUCTION':
+        return patternInstructionReadback(c);
+      case 'REPORT_POSITION':
+        return c.destination === 'REPORT_MIDFIELD_DOWNWIND'
+          ? 'Will report midfield downwind'
+          : c.destination === 'REPORT_BASE'
+            ? 'Will report base'
+            : c.distanceNm !== undefined ? `Will report ${numberWords(c.distanceNm)} mile final` : 'Will report final';
+      case 'FREQUENCY_CHANGE_APPROVED':
+        return 'Frequency change approved, good day';
+      case 'SQUAWK':
+        return `Squawk ${digitsSpoken(c.squawk ?? '1200')}`;
+      case 'AIRPORT_INFO':
+        return c.info?.altimeterInHg !== undefined ? `Altimeter ${digitsSpoken(String(Math.round(c.info.altimeterInHg * 100)))}` : 'Roger';
       default:
         return 'Roger';
     }
@@ -203,6 +227,45 @@ export function buildReadback(aircraft: Aircraft, c: Clearance, env: ReadbackEnv
   const result: ReadbackResult = { text: body === '' ? '' : `${body}, ${cs}` };
   if (error) result.error = error;
   return result;
+}
+
+/** Pilot readback of a runway exit instruction (JO 7110.65 3-10-9: "TURN LEFT/RIGHT (taxiway)", "IF ABLE, TURN LEFT/RIGHT (taxiway)"). */
+function exitReadback(c: Clearance): string {
+  if (c.destination === 'END') return 'Continuing to the end';
+  const twy = c.exitTaxiway ? spokenTaxiway(c.exitTaxiway) : undefined;
+  const where = twy ? `at ${twy}` : 'next taxiway';
+  const verb = c.turnDirection ? `turn ${c.turnDirection}` : 'exit';
+  const head = c.ifAble ? `Will ${verb} ${where} if able` : `${capitalize(verb)} ${where}`;
+  return head;
+}
+
+function patternInstructionReadback(c: Clearance): string {
+  switch (c.destination) {
+    case 'EXTEND_DOWNWIND':
+      return 'Extending downwind';
+    case 'TURN_BASE_NOW':
+      return 'Turning base';
+    case 'SHORT_APPROACH':
+      return 'Short approach';
+    case 'CIRCLE':
+      return `${capitalize(c.turnDirection ?? 'left')} ${c.turnDegrees === 270 ? 'two seventy' : 'three sixty'}`;
+    case 'CLOSED_TRAFFIC':
+      return `${c.turnDirection ? `${capitalize(c.turnDirection)} c` : 'C'}losed traffic`;
+    default:
+      return 'Roger';
+  }
+}
+
+/** Cleared for a touch-and-go but too little runway is left for the type's takeoff distance: the pilot makes a full stop. */
+export function touchAndGoRefusedCall(aircraft: Aircraft, env: ReadbackEnv): string {
+  return `${facility(aircraft, env)}, ${aircraft.spokenCallsign}, unable touch and go, not enough runway, full stop.`;
+}
+
+/** Landing roll: the pilot cannot make the instructed exit (the call is made on touchdown). */
+export function exitUnableCall(aircraft: Aircraft, env: ReadbackEnv, wanted: { taxiway?: string; side?: 'left' | 'right'; toEnd?: boolean }, actual?: string): string {
+  const what = wanted.taxiway ? ` ${spokenTaxiway(wanted.taxiway)}` : wanted.toEnd ? ' to the end' : ' that exit';
+  const then = actual ? `, will exit at ${spokenTaxiway(actual)}` : ', will exit when able';
+  return `${facility(aircraft, env)}, ${aircraft.spokenCallsign}, unable${what}${then}.`;
 }
 
 /** "ILS", "localizer", "RNAV", "VOR" as spoken in an approach clearance. */
@@ -396,6 +459,40 @@ export function missedApproachCheckInCall(aircraft: Aircraft, env: ReadbackEnv, 
 
 export function stoppedOnRunwayCall(aircraft: Aircraft, env: ReadbackEnv, runwayId: string): string {
   return `${facility(aircraft, env)}, ${aircraft.spokenCallsign}, stopped on runway ${runwayRef(runwayId)}, unable to exit, request taxi instructions.`;
+}
+
+/** After a rejected takeoff (JO 7110.65 3-9-11): the pilot reports stopped. Wording is the pilot's own; 7110.65 gives the controller phrase only. */
+export function stoppedAfterRejectCall(aircraft: Aircraft, env: ReadbackEnv, runwayEnd: string): string {
+  return `${facility(aircraft, env)}, ${aircraft.spokenCallsign}, stopped on runway ${runwayRef(runwayEnd)}, holding position.`;
+}
+
+/**
+ * Position reports requested by the controller (JO 7110.65 3-10-1: "requests for additional position reports", 3-10-11 "REPORT (position)"):
+ * midfield downwind, turning base, N-mile final.
+ */
+export function positionReportCall(aircraft: Aircraft, env: ReadbackEnv, kind: 'MIDFIELD_DOWNWIND' | 'BASE' | 'FINAL', runwayEnd: string, o: { side?: 'left' | 'right'; distanceNm?: number } = {}): string {
+  const f = facility(aircraft, env);
+  const cs = aircraft.spokenCallsign;
+  const rwy = runwayRef(runwayEnd);
+  if (kind === 'MIDFIELD_DOWNWIND') return `${f}, ${cs}, midfield ${o.side ?? 'left'} downwind runway ${rwy}.`;
+  if (kind === 'BASE') return `${f}, ${cs}, ${o.side ?? 'left'} base runway ${rwy}.`;
+  const n = Math.max(1, Math.round(o.distanceNm ?? 1));
+  return `${f}, ${cs}, ${digitsSpoken(String(n))} mile final runway ${rwy}.`;
+}
+
+/** The pilot acquires traffic he was looking for (JO 7110.65 7-2-1: "report traffic in sight") or loses it ("negative contact", P/CG). */
+export function trafficAcquiredCall(aircraft: Aircraft, env: ReadbackEnv, sighted: boolean): string {
+  return `${facility(aircraft, env)}, ${aircraft.spokenCallsign}, ${sighted ? 'traffic in sight' : 'negative contact'}.`;
+}
+
+/** A pilot who did not report the ATIS code asks for the numbers (JO 7110.65 3-9-1 / 3-10-1: runway, wind, altimeter unless the code or "have numbers" is given). */
+export function requestNumbersCall(aircraft: Aircraft, env: ReadbackEnv): string {
+  return `${facility(aircraft, env)}, ${aircraft.spokenCallsign}, request wind and altimeter.`;
+}
+
+/** Line up and wait for more than 90 s (JO 7110.65 3-9-4 NOTE): the pilot asks what to do. */
+export function luawIntentionsCall(aircraft: Aircraft, env: ReadbackEnv, runwayEnd: string): string {
+  return `${facility(aircraft, env)}, ${aircraft.spokenCallsign}, holding in position runway ${runwayRef(runwayEnd)}, say intentions.`;
 }
 
 export { capitalize, airportCallName };

@@ -22,6 +22,7 @@ export function sortAircraft(list: Aircraft[]): Aircraft[] {
 }
 
 export function freqLabel(state: SimulationState, mhz: number): string {
+  if (mhz <= 0) return 'no ATC frequency'; // left the frequency (frequency change approved)
   const f = state.airport.frequencies.find((x) => sameFrequency(x.mhz, mhz));
   return `${formatMhz(mhz)}${f ? ` ${f.id.replace(/-N$/, '')}` : ''}`;
 }

@@ -245,7 +245,9 @@ describe('every training lesson can be completed in the real engine', () => {
   it('train-07 go-around', () => {
     const L = lesson('train-07-go-around');
     L.step(6);
-    expect(accepted(L.speak('Cessna seven two three echo juliet, runway one three, line up and wait', 'TWR'))).toBe(true);
+    // line up and wait with the arrival 5 nm out needs the traffic information (JO 7110.65 3-9-4): refused without it in training mode
+    expect(L.speak('Cessna seven two three echo juliet, runway one three, line up and wait', 'TWR').outcomes[0].status).toBe('rejected');
+    expect(accepted(L.speak('Cessna seven two three echo juliet, runway one three, line up and wait. Traffic, an Airbus three twenty, five mile final', 'TWR'))).toBe(true);
     L.step(3);
     expect(L.ctrl.current().id).toBe('go-around');
     // Clearing the Airbus to land with the Cessna in position is refused in training mode.

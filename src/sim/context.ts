@@ -11,6 +11,7 @@ import { assertTransition, transitionPath } from './stateMachines';
 import type { MissedState } from './missedApproach';
 import type { HoldState } from './holding';
 import type { Minima } from './minima';
+import type { PilotBehaviour } from './pilotBehaviour';
 import type { GustState } from './wind';
 
 export const EVENT_CAP = 2000;
@@ -49,7 +50,71 @@ export interface ApproachRuntime {
   daChecked?: boolean;
 }
 
+/** Traffic-pattern state (flightDynamics.patternHeading). Legs follow AIM 4-3-2 / 4-3-3. */
+export interface PatternState {
+  leg: 'UPWIND' | 'CROSSWIND' | 'DOWNWIND' | 'BASE';
+  side: 'left' | 'right';
+  runwayEnd: string;
+  /** "Extend downwind": no base turn until "turn base now" (or the 6 nm safety limit). JO 7110.65 3-8-1. */
+  extend?: boolean;
+  /** "Make short approach": base is turned early (SHORT_BASE_ALONG_M instead of BASE_ALONG_M). */
+  short?: boolean;
+  /** "Make left/right three-sixty / two seventy": turn in progress (heading change so far in `turnedDeg`). */
+  circle?: { dir: 'left' | 'right'; totalDeg: number; turnedDeg: number; lastHeadingDeg: number };
+}
+
+/** A runway exit instruction in force for the landing roll (JO 7110.65 3-10-9). */
+export interface ExitInstruction {
+  taxiway?: string;
+  side?: 'left' | 'right';
+  /** "continue to the end": the last exit. */
+  toEnd?: boolean;
+  /** "turn right next taxiway": the first exit on that side. */
+  next?: boolean;
+  ifAble?: boolean;
+}
+
+/** A pilot looking for traffic the controller described (JO 7110.65 3-1-6, 7-2-1). */
+export interface TrafficLook {
+  targetId: string;
+  sinceSec: number;
+  /** The pilot reports the traffic in sight at this time (or negative contact if it is out of range then). */
+  acquireAtSec: number;
+}
+
+/** A position report the controller asked for (JO 7110.65 3-10-1: requests for additional position reports). */
+export interface PositionReport {
+  kind: 'MIDFIELD_DOWNWIND' | 'BASE' | 'FINAL';
+  distanceNm?: number;
+}
+
 export interface AircraftRuntime {
+  /** Runway exit instruction for the rollout in progress / about to start. */
+  exit?: ExitInstruction;
+  /** "Hold short of runway N" given during the landing roll / on final: the intersecting runway the rollout must stop short of. */
+  exitHoldShort?: string;
+  /** Touch-and-go ground roll in progress (phase ROLLOUT, runway occupied): see `stepTouchAndGo` in flightDynamics.ts. */
+  tgo?: { startSec: number; holdUntilSec: number; phase: 'DECEL' | 'RECONFIGURE' | 'ACCEL' };
+  /** Rejected takeoff: braking on the runway to a stop. */
+  aborting?: boolean;
+  /** Sim time at which the aircraft completed LUAW alignment (3-9-4 NOTE: not more than 90 s without further instructions). */
+  luawSinceSec?: number;
+  /** The pilot has the wind and altimeter (ATIS code reported or the controller issued the numbers). */
+  haveNumbers?: boolean;
+  /** The pilot already asked for the numbers once. */
+  numbersRequested?: boolean;
+  trafficLook?: TrafficLook;
+  /** Ids of traffic the pilot has reported in sight. */
+  trafficSeen?: string[];
+  /** Time of the last traffic advisory (counts as the traffic information a line-up-and-wait needs, 3-9-4). */
+  lastTrafficAdvisorySec?: number;
+  /** The aircraft was told to follow this traffic (3-8-1). */
+  follow?: { targetId: string; sequence?: number };
+  reports: PositionReport[];
+  /** Closed traffic approved / assumed after a touch-and-go, low approach or option (3-10-11). */
+  closedTraffic?: { side: 'left' | 'right' };
+  /** What the current landing clearance allows: full stop (default), touch-and-go, low approach, stop-and-go, option (3-8-1). */
+  landingOp?: 'full_stop' | 'touch_and_go' | 'low_approach' | 'stop_and_go' | 'option';
   /** The player (not an AI controller) has issued an accepted command to this aircraft: only then does it count as "handled" once an AI is active. */
   playerTouched?: boolean;
   /** AUTO = the aircraft flies its own approach/departure logic; HEADING = flies the assigned heading. */
@@ -68,10 +133,11 @@ export interface AircraftRuntime {
   firstCallAtSec: number;
   /** One-shot pilot calls already made (keys). */
   calls: Set<string>;
-  pendingFreq?: { atSec: number; mhz: number; id?: string };
+  /** `afterClear`: the change happens only once the aircraft is clear of the runway (exit instruction + "contact Ground", 3-10-9). */
+  pendingFreq?: { atSec: number; mhz: number; id?: string; afterClear?: boolean; silent?: boolean };
   readbackError?: ReadbackErrorRecord;
-  rollout?: { exitNodeId?: string; holdNodeId?: string; exitSpeedMps: number; brakeMps2: number; stopAlongM?: number };
-  pattern?: { leg: 'DOWNWIND' | 'BASE'; side: 'left' | 'right'; runwayEnd: string };
+  rollout?: { exitNodeId?: string; holdNodeId?: string; exitSpeedMps: number; brakeMps2: number; stopAlongM?: number; honoured?: boolean; unableReason?: string };
+  pattern?: PatternState;
   radioFreeAtSec: number;
   lastPilotText?: string;
   enteredRunways: Set<string>;
@@ -119,6 +185,8 @@ export interface AircraftRuntime {
 
 export interface SimContext {
   state: SimulationState;
+  /** Resolved `Scenario.pilotBehaviour` (design values, pilotBehaviour.ts). */
+  pilotBehaviour: PilotBehaviour;
   rng: Rng;
   runtime: Map<string, AircraftRuntime>;
   onPilotTransmission?: EngineOptions['onPilotTransmission'];
@@ -157,6 +225,7 @@ export function newRuntime(firstCallAtSec: number): AircraftRuntime {
     handedOff: false,
     depInstructed: false,
     passedFixes: new Set(),
+    reports: [],
   };
 }
 

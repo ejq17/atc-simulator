@@ -104,6 +104,27 @@ export const crossRunway = (ac: Aircraft, runwayId: string): Phrase => clauses(c
 
 export const lineUpAndWait = (ac: Aircraft, runwayEnd: string): Phrase => clauses(callsign(ac), words('runway', rwy(runwayEnd)), 'line up and wait');
 
+/** "N1AA, runway 13, line up and wait, traffic Cessna, 2 mile final" (JO 7110.65 3-9-4: traffic information with line up and wait). */
+export const lineUpAndWaitTraffic = (ac: Aircraft, runwayEnd: string, traffic: Phrase): Phrase =>
+  clauses(callsign(ac), words('runway', rwy(runwayEnd)), 'line up and wait', words('traffic', traffic));
+
+/** "N1AA, turn left at Charlie, contact Ground point niner" (JO 7110.65 3-10-9 example: exit instruction, then the frequency change). */
+export function exitAndContact(ac: Aircraft, airport: Airport, taxiway: string, side: 'left' | 'right', frequencyId: string, mhz: number): Phrase {
+  const f = frequencyById(airport, frequencyId) ?? frequencyByMhz(airport, mhz);
+  const word = f && f.position !== 'OTHER' && f.position !== 'ATIS' ? positionWord(f.position).toLowerCase() : 'next controller';
+  const twy = taxiwayList([taxiway]);
+  return clauses(callsign(ac), words('turn', side, 'at', twy), words('contact', word, frequency(airport, mhz, f?.id)));
+}
+
+/** "N1AA, wind 130 at 8, altimeter 3010" (3-9-1 / 3-10-1: wind and altimeter for a pilot who did not report the ATIS). */
+export function airportInfo(ac: Aircraft, dirDeg: number | undefined, speedKt: number, altimeterInHg: number): Phrase {
+  const alt = String(Math.round(altimeterInHg * 100));
+  const wind: Phrase = speedKt === 0 || dirDeg === undefined
+    ? { text: speedKt === 0 ? 'wind calm' : `wind variable at ${speedKt}`, spoken: speedKt === 0 ? 'wind calm' : `wind variable at ${digitsSpoken(String(speedKt))}` }
+    : { text: `wind ${String(dirDeg).padStart(3, '0')} at ${speedKt}`, spoken: `wind ${digitsSpoken(String(dirDeg).padStart(3, '0'))} at ${digitsSpoken(String(speedKt))}` };
+  return clauses(callsign(ac), wind, { text: `altimeter ${alt}`, spoken: `altimeter ${digitsSpoken(alt)}` });
+}
+
 export const clearedForTakeoff = (ac: Aircraft, runwayEnd: string, runwayHeading: boolean): Phrase =>
   clauses(callsign(ac), words('runway', rwy(runwayEnd)), runwayHeading && 'fly runway heading', 'cleared for takeoff');
 

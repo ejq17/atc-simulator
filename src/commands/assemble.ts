@@ -63,6 +63,20 @@ export function assemble(elements: Element[], tokenCount: number, preConsumed: r
     mark(e);
   }
 
+  // Wind / altimeter spoken with another instruction ("wind 130 at 8, runway 13, cleared for takeoff") is information for that
+  // instruction (3-9-1 / 3-10-1), not a command of its own; a transmission of information alone keeps its AIRPORT_INFO command.
+  if (drafts.some((p) => p.draft.kind !== 'AIRPORT_INFO')) {
+    const carriers = drafts.filter((p) => p.draft.kind !== 'AIRPORT_INFO');
+    for (const p of drafts) {
+      if (p.draft.kind !== 'AIRPORT_INFO') continue;
+      const carrier = carriers.find((c) => c.start >= p.end) ?? [...carriers].reverse().find((c) => c.end <= p.start);
+      if (!carrier) continue;
+      carrier.draft.fields.info = { ...carrier.draft.fields.info, ...p.draft.fields.info };
+      carrier.draft.issues.push(...p.draft.issues);
+    }
+    drafts = carriers;
+  }
+
   drafts = drafts.filter((p, k) => {
     const before = drafts[k - 1];
     return !(before && before.draft.kind === p.draft.kind

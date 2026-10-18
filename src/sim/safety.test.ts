@@ -67,7 +67,7 @@ describe('takeoff / landing safety', () => {
   it('landing clearance with the runway occupied cites the landing-clearance topic', () => {
     const e = makeEngine({ scenario: { mode: 'training', spawns: [HOLDING('N1AA', 'H13', '13'), ARRIVING('N5CC', '13', 5)] } });
     run(e, 2);
-    e.applyCommand(cmd('LINE_UP_AND_WAIT', 'N1AA', { runwayEnd: '13' }));
+    e.applyCommand(cmd('LINE_UP_AND_WAIT', 'N1AA', { runwayEnd: '13', trafficAdvised: true }));
     run(e, 25);
     const out = e.applyCommand(cmd('LAND', 'N5CC', { runwayEnd: '13' }));
     expect(out.status).toBe('rejected');

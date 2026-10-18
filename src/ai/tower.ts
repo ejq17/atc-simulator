@@ -12,7 +12,9 @@ import { projectArrival, timeToThreshold } from '../sim/runwayTiming';
 import { findRunwayEnd, isOnFinal } from '../sim/runways';
 import type { RunwayEndGeom } from '../sim/runways';
 import { frequencyForPosition } from '../radio/frequencies';
-import { KT_TO_MPS } from '../sim/geo';
+import { KT_TO_MPS, trueToMagnetic } from '../sim/geo';
+import { predictedExit } from '../sim/flightDynamics';
+import { describeTraffic, luawTraffic } from '../sim/towerCommands';
 import { getPerformance } from '../sim/performance';
 import { holdTooShort } from '../sim/holdSelection';
 import { hasActive, mkCmd } from './core';
@@ -51,6 +53,8 @@ export const GO_AROUND_NM = 1.0;
 /** ... or within this many seconds of the threshold (the A320 covers 1 nm in 26 s). */
 export const GO_AROUND_SEC = 30;
 const DEP_HANDOFF_AGL_FT = 400;
+/** The exit instruction is not given right after touchdown (JO 7110.65 3-10-9 NOTE): once the aircraft is below this speed on the rollout. */
+const EXIT_CALL_MAX_KT = 70;
 /** Aircraft in the traffic pattern closer than this to the threshold (nm) block departures. */
 const PATTERN_BLOCK_NM = 3.5;
 
@@ -215,11 +219,13 @@ export function createTowerAgent(): Agent {
           summary: `${ac.callsign} cleared for takeoff runway ${g.end.id}`,
         });
       } else if (ac.phase === 'HOLDING_SHORT' && slack >= LINEUP_EXTRA_SEC && !departureTrailConflict(state, ac, g)) {
-        const luaw = mkCmd('LINE_UP_AND_WAIT', ac, { runwayEnd: g.end.id, runwayId: g.runway.id });
+        // JO 7110.65 3-9-4: the aircraft authorised to line up and wait is told about the closest traffic within 6 miles for the same runway.
+        const near = luawTraffic({ state }, ac, g);
+        const luaw = mkCmd('LINE_UP_AND_WAIT', ac, { runwayEnd: g.end.id, runwayId: g.runway.id, ...(near ? { trafficAdvised: true } : {}) });
         if (safe(luaw)) {
           plans.push({
             key: `${ac.id}:luaw`, aircraftId: ac.id, callsign: ac.callsign, priority: 60, cmds: [luaw],
-            phrase: say.lineUpAndWait(ac, g.end.id), cooldownSec: 20, once: true,
+            phrase: near ? say.lineUpAndWaitTraffic(ac, g.end.id, describeTraffic({ state }, near.other, near.nm)) : say.lineUpAndWait(ac, g.end.id), cooldownSec: 20, once: true,
             summary: `${ac.callsign} line up and wait runway ${g.end.id}`,
           });
         }
@@ -231,6 +237,33 @@ export function createTowerAgent(): Agent {
       if (ac.radioState === 'TRANSMITTING') continue;
       const pending = ac.pendingRequest?.kind;
       const ready = pending !== undefined || v.settled(ac) >= 4;
+
+      // A pilot who did not report the ATIS asks for the numbers (3-9-1 / 3-10-1): wind and altimeter from the observation.
+      if (ac.pendingRequest?.kind === 'OTHER' && /wind and altimeter/.test(ac.pendingRequest.text)) {
+        const w = state.weather;
+        const magDir = w.windDirDeg === 'VRB' ? undefined : (Math.round(trueToMagnetic(w.windDirDeg, airport.magneticVariationDeg) / 10) * 10 + 360) % 360 || 360;
+        plans.push({
+          key: `${ac.id}:info`, aircraftId: ac.id, callsign: ac.callsign, priority: 88, once: true,
+          cmds: [mkCmd('AIRPORT_INFO', ac, { info: { ...(w.windSpeedKt === 0 ? { calm: true } : { windSpeedKt: w.windSpeedKt, ...(magDir !== undefined ? { windDirDeg: magDir } : {}) }), altimeterInHg: Math.round(w.altimeterInHg * 100) / 100 } })],
+          phrase: say.airportInfo(ac, magDir, w.windSpeedKt, w.altimeterInHg), summary: `${ac.callsign} wind and altimeter`,
+        });
+        continue;
+      }
+
+      // Arrival rolling out with Ground staffed: the exit and the frequency change in one transmission (3-10-9 example); the aircraft changes once clear.
+      if (!ac.isDeparture && ac.onGround && ac.phase === 'ROLLOUT' && v.staffed.has('GND') && ac.groundSpeedKt <= EXIT_CALL_MAX_KT && !hasActive(ac, 'EXIT_RUNWAY')) {
+        const g = findRunwayEnd(airport, ac.assignedRunwayEnd);
+        const gnd = frequencyForPosition(airport, 'GND');
+        const ex = g ? predictedExit(state, ac, g) : undefined;
+        if (g && gnd && ex) {
+          plans.push({
+            key: `${ac.id}:exit-gnd`, aircraftId: ac.id, callsign: ac.callsign, priority: 56, once: true,
+            cmds: [mkCmd('EXIT_RUNWAY', ac, { exitTaxiway: ex.taxiway, turnDirection: ex.side }), mkCmd('CONTACT_FREQUENCY', ac, { frequencyId: gnd.id })],
+            phrase: say.exitAndContact(ac, airport, ex.taxiway, ex.side, gnd.id, gnd.mhz), summary: `${ac.callsign} turn ${ex.side} at ${ex.taxiway}, contact Ground`,
+          });
+          continue;
+        }
+      }
 
       // Departures that are airborne: handoff to Departure (IFR: the sector frequency of the clearance).
       if (ac.isDeparture && !ac.onGround && (ac.phase === 'INITIAL_CLIMB' || ac.phase === 'DEPARTURE') && ac.altitudeFt - airport.elevationFt >= DEP_HANDOFF_AGL_FT) {

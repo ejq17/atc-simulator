@@ -14,6 +14,10 @@ import {
   ruleContact, ruleFiller, ruleRoute, ruleRunwayRef, ruleSayAgain, ruleUnsupported, ruleWind,
 } from './rules-misc';
 import { ruleContinue, ruleGoAround, ruleLand, rulePushback, ruleTakeoff } from './rules-tower';
+import {
+  ruleAirportInfo, ruleCancelTakeoff, ruleExitRunway, ruleFollowTraffic, ruleFrequencyApproved, rulePatternInstruction, ruleRadarServiceTerminated, ruleReportPosition,
+  ruleSquawk, ruleTrafficAdvisory, withLuawTraffic,
+} from './rules-tower-ext';
 
 /**
  * Ordered rule list; the first rule that matches at a position wins.
@@ -27,13 +31,16 @@ import { ruleContinue, ruleGoAround, ruleLand, rulePushback, ruleTakeoff } from 
  *  - hold-at-fix before hold-short / hold-position (it only claims "hold at|as published|<compass>|<known fix>"
  *    and "cleared to FIX, hold"); missed approach before go-around ("go around, fly the published missed approach")
  *  - radar contact / resume nav / direct before heading ("proceed")
+ *  - tower vocabulary (rules-tower-ext.ts) sits before the heading / pattern / continue rules: "turn left at Charlie" and "turn base now"
+ *    start like a heading, "continue to the end" like "continue"; cancel takeoff before the older "cancel" rule; airport info before the wind filler
  *  - the positional "N miles from X" filler sits after the runway / route refs
  * Fix-aware rules (direct, until, position text) need `ctx.fixes`, so the list is built per parse.
  */
 export function buildRules(ctx: Pick<ParseContext, 'fixes' | 'taxiways' | 'runwayEnds'> = {}): readonly Rule[] {
   const fixes = makeFixMatcher(ctx.fixes);
   return [
-    ruleWind, ruleSayAgain, ruleTaxiIntoPosition, ruleLineUp, ruleTakeoff, ruleLand, ruleHoldAtFix(fixes),
+    ruleAirportInfo, ruleWind, ruleSayAgain, ruleTaxiIntoPosition, withLuawTraffic(ruleLineUp), ruleCancelTakeoff, ruleRadarServiceTerminated, ruleFrequencyApproved, ruleSquawk,
+    ruleExitRunway, rulePatternInstruction, ruleReportPosition, ruleFollowTraffic, ruleTrafficAdvisory, ruleTakeoff, ruleLand, ruleHoldAtFix(fixes),
     ruleMissedApproach, ruleGoAround, rulePushback, ruleRadarContact(fixes), ruleResumeNav, makeClearedToParkingRule(ctx.taxiways, ctx.runwayEnds), ruleApproach, ruleDirectFix(fixes),
     ruleIfrClearance, ruleContact, makeHoldShortRule(ctx.runwayEnds), ruleHoldPosition, ruleCancel, ruleCross, makeContinueTaxiRule(ctx.taxiways, ctx.runwayEnds), makeTaxiRule(ctx.taxiways, ctx.runwayEnds),
     ruleHeading, ruleSpeed, makeAltitudeRule(fixes), rulePattern, ruleContinue, ruleUnsupported,

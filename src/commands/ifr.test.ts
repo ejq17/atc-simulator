@@ -176,7 +176,7 @@ run({
     { say: `${S}, cleared for takeoff runway 13`, cmds: [{ kind: 'TAKEOFF', runwayEnd: '13' }], clean: true },
     { say: `${S}, cleared to land runway 31`, cmds: [{ kind: 'LAND', runwayEnd: '31' }], clean: true },
     { say: `${S}, cleared for a low approach runway 4`, cmds: [{ kind: 'LAND', destination: 'low_approach' }], clean: true },
-    { say: `${S}, squawk one two zero zero`, cmds: [{ kind: 'UNKNOWN' }], issue: 'unsupported instruction: squawk' },
+    { say: `${S}, squawk ident`, cmds: [{ kind: 'UNKNOWN' }], issue: 'unsupported instruction: squawk' },
     { say: `${S}, turn left heading two seven zero, climb and maintain five thousand`, cmds: [{ kind: 'HEADING', headingDeg: 270 }, { kind: 'ALTITUDE', altitudeFt: 5000 }], clean: true },
   ],
 });

@@ -11,7 +11,9 @@ import { findRunwayEnd, alongCross } from './runways';
 import { holdTooShort } from './holdSelection';
 import { emitEvent, getRuntime, newRuntime, perfOf, pilotSay, setPhase } from './context';
 import type { SimContext } from './context';
-import { mulberry32, rngInt, rngPick } from './rng';
+import { mulberry32, rngInt, rngPick, seeded01 } from './rng';
+import { LUAW_LIMIT_SEC } from './towerCommands';
+import { DEFAULT_PILOT_BEHAVIOUR } from './pilotBehaviour';
 import { frequencyById, frequencyByMhz, frequencyForPosition, sameFrequency } from '../radio/frequencies';
 import { findNavFix, fixPosition } from './navigation';
 import { assignSquawk } from './ifr';
@@ -19,6 +21,7 @@ import { spokenCallsign as buildSpokenCallsign } from '../radio/spoken';
 import {
   approachCheckInCall, arrivalTowerCheckInCall, checkInCall, clearOfRunwayCall, departureCheckInCall, establishedCall, finalCall, goAroundEstablishedCall,
   holdingShortCall, approachingHoldCall, holdingShortCrossingCall, ifrClearanceRequestCall, inboundCall, missedApproachCheckInCall, readyToTaxiCall, stoppedOnRunwayCall,
+  luawIntentionsCall, positionReportCall, requestNumbersCall, trafficAcquiredCall,
 } from '../radio/readback';
 import type { ReadbackEnv } from '../radio/readback';
 
@@ -317,17 +320,21 @@ export function applyPendingFrequencyChanges(ctx: SimContext): void {
   for (const ac of Object.values(ctx.state.aircraft)) {
     const rt = getRuntime(ctx, ac);
     if (!rt.pendingFreq || now < rt.pendingFreq.atSec) continue;
-    const { mhz, id } = rt.pendingFreq;
+    // exit instruction + "contact Ground": the frequency changes once the aircraft is clear of the runway (JO 7110.65 3-10-9)
+    if (rt.pendingFreq.afterClear && (ac.phase === 'LANDING' || ac.phase === 'ROLLOUT' || ac.occupyingRunways.length > 0)) continue;
+    const { mhz, id, silent } = rt.pendingFreq;
     rt.pendingFreq = undefined;
     ac.frequencyMhz = mhz;
     ac.frequencyId = id;
     if (ac.pendingRequest?.kind === 'FREQUENCY_CHANGE') ac.pendingRequest = undefined;
     rt.handedOff = true;
-    rt.checkInAtSec = now + 1 + ctx.rng() * 1.5;
-    emitEvent(ctx, {
-      kind: 'HANDOFF', aircraftId: ac.id, callsign: ac.callsign, severity: 'info', speaker: 'SYSTEM', frequencyMhz: mhz,
-      text: `${ac.callsign} changed to ${mhz.toFixed(3)}${id ? ` (${id})` : ''}`, data: { frequencyId: id },
-    });
+    if (!silent) rt.checkInAtSec = now + 1 + ctx.rng() * 1.5;
+    emitEvent(ctx, mhz <= 0
+      ? { kind: 'HANDOFF', aircraftId: ac.id, callsign: ac.callsign, severity: 'info', speaker: 'SYSTEM', text: `${ac.callsign} left the frequency (frequency change approved)`, data: { leftFrequency: true } }
+      : {
+        kind: 'HANDOFF', aircraftId: ac.id, callsign: ac.callsign, severity: 'info', speaker: 'SYSTEM', frequencyMhz: mhz,
+        text: `${ac.callsign} changed to ${mhz.toFixed(3)}${id ? ` (${id})` : ''}`, data: { frequencyId: id },
+      });
   }
 }
 
@@ -337,6 +344,79 @@ export function applyPendingFrequencyChanges(ctx: SimContext): void {
 
 function readbackEnv(ctx: SimContext): ReadbackEnv {
   return { airport: ctx.state.airport };
+}
+
+/** Light VFR aircraft that did not report the ATIS code (40 %, seeded per aircraft): they need the numbers from the controller (JO 7110.65 3-9-1 / 3-10-1). */
+export function pilotNeedsNumbers(ac: Aircraft, fraction = DEFAULT_PILOT_BEHAVIOUR.noAtisFraction): boolean {
+  return ac.flightRules === 'VFR' && perfOf(ac).category === 'light' && seeded01(ac.seed, 'no-atis') < fraction;
+}
+
+/**
+ * Calls the controller asked for or the vocabulary implies: traffic acquired, requested position reports, line up and wait longer than
+ * 90 s (JO 7110.65 3-9-4 NOTE), request for wind and altimeter. Returns true when the aircraft spoke.
+ */
+function towerVocabularyCalls(ctx: SimContext, ac: Aircraft, rt: ReturnType<typeof getRuntime>, env: ReadbackEnv): boolean {
+  const { state } = ctx;
+  const airport = state.airport;
+  const now = state.clock.timeSec;
+  const g = findRunwayEnd(airport, ac.assignedRunwayEnd);
+
+  // 1. Traffic the pilot was looking for (JO 7110.65 3-1-6, 7-2-1).
+  if (rt.trafficLook && now >= rt.trafficLook.acquireAtSec) {
+    const target = state.aircraft[rt.trafficLook.targetId];
+    rt.trafficLook = undefined;
+    const sighted = !!target && dist(ac.pos, target.pos) <= Math.min(state.weather.visibilitySm, ctx.pilotBehaviour.look.maxRangeSm) * 1609.344;
+    if (sighted && target) rt.trafficSeen = [...new Set([...(rt.trafficSeen ?? []), target.id])];
+    pilotSay(ctx, ac, trafficAcquiredCall(ac, env, sighted), { trafficLook: true });
+    return true;
+  }
+
+  // 2. Requested position reports.
+  if (!ac.onGround && g && rt.reports.length) {
+    const { along: alongPave } = alongCross(g, ac.pos);
+    const along = alongPave - g.displacedM; // from the landing threshold
+    for (const r of rt.reports) {
+      let fire = false;
+      if (r.kind === 'MIDFIELD_DOWNWIND') fire = ac.phase === 'PATTERN' && rt.pattern?.leg === 'DOWNWIND' && alongPave <= g.lengthM / 2;
+      else if (r.kind === 'BASE') fire = ac.phase === 'PATTERN' && rt.pattern?.leg === 'BASE';
+      else fire = (ac.phase === 'FINAL' || ac.phase === 'LANDING') && mToNm(-along) <= (r.distanceNm ?? 3) + 0.15 && -along > 0;
+      if (!fire) continue;
+      rt.reports = rt.reports.filter((x) => x !== r);
+      pilotSay(ctx, ac, positionReportCall(ac, env, r.kind, g.end.id, { side: rt.pattern?.side, distanceNm: r.distanceNm ?? Math.max(1, mToNm(-along)) }), { positionReport: r.kind });
+      if (r.kind === 'FINAL') {
+        rt.calls.add('final');
+        if (!rt.landingEnd) ac.pendingRequest = { kind: 'LANDING', text: `${Math.max(1, Math.round(r.distanceNm ?? mToNm(-along)))} mile final, requesting landing clearance`, sinceSec: now };
+      } else {
+        ac.pendingRequest = { kind: 'PATTERN', text: r.kind === 'BASE' ? 'on base, requesting landing clearance' : 'midfield downwind, requesting landing clearance', sinceSec: now };
+      }
+      return true;
+    }
+  }
+
+  // 3. Line up and wait for more than 90 seconds (3-9-4 NOTE): the pilot asks for intentions; the timer restarts after the call.
+  if (ac.onGround && ac.phase === 'LINE_UP_AND_WAIT' && rt.lineUp?.aligned && ac.groundSpeedKt < 1 && !rt.takeoffCleared && !rt.aborting) {
+    rt.luawSinceSec ??= now;
+    if (now - rt.luawSinceSec >= LUAW_LIMIT_SEC && g) {
+      rt.luawSinceSec = now;
+      pilotSay(ctx, ac, luawIntentionsCall(ac, env, g.end.id), { request: 'DEPARTURE', luawTimeout: true });
+      ac.pendingRequest = { kind: 'DEPARTURE', text: `in position runway ${g.end.id} for more than 90 seconds, say intentions`, sinceSec: now };
+      emitEvent(ctx, { kind: 'INFO', aircraftId: ac.id, callsign: ac.callsign, severity: 'warning', speaker: 'SYSTEM', text: `${ac.callsign} has been in position on runway ${g.end.id} for ${LUAW_LIMIT_SEC} s (JO 7110.65 3-9-4 NOTE: not more than 90 seconds without additional instructions)`, data: { luawTimeout: true } });
+      return true;
+    }
+  } else if (rt.luawSinceSec !== undefined && ac.phase !== 'LINE_UP_AND_WAIT') {
+    rt.luawSinceSec = undefined;
+  }
+
+  // 4. A pilot who did not report the ATIS code and was not given the numbers asks for wind and altimeter.
+  if (!rt.haveNumbers && !rt.numbersRequested && ac.pendingRequest && now - ac.pendingRequest.sinceSec >= ctx.pilotBehaviour.numbersRequestAfterSec
+    && (ac.pendingRequest.kind === 'DEPARTURE' || ac.pendingRequest.kind === 'LANDING')
+    && frequencyByMhz(airport, ac.frequencyMhz)?.position === 'TWR' && pilotNeedsNumbers(ac, ctx.pilotBehaviour.noAtisFraction)) {
+    rt.numbersRequested = true;
+    pilotSay(ctx, ac, requestNumbersCall(ac, env), { request: 'OTHER', numbersRequest: true });
+    ac.pendingRequest = { kind: 'OTHER', text: 'request wind and altimeter', sinceSec: now };
+    return true;
+  }
+  return false;
 }
 
 export function updatePilotRequests(ctx: SimContext): void {
@@ -363,6 +443,8 @@ export function updatePilotRequests(ctx: SimContext): void {
     }
 
     if (ac.radioState === 'TRANSMITTING') continue;
+
+    if (towerVocabularyCalls(ctx, ac, rt, env)) continue;
 
     // Track standing still.
     if (ac.onGround && ac.groundSpeedKt < 0.1) rt.stillSince = rt.stillSince ?? now;
@@ -448,7 +530,7 @@ export function updatePilotRequests(ctx: SimContext): void {
       if (g && (ac.phase === 'INBOUND' || ac.phase === 'APPROACH' || ac.phase === 'FINAL') && !rt.calls.has('inbound') && now >= rt.firstCallAtSec) {
         rt.calls.add('inbound');
         const distNm = mToNm(dist(ac.pos, { x: 0, y: 0 }));
-        pilotSay(ctx, ac, inboundCall(ac, env, { distanceNm: distNm, bearingFromAirportDeg: bearingDeg({ x: 0, y: 0 }, ac.pos), atisLetter: state.atis.letter }), { request: 'LANDING' });
+        pilotSay(ctx, ac, inboundCall(ac, env, { distanceNm: distNm, bearingFromAirportDeg: bearingDeg({ x: 0, y: 0 }, ac.pos), atisLetter: pilotNeedsNumbers(ac, ctx.pilotBehaviour.noAtisFraction) ? undefined : state.atis.letter }), { request: 'LANDING' });
         ac.pendingRequest = { kind: 'LANDING', text: 'inbound for landing', sinceSec: now };
         continue;
       }

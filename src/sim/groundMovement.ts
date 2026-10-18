@@ -154,6 +154,7 @@ export function updateGroundMovement(ctx: SimContext, dt: number): void {
   for (const ac of Object.values(ctx.state.aircraft)) {
     if (!ac.onGround) continue;
     if (ac.phase === 'TAKEOFF_ROLL' || ac.phase === 'ROLLOUT') continue;
+    if (getRuntime(ctx, ac).aborting) continue; // rejected takeoff: flightDynamics.stepAbort brakes it to a stop
     stepGround(ctx, ac, dt);
   }
 }

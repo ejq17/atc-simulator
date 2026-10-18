@@ -122,9 +122,31 @@ export function markForClearance(c: Clearance): Pick<StripMark, 'text' | 'title'
       return { text: 'PAT', title: 'Enter the traffic pattern' };
     case 'RADAR_CONTACT':
       return { text: 'RC', title: 'Radar contact' };
+    case 'EXIT_RUNWAY':
+      return { text: c.destination === 'END' ? 'EXIT END' : `EXIT ${c.exitTaxiway ?? ''}`.trim(), title: `Exit the runway${c.exitTaxiway ? ` at ${c.exitTaxiway}` : c.destination === 'END' ? ' at the end' : ' at the next taxiway'}${c.turnDirection ? `, turn ${c.turnDirection}` : ''}` };
+    case 'CANCEL_TAKEOFF':
+      return { text: 'CNX TO', title: 'Takeoff clearance cancelled' };
+    case 'TRAFFIC_ADVISORY':
+      return { text: 'TFC', title: `Traffic information${c.trafficResponse ? ` (pilot: ${c.trafficResponse.replace('_', ' ')})` : ''}` };
+    case 'FOLLOW_TRAFFIC':
+      return { text: c.sequenceNumber ? `#${c.sequenceNumber} FLW` : 'FLW', title: 'Follow the named traffic' };
+    case 'PATTERN_INSTRUCTION': {
+      const t: Record<string, [string, string]> = {
+        EXTEND_DOWNWIND: ['EXT DW', 'Extend downwind'], TURN_BASE_NOW: ['BASE', 'Turn base now'], SHORT_APPROACH: ['SHORT', 'Short approach'],
+        CIRCLE: [`${c.turnDegrees ?? 360}${c.turnDirection === 'right' ? 'R' : 'L'}`, `Make a ${c.turnDirection ?? 'left'} ${c.turnDegrees ?? 360}`], CLOSED_TRAFFIC: ['CLSD', 'Closed traffic'],
+      };
+      const [text, title] = t[c.destination ?? ''] ?? ['PAT', 'Pattern instruction'];
+      return { text, title };
+    }
+    case 'REPORT_POSITION':
+      return { text: 'RPT', title: 'Report position' };
+    case 'FREQUENCY_CHANGE_APPROVED':
+      return { text: 'FC OK', title: 'Frequency change approved' };
     case 'ALTITUDE':
+    case 'SQUAWK':
+    case 'AIRPORT_INFO':
     case 'CONTACT_FREQUENCY':
-      return null; // altitude box / the strip moves to the next bay
+      return null; // altitude box / squawk box / not written down / the strip moves to the next bay
     default:
       return null;
   }

@@ -7,16 +7,16 @@
  */
 import type { Aircraft, AircraftPerformance, FlightPhase, Vec2 } from './types';
 import {
-  clamp, deg2rad, dist, headingDiff, headingToVec, ktToMps, mpsToKt, mToFt, mToNm, nmToM, normHeading, pointInPolygon, rad2deg,
+  clamp, deg2rad, dist, ftToM, headingDiff, headingToVec, ktToMps, mpsToKt, mToFt, mToNm, nmToM, normHeading, pointInPolygon, rad2deg,
   vAdd, vDot, vScale, vSub, vecToHeading, bearingDeg,
 } from './geo';
 import { patternAltitudeFt } from './performance';
 import { activeClearance, completeClearances, emitEvent, getRuntime, perfOf, pilotSay, setPhase } from './context';
-import type { AircraftRuntime, SimContext } from './context';
+import type { AircraftRuntime, ExitInstruction, SimContext } from './context';
 import { alongCross, crossingRunways, findRunwayEnd } from './runways';
 import type { RunwayEndGeom } from './runways';
 import { neighborIds, shortestDistances } from './pathfinding';
-import { goingAroundCall } from '../radio/readback';
+import { exitUnableCall, goingAroundCall, stoppedAfterRejectCall, touchAndGoRefusedCall } from '../radio/readback';
 import { componentsOfVector, exceedsLimits, newGustState, stepGust, windVector } from './wind';
 import { advanceNav, fixPosition, turnLeadM } from './navigation';
 import { landedDistanceExceptionApplies, precedingArrivalBlockers } from './conflicts';
@@ -24,9 +24,40 @@ import { holdGuidance } from './holding';
 import { missedGuidance, publishedMissedAltitudeFt, startPublishedMissed } from './missedApproach';
 import { resolveMinima, runwayInSight } from './minima';
 import { APPROACH_FINAL_NM, courseGeom, isOnCourse } from './approach';
+import { seeded01 } from './rng';
+import { projectArrival } from './runwayTiming';
 
 /** Fallback glidepath (a 3 degree path crossing the threshold at 50 ft) when neither the plate nor the runway end data has one. */
 export const GLIDEPATH_DEG = 3;
+/** AIM 4-3-3: the crosswind turn is made beyond the departure end, within 300 feet of pattern altitude. */
+const CROSSWIND_TURN_BELOW_TPA_FT = 300;
+/** Base leg turn point behind the threshold: standard, and after "make short approach" (the turn to final stays at least 1/4 mile out, AIM 4-3-3). */
+const BASE_ALONG_M = nmToM(1.2);
+const SHORT_BASE_ALONG_M = nmToM(0.8);
+/** "Extend downwind" without a "turn base" call: the pilot turns base on his own at this distance behind the threshold (safety limit of the simulator). */
+const EXTEND_LIMIT_M = nmToM(6);
+
+/**
+ * Touch-and-go ground roll (JO 7110.65 3-8-2: an arrival until it touches down, a departure after). DESIGN VALUES, not FAA figures:
+ * the aircraft brakes at the type's normal landing deceleration for TGO_DECEL_SEC, holds that speed for TGO_RECONFIGURE_SEC (flaps, trim,
+ * power), accelerates at the type's takeoff acceleration to its rotation speed and lifts off. It needs the runway for the whole sequence
+ * (`touchAndGoRollM`) and at least the type's takeoff distance (`takeoffDistanceFt`) ahead of the touchdown point, less TGO_END_MARGIN_M;
+ * otherwise the pilot makes a full stop instead and says so.
+ */
+export const TGO_DECEL_SEC = 3;
+export const TGO_RECONFIGURE_SEC = 3;
+const TGO_END_MARGIN_M = 60;
+
+/** Distance (m) of the touch-and-go roll for an aircraft touching down at `vTdKt`: decelerate, hold, accelerate to the rotation speed. */
+export function touchAndGoRollM(perf: AircraftPerformance, vTdKt: number): number {
+  const v1 = Math.max(ktToMps(perf.minSpeedKt * 0.5), ktToMps(vTdKt) - ktToMps(perf.decelKtPerSec) * TGO_DECEL_SEC);
+  const dDecel = ((ktToMps(vTdKt) + v1) / 2) * TGO_DECEL_SEC;
+  const dHold = v1 * TGO_RECONFIGURE_SEC;
+  const vr = ktToMps(perf.rotateSpeedKt);
+  const a = ktToMps(perf.accelKtPerSec);
+  const dAccel = vr > v1 ? (vr * vr - v1 * v1) / (2 * a) : 0;
+  return dDecel + dHold + dAccel;
+}
 export const TCH_FT = 50;
 export const DECISION_POINT_M = nmToM(0.5);
 /** Inside this distance a cleared arrival that is still high goes around if the runway is occupied. */
@@ -115,7 +146,9 @@ export function updateFlightDynamics(ctx: SimContext, dt: number): void {
   for (const ac of Object.values(ctx.state.aircraft)) {
     if (ac.onGround) {
       if (ac.phase === 'TAKEOFF_ROLL') stepTakeoffRoll(ctx, ac, dt);
+      else if (ac.phase === 'ROLLOUT' && getRuntime(ctx, ac).tgo) stepTouchAndGo(ctx, ac, dt);
       else if (ac.phase === 'ROLLOUT') stepRollout(ctx, ac, dt);
+      else if (getRuntime(ctx, ac).aborting) stepAbort(ctx, ac, dt);
       continue;
     }
     stepAirborne(ctx, ac, dt);
@@ -154,6 +187,8 @@ function stepTakeoffRoll(ctx: SimContext, ac: Aircraft, dt: number): void {
     completeClearances(ctx, ac, ['TAKEOFF', 'LINE_UP_AND_WAIT', 'TAXI']);
     setPhase(ctx, ac, 'INITIAL_CLIMB', 'airborne');
     emitEvent(ctx, { kind: 'INFO', aircraftId: ac.id, callsign: ac.callsign, text: `${ac.callsign} airborne runway ${g.end.id}`, severity: 'info', speaker: 'SYSTEM', data: { airborne: true, runwayEnd: g.end.id, runwayId: g.runway.id } });
+    // "make left closed traffic" with the takeoff clearance (JO 7110.65 3-10-11): the departure stays in the pattern.
+    if (rt.closedTraffic) startClosedTrafficPattern(ctx, ac, g, rt.closedTraffic.side);
   }
 }
 
@@ -161,6 +196,60 @@ function centreOnRunway(ac: Aircraft, g: RunwayEndGeom, dt: number): void {
   const { cross } = alongCross(g, ac.pos);
   const fix = clamp(cross, -2 * dt, 2 * dt);
   ac.pos = vSub(ac.pos, vScale(g.right, fix));
+}
+
+/** The ground roll of a touch-and-go: decelerate, reconfigure, accelerate to rotation speed, lift off into the closed-traffic pattern. Wind is ignored during the roll (design simplification). */
+function stepTouchAndGo(ctx: SimContext, ac: Aircraft, dt: number): void {
+  const perf = perfOf(ac);
+  const rt = getRuntime(ctx, ac);
+  const g = findRunwayEnd(ctx.state.airport, ac.assignedRunwayEnd);
+  const tgo = rt.tgo!;
+  if (!g) { rt.tgo = undefined; return; }
+  const now = ctx.state.clock.timeSec;
+  let v = ktToMps(ac.groundSpeedKt);
+  const vFloor = ktToMps(perf.minSpeedKt * 0.5);
+  if (tgo.phase === 'DECEL') {
+    v = Math.max(vFloor, v - ktToMps(perf.decelKtPerSec) * dt);
+    if (now - tgo.startSec >= TGO_DECEL_SEC) { tgo.phase = 'RECONFIGURE'; tgo.holdUntilSec = now + TGO_RECONFIGURE_SEC; }
+  } else if (tgo.phase === 'RECONFIGURE') {
+    if (now >= tgo.holdUntilSec) tgo.phase = 'ACCEL';
+  } else {
+    v += ktToMps(perf.accelKtPerSec) * dt;
+  }
+  ac.pos = vAdd(ac.pos, vScale(g.dir, v * dt));
+  centreOnRunway(ac, g, dt);
+  ac.headingDeg = g.headingDeg;
+  ac.trackDeg = g.headingDeg;
+  ac.groundSpeedKt = mpsToKt(v);
+  ac.airspeedKt = ac.groundSpeedKt;
+  if (tgo.phase === 'ACCEL' && ac.airspeedKt >= perf.rotateSpeedKt) {
+    rt.tgo = undefined;
+    ac.onGround = false;
+    ac.altitudeFt = g.elevationFt;
+    continueInPattern(ctx, ac, rt, g, 'touch and go');
+  }
+}
+
+/** Rejected takeoff (JO 7110.65 3-9-11): maximum braking along the runway centreline to a stop, then the pilot reports. */
+function stepAbort(ctx: SimContext, ac: Aircraft, dt: number): void {
+  const perf = perfOf(ac);
+  const rt = getRuntime(ctx, ac);
+  const g = findRunwayEnd(ctx.state.airport, ac.assignedRunwayEnd);
+  if (!g) { rt.aborting = false; return; }
+  const v = Math.max(0, ktToMps(ac.groundSpeedKt) - ktToMps(perf.decelKtPerSec) * MAX_BRAKE_FACTOR * dt);
+  ac.pos = vAdd(ac.pos, vScale(g.dir, v * dt));
+  centreOnRunway(ac, g, dt);
+  ac.headingDeg = g.headingDeg;
+  ac.trackDeg = g.headingDeg;
+  ac.groundSpeedKt = mpsToKt(v);
+  ac.airspeedKt = ac.groundSpeedKt;
+  if (v < 0.05) {
+    ac.groundSpeedKt = 0;
+    ac.airspeedKt = 0;
+    rt.aborting = false;
+    pilotSay(ctx, ac, stoppedAfterRejectCall(ac, { airport: ctx.state.airport }, g.end.id), { rejectedTakeoff: true });
+    ac.pendingRequest = { kind: 'DEPARTURE', text: `stopped on runway ${g.end.id} after a rejected takeoff`, sinceSec: ctx.state.clock.timeSec };
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -174,9 +263,10 @@ const INTERSECTION_HOLD_MARGIN_M = 60;
 const RUNWAY_END_STOP_MARGIN_M = 60;
 
 /** Where (m along `g`) an intersecting runway's surface begins, if it is ahead of `fromAlong`. */
-function intersectionStartAlong(ctx: SimContext, g: RunwayEndGeom, fromAlong: number): number | undefined {
+export function intersectionStartAlong(ctx: SimContext, g: RunwayEndGeom, fromAlong: number, onlyRunwayId?: string): number | undefined {
   let best: number | undefined;
   for (const other of crossingRunways(ctx.state.airport, g.runway.id)) {
+    if (onlyRunwayId && other.id !== onlyRunwayId) continue;
     for (let s = Math.max(0, fromAlong); s <= g.lengthM; s += 10) {
       const c = vAdd(g.end.threshold, vScale(g.dir, s));
       const inside = [-20, 0, 20].some((lat) => pointInPolygon(vAdd(c, vScale(g.right, lat)), other.polygon));
@@ -206,37 +296,56 @@ export interface RolloutPlan {
   brakeMps2: number;
   /** No exit: the along-runway position (m) the aircraft must stop short of. */
   stopAlongM?: number;
+  /** An exit instruction was given: true when this plan follows it, false when the aircraft cannot (the plan is the default one). */
+  honoured?: boolean;
+  /** Why an instructed exit cannot be made. */
+  unableReason?: string;
 }
+
+/** Exits of the runway: the runway node, its position along `g`, and the hold-line nodes with the side of the runway they lie on (JO 7110.65 3-10-9). */
+export interface RunwayExit { id: string; along: number; taxiways: string[]; holds: { id: string; side: 'left' | 'right'; taxiways: string[] }[] }
+
+export function runwayExits(ctx: SimContext, g: RunwayEndGeom): RunwayExit[] {
+  const graph = ctx.state.airport.taxiwayGraph;
+  const out: RunwayExit[] = [];
+  for (const id of Object.keys(graph.nodes)) {
+    const n = graph.nodes[id];
+    if (n.kind !== 'runway' || n.runwayId !== g.runway.id) continue;
+    const holds = neighborIds(graph, id)
+      .filter((h) => graph.nodes[h].kind === 'holding_position' && graph.nodes[h].runwayId === g.runway.id)
+      .map((h) => ({ id: h, side: (vDot(vSub(graph.nodes[h].pos, n.pos), g.right) > 0 ? 'right' : 'left') as 'left' | 'right', taxiways: graph.nodes[h].taxiways }));
+    if (!holds.length) continue;
+    out.push({ id, along: alongCross(g, n.pos).along, taxiways: n.taxiways, holds });
+  }
+  return out.sort((a, b) => a.along - b.along || (a.id < b.id ? -1 : 1));
+}
+
+const sameTwy = (list: readonly string[], twy: string): boolean => list.some((x) => x.toUpperCase() === twy.toUpperCase());
 
 /**
  * Plan the rollout: the FIRST exit the aircraft can make at a safe exit speed (`exitSpeedMps`) braking no harder than the
  * normal landing rate; failing that, the first exit it can make braking up to the maximum rate; failing that, no exit: stop
  * short of the runway end and of any intersecting runway (never stopping in or beyond its hold line) and ask for taxi instructions.
  */
-function chooseExit(ctx: SimContext, ac: Aircraft, g: RunwayEndGeom, tdAlong: number, vTd: number, lahsoStopAlong?: number): RolloutPlan {
+function chooseExit(ctx: SimContext, ac: Aircraft, g: RunwayEndGeom, tdAlong: number, vTd: number, lahsoStopAlong?: number, exit?: ExitInstruction, holdShortAlong?: number): RolloutPlan {
   const graph = ctx.state.airport.taxiwayGraph;
   const perf = perfOf(ac);
   const normal = ktToMps(perf.decelKtPerSec);
   const maxBrake = normal * MAX_BRAKE_FACTOR;
-  const cands: { id: string; along: number; holds: string[] }[] = [];
-  for (const id of Object.keys(graph.nodes)) {
-    const n = graph.nodes[id];
-    if (n.kind !== 'runway' || n.runwayId !== g.runway.id) continue;
-    const holds = neighborIds(graph, id).filter((h) => graph.nodes[h].kind === 'holding_position' && graph.nodes[h].runwayId === g.runway.id);
-    if (!holds.length) continue;
-    cands.push({ id, along: alongCross(g, graph.nodes[id].pos).along, holds });
-  }
-  cands.sort((a, b) => a.along - b.along || (a.id < b.id ? -1 : 1));
-  // Land and hold short: only exits before the hold-short point can be used, otherwise stop at it.
-  if (lahsoStopAlong !== undefined) {
-    for (let i = cands.length - 1; i >= 0; i--) if (cands[i].along > lahsoStopAlong) cands.splice(i, 1);
+  const stopLimit = Math.min(lahsoStopAlong ?? Infinity, holdShortAlong ?? Infinity);
+  const cands: { id: string; along: number; holds: string[]; exitRow: RunwayExit }[] = [];
+  for (const row of runwayExits(ctx, g)) cands.push({ id: row.id, along: row.along, holds: row.holds.map((h) => h.id), exitRow: row });
+  // Land and hold short (LAHSO) / "hold short of runway N" after landing: only exits before the hold-short point can be used, otherwise stop at it.
+  if (Number.isFinite(stopLimit)) {
+    for (let i = cands.length - 1; i >= 0; i--) if (cands[i].along > stopLimit) cands.splice(i, 1);
   }
   // The hold on the side from which parking is closest by taxi WITHOUT crossing any runway (`shortestDistances` never uses runway
   // surfaces): cost = Infinity when every side needs a runway crossing (re-crossing the landing or an intersecting runway).
-  const pickHold = (c: { id: string; holds: string[] }): { hold: string; cost: number } => {
-    let bestHold = c.holds[0];
+  const pickHold = (c: { id: string; holds: string[] }, only?: readonly string[]): { hold: string; cost: number } => {
+    const holds = only?.length ? c.holds.filter((h) => only.includes(h)) : c.holds;
+    let bestHold = holds[0];
     let bestCost = Infinity;
-    for (const h of c.holds) {
+    for (const h of holds) {
       const dm = shortestDistances(graph, h);
       let cost = Infinity;
       for (const p of ctx.state.airport.parking) cost = Math.min(cost, dm.get(p.nodeId) ?? Infinity);
@@ -249,13 +358,14 @@ function chooseExit(ctx: SimContext, ac: Aircraft, g: RunwayEndGeom, tdAlong: nu
   };
   // The first reachable exit, but an exit whose taxi route to parking needs no runway crossing is preferred over earlier ones that
   // lead onto a hold beyond which the aircraft must cross a runway again (if none exists the first exit is used: the aircraft
-  // stops at the hold and asks for the crossing).
-  const evaluate = (limit: number): RolloutPlan | undefined => {
+  // stops at the hold and asks for the crossing). With an exit instruction (`pool`) the controller's choice wins: the first exit of
+  // the pool the aircraft can make, the cost preference is not applied.
+  const evaluate = (limit: number, pool: typeof cands = cands, instructed = false, holdIds?: (c: (typeof cands)[number]) => readonly string[] | undefined): RolloutPlan | undefined => {
     let firstAny: RolloutPlan | undefined;
-    for (const c of cands) {
+    for (const c of pool) {
       const d = c.along - tdAlong;
       if (d < 20) continue;
-      const { hold, cost } = pickHold(c);
+      const { hold, cost } = pickHold(c, holdIds?.(c));
       const from = graph.nodes[c.id].pos;
       const to = graph.nodes[hold].pos;
       const angle = Math.abs(headingDiff(g.headingDeg, bearingDeg(from, to)));
@@ -263,28 +373,128 @@ function chooseExit(ctx: SimContext, ac: Aircraft, g: RunwayEndGeom, tdAlong: nu
       const aReq = vTd > vC ? (vTd * vTd - vC * vC) / (2 * d) : 0;
       if (aReq <= limit) {
         const plan: RolloutPlan = { exitNodeId: c.id, holdNodeId: hold, exitSpeedMps: vC, brakeMps2: Math.max(aReq, 0.5 * normal) };
-        if (Number.isFinite(cost)) return plan;
+        if (instructed || Number.isFinite(cost)) return plan;
         firstAny ??= plan;
       }
     }
     return firstAny;
   };
+  if (exit && (exit.taxiway || exit.toEnd || exit.next || exit.side)) {
+    let pool = cands;
+    let why = '';
+    if (exit.toEnd) pool = cands.length ? [cands[cands.length - 1]] : [];
+    if (exit.taxiway) {
+      pool = pool.filter((c) => sameTwy(c.exitRow.taxiways, exit.taxiway!) || c.exitRow.holds.some((h) => sameTwy(h.taxiways, exit.taxiway!)));
+      if (!pool.length) why = `no exit on taxiway ${exit.taxiway} ahead of the aircraft on runway ${g.runway.id}`;
+    }
+    const holdsFor = (c: (typeof cands)[number]): readonly string[] | undefined => {
+      let hs = c.exitRow.holds;
+      if (exit.side) hs = hs.filter((h) => h.side === exit.side);
+      if (exit.taxiway) {
+        const onTwy = hs.filter((h) => sameTwy(h.taxiways, exit.taxiway!));
+        if (onTwy.length) hs = onTwy;
+      }
+      return hs.map((h) => h.id);
+    };
+    if (exit.side) {
+      pool = pool.filter((c) => holdsFor(c)!.length > 0);
+      if (!pool.length && !why) why = `no exit to the ${exit.side} ${exit.taxiway ? `on taxiway ${exit.taxiway} ` : ''}ahead of the aircraft`;
+    }
+    if (pool.length) {
+      const plan = evaluate(normal, pool, true, holdsFor) ?? evaluate(maxBrake, pool, true, holdsFor);
+      if (plan) return { ...plan, honoured: true };
+      why = `the exit is too far ahead / too fast to make (cannot slow to the exit speed within the maximum braking)`;
+    }
+    const fallback = chooseExit(ctx, ac, g, tdAlong, vTd, lahsoStopAlong, undefined, holdShortAlong);
+    return { ...fallback, honoured: false, unableReason: why || 'exit not available' };
+  }
   const plan = evaluate(normal) ?? evaluate(maxBrake);
   if (plan) return plan;
   // No exit within reach: stop on the remaining runway, short of an intersection and of the end.
   const natural = tdAlong + (vTd * vTd) / (2 * normal);
   const inter = intersectionStartAlong(ctx, g, tdAlong);
   const stopTarget = Math.min(
-    natural, g.lengthM - RUNWAY_END_STOP_MARGIN_M, lahsoStopAlong ?? Infinity,
+    natural, g.lengthM - RUNWAY_END_STOP_MARGIN_M, stopLimit,
     inter !== undefined ? inter - INTERSECTION_HOLD_MARGIN_M - perf.lengthM / 2 : Infinity,
   );
   const room = Math.max(1, stopTarget - tdAlong);
   return { exitSpeedMps: 0, brakeMps2: clamp((vTd * vTd) / (2 * room), normal, maxBrake), stopAlongM: stopTarget };
 }
 
+/** The exit the default rollout plan would take for an aircraft already rolling out: its taxiway and the side of the runway (what the tower names in an exit instruction). */
+export function predictedExit(state: SimContext['state'], ac: Aircraft, g: RunwayEndGeom): { taxiway: string; side: 'left' | 'right' } | undefined {
+  const ctx = { state } as SimContext;
+  const plan = chooseExit(ctx, ac, g, alongCross(g, ac.pos).along, ktToMps(ac.groundSpeedKt));
+  if (!plan.exitNodeId || !plan.holdNodeId) return undefined;
+  const row = runwayExits(ctx, g).find((r) => r.id === plan.exitNodeId);
+  const hold = row?.holds.find((h) => h.id === plan.holdNodeId);
+  const taxiway = hold?.taxiways[0] ?? row?.taxiways[0];
+  return hold && taxiway ? { taxiway, side: hold.side } : undefined;
+}
+
+/** Along-runway limit (m) for "hold short of runway N" during the landing roll: short of that intersecting runway's surface. */
+export function holdShortStopAlong(ctx: SimContext, ac: Aircraft, g: RunwayEndGeom, fromAlong: number, holdShortRunwayId: string | undefined): number | undefined {
+  if (!holdShortRunwayId) return undefined;
+  const start = intersectionStartAlong(ctx, g, fromAlong, holdShortRunwayId);
+  return start === undefined ? undefined : start - INTERSECTION_HOLD_MARGIN_M - perfOf(ac).lengthM / 2;
+}
+
+/** Replan the landing rollout for the aircraft's current position and speed (new exit / hold-short instruction while rolling). */
+export function replanRollout(ctx: SimContext, ac: Aircraft, rt: AircraftRuntime, g: RunwayEndGeom, exit?: ExitInstruction, holdShortRunwayId?: string): RolloutPlan {
+  const along = alongCross(g, ac.pos).along;
+  return chooseExit(ctx, ac, g, along, ktToMps(ac.groundSpeedKt), rt.lahso?.stopAlongM, exit ?? rt.exit, holdShortAlongFor(ctx, ac, g, along, holdShortRunwayId ?? rt.exitHoldShort));
+}
+
+function holdShortAlongFor(ctx: SimContext, ac: Aircraft, g: RunwayEndGeom, fromAlong: number, runwayId: string | undefined): number | undefined {
+  return holdShortStopAlong(ctx, ac, g, fromAlong, runwayId);
+}
+
 /** The rollout plan for an aircraft of `type` touching down (or already rolling) at `tdAlongM` with `vTdMps`; pure, for predictions. */
 export function predictRolloutPlan(state: SimContext['state'], type: string, g: RunwayEndGeom, tdAlongM: number, vTdMps: number): RolloutPlan {
   return chooseExit({ state } as SimContext, { type } as Aircraft, g, tdAlongM, vTdMps);
+}
+
+/**
+ * Put an airborne aircraft on the upwind leg of the pattern of `g`: a departure that stays in the pattern (closed traffic, 3-10-11), a
+ * touch-and-go / low approach / option that continues (3-8-2: an arrival until it touches down, a departure afterwards), a go-around into the pattern.
+ */
+export function startClosedTrafficPattern(ctx: SimContext, ac: Aircraft, g: RunwayEndGeom, side: 'left' | 'right'): void {
+  const rt = getRuntime(ctx, ac);
+  rt.closedTraffic = { side };
+  rt.pattern = { leg: 'UPWIND', side, runwayEnd: g.end.id };
+  ac.assignedRunwayEnd = g.end.id;
+  rt.navMode = 'AUTO';
+  rt.decisionDone = false;
+  ac.target.headingDeg = undefined;
+  ac.target.altitudeFt = undefined;
+  ac.nav = undefined;
+  if (ac.phase !== 'PATTERN') setPhase(ctx, ac, 'PATTERN', 'closed traffic');
+}
+
+/** Cleared for the option (3-8-1): the pilot's choice, here seeded per aircraft and landing (touch-and-go or full stop). */
+function resolveLandingOp(ac: Aircraft, rt: AircraftRuntime): 'full_stop' | 'touch_and_go' | 'low_approach' | 'stop_and_go' {
+  const op = rt.landingOp ?? 'full_stop';
+  if (op !== 'option') return op;
+  const n = ac.clearances.filter((c) => c.kind === 'LAND').length;
+  return seeded01(ac.seed, `option:${n}`) < 0.5 ? 'touch_and_go' : 'full_stop';
+}
+
+/** Touch-and-go and low approach: the aircraft climbs out over the runway and flies the closed traffic pattern. */
+function continueInPattern(ctx: SimContext, ac: Aircraft, rt: AircraftRuntime, g: RunwayEndGeom, what: 'touch and go' | 'low approach'): void {
+  completeClearances(ctx, ac, ['LAND']);
+  const idx = ac.runwayAuthorizations.indexOf(g.runway.id);
+  if (idx >= 0) ac.runwayAuthorizations.splice(idx, 1);
+  rt.landingEnd = undefined;
+  rt.lahso = undefined;
+  rt.landingOp = undefined;
+  rt.follow = undefined;
+  ac.altitudeFt = Math.max(ac.altitudeFt, g.elevationFt + 5);
+  ac.verticalSpeedFpm = Math.max(ac.verticalSpeedFpm, 300);
+  emitEvent(ctx, {
+    kind: 'INFO', aircraftId: ac.id, callsign: ac.callsign, severity: 'info', speaker: 'SYSTEM',
+    text: `${ac.callsign} ${what} runway ${g.end.id}`, data: { touchAndGo: what === 'touch and go', lowApproach: what === 'low approach', runwayEnd: g.end.id },
+  });
+  startClosedTrafficPattern(ctx, ac, g, rt.closedTraffic?.side ?? 'left');
 }
 
 function touchdown(ctx: SimContext, ac: Aircraft, rt: AircraftRuntime, g: RunwayEndGeom): void {
@@ -305,7 +515,28 @@ function touchdown(ctx: SimContext, ac: Aircraft, rt: AircraftRuntime, g: Runway
   rt.turnRateDegPerSec = 0;
   setPhase(ctx, ac, 'ROLLOUT', 'touchdown');
   const { along } = alongCross(g, ac.pos);
-  rt.rollout = chooseExit(ctx, ac, g, along, ktToMps(ac.groundSpeedKt), rt.lahso?.stopAlongM);
+  const op = resolveLandingOp(ac, rt);
+  if (op === 'touch_and_go') {
+    const perf = perfOf(ac);
+    const avail = g.lengthM - along - TGO_END_MARGIN_M;
+    if (avail >= Math.max(ftToM(perf.takeoffDistanceFt), touchAndGoRollM(perf, ac.groundSpeedKt))) {
+      rt.rollout = undefined;
+      rt.tgo = { startSec: ctx.state.clock.timeSec, holdUntilSec: 0, phase: 'DECEL' };
+      emitEvent(ctx, { kind: 'INFO', aircraftId: ac.id, callsign: ac.callsign, severity: 'info', speaker: 'SYSTEM', text: `${ac.callsign} touched down runway ${g.end.id} ${Math.round(along - g.displacedM)} m from threshold (touch and go: rolling)`, data: { runwayEnd: g.end.id, alongM: along - g.displacedM, touchAndGo: 'rolling' } });
+      return;
+    }
+    // too little runway left for the type's takeoff distance: the pilot makes a full stop instead
+    rt.landingOp = 'full_stop';
+    pilotSay(ctx, ac, touchAndGoRefusedCall(ac, { airport: ctx.state.airport }), { touchAndGoRefused: true });
+    emitEvent(ctx, { kind: 'INFO', aircraftId: ac.id, callsign: ac.callsign, severity: 'warning', speaker: 'SYSTEM', text: `${ac.callsign} unable touch and go: ${Math.round(avail / 0.3048)} ft of runway left, ${perf.takeoffDistanceFt} ft needed; full stop`, data: { touchAndGoRefused: true } });
+  }
+  rt.rollout = chooseExit(ctx, ac, g, along, ktToMps(ac.groundSpeedKt), rt.lahso?.stopAlongM, rt.exit, holdShortAlongFor(ctx, ac, g, along, rt.exitHoldShort));
+  if (rt.exit && rt.rollout.honoured === false) {
+    // JO 7110.65 3-10-9: the pilot who cannot make the instructed exit says so (and takes the exit he can make).
+    const actual = rt.rollout.holdNodeId ? ctx.state.airport.taxiwayGraph.nodes[rt.rollout.holdNodeId]?.taxiways[0] : undefined;
+    pilotSay(ctx, ac, exitUnableCall(ac, { airport: ctx.state.airport }, rt.exit, actual), { exitUnable: true });
+    emitEvent(ctx, { kind: 'INFO', aircraftId: ac.id, callsign: ac.callsign, severity: 'warning', speaker: 'SYSTEM', text: `${ac.callsign} cannot make the instructed exit: ${rt.rollout.unableReason}`, data: { exitUnable: true } });
+  }
   // distance from the LANDING threshold (the displaced one where there is one)
   const fromThr = along - g.displacedM;
   emitEvent(ctx, {
@@ -355,6 +586,8 @@ function stepRollout(ctx: SimContext, ac: Aircraft, dt: number): void {
       ac.airspeedKt = ac.groundSpeedKt;
       rt.rollout = undefined;
       rt.lahso = undefined;
+      rt.exit = undefined;
+      rt.exitHoldShort = undefined;
       setPhase(ctx, ac, 'RUNWAY_EXIT', `exit via ${graph.nodes[hold].taxiways[0] ?? exitNode.id}`);
       return;
     }
@@ -367,6 +600,8 @@ function stepRollout(ctx: SimContext, ac: Aircraft, dt: number): void {
     rt.rollout = undefined;
     setPhase(ctx, ac, 'RUNWAY_EXIT', 'stopped on runway');
     rt.lahso = undefined;
+    rt.exit = undefined;
+    rt.exitHoldShort = undefined;
     rt.calls.add('stoppedOnRunway');
   }
 }
@@ -512,6 +747,7 @@ function finalStartM(rt: AircraftRuntime, perf: AircraftPerformance): number {
 function maybeEstablishFinal(ctx: SimContext, ac: Aircraft, rt: AircraftRuntime, g: RunwayEndGeom, perf: AircraftPerformance): boolean {
   if (ac.phase === 'INBOUND' && rt.approach) setPhase(ctx, ac, 'APPROACH');
   if (ac.phase !== 'APPROACH' && ac.phase !== 'PATTERN') return false;
+  if (rt.pattern && (rt.pattern.leg === 'UPWIND' || rt.pattern.leg === 'CROSSWIND')) return false;
   const d = -alongCross(g, ac.pos).along;
   if (!(inCaptureZone(g, ac, perf) && d <= finalStartM(rt, perf) + 300)) return false;
   setPhase(ctx, ac, 'FINAL', `established runway ${g.end.id}`);
@@ -534,7 +770,7 @@ function approachGuidance(ctx: SimContext, ac: Aircraft, rt: AircraftRuntime, g:
   const d = -along;
   const startM = finalStartM(rt, perf);
   const distThr = dist(ac.pos, g.end.threshold);
-  const base = ac.target.speedKt ?? defaultSpeedKt(ac, perf, aglFt);
+  const base = ac.target.speedKt ?? followAdjustedSpeed(ctx, ac, rt, g, perf, defaultSpeedKt(ac, perf, aglFt));
   const gp = glidePathFor(ctx.state.airport, rt, g, perf);
   const tanGp = Math.tan(deg2rad(gp.angleDeg));
 
@@ -615,7 +851,7 @@ function approachGuidance(ctx: SimContext, ac: Aircraft, rt: AircraftRuntime, g:
   let interceptAlt = Math.ceil(glideAltitudeFt(g.elevationFt, startM, gp) / 100) * 100;
   const captured = inCaptureZone(g, ac, perf);
   if (ac.phase === 'PATTERN' && rt.pattern) {
-    desiredHeading = patternHeading(g, ac, rt, wind);
+    desiredHeading = patternHeading(ctx, g, ac, rt, wind);
     interceptAlt = Math.round(patternAltitudeFt(perf, g.elevationFt, ctx.state.airport.trafficPatternAltitudeFt) / 100) * 100;
   } else if (captured) {
     desiredHeading = centrelineHeading(g, ac, perf, wind);
@@ -635,21 +871,82 @@ function approachGuidance(ctx: SimContext, ac: Aircraft, rt: AircraftRuntime, g:
   return { desiredHeading, altTargetFt: altTarget, speedKt: base };
 }
 
-function patternHeading(g: RunwayEndGeom, ac: Aircraft, rt: AircraftRuntime, wind: Vec2): number {
-  const p = rt.pattern!;
-  const { along, cross } = alongCross(g, ac.pos);
+/**
+ * The aircraft told to follow traffic (JO 7110.65 3-8-1 "number two, follow ...") keeps flying downwind until its base turn would be behind
+ * the leader: the leader has turned base, or is on final already inside the point where this aircraft's base leg joins the final course
+ * (the turn point + 0.5 nm). Limited like an extended downwind (`EXTEND_LIMIT_M`).
+ */
+function followHolds(ctx: SimContext, rt: AircraftRuntime, g: RunwayEndGeom, turnAtM: number, alongM: number): boolean {
+  if (!rt.follow) return false;
+  const lead = ctx.state.aircraft[rt.follow.targetId];
+  if (!lead || lead.onGround || -alongM > EXTEND_LIMIT_M) {
+    rt.follow = undefined;
+    return false;
+  }
+  const lrt = getRuntime(ctx, lead);
+  if (lead.phase === 'PATTERN') return lrt.pattern?.leg !== 'BASE';
+  if (lead.phase === 'FINAL' || lead.phase === 'LANDING') return -(alongCross(g, lead.pos).along - g.displacedM) > turnAtM + nmToM(0.5);
+  return false;
+}
+
+
+/** Speed for an arrival that follows named traffic: slower (down to the approach speed) while it would cross the threshold before the leader is clear. */
+function followAdjustedSpeed(ctx: SimContext, ac: Aircraft, rt: AircraftRuntime, g: RunwayEndGeom, perf: AircraftPerformance, speedKt: number): number {
+  if (!rt.follow) return speedKt;
+  const lead = ctx.state.aircraft[rt.follow.targetId];
+  if (!lead || (lead.onGround && lead.occupyingRunways.length === 0)) {
+    rt.follow = undefined;
+    return speedKt;
+  }
+  if (lead.assignedRunwayEnd !== g.end.id) return speedKt;
+  const need = projectArrival(ctx.state, lead, g).tClear + ctx.pilotBehaviour.followMarginSec;
+  const myEta = dist(ac.pos, g.landingThreshold) / Math.max(ktToMps(ac.groundSpeedKt), 15);
+  if (myEta >= need) return speedKt;
+  return Math.min(speedKt, Math.max(perf.approachSpeedKt, (speedKt * myEta) / Math.max(need, 1)));
+}
+
+/**
+ * Traffic pattern (AIM 4-3-2 / 4-3-3): upwind straight ahead beyond the departure end and within 300 ft of pattern altitude, crosswind,
+ * downwind at the offset, base at `BASE_ALONG_M` behind the threshold (turn to final at least 1/4 mile out). Instructions change the legs:
+ * extend downwind (no base turn), turn base now, short approach (earlier base), a three-sixty / two-seventy turn, follow named traffic.
+ */
+function patternHeading(ctx: SimContext, g: RunwayEndGeom, ac: Aircraft, rt: AircraftRuntime, wind: Vec2): number {
+  let p = rt.pattern!;
+  const { along: alongPave, cross } = alongCross(g, ac.pos);
+  const along = alongPave - g.displacedM; // measured from the landing threshold (the displaced one at KMHT)
   const sideSign = p.side === 'left' ? -1 : 1; // left of landing direction = negative cross
   const offset = sideSign * nmToM(0.8);
+  if (p.circle) {
+    const c = p.circle;
+    c.turnedDeg += Math.abs(headingDiff(c.lastHeadingDeg, ac.headingDeg));
+    c.lastHeadingDeg = ac.headingDeg;
+    if (c.turnedDeg >= c.totalDeg - 5) rt.pattern = p = { ...p, circle: undefined };
+    else return normHeading(ac.headingDeg + (c.dir === 'left' ? -30 : 30)); // a steady turn at the type's turn rate
+  }
+  if (p.leg === 'UPWIND') {
+    const agl = ac.altitudeFt - g.elevationFt;
+    const tpaAgl = patternAltitudeFt(perfOf(ac), g.elevationFt, ctx.state.airport.trafficPatternAltitudeFt) - g.elevationFt;
+    if (alongPave >= g.lengthM && agl >= tpaAgl - CROSSWIND_TURN_BELOW_TPA_FT) rt.pattern = p = { ...p, leg: 'CROSSWIND' };
+    else return headingForTrack(g.headingDeg - clamp(cross * 0.03, -20, 20), ac.airspeedKt, wind);
+  }
+  if (p.leg === 'CROSSWIND') {
+    if (Math.abs(cross) >= Math.abs(offset) - 200) rt.pattern = p = { ...p, leg: 'DOWNWIND' };
+    else return headingForTrack(normHeading(g.headingDeg + (p.side === 'left' ? -90 : 90)), ac.airspeedKt, wind);
+  }
   if (p.leg === 'DOWNWIND') {
-    if (along <= -nmToM(1.2) && Math.abs(cross - offset) < 600) {
-      rt.pattern = { ...p, leg: 'BASE' };
+    if (p.extend && -along > EXTEND_LIMIT_M) rt.pattern = p = { ...p, extend: false };
+    const turnAt = p.short ? SHORT_BASE_ALONG_M : BASE_ALONG_M;
+    if (!p.extend && !followHolds(ctx, rt, g, turnAt, along) && along <= -turnAt && Math.abs(cross - offset) < 600) {
+      rt.pattern = p = { ...p, leg: 'BASE' };
     } else {
       const recip = normHeading(g.headingDeg + 180);
       const ang = clamp((cross - offset) * 0.04, -45, 45);
       return headingForTrack(recip + ang, ac.airspeedKt, wind);
     }
   }
-  // BASE: fly perpendicular toward the centreline.
+  // BASE: fly perpendicular toward the centreline (the final course is captured by maybeEstablishFinal; a long base captures it on the way).
+  const perf = perfOf(ac);
+  if (inCaptureZone(g, ac, perf) && -along > 150) return centrelineHeading(g, ac, perf, wind);
   const baseHdg = normHeading(g.headingDeg + (p.side === 'left' ? 90 : -90));
   return headingForTrack(baseHdg, ac.airspeedKt, wind);
 }
@@ -911,6 +1208,10 @@ function stepAirborne(ctx: SimContext, ac: Aircraft, dt: number): void {
   ac.groundSpeedKt = mpsToKt(Math.hypot(gv.x, gv.y));
   ac.trackDeg = vecToHeading(gv);
 
+  // Low approach (3-8-1): over the threshold the aircraft does not touch down but climbs out into the pattern.
+  if (g && ac.phase === 'LANDING' && rt.landingOp === 'low_approach' && agl <= 30 && alongCross(g, ac.pos).along - g.displacedM > -nmToM(0.1)) {
+    continueInPattern(ctx, ac, rt, g, 'low approach');
+  }
   // Touchdown.
   if (g && ac.phase === 'LANDING' && ac.altitudeFt <= g.elevationFt + 0.5) touchdown(ctx, ac, rt, g);
   if (g && ac.phase === 'FINAL' && ac.altitudeFt <= g.elevationFt + 0.5) {

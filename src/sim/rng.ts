@@ -35,3 +35,8 @@ export function rngInt(rng: Rng, min: number, max: number): number {
 export function rngPick<T>(rng: Rng, items: readonly T[]): T {
   return items[Math.min(items.length - 1, Math.floor(rng() * items.length))];
 }
+
+/** Deterministic number in [0,1) for a pair (seed, label): a per-aircraft decision that does not draw from the shared sim generator. */
+export function seeded01(seed: number, label: string): number {
+  return mulberry32((seed ^ hashString(label)) >>> 0)();
+}

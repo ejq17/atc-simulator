@@ -196,8 +196,12 @@ approach), go around, continue approach, contact/monitor frequency, headings, al
 speeds, pattern entries, IFR clearances (Clearance Delivery), approach clearances
 (ILS/LOC/RNAV/VOR/visual), direct-to-fix, resume own navigation, radar contact, holding
 instructions (as published or with radial/turns/legs/EFC), execute missed approach,
-land-and-hold-short (LAHSO) clearances.
-430+ parser test transmissions in `src/commands`. Positions: Clearance Delivery,
+land-and-hold-short (LAHSO) clearances. Tower vocabulary: runway exit instructions ("turn left at Charlie, contact Ground point niner",
+"hold short of runway 4" after landing), cancel takeoff clearance / abort, traffic information ("traffic, Cessna two-mile final"),
+sequencing ("number two, follow the Skyhawk", extend downwind, turn base now, make short approach, make left three sixty), closed traffic,
+touch-and-go / low approach / option, position reports ("report midfield downwind / base / two mile final"), "squawk VFR / squawk one two zero
+zero", "frequency change approved", wind and altimeter with a clearance, line up and wait with traffic information.
+660+ parser tests in `src/commands`. Positions: Clearance Delivery,
 Ground, Tower, Approach/Departure, or any combination.
 
 ## Layout

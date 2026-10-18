@@ -56,7 +56,7 @@ const r = parseTransmission('Spirit four fifty one, runway one three, cleared fo
 | turn left/right heading N, fly heading N, fly runway heading | `HEADING` (`headingDeg` 1..360, 000 -> 360; "runway heading" -> `destination: 'RUNWAY_HEADING'`, "present heading" -> `'PRESENT_HEADING'`) |
 | climb/descend/maintain [and maintain] [VFR at or below] N, flight level N | `ALTITUDE` (`altitudeFt`; FL180 -> 18000) |
 | reduce speed to N, slow to N, speed N, maintain N knots, resume normal speed | `SPEED` (`speedKt`, or `destination: 'NORMAL_SPEED'`) |
-| enter left/right downwind/base runway N, make straight in, make left traffic, report [N mile] final/downwind/base | `ENTER_PATTERN` (`patternLeg`, `turnDirection` = side, report forms set `destination: 'REPORT_...'`) |
+| enter left/right downwind/base runway N, make straight in, make left traffic | `ENTER_PATTERN` (`patternLeg`, `turnDirection` = side) |
 | pushback approved | `PUSHBACK` |
 | say again / repeat | `SAY_AGAIN` |
 | cleared [for] [the] ILS / I-L-S / localizer / RNAV [GPS] / VOR / visual [approach] [runway] N [approach] | `APPROACH` (`approachType` ILS, LOC, RNAV, VOR, VISUAL; `runwayEnd`, `runwayId`). A bare `runway N` before/after attaches like other runway instructions. Needs approachType + runway |
@@ -67,7 +67,16 @@ const r = parseTransmission('Spirit four fifty one, runway one three, cleared fo
 | `maintain N until established [on the localizer]`, `until <fix>` | the normal `ALTITUDE`, plus `destination: 'UNTIL_ESTABLISHED'` or `'UNTIL_<FIX>'` (+ `fix`) |
 | hold [at] <fix> [as published], hold <dir> of <fix> on the N radial \| localizer, right\|left turns, N minute \| N mile legs, expect further clearance [at] HHMM; "cleared to <fix>, hold ..." | `HOLD_AT_FIX` (`hold`, see below) |
 | execute [the] [published] missed approach, fly the published missed approach, go missed, "go around, fly the published missed approach" | `MISSED_APPROACH` (the go-around prefix is absorbed, no separate `GO_AROUND`) |
-| standalone squawk, ident, other "cleared ... approach" (NDB, TACAN), ambiguous `maintain 180` | `UNKNOWN` with an explanatory issue |
+| turn left\|right [at] <taxiway>, exit [left\|right] [at] <taxiway>, turn right next taxiway, if able turn left at C, left on C, continue to the end (non-standard) | `EXIT_RUNWAY` (`turnDirection`, `exitTaxiway`, `ifAble`; `destination: 'NEXT'` or `'END'`). A bare "turn left" stays an incomplete `HEADING`. 7110.65 3-10-9. "..., contact ground point niner" and "..., hold short of runway 4" are separate commands in the same transmission |
+| cancel takeoff clearance [reason], abort [the] takeoff, abort abort, reject takeoff | `CANCEL_TAKEOFF` (`reason` = the words spoken after it: "traffic on the runway"). A bare "stop" stays `HOLD_POSITION` (the engine reads it as a cancellation during the takeoff roll). 7110.65 3-9-11 |
+| traffic, [clock] [a] <type words> <position>: "two mile final", "on left base", "left downwind", "departing", "in position" | `TRAFFIC_ADVISORY` (`traffic: { desc, position, side, distanceNm }`; `desc` = the type words lower-case, "boeing 737"). The merged number "seven thirty seven six mile final" -> 7376 is split into type 737 and 6 nm. After "line up and wait" the traffic is part of the `LINE_UP_AND_WAIT` (`trafficAdvised`, `traffic`). 7110.65 3-1-6, 2-1-21, 3-9-4 |
+| [number N,] follow [the] <type> [position] | `FOLLOW_TRAFFIC` (`sequenceNumber`, `traffic`). 3-8-1 |
+| extend [your] downwind [I'll call your base], turn base [now], base now, make short approach, make [a] left\|right three sixty \| two seventy \| 360 \| 270, remain in closed traffic, make left closed traffic, left closed traffic approved | `PATTERN_INSTRUCTION` with `destination` `EXTEND_DOWNWIND`, `TURN_BASE_NOW`, `SHORT_APPROACH`, `CIRCLE` (`turnDirection`, `turnDegrees`), `CLOSED_TRAFFIC` (`turnDirection`). 3-8-1, 3-10-11 |
+| report [abeam] [midfield] downwind, report base, report N mile final, report final | `REPORT_POSITION` (`destination` `REPORT_MIDFIELD_DOWNWIND`, `REPORT_BASE`, `REPORT_FINAL` + `distanceNm`). Replaces the old `ENTER_PATTERN` with `REPORT_...`. 3-10-1 |
+| squawk VFR, squawk one two zero zero, squawk 4321 | `SQUAWK` (`squawk` four digits 0-7, `destination: 'VFR'` for "squawk VFR" = 1200); a bad code is an issue (`invalid squawk code`). "squawk ident" stays `UNKNOWN`. 5-2-1, AIM 4-1-20 |
+| [radar service terminated,] frequency change approved, change to advisory frequency approved | `FREQUENCY_CHANGE_APPROVED`. 7-6-11 |
+| wind one three zero at eight [gusts 15], wind calm, altimeter three zero one zero \| 30.10 | `AIRPORT_INFO` (`info: { windDirDeg, windSpeedKt, windGustKt, calm, altimeterInHg }`) when alone; with another instruction the information is merged into that command's `info` (`assemble.ts`) and is not a command of its own. 3-9-1, 3-10-1 |
+| standalone ident, other "cleared ... approach" (NDB, TACAN), ambiguous `maintain 180` | `UNKNOWN` with an explanatory issue |
 | anything else / empty | one `UNKNOWN` with `no recognised instruction` / `empty transmission` |
 
 **Hold-short safety.** A taxi (`TAXI` / `TAXI_TO_PARKING`) whose hold-short clause is spoken but whose point cannot be read is not a plain taxi: the clause is consumed (no separate `HOLD_SHORT`), the command carries the issue `missing hold short point (runway or taxiway)` and counts as a missing required entity (`requirements.ts`), so confidence falls to about 0.5, below the 0.70 execute threshold, and the engine asks for a say-again.
@@ -165,10 +174,11 @@ Constants live in `confidence.ts` and `callsign.ts` (`CALLSIGN_ACCEPT`).
 * **New word / alias**: add to `lexicon.ts` (airlines, GA prefixes, STT fixes in `ALIASES`, multi-word `PHRASES`, `FILLERS`).
 * **New instruction**: write a `Rule` (`(tokens, i) => Hit | null`) in a `rules-*.ts` file using `seq`, `skipWords` and `makeDraft`, add it to `buildRules` in `grammar.ts` (mind the ordering notes there), add required entities to `requirements.ts` and, if it takes a runway, to `acceptsRunway`/`lacksRunway`/`applyRunway` in `draft.ts`. Add table rows to `transmissions.test.ts`.
 * **Airport-specific validation**: pass `taxiways`, `runwayEnds`, `frequencies` in the context; extend `validate.ts` for new id types.
-* Tests: `npm test -- src/commands` (`transmissions.test.ts` for tower/ground, `ifr.test.ts` for approach / direct / IFR clearance; fixtures including `FIXES` in `testkit.ts`).
+* Tests: `npm test -- src/commands` (`transmissions.test.ts` for tower/ground, `towerVocab.test.ts` for exit / cancel / traffic / pattern / report / squawk / information, `ifr.test.ts` for approach / direct / IFR clearance; fixtures including `FIXES` in `testkit.ts`).
 
 ## Known limits
 
-* `ParsedCommand` has no field for "at or below" altitude restrictions, pattern side on `base`, or runway-less "report" legs; these are encoded in `turnDirection`/`destination` or dropped (see report).
+* `ParsedCommand` has no field for "at or below" altitude restrictions or pattern side on `base`; these are encoded in `turnDirection`/`destination` or dropped. Not parsed: "unable closed traffic", "circle the airport", "cleared ... , traffic holding in position" as an instruction of its own, the pilot's "have numbers".
+* Traffic descriptions are matched by the engine, not the parser: the parser only keeps the words ("boeing 737", "skyhawk") and the position clause.
 * Conditional clauses ("behind the landing traffic", "after departure") are not modelled; their words show up as `unrecognised words`.
 * Two-letter taxiway names and runway designators with parallel suffixes are only lightly supported.

@@ -21,6 +21,7 @@ export const AVIATION_KEYWORDS = [
   'takeoff', 'landing', 'squawk', 'taxiway', 'short', 'wait', 'line',
   'traffic', 'wilco', 'roger', 'expedite', 'altitude', 'frequency', 'ident',
   'tree', 'fife', 'flight', 'level', 'turn', 'left', 'right', 'direct',
+  'cancel', 'abort', 'extend', 'downwind', 'base', 'follow', 'report', 'midfield', 'altimeter', 'wind', 'closed', 'option',
   ...PHONETIC_ALPHABET,
 ] as const;
 
@@ -36,6 +37,8 @@ export const AVIATION_KEYTERMS: readonly string[] = [
   'contact departure', 'contact approach', 'go around', 'squawk', 'ident',
   'heading', 'maintain', 'expedite', 'wilco', 'roger', 'traffic',
   'readback', 'say again', 'flight level', 'frequency',
+  'cancel takeoff clearance', 'extend downwind', 'turn base now', 'make short approach', 'frequency change approved', 'squawk VFR',
+  'number two, follow', 'cleared for the option',
 ];
 
 const KEYWORD_SET = new Set<string>(AVIATION_KEYWORDS);

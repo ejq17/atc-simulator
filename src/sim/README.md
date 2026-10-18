@@ -534,6 +534,63 @@ after touchdown on the fixture; A320 ~30 s.
   so a follower turning into a hold-short queue stops its following distance back instead of 13 m behind. `conflicts.sameQueue` also treats a
   follower creeping below 8 kt behind a stopped leader as queueing.
 
+## Tower vocabulary (`towerCommands.ts`, `flightDynamics.ts`, `traffic.ts`)
+
+Planners for the Tower instructions of the 2026-10-18 round, with the FAA source in each code comment (docs/FAA-REFERENCES.md,
+docs/PHRASEOLOGY-AUDIT.md section G, docs/BEHAVIOUR-ACCURACY.md T8, T11, T13-T17, G9, F11). All seeded decisions use
+`seeded01(aircraft.seed, label)` (`rng.ts`), never the shared generator, so existing runs keep their random sequence.
+
+* **Runway exits (`EXIT_RUNWAY`, 3-10-9).** `runwayExits(ctx, g)` lists the exits of the landing runway (runway node, along distance,
+  the hold nodes with their side: left/right of the landing direction). `chooseExit(..., exit, holdShortAlong)` takes the instructed
+  exit (taxiway, side, "next", "to the end" = the last one) when the aircraft can slow to the exit speed within the maximum braking and
+  returns `honoured: false` + `unableReason` otherwise. The command sets `rt.exit`; on the ground it replans the rollout at once (refused
+  if not possible), on final the check is made at touchdown and the pilot calls "unable charlie, will exit at alpha"
+  (`exitUnableCall`). "Hold short of runway N" during FINAL / LANDING / ROLLOUT (`planLandingHoldShort`) sets `rt.exitHoldShort`: the
+  exits beyond that runway's surface are dropped and the no-exit stop line is 60 m + half the aircraft length short of it; refused
+  ("we can't hold short of runway N") when `startAlong + v^2 / (2 x max braking)` would pass the line. "Contact Ground" in the same
+  transmission sets `pendingFreq.afterClear`: `applyPendingFrequencyChanges` waits for the end of the rollout and the runway to be clear.
+* **Cancel takeoff (`CANCEL_TAKEOFF`, 3-9-11).** `planCancelTakeoff`: CLEARED_FOR_TAKEOFF -> LINE_UP_AND_WAIT (new legal transitions in
+  `stateMachines.ts`); TAKEOFF_ROLL -> LINE_UP_AND_WAIT with `rt.aborting` while `stepAbort` brakes at `MAX_BRAKE_FACTOR` x the landing
+  deceleration along the centreline, then the pilot reports. Decision rule: airspeed below `rotateSpeedKt` (14 CFR 25.107(e)(1)(i): V1 <= VR;
+  V1 itself is not tabulated) and `1.5 s x v + v^2 / (2a)` within the runway left less 60 m; otherwise "unable ..., continuing". After the
+  roll started the instruction needs a reason or a hazard (another aircraft on the runway) else it is flagged (training: refused).
+  `HOLD_POSITION` ("stop") in CLEARED_FOR_TAKEOFF / TAKEOFF_ROLL is routed to the same planner (the clearance's kind becomes CANCEL_TAKEOFF).
+* **Traffic information (`TRAFFIC_ADVISORY`, `FOLLOW_TRAFFIC`, 3-1-6, 7-2-1, 3-8-1).** `matchTraffic` finds the described aircraft from the type
+  words (`describeWords`: spoken callsign, callsign, type words) and `trafficGeometry` (pattern leg, final distance, on the runway ...);
+  `lookForTraffic` gives the pilot's answer (range from the visibility, bearing from the nose, seeded chance); "looking" sets
+  `rt.trafficLook` and `towerVocabularyCalls` (traffic.ts) makes the second call. A follow instruction needs the traffic in sight and sets
+  `rt.follow`; `patternHeading` holds the base turn while the leader has not turned base / passed the join point (`followHolds`) and
+  `followAdjustedSpeed` slows the follower so that it crosses the threshold `pilotBehaviour.followMarginSec` after the leader is clear. Pattern distances are measured from the landing threshold (`RunwayEndGeom.landingThreshold` / `displacedM`, so KMHT's displaced thresholds count) and the pattern altitude is `patternAltitudeFt` of the type (published TPA when the airport data has one).
+* **Pattern (`PATTERN_INSTRUCTION`, `REPORT_POSITION`, closed traffic).** `rt.pattern` has legs UPWIND, CROSSWIND, DOWNWIND, BASE and the
+  flags `extend`, `short`, `circle` (see `PatternState` in `context.ts`; AIM 4-3-2 / 4-3-3 geometry). ENTER_PATTERN from a go-around (or a low
+  departure) starts on UPWIND. LAND carries the operation (`rt.landingOp`: full stop, touch-and-go, low approach, stop-and-go (= full stop),
+  option (seeded touch-and-go or full stop)); a touch-and-go / low approach calls `continueInPattern` (LANDING -> PATTERN, UPWIND on the
+  `rt.closedTraffic` side, left by default) and a departure with `rt.closedTraffic` joins the upwind leg at lift-off
+  (`startClosedTrafficPattern`). Requested reports are `rt.reports`; `towerVocabularyCalls` fires them at midfield abeam (along <= half the
+  runway), when `rt.pattern.leg` becomes BASE, or at the requested distance on final.
+* **Frequency, squawk, information.** `FREQUENCY_CHANGE_APPROVED` (airborne VFR only): `handedOff`, then a silent `pendingFreq` with
+  `NO_FREQUENCY_MHZ` (0): the aircraft is on no ATC frequency (the dataset has no advisory frequency for KACY / KMHT and none is invented),
+  a HANDOFF event says it left the frequency, no check-in follows, the strip moves to the OTHER bay and it despawns as handled. `SQUAWK` sets
+  `ac.squawk` (and the flight plan's). `info` (wind / altimeter) on a command or `AIRPORT_INFO`: `rt.haveNumbers`; a mismatch with the
+  observation is an improper-instruction flag. Light VFR pilots (`pilotBehaviour.noAtisFraction`) do not give the ATIS code and, after
+  `numbersRequestAfterSec` of waiting on Tower, ask once for wind and altimeter.
+* **Touch-and-go ground roll.** At touchdown with a touch-and-go (or an option the pilot resolves that way) `touchdown()` checks the runway
+  ahead: it must hold the type's `takeoffDistanceFt` and the whole roll (`touchAndGoRollM`), less 60 m. If not, the pilot says "unable touch and
+  go, not enough runway, full stop" and rolls out normally. Otherwise the aircraft stays in ROLLOUT on the ground (`rt.tgo`, `stepTouchAndGo`):
+  `TGO_DECEL_SEC` = 3 s of normal landing deceleration, `TGO_RECONFIGURE_SEC` = 3 s at that speed, then takeoff acceleration to
+  `rotateSpeedKt`, lift-off and `continueInPattern` (ROLLOUT -> PATTERN). These two intervals are design values, not FAA figures. The runway
+  is occupied for the whole roll (runway occupancy and same-runway separation see a landed aircraft on it); wind is ignored during the roll.
+* **Pilot behaviour tuning (`pilotBehaviour.ts`, `Scenario.pilotBehaviour`).** The probabilities and times that make simulated pilots imperfect
+  are DESIGN VALUES (the FAA text defines the situations, not the rates), gathered in one object with these defaults: `noAtisFraction` 0.4,
+  `numbersRequestAfterSec` 20, `followMarginSec` 10, and `look` { `maxRangeSm` 10, `pAhead` 0.95 within `aheadDeg` 60 of the nose, `pSide` 0.6 within
+  `sideDeg` 110, `pBehind` 0.2, x`altFactor` 0.5 above `altDiffFt` 3000, x`farFactor` 0.7 beyond `farShare` 0.6 of the range, `immediateShare` 0.6
+  of the probability seen at once, otherwise acquired `acquireMinSec` 6 + up to `acquireSpreadSec` 10 s later }. A scenario overrides any subset
+  (`pilotBehaviour: { noAtisFraction: 0, look: { pAhead: 1 } }`) so a later task can scale them by difficulty. The touch-and-go roll intervals
+  (`TGO_*`) and the 0.75 nm "turn base now" minimum are also design values but are constants in `flightDynamics.ts` / `towerCommands.ts`.
+* **LUAW (3-9-4).** `luawTrafficIssue`: closest airborne arrival / pattern aircraft for the same runway within 6 nm (`LUAW_TRAFFIC_NM`)
+  needs traffic information (`trafficAdvised`, or a traffic advisory in the last 15 s); free play flags, training refuses. After
+  `LUAW_LIMIT_SEC` = 90 s lined up and stationary the pilot asks for intentions.
+
 ## Landing rollout and runway exit
 
 Braking follows the sourced landing distances (A320 6 kt/s, C172 4.4 kt/s; maximum braking = 1.4x). At touchdown `chooseExit` takes the
@@ -570,9 +627,10 @@ surface carry `onRunwayId`; parking nodes of kind `parking`; GND/TWR frequencies
 * Performance tables carry `source:` comments per changed value (data/sources/aircraft-performance.json, docs/REALISM-VERIFICATION.md); A320 roll ~35 s / ~1.3 km to rotation, takeoff distance 5,000 ft (refused from an intersection of KACY 4/22 with less remaining).
 * Simplified physics: first-order heading/vertical dynamics, constant accelerations, no density altitude,
   steady wind (gusts ignored), no wake turbulence, no braking-action effects.
-* Takeoff abort and rejected landings on the runway are not modelled; an aircraft told to line up cannot be
-  told to exit the runway again (no such command yet).
-* Pattern work is minimal (downwind -> base -> final, fixed 0.8 nm offset); holding patterns are not flown.
+* Rejected landings on the runway are not modelled (a rejected takeoff is, see Tower vocabulary); an aircraft told to line up cannot be
+  told to exit the runway again except by a taxi instruction from the position it stopped in.
+* Pattern work: upwind, crosswind, downwind, base, final with a fixed 0.8 nm offset and one pattern altitude (1,000 ft AGL) for every type; no overhead
+  maneuver, no parallel-runway patterns; a touch-and-go is a low pass (no ground roll). Holding patterns are flown (holding.ts).
 * Pushback is a state change only (no motion). No vehicles, no de-icing, no helicopters.
 * After a go-around the aircraft flies runway heading at a fixed altitude until instructed.
 * IFR: no procedure turns, DME arcs, STARs, speed restrictions per fix (published fix altitudes on approaches are flown); one transponder code per aircraft, no radar coverage model (everything is "radar
