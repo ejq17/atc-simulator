@@ -11,8 +11,9 @@ import { assessClearanceSafety } from '../sim/conflicts';
 import { isRotorcraftType, isVehicleType, patternAltitudeFt, getPerformance } from '../sim/performance';
 import { findRunwayEnd } from '../sim/runways';
 import { digitsSpoken } from '../radio/spoken';
-import { cardinal, distancePointToSegment, mToNm, trueToMagnetic, dist } from '../sim/geo';
+import { cardinal, mToNm, trueToMagnetic, dist } from '../sim/geo';
 import { clearBearingFrom } from '../sim/rotorcraft';
+import { fixedWingNearTrack } from '../sim/helicopterSeparation';
 import { closedTaxiways } from '../sim/airportOps';
 import { frequencyForPosition } from '../radio/frequencies';
 import { hasActive, mkCmd } from './core';
@@ -32,19 +33,18 @@ export function transitSquawk(ac: Aircraft): string {
   return code === '1200' ? '2100' : code;
 }
 
-/** A helicopter's straight path is clear of aeroplanes: none airborne within `PATH_CLEAR_NM` of the segment, none rolling on a runway the segment passes near. */
-const PATH_CLEAR_NM = 1.2;
 /** A transit is released once this far out and moving away (nm). */
 const TERMINATE_NM = 8;
-/** An inbound helicopter without a landing clearance hovers when this close to its pad (nm; design value). */
-const HOVER_HOLD_NM = 1.5;
+/** An inbound helicopter without a landing clearance hovers when this close to its pad (nm; design value): the pads lie within 1 nm of the runway tracks, so it waits outside them. */
+const HOVER_HOLD_NM = 7;
+
+/**
+ * A helicopter's straight path is clear when no fixed-wing aircraft is rolling or airborne below the helicopter band within the separation distance of it
+ * (`helicopterSeparation.ts`; pattern traffic at 1,000 ft AGL or higher is 500 ft or more above a helicopter that has levelled at 400 ft AGL and does not
+ * block it).
+ */
 export function heliPathClear(state: SimulationState, from: Vec2, to: Vec2, exceptId: string): boolean {
-  for (const o of Object.values(state.aircraft)) {
-    if (o.id === exceptId || isRotorcraftType(o.type) || isVehicleType(o.type)) continue;
-    if (o.onGround && o.phase !== 'TAKEOFF_ROLL' && o.phase !== 'ROLLOUT') continue;
-    if (mToNm(distancePointToSegment(o.pos, from, to)) < PATH_CLEAR_NM && (!o.onGround || o.groundSpeedKt > 20)) return false;
-  }
-  return true;
+  return fixedWingNearTrack(state, [from, to], exceptId, true).length === 0;
 }
 
 function windPhrase(v: AgentView): say.Phrase {
@@ -154,8 +154,10 @@ function heliPlans(v: AgentView, ac: Aircraft, position: ControllerPositionId): 
   if (position === 'TWR' && ac.onGround && ac.phase === 'READY' && pending?.kind === 'DEPARTURE' && stationary(ac)) {
     const bearing = clearBearingFrom(airport, ac.pos, 180);
     const hovering = Object.values(state.aircraft).some((o) => o.id !== ac.id && isRotorcraftType(o.type) && !o.onGround && o.altitudeFt - airport.elevationFt < 100 && dist(o.pos, ac.pos) < 150);
-    if (bearing !== undefined && !hovering) {
-      const mag = Math.round(trueToMagnetic(bearing, airport.magneticVariationDeg));
+    const magB = bearing === undefined ? 0 : Math.round(trueToMagnetic(bearing, airport.magneticVariationDeg));
+    const takeoffCmd = mkCmd('TAKEOFF', ac, { headingDeg: magB === 0 ? 360 : magB });
+    if (bearing !== undefined && !hovering && assessClearanceSafety(state, takeoffCmd).safe) {
+      const mag = magB;
       const pad = airport.parking.find((p) => dist(p.pos, ac.pos) < 12);
       const turn: 'left' | 'right' = Math.sin(((bearing - ac.headingDeg) * Math.PI) / 180) >= 0 ? 'right' : 'left';
       plans.push({
@@ -189,20 +191,20 @@ function heliPlans(v: AgentView, ac: Aircraft, position: ControllerPositionId): 
     }
   }
   // Close to the pad without a landing clearance (traffic near its path): hover until cleared.
-  if (position === 'TWR' && !ac.onGround && !ac.isDeparture && ac.phase === 'INBOUND' && !hasActive(ac, 'LAND') && !hasActive(ac, 'HOLD_POSITION')) {
+  if (position === 'TWR' && !ac.onGround && !ac.isDeparture && ac.phase === 'INBOUND') {
     const pad = airport.parking.find((p) => p.id === ac.flags.padId);
-    if (pad && dist(ac.pos, pad.pos) < HOVER_HOLD_NM * 1852 && ac.airspeedKt > 20) {
+    if (pad && dist(ac.pos, pad.pos) < HOVER_HOLD_NM * 1852 && dist(ac.pos, pad.pos) > 1852 && ac.airspeedKt > 20 && !heliPathClear(state, ac.pos, pad.pos, ac.id)) {
       plans.push({ key: `${ac.id}:heli-hold`, aircraftId: ac.id, callsign: ac.callsign, priority: 90, cmds: [mkCmd('HOLD_POSITION', ac)], phrase: say.holdPosition(ac), cooldownSec: 60, summary: `${ac.callsign} hold position` });
     }
   }
   // Landing at the pad: Tower, 3-11-6. Wait (hover) when an aeroplane is near the helicopter's straight path.
-  if (position === 'TWR' && !ac.onGround && !ac.isDeparture && (ac.phase === 'INBOUND' || ac.phase === 'APPROACH') && !hasActive(ac, 'LAND')) {
+  if (position === 'TWR' && !ac.onGround && !ac.isDeparture && (ac.phase === 'INBOUND' || ac.phase === 'APPROACH') && (!hasActive(ac, 'LAND') || ac.airspeedKt < 5)) {
     const pad = airport.parking.find((p) => p.id === ac.flags.padId);
     if (pad && pending?.kind === 'LANDING') {
       const occupied = Object.values(state.aircraft).some((o) => o.id !== ac.id && o.onGround && dist(o.pos, pad.pos) < 15);
       if (!occupied && heliPathClear(state, ac.pos, pad.pos, ac.id)) {
         plans.push({
-          key: `${ac.id}:heli-land`, aircraftId: ac.id, callsign: ac.callsign, priority: 65, once: true,
+          key: `${ac.id}:heli-land:${ac.clearances.filter((c) => c.kind === 'LAND').length}`, aircraftId: ac.id, callsign: ac.callsign, priority: 65, once: true,
           cmds: [mkCmd('LAND', ac, { destination: pad.id })], phrase: say.heliLand(ac, pad.name.replace(/^USCG/i, 'Coast Guard')), summary: `${ac.callsign} cleared to land at ${pad.name}`,
         });
       }

@@ -20,7 +20,8 @@ import { TAXI_PHASES } from './stateMachines';
 import { activeClearance, emitEvent, perfOf } from './context';
 import { activeClosures } from './airportOps';
 import { isDaylight, simUtcMs } from './solar';
-import { getPerformance, isVehicleType, lineUpTimeSec, srsCategory, wakeRecatCategory } from './performance';
+import { fixedWingNearTrack, helicopterTrack, lowHelicoptersNearTrack, runwayDepartureTrack, runwayFinalTrack, HELI_LATERAL_NM } from './helicopterSeparation';
+import { getPerformance, isRotorcraftType, isVehicleType, lineUpTimeSec, srsCategory, wakeRecatCategory } from './performance';
 import { wakeMinimumNm } from './wake';
 import type { RunwayEndGeom } from './runways';
 import type { SimContext } from './context';
@@ -52,6 +53,7 @@ export interface SafetyAssessment {
 
 const FINAL_TAKEOFF_NM = 2;
 const FINAL_CROSSING_NM = 3;
+const REF_HELI = 'JO 7110.65 3-11-1 / AIM 4-3-17 (helicopters avoid the flow of fixed-wing aircraft); 7-8-3 (500 ft); 7-2-1 visual separation not applied';
 /** A vehicle sent onto a runway stays for minutes (a runway inspection): no arrival on final inside this range (nm) and no traffic in the pattern (design value). */
 const FINAL_PROCEED_NM = 8;
 
@@ -410,6 +412,18 @@ export function assessClearanceSafety(state: SimulationState, cmd: ParsedCommand
   if (cmd.kind === 'HEADING' || cmd.kind === 'ALTITUDE') return assessMva(state, ac, cmd);
   const activity = computeRunwayActivity(state);
 
+  if (cmd.kind === 'TAKEOFF' && isRotorcraftType(ac.type) && !findRunwayEnd(airport, cmd.runwayEnd ?? cmd.runwayId)) {
+    // A helicopter lift-off (3-11-2): not while fixed-wing traffic is rolling or low near its first 4 nm.
+    const bearing = cmd.headingDeg !== undefined ? magneticToTrue(cmd.headingDeg, airport.magneticVariationDeg) : ac.headingDeg;
+    const fw = fixedWingNearTrack(state, helicopterTrack(ac.pos, bearing), ac.id, true);
+    if (fw.length) {
+      issues.push({
+        kind: 'RUNWAY_CONFLICT', aircraftIds: [ac.id, ...fw.map((o) => o.id)],
+        text: `Takeoff clearance for helicopter ${ac.callsign} with ${cs(state, fw.map((o) => o.id))} rolling or low within ${HELI_LATERAL_NM} nm of its departure path`, reference: REF_HELI,
+      });
+    }
+    return { safe: issues.length === 0, issues };
+  }
   let runwayId: string | undefined;
   if (cmd.kind === 'TAKEOFF' || cmd.kind === 'LINE_UP_AND_WAIT' || cmd.kind === 'LAND') {
     const g = findRunwayEnd(airport, cmd.runwayEnd ?? cmd.runwayId ?? ac.assignedRunwayEnd);
@@ -516,6 +530,20 @@ export function assessClearanceSafety(state: SimulationState, cmd: ParsedCommand
         if (holdShortIds.includes(other.id)) continue;
         issues.push(...intersectingIssues(state, ac, cmd.kind, gEnd, other));
         issues.push(...crossingAgainstIssues(state, ac, cmd.kind, gEnd, other, activity));
+      }
+    }
+  }
+  // A helicopter low near the departure track / final approach course (helicopterSeparation.ts): the clearance waits until it has passed.
+  if (cmd.kind === 'TAKEOFF' || cmd.kind === 'LAND') {
+    const gH = findRunwayEnd(airport, cmd.runwayEnd ?? cmd.runwayId ?? ac.assignedRunwayEnd);
+    if (gH && !isRotorcraftType(ac.type)) {
+      const heli = lowHelicoptersNearTrack(state, cmd.kind === 'TAKEOFF' ? runwayDepartureTrack(gH) : runwayFinalTrack(gH), ac.id);
+      if (heli.length) {
+        issues.push({
+          kind: 'RUNWAY_CONFLICT', aircraftIds: [ac.id, ...heli.map((h) => h.id)], runwayId,
+          text: `${cmd.kind === 'TAKEOFF' ? 'Takeoff' : 'Landing'} clearance for ${ac.callsign} with ${cs(state, heli.map((h) => h.id))} hovering / flying low within ${HELI_LATERAL_NM} nm of the ${cmd.kind === 'TAKEOFF' ? 'departure path' : 'final approach course'} of runway ${gH.end.id}`,
+          reference: REF_HELI,
+        });
       }
     }
   }

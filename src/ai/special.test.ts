@@ -206,9 +206,11 @@ describe('safety of the AI with special traffic', () => {
 
   it('a helicopter path is clear only when no aeroplane is near it (hold position until it is)', async () => {
     const { heliPathClear } = await import('./special');
-    const state = { aircraft: { a: { id: 'a', type: 'C172', onGround: false, pos: { x: 1000, y: 0 }, groundSpeedKt: 90 } } } as never;
+    const state = { airport: { elevationFt: 75 }, aircraft: { a: { id: 'a', type: 'C172', onGround: false, pos: { x: 1000, y: 0 }, altitudeFt: 575, groundSpeedKt: 90 }, b: { id: 'b', type: 'C172', onGround: false, pos: { x: 1000, y: 100 }, altitudeFt: 1575, groundSpeedKt: 90 } } } as never;
     expect(heliPathClear(state, { x: 0, y: 0 }, { x: 2000, y: 0 }, 'h')).toBe(false); // an aeroplane on the segment
     expect(heliPathClear(state, { x: 0, y: 5000 }, { x: 2000, y: 5000 }, 'h')).toBe(true);
+    // pattern traffic 1,500 ft above the helicopter's level does not block it
+    expect(heliPathClear({ ...(state as object), aircraft: { b: (state as { aircraft: { b: unknown } }).aircraft.b } } as never, { x: 0, y: 0 }, { x: 2000, y: 0 }, 'h')).toBe(true);
   });
 });
 
@@ -224,4 +226,53 @@ describe('vehicle queueing (several vehicles at once, seeds 11-15)', () => {
     expect(alerts.map((e) => `${e.timeSec} ${e.text}`), log).toEqual([]);
     expect(done, log).toBe(true);
   }, 60000);
+});
+
+describe('helicopter versus runway traffic (JO 7110.65 3-11 / 7-8-3; src/sim/helicopterSeparation.ts)', () => {
+  it('a helicopter ready for departure waits on its pad while an A320 is cleared for takeoff on the runway whose path its bearing is near, then lifts off after it has passed', () => {
+    const h = createHarness({
+      spawns: [
+        { atSec: 0, callsign: 'NKS500', type: 'A320', flightRules: 'VFR', isDeparture: true, initialFrequencyId: 'TWR', start: { kind: 'holding_short', nodeId: 'HP13-31-B-1', runwayEnd: '13' } },
+        heli('CGD61390', { kind: 'helicopter', padId: 'USCG-2', mission: 'DEPARTURE' }, { kind: 'parked', parkingId: 'USCG-2' }, { atSec: 0 }),
+      ], player: [], activeRunways: { departing: ['13'], landing: ['13'] },
+    });
+    let heliCleared = -1;
+    let jetCleared = -1;
+    let jetAglAtHeli = NaN;
+    let jetDistAtHeli = NaN;
+    h.runUntil(() => {
+      const ev = h.events;
+      if (jetCleared < 0) jetCleared = ev.find((e) => e.kind === 'COMMAND_ACCEPTED' && /NKS500: TAKEOFF/.test(e.text))?.timeSec ?? -1;
+      if (heliCleared < 0) {
+        heliCleared = ev.find((e) => e.kind === 'COMMAND_ACCEPTED' && /CGD61390: TAKEOFF/.test(e.text))?.timeSec ?? -1;
+        const jet = h.find('NKS500');
+        const heliAc = h.find('CGD61390');
+        if (heliCleared > 0 && jet && heliAc) {
+          jetAglAtHeli = jet.altitudeFt - kacy.elevationFt;
+          jetDistAtHeli = Math.hypot(jet.pos.x - heliAc.pos.x, jet.pos.y - heliAc.pos.y) / 1852;
+        }
+      }
+      return heliCleared > 0 && (h.find('CGD61390')?.altitudeFt ?? 0) - kacy.elevationFt > 380;
+    }, 900);
+    const log = timeline(h);
+    expect(jetCleared, log).toBeGreaterThan(0);
+    expect(heliCleared, log).toBeGreaterThan(jetCleared); // the helicopter waited
+    // when the helicopter was cleared the jet was beyond the helicopter band or farther than the separation distance
+    expect(jetAglAtHeli > 900 || jetDistAtHeli > 1.8 || h.find('NKS500') === undefined, log).toBe(true);
+    expect(h.events.filter((e) => e.kind === 'SEPARATION_VIOLATION' && /CGD61390/.test(e.text)), log).toEqual([]);
+  });
+
+  it('a runway takeoff is not cleared while a helicopter hovers or climbs low beside its departure path (the safety check)', async () => {
+    const { assessClearanceSafety } = await import('../sim/conflicts');
+    const h = createHarness({
+      spawns: [
+        { atSec: 0, callsign: 'NKS500', type: 'A320', flightRules: 'VFR', isDeparture: true, initialFrequencyId: 'TWR', start: { kind: 'holding_short', nodeId: 'HP13-31-B-1', runwayEnd: '13' } },
+        { atSec: 0, callsign: 'CGD61391', type: 'H65', flightRules: 'VFR', isDeparture: false, initialFrequencyId: 'TWR', start: { kind: 'airborne', pos: { x: 600, y: -300 }, altitudeFt: 475, headingDeg: 0, speedKt: 0 }, behavior: { kind: 'helicopter', padId: 'USCG-3', mission: 'ARRIVAL' } },
+      ], player: [], mode: 'training',
+    });
+    h.run(2);
+    const a = assessClearanceSafety(h.engine.getState(), { kind: 'TAKEOFF', callsign: 'NKS500', runwayEnd: '13', runwayId: '13/31', confidence: 1, rawText: '', normalizedText: '', issues: [] });
+    expect(a.safe).toBe(false);
+    expect(a.issues.map((i) => i.text).join(' ')).toMatch(/CGD61391|Coast Guard|hovering/);
+  });
 });

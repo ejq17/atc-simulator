@@ -18,6 +18,7 @@ import { bearingDeg, mToNm, clamp, dist, headingDiff, headingToVec, ktToMps, mag
 import { advancePhase, completeClearances, emitEvent, getRuntime, perfOf, pilotSay, setPhase } from './context';
 import type { AircraftRuntime, SimContext } from './context';
 import { isRotorcraftType } from './performance';
+import { HELI_LEVEL_AGL_FT } from './helicopterSeparation';
 import type { Env, PlanResult } from './commandExecutor';
 import { unable } from './commandExecutor';
 import { heliAirTaxiRequestCall, heliDepartureRequestCall, heliInboundCall } from '../radio/specialCalls';
@@ -43,8 +44,8 @@ export const HELI_APPROACH_ANGLE_DEG = 6;
 const APPROACH_DECEL_MPS2 = 1.2;
 /** Within this distance of the pad centre the helicopter stops translating and descends vertically (m). */
 const PAD_CAPTURE_M = 6;
-/** Climb-out target (ft above the field) after a helicopter lift-off: design value. */
-export const HELI_CLIMBOUT_AGL_FT = 1000;
+/** Climb-out level (ft above the field) after a helicopter lift-off: the helicopter's level of `helicopterSeparation.ts` (400 ft AGL, under the 500 ft AGL helicopter pattern of AIM 4-3-3, 500 ft or more below a 1,000 ft AGL pattern). Design value. */
+export const HELI_CLIMBOUT_AGL_FT = HELI_LEVEL_AGL_FT;
 
 export const isRotorcraft = (ac: Pick<Aircraft, 'type'>): boolean => isRotorcraftType(ac.type);
 
@@ -139,7 +140,7 @@ function stepLiftoff(ctx: SimContext, ac: Aircraft, rt: AircraftRuntime, h: Heli
   rt.navMode = 'HEADING';
   rt.takeoffCleared = false;
   ac.target.headingDeg = lo.headingDeg;
-  ac.target.altitudeFt = Math.round((elev + HELI_CLIMBOUT_AGL_FT) / 100) * 100;
+  ac.target.altitudeFt = Math.ceil((elev + HELI_CLIMBOUT_AGL_FT) / 50) * 50;
   ac.target.speedKt = undefined;
   setPhase(ctx, ac, 'TAKEOFF_ROLL', 'lift-off');
   setPhase(ctx, ac, 'INITIAL_CLIMB', 'airborne');

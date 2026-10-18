@@ -15,6 +15,7 @@ import type { Rng } from '../sim/rng';
 import { activeClosures } from '../sim/airportOps';
 import { getPerformance, patternAltitudeFt } from '../sim/performance';
 import { clearBearingFrom } from '../sim/rotorcraft';
+import { HELI_LEVEL_AGL_FT } from '../sim/helicopterSeparation';
 import { bearingDeg, dist, headingToVec, trueToMagnetic } from '../sim/geo';
 import { finalPosition, NM, norm360, randomNNumber } from './world';
 import { profileFor } from './airportProfile';
@@ -116,13 +117,13 @@ export function createSpecialTrafficGenerator(scenario: GameScenario, airport: A
       const brg = clearBearingFrom(airport, pad.pos, 180);
       if (brg === undefined) return undefined;
       const v = headingToVec(brg);
-      const pos = { x: pad.pos.x + v.x * 5 * NM, y: pad.pos.y + v.y * 5 * NM };
+      const pos = { x: pad.pos.x + v.x * 8 * NM, y: pad.pos.y + v.y * 8 * NM };
       if (!airborneClear(state, pos)) return undefined;
       reserved.set(pad.id, now);
       used.add(cs);
       return {
         atSec: now, callsign: cs, type: 'H65', flightRules: 'VFR', isDeparture: false, initialFrequencyId: towerFreq, initialRequest: 'LANDING',
-        start: { kind: 'airborne', pos, altitudeFt: Math.round((airport.elevationFt + 1000) / 100) * 100, headingDeg: norm360(brg + 180), speedKt: 100 },
+        start: { kind: 'airborne', pos, altitudeFt: Math.ceil((airport.elevationFt + HELI_LEVEL_AGL_FT) / 50) * 50, headingDeg: norm360(brg + 180), speedKt: 100 },
         behavior: { kind: 'helicopter', padId: pad.id, mission: 'ARRIVAL' },
       };
     }
