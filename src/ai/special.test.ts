@@ -211,3 +211,17 @@ describe('safety of the AI with special traffic', () => {
     expect(heliPathClear(state, { x: 0, y: 5000 }, { x: 2000, y: 5000 }, 'h')).toBe(true);
   });
 });
+
+describe('vehicle queueing (several vehicles at once, seeds 11-15)', () => {
+  it.each([11, 12, 13, 14, 15])('seed %i: six vehicles of every task share the airfield with no proximity alert and all finish', (seed) => {
+    const homes = ['FAA-1', 'FAA-2', 'FAA-3', 'FBO-1', 'FBO-2', 'FAA-1'];
+    const tasks: ('RUNWAY_INSPECTION' | 'PAVEMENT_INSPECTION' | 'ERRAND')[] = ['PAVEMENT_INSPECTION', 'RUNWAY_INSPECTION', 'PAVEMENT_INSPECTION', 'ERRAND', 'RUNWAY_INSPECTION', 'PAVEMENT_INSPECTION'];
+    const spawns = tasks.map((t, i) => vehicle(`APT${10 + i * 7}`, homes[i], t, { atSec: i * (i === 5 ? 700 : 20) }));
+    const h = createHarness({ spawns, player: [], seed, aiSeed: seed });
+    const done = h.runUntil(() => Object.values(h.engine.getState().aircraft).every((a) => a.type !== 'VEH'), 9000);
+    const log = timeline(h);
+    const alerts = h.events.filter((e) => (e.kind === 'SEPARATION_VIOLATION' || e.kind === 'RUNWAY_INCURSION') && /APT/.test(e.text));
+    expect(alerts.map((e) => `${e.timeSec} ${e.text}`), log).toEqual([]);
+    expect(done, log).toBe(true);
+  }, 60000);
+});

@@ -194,7 +194,7 @@ export function spawnFromSpec(ctx: SimContext, spec: SpawnSpec): Aircraft {
     seed: Math.floor(rng() * 2147483647),
   };
   // A student pilot: forced by the spawn, else a seeded share of light VFR aircraft (pilot realism studentShare). Own seeded draw: the sim's generator is untouched.
-  const student = spec.student ?? (spec.flightRules === 'VFR' && perf.category === 'light' && seeded01(ac.seed, 'student') < ctx.pilotBehaviour.realism.studentShare);
+  const student = spec.student ?? (spec.flightRules === 'VFR' && perf.category === 'light' && !perf.craft && !perf.military && seeded01(ac.seed, 'student') < ctx.pilotBehaviour.realism.studentShare);
   if (student) ac.student = true;
   if (ctx.pilotBehaviour.realism.level !== 'off') ac.flags.inContact = false;
   const rt = newRuntime(now + 2 + rng() * 4);

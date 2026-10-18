@@ -17,7 +17,9 @@ import { closedTaxiways } from '../sim/airportOps';
 import { frequencyForPosition } from '../radio/frequencies';
 import { hasActive, mkCmd } from './core';
 import type { Agent, AgentView, Plan } from './core';
-import { busyHoldIds, holdNodeAt, planDeparture } from './world';
+import { busyHoldIds, holdNodeAt, opposingTraffic, planDeparture, taxiStartNode } from './world';
+import { findTaxiRoute } from '../sim/pathfinding';
+import { pavementTour } from '../sim/vehicles';
 import { runwayInUse } from './ground';
 import * as say from './phrase';
 
@@ -54,10 +56,33 @@ function windPhrase(v: AgentView): say.Phrase {
   return { text: `wind ${d} at ${w.windSpeedKt}`, spoken: `wind ${digitsSpoken(d)} at ${digitsSpoken(String(w.windSpeedKt))}` };
 }
 
+/**
+ * Another vehicle is under way on the movement area. Vehicle movements are queued: Ground starts one only when no other vehicle is taxiing, and Tower
+ * sends a vehicle onto a runway only then (a vehicle route is not checked against another vehicle's route, so two vehicles on the lanes at once could meet
+ * head-on or arrive at the same ramp spot; the engine's leader spacing does not see an opposing vehicle). Aircraft are separated from vehicles by the
+ * ordinary opposing-traffic and runway checks.
+ */
+export function otherVehicleMoving(state: SimulationState, ac: Aircraft, includeHolding = false): boolean {
+  return Object.values(state.aircraft).some((o) => o.id !== ac.id && isVehicleType(o.type) && (o.phase === 'TAXIING' || (includeHolding && o.phase === 'HOLDING_SHORT')));
+}
+
+/** Aircraft are moving the other way on (part of) the route of a vehicle from where it stands to a parking node: the vehicle waits (same rule as the aircraft taxi plans). */
+function routeBlocked(v: AgentView, ac: Aircraft, toNodeId: string): boolean {
+  const start = taxiStartNode(v.airport, ac);
+  if (!start) return true;
+  const r = findTaxiRoute(v.airport.taxiwayGraph, start.id, toNodeId, { avoidRunways: true, allowedRunwayIds: v.airport.runways.map((x) => x.id), avoidTaxiways: closedTaxiways(v.state) });
+  return !r.route || !!opposingTraffic(v.state, r.route.nodeIds, ac.id);
+}
+
 function vehicleGroundPlans(v: AgentView, ac: Aircraft): Plan[] {
   const { airport, state } = v;
   const pending = ac.pendingRequest;
   if (!pending || pending.kind !== 'TAXI' || !stationary(ac) || hasActive(ac, 'PROCEED')) return [];
+  // (a vehicle standing at a hold line is part of the queue too: two vehicles holding short on both sides of a runway would wait for each other)
+  if (otherVehicleMoving(state, ac, true)) return [];
+  // Vehicles also wait for the taxiways to be quiet: a vehicle cannot pull off a lane, so one that starts while an aircraft is taxiing toward it meets it
+  // head-on (the aircraft plans check the vehicle's route, but an aircraft already under way is not re-routed). Standing aircraft do not matter.
+  if (Object.values(state.aircraft).some((o) => o.onGround && !isVehicleType(o.type) && (o.phase === 'TAXIING' || o.phase === 'TAXI_TO_PARKING' || o.phase === 'PUSHBACK') && o.groundSpeedKt > 0.5)) return [];
   const task = ac.flags.vehicleTask;
   const key = `${ac.id}:veh-ground:${pending.sinceSec}`;
   const mk = (cmds: Plan['cmds'], phrase: say.Phrase, summary: string): Plan => ({ key, aircraftId: ac.id, callsign: ac.callsign, priority: 50, cmds, phrase, summary, once: true });
@@ -65,7 +90,7 @@ function vehicleGroundPlans(v: AgentView, ac: Aircraft): Plan[] {
   // Back from the inspection run / the errand: proceed to the home ramp.
   if (/ramp/.test(pending.text) && home && (ac.phase === 'HOLDING_SHORT' || ac.phase === 'TAXIING' || ac.phase === 'READY')) {
     const spot = airport.parking.find((p) => p.id === home);
-    if (!spot) return [];
+    if (!spot || routeBlocked(v, ac, spot.nodeId)) return [];
     return [mk([mkCmd('TAXI_TO_PARKING', ac, { destination: spot.id })], say.proceedToRamp(ac, [], []), `${ac.callsign} proceed to the ramp`)];
   }
   if (ac.phase !== 'READY' && ac.phase !== 'PARKED') return [];
@@ -73,20 +98,22 @@ function vehicleGroundPlans(v: AgentView, ac: Aircraft): Plan[] {
     const end = findRunwayEnd(airport, ac.assignedRunwayEnd);
     if (!end) return [];
     const dep = planDeparture(airport, ac, [end.end.id, ...end.runway.ends.map((e) => e.id).filter((e) => e !== end.end.id)], busyHoldIds(state, ac.id), closedTaxiways(state));
-    if (!dep) return [];
+    if (!dep || opposingTraffic(state, dep.nodeIds, ac.id)) return [];
     // inspect the runway that is not in use by the traffic first; if it is in use the vehicle waits at the hold for Tower (the engine's PROCEED check decides)
     return [mk([mkCmd('TAXI', ac, { destination: `RWY${dep.runwayEnd}`, runwayEnd: dep.runwayEnd, route: dep.via, holdShort: dep.holdShort })], say.proceedToRunway(ac, dep.runwayEnd, dep.via, dep.holdShort), `${ac.callsign} proceed to runway ${dep.runwayEnd} for the inspection`)];
   }
   if (task === 'PAVEMENT_INSPECTION') {
     // one vehicle at a time on the taxiways (the tour routes overlap)
     if (Object.values(state.aircraft).some((o) => o.id !== ac.id && isVehicleType(o.type) && o.flags.vehicleTask === 'PAVEMENT_INSPECTION' && o.phase === 'TAXIING')) return [];
+    const tour = home ? pavementTour(airport, ac, home) : undefined;
+    if (!tour || opposingTraffic(state, tour.nodeIds, ac.id)) return [];
     return [mk([mkCmd('PROCEED', ac, { destination: 'TAXIWAYS' })], say.proceedOnTaxiways(ac), `${ac.callsign} proceed on the taxiways`)];
   }
   if (task === 'ERRAND') {
     const want = /FBO/i.test(pending.text) ? 'fbo' : /FAA/i.test(pending.text) ? 'cargo' : 'ga';
     const spot = airport.parking.filter((p) => p.category === want && p.id !== home).sort((a, b) => dist(a.pos, ac.pos) - dist(b.pos, ac.pos))
       .find((p) => !Object.values(state.aircraft).some((o) => o.id !== ac.id && o.onGround && dist(o.pos, p.pos) < 10));
-    if (!spot) return [];
+    if (!spot || routeBlocked(v, ac, spot.nodeId)) return [];
     return [mk([mkCmd('TAXI_TO_PARKING', ac, { destination: spot.id })], say.proceedToRamp(ac, [], []), `${ac.callsign} proceed to ${spot.name}`)];
   }
   return [];
@@ -101,7 +128,7 @@ function vehicleTowerPlans(v: AgentView, ac: Aircraft): Plan[] {
     const g = findRunwayEnd(airport, ac.assignedRunwayEnd);
     if (!hold || !g || hold.runwayId !== g.runway.id) return [];
     const cmd = mkCmd('PROCEED', ac, { runwayEnd: g.end.id, runwayId: g.runway.id, reportClear: true });
-    if (runwayInUse(v, g.runway.id, ac.id) || !assessClearanceSafety(state, cmd).safe) return [];
+    if (otherVehicleMoving(state, ac) || runwayInUse(v, g.runway.id, ac.id) || !assessClearanceSafety(state, cmd).safe) return [];
     return [{
       key: `${ac.id}:proceed:${pending.sinceSec}`, aircraftId: ac.id, callsign: ac.callsign, priority: 60, cmds: [cmd], once: true,
       phrase: say.proceedOnRunway(ac, g.end.id, 'report runway inspection complete'), summary: `${ac.callsign} proceed on runway ${g.end.id}, inspection`,

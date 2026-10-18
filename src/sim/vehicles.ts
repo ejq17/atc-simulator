@@ -21,7 +21,7 @@ import { getRuntime, pilotSay, setPhase, advancePhase, completeClearances, emitE
 import type { AircraftRuntime, SimContext } from './context';
 import type { Env, PlanResult } from './commandExecutor';
 import { unable } from './commandExecutor';
-import { findTaxiRoute, neighborIds } from './pathfinding';
+import { findTaxiRoute, neighborIds, shortestDistances } from './pathfinding';
 import { alongCross, crossingRunways, findRunway, findRunwayEnd } from './runways';
 import { seeded01 } from './rng';
 import { runwayExitNodes } from '../airport/graphUtils';
@@ -161,7 +161,7 @@ export function vehiclePilotCalls(ctx: SimContext, ac: Aircraft, rt: AircraftRun
   }
 
   // 5. Errand: dwell at the far ramp, then ask to go back.
-  if (v.task === 'ERRAND' && v.stage === 'ON_TASK' && ac.phase === 'PARKED' && ac.onGround && !airport.parking.some((p) => p.id === v.homeParkingId && dist(p.pos, ac.pos) < 8)) {
+  if (v.task === 'ERRAND' && (v.stage === 'ON_TASK' || v.stage === 'OUT') && rt.calls.has('vehReq') && ac.phase === 'PARKED' && ac.onGround && !airport.parking.some((p) => p.id === v.homeParkingId && dist(p.pos, ac.pos) < 8)) {
     v.dwellSinceSec ??= now;
     if (now - v.dwellSinceSec >= ERRAND_DWELL_SEC && !rt.calls.has('vehBack')) {
       rt.calls.add('vehBack');
@@ -205,7 +205,7 @@ export function planProceed(env: Env): PlanResult {
   if (!v) return unable(env, `${ac.callsign} has no task.`, 'we have no task');
 
   if (cmd.destination === 'TAXIWAYS') {
-    const tour = pavementTour(ctx, ac, v);
+    const tour = pavementTour(ctx.state.airport, ac, v.homeParkingId);
     if (!tour) return unable(env, `No taxiway tour from ${ac.callsign}'s position.`, "we can't reach the taxiways");
     return {
       plan: {
@@ -293,13 +293,15 @@ export function runwayRun(airport: Airport, hold: { id: string; pos: Vec2 }, sta
 }
 
 /** A tour of three taxiway points that never touches a runway, from the vehicle's node back to its home parking position. */
-function pavementTour(ctx: SimContext, ac: Aircraft, v: VehicleRuntime): { nodeIds: string[]; taxiways: string[] } | undefined {
-  const graph = ctx.state.airport.taxiwayGraph;
-  const home = ctx.state.airport.parking.find((p) => p.id === v.homeParkingId);
+export function pavementTour(airport: Airport, ac: Pick<Aircraft, 'pos' | 'seed'>, homeParkingId: string): { nodeIds: string[]; taxiways: string[] } | undefined {
+  const graph = airport.taxiwayGraph;
+  const home = airport.parking.find((p) => p.id === homeParkingId);
   const startId = home?.nodeId;
   const here = Object.values(graph.nodes).filter((n) => dist(n.pos, ac.pos) < 3)[0]?.id ?? startId;
   if (!here || !home) return undefined;
-  const cands = Object.values(graph.nodes).filter((n) => (n.kind === 'taxiway' || n.kind === 'intersection') && n.taxiways.some((t) => t && t !== 'UNNAMED') && dist(n.pos, ac.pos) > 150);
+  // only points reachable without touching a runway (a tour never crosses one), and from which the way home is open too
+  const reach = shortestDistances(graph, here, { allowedRunwayIds: [] });
+  const cands = Object.values(graph.nodes).filter((n) => (n.kind === 'taxiway' || n.kind === 'intersection') && n.taxiways.some((t) => t && t !== 'UNNAMED') && (reach.get(n.id) ?? 0) > 150 && reach.has(n.id));
   if (!cands.length) return undefined;
   const picks: string[] = [];
   for (let i = 0; i < 3; i++) {

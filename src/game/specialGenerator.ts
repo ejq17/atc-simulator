@@ -200,7 +200,9 @@ export function createSpecialTrafficGenerator(scenario: GameScenario, airport: A
   const vehicleSpawn = (state: Readonly<SimulationState>, inspectionRunway?: string): SpawnSpec | undefined => {
     if (!groundFreq) return undefined;
     const now = state.clock.timeSec;
-    const homes = airport.parking.filter((p) => (p.category === 'fbo' || p.category === 'cargo') && parkingFree(state, p, reserved));
+    // a home spot is also the destination of its vehicle's return: no second vehicle may be given the same one while the first is out
+    const taken = new Set(Object.values(state.aircraft).map((a) => a.flags.vehicleHome).filter((x): x is string => !!x));
+    const homes = airport.parking.filter((p) => (p.category === 'fbo' || p.category === 'cargo') && !taken.has(p.id) && parkingFree(state, p, reserved));
     if (!homes.length) return undefined;
     const home = pick(rng!, homes);
     const cs = callsign('APT', () => String(1 + Math.floor(rng!() * 99)), state);
