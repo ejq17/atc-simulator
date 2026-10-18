@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { ScenarioAircraftSpawn } from './types';
-import { ARRIVING, cmd, find, GA_PARKED, HOLDING, makeEngine, run, runUntil } from './__fixtures__/testHelpers';
+import { ARRIVING, cmd, find, FIXTURE_GROUND, GA_PARKED, HOLDING, makeEngine, run, runUntil } from './__fixtures__/testHelpers';
 import { assessClearanceSafety } from './conflicts';
 import { computeScore, SCORE_WEIGHTS } from './scoring';
 import { createTestAirport } from './__fixtures__/testAirport';
@@ -217,6 +217,7 @@ describe('hold-short queue on the ground (real KACY, runway 31 from B)', () => {
         id: 'q', name: 'q', description: 'q', mode: 'training', seed: 5,
         weather: { source: 'simulated', windDirDeg: 310, windSpeedKt: 6, visibilitySm: 10, clouds: [], temperatureC: 15, dewpointC: 5, altimeterInHg: 29.92, phenomena: [], flightCategory: 'VFR' },
         activeRunways: { departing: ['31'], landing: ['31'] }, controllerPositions: ['TWR', 'GND'], playerPositions: ['GND'],
+        pilotBehaviour: { ground: FIXTURE_GROUND },
         spawns: [
           HOLDING('N451NL', 'HP13-31-B-2', '31', 'C172', 'TWR'),
           { atSec: 0, callsign: 'AAL1727', type: 'A320', flightRules: 'IFR', isDeparture: true, initialFrequencyId: 'GND', start: { kind: 'parked', parkingId: 'GATE-1' } },
@@ -225,7 +226,7 @@ describe('hold-short queue on the ground (real KACY, runway 31 from B)', () => {
     });
     run(e, 3);
     const [a, c] = [find(e, 'AAL1727'), find(e, 'N451NL')];
-    expect(e.applyCommand(cmd('TAXI', 'AAL1727', { destination: 'RWY31', runwayEnd: '31', route: [] }), { position: 'GND' }).status).toBe('accepted');
+    expect(e.applyCommand(cmd('TAXI', 'AAL1727', { destination: 'RWY31', runwayEnd: '31', route: ['L', 'P', 'B'] }), { position: 'GND' }).status).toBe('accepted');
     let minGap = Infinity;
     for (let i = 0; i < 400; i++) {
       run(e, 1);

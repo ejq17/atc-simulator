@@ -7,7 +7,9 @@
  * (coordination.ts, ai/coordination.ts). Otherwise (nobody works Tower, or one person works both) Ground decides alone with the stricter
  * rule below. The engine's own safety check (crossing in front of a departure, an arrival inside 3 nm, an occupied runway) always applies.
  */
-import type { Aircraft } from '../sim/types';
+import type { Aircraft, Clearance, SimulationState } from '../sim/types';
+import { cardinal } from '../sim/geo';
+import { pushbackGeometry, pushbackStand } from '../sim/pushback';
 import { assessClearanceSafety } from '../sim/conflicts';
 import { findRunway, findRunwayEnd } from '../sim/runways';
 import { COORDINATION_DESIGN, afterAircraftClear, crossingNeedsApproval, crossingPointFor, findOpenRequest, validApproval } from '../sim/coordination';
@@ -17,7 +19,7 @@ import type { Agent, AgentView, Plan } from './core';
 import { createClearanceAgent } from './clnc';
 import type { ClearanceStore } from './clnc';
 import { closedTaxiways } from '../sim/airportOps';
-import { busyHoldIds, etaToThresholdSec, holdNodeAt, interactingRunways, opposingTraffic, pendingIntermediateStops, planDeparture, planParking, remainingRouteM } from './world';
+import { busyHoldIds, etaToThresholdSec, holdNodeAt, interactingRunways, nextProgressiveSegment, opposingTraffic, pendingIntermediateStops, planDeparture, planParking, remainingRouteM, taxiStartNode } from './world';
 import { holdTooShort } from '../sim/holdSelection';
 import * as say from './phrase';
 
@@ -50,6 +52,20 @@ export function runwayInUse(v: AgentView, runwayId: string, exceptId: string): b
   return false;
 }
 
+/** A segment of a progressive taxi is issued this far before the aircraft reaches the end of the one it is flying, so it does not have to stop. */
+const SEGMENT_LOOKAHEAD_M = 60;
+
+/** The pilot's readback of this clearance (a pilot TRANSMISSION event tagged with its id) contains the hold-short. */
+function holdShortReadBack(state: SimulationState, ac: Aircraft, clr: Clearance): boolean | undefined {
+  const evs = state.events;
+  for (let i = evs.length - 1, n = 0; i >= 0 && n < 300; i--, n++) {
+    const ev = evs[i];
+    if (ev.speaker !== 'PILOT' || ev.aircraftId !== ac.id || ev.data?.clearanceId !== clr.id) continue;
+    return /hold short/i.test(ev.text);
+  }
+  return undefined;
+}
+
 function taxiFollowOk(v: AgentView, ac: Aircraft): boolean {
   for (const o of Object.values(v.state.aircraft)) {
     if (o.id === ac.id || !o.onGround || o.phase !== 'TAXIING') continue;
@@ -70,6 +86,75 @@ export function createGroundAgent(store: ClearanceStore): Agent {
     for (const ac of v.onFrequency) {
       if (!ac.onGround || ac.radioState === 'TRANSMITTING') continue;
       const pending = ac.pendingRequest?.kind;
+
+      // 0. Airliner at its gate asking for pushback (not FAA phraseology; the sim lets Ground approve it): approve, tail toward the lane that leads to the runway.
+      if (ac.isDeparture && ac.phase === 'PARKED' && pending === 'PUSHBACK') {
+        const stand = pushbackStand(airport, ac);
+        const geo = stand ? pushbackGeometry(airport, stand, ac, { departingEnds: state.activeRunways.departing }) : undefined;
+        const tail = geo ? cardinal(geo.finalHeadingDeg + 180) : undefined;
+        const tailDeg = tail ? Math.round(((geo!.finalHeadingDeg + 180) % 360) / 45) * 45 % 360 : undefined;
+        plans.push({
+          key: `${ac.id}:pushback`, aircraftId: ac.id, callsign: ac.callsign, priority: 50,
+          cmds: [mkCmd('PUSHBACK', ac, tailDeg !== undefined ? { pushTailDeg: tailDeg } : {})],
+          phrase: say.pushbackApproved(ac, tail), cooldownSec: 20, summary: `${ac.callsign} pushback approved${tail ? `, tail ${tail}` : ''}`,
+        });
+        continue;
+      }
+
+      // 0b. A hold-short that was not read back (JO 7110.65 2-4-3, 3-7-2 "READ BACK HOLD INSTRUCTIONS"): ask for it.
+      {
+        const clr = lastClearance(ac, 'TAXI') ?? lastClearance(ac, 'TAXI_TO_PARKING');
+        const last = [lastClearance(ac, 'TAXI'), lastClearance(ac, 'TAXI_TO_PARKING')].filter((c): c is Clearance => !!c).sort((a, b) => b.issuedAtSec - a.issuedAtSec)[0] ?? clr;
+        if (last && last.byPosition === 'GND' && last.completedAtSec === undefined && last.holdShort?.length && v.now - last.issuedAtSec >= 4 && holdShortReadBack(state, ac, last) === false) {
+          plans.push({
+            key: `${ac.id}:rbhold:${last.id}`, aircraftId: ac.id, callsign: ac.callsign, priority: 55, cmds: [mkCmd('READ_BACK_HOLD', ac)],
+            phrase: say.readBackHoldInstructions(ac), once: true, summary: `${ac.callsign} read back hold instructions`,
+          });
+          continue;
+        }
+      }
+
+      // 1p. Progressive taxi (AIM 4-3-18): the pilot asked for it, or a segment is about to end. Step by step until two taxiways remain, then the full route.
+      {
+        const asked = ac.isDeparture && (ac.phase === 'READY' || ac.phase === 'PARKED' || ac.phase === 'TAXIING') && pending === 'TAXI' && !!ac.pendingRequest?.progressive;
+        const lastTaxi = lastClearance(ac, 'TAXI');
+        const lookahead = ac.isDeparture && ac.phase === 'TAXIING' && !pending && !!lastTaxi?.segment && lastTaxi.completedAtSec === undefined && !!ac.route
+          && remainingRouteM(airport, ac) <= SEGMENT_LOOKAHEAD_M;
+        if (asked || lookahead) {
+          const needsIfr = ac.flightPlan?.flightRules === 'IFR' && !ac.flightPlan.ifrClearance;
+          if (needsIfr || (asked && ac.phase !== 'TAXIING' && !taxiFollowOk(v, ac))) continue;
+          let virtual: Aircraft = ac;
+          if (lookahead && ac.route) {
+            const ids = ac.route.nodeIds;
+            const endN = airport.taxiwayGraph.nodes[ids[ids.length - 1]];
+            const prevN = airport.taxiwayGraph.nodes[ids[Math.max(0, ids.length - 2)]];
+            if (!endN || endN.kind === 'holding_position' || endN.kind === 'parking') continue;
+            virtual = { ...ac, pos: endN.pos, route: undefined, headingDeg: (Math.atan2(endN.pos.x - prevN.pos.x, endN.pos.y - prevN.pos.y) * 180 / Math.PI + 360) % 360 };
+          }
+          const dep = planDeparture(airport, virtual, state.activeRunways.departing, busyHoldIds(state, ac.id));
+          const startNode = taxiStartNode(airport, virtual);
+          if (!dep || !startNode || opposingTraffic(state, dep.nodeIds, ac.id)) continue;
+          const seg = nextProgressiveSegment(airport, dep.nodeIds, virtual.headingDeg);
+          if (seg && seg.remaining > 2) {
+            plans.push({
+              key: `${ac.id}:seg:${startNode.id}`, aircraftId: ac.id, callsign: ac.callsign, priority: 50, once: true,
+              cmds: [mkCmd('TAXI', ac, { segment: true, turnDirection: seg.turn, route: seg.taxiways, destination: seg.next ? `TWY${seg.next}` : undefined, toNodeId: seg.endNodeId })],
+              phrase: say.progressiveStep(ac, seg), summary: `${ac.callsign} progressive taxi: ${seg.turn ? `turn ${seg.turn} on ${seg.taxiways[0]}` : `via ${seg.taxiways.join(' ')}`}${seg.next ? `, continue to ${seg.next}` : ''}`,
+            });
+            continue;
+          }
+          // Two taxiways or fewer left: the complete route (with the hold-short instructions) in one instruction.
+          if (!lookahead || dep.nodeIds.length > 1) {
+            plans.push({
+              key: `${ac.id}:seg-final:${startNode.id}`, aircraftId: ac.id, callsign: ac.callsign, priority: 50, once: true,
+              cmds: [mkCmd('TAXI', ac, { destination: `RWY${dep.runwayEnd}`, runwayEnd: dep.runwayEnd, route: dep.via, holdShort: dep.holdShort })],
+              phrase: say.taxiToRunway(ac, dep.runwayEnd, dep.via, dep.holdShort),
+              summary: `${ac.callsign} taxi to runway ${dep.runwayEnd} (final step of a progressive taxi)`,
+            });
+          }
+          continue;
+        }
+      }
 
       // 1. Departure asking for taxi.
       if (ac.isDeparture && (ac.phase === 'READY' || ac.phase === 'PARKED') && pending === 'TAXI' && !hasActive(ac, 'TAXI')) {

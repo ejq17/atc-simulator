@@ -4,7 +4,15 @@ import { createEngine } from '../engine';
 import type { EngineOptionsExt } from '../engine';
 import { createTestAirport } from './testAirport';
 
+/**
+ * Fixture pilots start instantly and airliners taxi from their stands, so the tests of other features do not depend on engine-start timing or
+ * pushback. Tests of those features (pushback.test.ts, groundOps.test.ts) pass `pilotBehaviour: REAL_GROUND`.
+ */
+export const FIXTURE_GROUND = { airlinerPushback: false, gaStartSec: [0, 0] as [number, number] };
+export const REAL_GROUND = { airlinerPushback: true, gaStartSec: [8, 25] as [number, number] };
+
 export function makeScenario(over: Partial<Scenario> = {}): Scenario {
+  const pilotBehaviour = { ...over.pilotBehaviour, ground: { ...FIXTURE_GROUND, ...over.pilotBehaviour?.ground } };
   return {
     id: 'test',
     name: 'Test scenario',
@@ -19,6 +27,7 @@ export function makeScenario(over: Partial<Scenario> = {}): Scenario {
     controllerPositions: ['TWR', 'GND'],
     spawns: [],
     ...over,
+    pilotBehaviour,
   };
 }
 

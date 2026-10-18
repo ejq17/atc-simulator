@@ -323,8 +323,10 @@ describe('career steps 7, 9 and 11 include an IFR departure', () => {
     expect(accepted(say(e, 'Spirit three twenty nine, cleared to Philadelphia airport via the Atlantic City Three departure, radar vectors, maintain two thousand, expect one zero thousand one zero minutes after departure, departure frequency one two four point six, squawk four two one five', 'CLNC'))).toBe(true);
     expect(evaluateCheck(e.getState(), 'ifr_clearance:NKS329')).toBe(true);
     expect(ac().squawk).toBe('4215');
-    expect(runUntil(e, () => ac().pendingRequest?.kind === 'TAXI', 40)).toBe(true);
+    expect(runUntil(e, () => ac().pendingRequest?.kind === 'PUSHBACK', 60)).toBe(true);
     expect(ac().frequencyId).toBe('GND');
+    expect(accepted(say(e, 'Spirit three twenty nine, pushback approved, tail east', 'GND'))).toBe(true);
+    expect(runUntil(e, () => ac().pendingRequest?.kind === 'TAXI', 300)).toBe(true);
     expect(accepted(say(e, 'Spirit three twenty nine, taxi to runway one three via bravo, hold short of runway four', 'GND'))).toBe(true);
     expect(runUntil(e, (s) => evaluateCheck(s, 'crossing_request:NKS329'), 900)).toBe(true);
     expect(accepted(say(e, 'Spirit three twenty nine, cross runway four at bravo', 'GND'))).toBe(true);

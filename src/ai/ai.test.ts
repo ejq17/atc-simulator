@@ -25,7 +25,8 @@ function groundPlayer(h: Harness) {
     for (const ac of aircraft(h)) {
       if (ac.frequencyMhz !== GND_MHZ || ac.radioState === 'TRANSMITTING') continue;
       const p = ac.pendingRequest?.kind;
-      if (ac.isDeparture && p === 'TAXI') h.say('GND', cmd('TAXI', ac.callsign, { destination: 'RWY13', route: ['B'], holdShort: ['4/22'] }));
+      if (ac.isDeparture && p === 'PUSHBACK') h.say('GND', cmd('PUSHBACK', ac.callsign));
+      else if (ac.isDeparture && p === 'TAXI') h.say('GND', cmd('TAXI', ac.callsign, { destination: 'RWY13', route: ['B'], holdShort: ['4/22'] }));
       else if (p === 'CROSSING') {
         const c = cmd('CROSS_RUNWAY', ac.callsign, { crossRunwayId: '4/22' });
         if (safe(h, c)) h.say('GND', c);
@@ -105,13 +106,13 @@ function expectOneEventPerTransmission(h: Harness) {
 describe('(1) Ground-only player: AI Clearance, Tower, Approach and Departure work the rest', () => {
   const run = () => {
     const h = createHarness({ player: ['GND'], spawns: [IFR_DEP('NKS451', 'GATE-1', ['VCN']), IFR_ARR('AAL212', 'CARYL', ['CARYL', 'MAYBN'], '13', 4000)] });
-    h.runUntil(allGone(h), 1500, groundPlayer(h));
+    h.runUntil(allGone(h), 2100, groundPlayer(h));
     return h;
   };
   const h = run();
 
-  it('finishes both flights in under 25 simulated minutes, cleanly', () => {
-    expect(h.now()).toBeLessThan(25 * 60);
+  it('finishes both flights in under 30 simulated minutes (pushback and engine start included), cleanly', () => {
+    expect(h.now()).toBeLessThan(30 * 60);
     expect(Object.keys(h.engine.getState().aircraft)).toHaveLength(0);
     expectClean(h);
     expect(h.engine.getState().score.aircraftHandled).toBe(2);
@@ -124,7 +125,7 @@ describe('(1) Ground-only player: AI Clearance, Tower, Approach and Departure wo
     expect(clr.timeSec - call.timeSec).toBeGreaterThanOrEqual(2); // human reaction delay
     const accepted = h.events.find((e) => e.kind === 'COMMAND_ACCEPTED' && e.callsign === 'NKS451' && e.data?.kind === 'IFR_CLEARANCE')!;
     expect(accepted).toBeDefined();
-    const taxiCall = h.events.find((e) => e.speaker === 'PILOT' && e.frequencyMhz === GND_MHZ && /Spirit four fifty one, at Gate one, ready to taxi/.test(e.text))!;
+    const taxiCall = h.events.find((e) => e.speaker === 'PILOT' && e.frequencyMhz === GND_MHZ && /Spirit four fifty one, pushed back from Gate one, ready to taxi/.test(e.text))!;
     expect(taxiCall.timeSec).toBeGreaterThan(clr.timeSec);
     const issued = h.transmissions.find((t) => t.callsign === 'NKS451' && t.position === 'CLNC')!;
     expect(issued.voiceId).toBe('atc-clnc');
@@ -197,20 +198,23 @@ describe('(2) Tower-only player: AI Ground taxis the departure to the runway and
   });
 
   it('AI Ground taxis via Bravo, walks the aircraft across 4/22 and hands it to Tower; the holding-short call arrives on the Tower frequency', () => {
-    const gnd = texts(atcAi(h, 'NKS451', 'GND'));
-    expect(gnd[0]).toMatch(/^Spirit four fifty one, runway one three, taxi via .*bravo, hold short of runway four$/);
+    const all = texts(atcAi(h, 'NKS451', 'GND'));
+    expect(all[0]).toMatch(/^Spirit four fifty one, pushback approved, tail (north|south|east|west|northeast|northwest|southeast|southwest)$/);
+    const gnd = all.slice(1);
+    expect(gnd[0]).toMatch(/^Spirit four fifty one, runway one three, taxi via .*(bravo|charlie), hold short of runway four$/); // which of the two holds depends on the order the pushbacks finish
     expect(gnd[1]).toBe('Spirit four fifty one, cross runway four');
     expect(gnd[2]).toBe('Spirit four fifty one, contact tower one two zero point three');
-    const hold = h.events.find((e) => e.speaker === 'PILOT' && e.callsign === 'NKS451' && /holding short runway one three, ready for departure/.test(e.text))!;
+    const hold = h.events.find((e) => e.speaker === 'PILOT' && e.callsign === 'NKS451' && /(holding short|approaching the hold) runway one three, ready for departure/.test(e.text))!; // the handoff comes within 400 m of the hold
     expect(hold).toBeDefined();
     expect(hold.frequencyMhz).toBe(TWR_MHZ);
-    expect(hold.text).toMatch(/^Atlantic City Tower, Spirit four fifty one, holding short runway one three, ready for departure\.$/);
-    expect(hold.timeSec).toBeGreaterThan(atcAi(h, 'NKS451', 'GND')[2].timeSec);
+    expect(hold.text).toMatch(/^Atlantic City Tower, Spirit four fifty one, (holding short|approaching the hold) runway one three, ready for departure\.$/);
+    expect(hold.timeSec).toBeGreaterThan(atcAi(h, 'NKS451', 'GND')[3].timeSec);
   });
 
   it('the second departure takes a different hold (no queue at one hold line) and the arrival is sent to Ground after the player lands it', () => {
-    const second = texts(atcAi(h, 'DAL88', 'GND'))[0];
-    expect(second).toMatch(/charlie, hold short of runway four$/);
+    const taxiInstruction = (cs: string) => texts(atcAi(h, cs, 'GND')).find((t) => /taxi via/.test(t))!; // [0] is the pushback approval
+    const holdOf = (t: string) => /(\w+), hold short of runway four$/.exec(t)![1];
+    expect(holdOf(taxiInstruction('DAL88'))).not.toBe(holdOf(taxiInstruction('NKS451')));
     expect(h.events.some((e) => e.kind === 'COMMAND_ACCEPTED' && e.callsign === 'AAL212' && e.data?.kind === 'CONTACT_FREQUENCY' && e.aiPosition === undefined && e.timeSec > 0)).toBe(true);
     expect(texts(atcAi(h, 'AAL212', 'GND'))[0]).toMatch(/^American two twelve, taxi to gate .* via /);
     // The arrival was handed to the player by AI Approach exactly as a human would.

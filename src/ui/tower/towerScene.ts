@@ -565,7 +565,7 @@ export function createTowerScene(canvas: HTMLCanvasElement, airport: Airport, si
       // Tilt about the main gear contact point rather than the middle of the fuselage.
       v3.set(0, 0, o.m.pivotZ).applyEuler(o.tilt.rotation);
       o.tilt.position.set(-v3.x, -v3.y, o.m.pivotZ - v3.z);
-      const running = !ac.onGround || (ac.phase !== 'PARKED' && ac.phase !== 'ARRIVED');
+      const running = !ac.onGround || (ac.phase !== 'PARKED' && ac.phase !== 'ARRIVED' && ac.phase !== 'PUSHBACK');
       for (const pr of o.m.props) {
         pr.rotation.z = running ? (f.nowMs * 0.045) % (Math.PI * 2) : 0;
         if (pr.children[0]) pr.children[0].visible = running;

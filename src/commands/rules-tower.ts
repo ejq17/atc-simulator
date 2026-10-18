@@ -82,8 +82,32 @@ export const ruleContinue: Rule = (t, i) => {
   return cmdHit(j, makeDraft('CONTINUE_APPROACH'));
 };
 
-/** "pushback [and start] approved" */
+const COMPASS: Readonly<Record<string, number>> = {
+  north: 0, northeast: 45, east: 90, southeast: 135, south: 180, southwest: 225, west: 270, northwest: 315,
+};
+
+/**
+ * "pushback [and start] approved [, tail east | face south]". NOT FAA phraseology: JO 7110.65 has no pushback phrase (pushback is normally a
+ * ramp / company function), so the phrase is parsed as written and marked non-standard; the tail / nose direction is a compass point taken as a
+ * true direction.
+ */
 export const rulePushback: Rule = (t, i) => {
-  const j = seq(t, i, 'pushback|push and? start? approved?');
-  return j < 0 ? null : cmdHit(j, makeDraft('PUSHBACK'));
+  let j = seq(t, i, 'pushback|push and? start? approved?');
+  if (j < 0) return null;
+  const d = makeDraft('PUSHBACK');
+  d.nonstandard++;
+  d.issues.push('non-standard phraseology: JO 7110.65 has no pushback phrase (pushback is normally a ramp / company function)');
+  j = skipWords(t, j, ['approved', 'approve', 'and', 'start', 'expect']);
+  const tail = seq(t, j, 'tail|tails');
+  const face = seq(t, j, 'face|facing|nose');
+  const k = tail >= 0 ? tail : face;
+  if (k >= 0) {
+    const dirIdx = skipWords(t, k, ['to', 'the', 'toward', 'towards']);
+    const deg = COMPASS[t[dirIdx]?.text ?? ''];
+    if (deg !== undefined) {
+      if (tail >= 0) d.fields.pushTailDeg = deg; else d.fields.pushFaceDeg = deg;
+      j = dirIdx + 1;
+    }
+  }
+  return cmdHit(j, d);
 };

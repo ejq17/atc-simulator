@@ -84,7 +84,9 @@ describe('A320 departures from the terminal', () => {
     expect(runUntil(e, (s) => evaluateCheck(s, 'takeoff:N412KB'), 90)).toBe(true);
     expect(accepted(say(e, 'Cessna eight eight papa lima, runway one three, cleared for takeoff'))).toBe(true);
     expect(runUntil(e, (s) => evaluateCheck(s, 'takeoff:N88PL'), 90)).toBe(true);
-    expect(runUntil(e, () => ac(e, 'NKS608')?.pendingRequest?.kind === 'TAXI', 90)).toBe(true);
+    expect(runUntil(e, () => ac(e, 'NKS608')?.pendingRequest?.kind === 'PUSHBACK', 90)).toBe(true);
+    expect(accepted(say(e, 'Spirit six oh eight, pushback approved', 'GND'))).toBe(true);
+    expect(runUntil(e, () => ac(e, 'NKS608')?.pendingRequest?.kind === 'TAXI', 300)).toBe(true);
     say(e, 'Spirit six oh eight, taxi to runway one three via bravo, hold short of runway four', 'GND');
     expect(ac(e, 'NKS608').route).toBeDefined();
     expect(runUntil(e, (s) => evaluateCheck(s, 'crossing_request:NKS608'), 600)).toBe(true);

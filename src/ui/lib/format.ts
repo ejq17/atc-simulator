@@ -64,7 +64,7 @@ export function altimeterText(inHg: number): string {
 
 /** Short phase codes used in data labels and the strip list. */
 export const PHASE_SHORT: Record<string, string> = {
-  PARKED: 'PK', READY: 'RDY', TAXIING: 'TX', HOLDING_SHORT: 'HS', LINE_UP_AND_WAIT: 'LUAW',
+  PARKED: 'PK', PUSHBACK: 'PB', READY: 'RDY', TAXIING: 'TX', HOLDING_SHORT: 'HS', LINE_UP_AND_WAIT: 'LUAW',
   CLEARED_FOR_TAKEOFF: 'CTO', TAKEOFF_ROLL: 'ROLL', INITIAL_CLIMB: 'ICL', DEPARTURE: 'DEP',
   INBOUND: 'INB', APPROACH: 'APP', FINAL: 'FIN', LANDING: 'LDG', ROLLOUT: 'RLO',
   RUNWAY_EXIT: 'EXT', TAXI_TO_PARKING: 'TXP', ARRIVED: 'ARR', GO_AROUND: 'GA', PATTERN: 'PAT', HOLDING: 'HLD',
@@ -85,6 +85,7 @@ export function statusTone(ac: Pick<Aircraft, 'phase' | 'onGround' | 'flags'>): 
   if (ac.flags?.emergency) return 'alert';
   switch (ac.phase) {
     case 'PARKED': case 'READY': case 'ARRIVED': return 'idle';
+    case 'PUSHBACK': return 'taxi';
     case 'TAXIING': case 'TAXI_TO_PARKING': case 'RUNWAY_EXIT': return 'taxi';
     case 'HOLDING_SHORT': case 'LINE_UP_AND_WAIT': return 'hold';
     case 'CLEARED_FOR_TAKEOFF': case 'TAKEOFF_ROLL': case 'LANDING': case 'ROLLOUT': return 'runway';

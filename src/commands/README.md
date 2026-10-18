@@ -57,7 +57,9 @@ const r = parseTransmission('Spirit four fifty one, runway one three, cleared fo
 | climb/descend/maintain [and maintain] [VFR at or below] N, flight level N | `ALTITUDE` (`altitudeFt`; FL180 -> 18000) |
 | reduce speed to N, slow to N, speed N, maintain N knots, resume normal speed | `SPEED` (`speedKt`, or `destination: 'NORMAL_SPEED'`) |
 | enter left/right downwind/base runway N, make straight in, make left traffic | `ENTER_PATTERN` (`patternLeg`, `turnDirection` = side) |
-| pushback approved | `PUSHBACK` |
+| pushback [and start] approved [, tail <compass point> \| face\|facing\|nose <compass point>] | `PUSHBACK` (`pushTailDeg` / `pushFaceDeg`, compass point as a true heading; always marked non-standard: JO 7110.65 has no pushback phrase) |
+| read back [hold short] instructions, readback hold short | `READ_BACK_HOLD` (3-7-2 "READ BACK HOLD INSTRUCTIONS.") |
+| continue [straight] [on\|via X] to Y | `TAXI` with `segment: true`, `destination: 'TWY<Y>'`, `route: [X]` (progressive taxi step, non-standard without "taxiing"). "turn left on Bravo" before it is the `EXIT_RUNWAY` rule below; the engine reads it as a taxi turn once the aircraft is taxiing |
 | say again / repeat | `SAY_AGAIN` |
 | cleared [for] [the] ILS / I-L-S / localizer / RNAV [GPS] / VOR / visual [approach] [runway] N [approach] | `APPROACH` (`approachType` ILS, LOC, RNAV, VOR, VISUAL; `runwayEnd`, `runwayId`). A bare `runway N` before/after attaches like other runway instructions. Needs approachType + runway |
 | [when able] [proceed\|cleared\|fly] direct [to] <fix> | `DIRECT_FIX` (`fix` = fix id, see Fixes) |

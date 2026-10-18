@@ -268,7 +268,7 @@ export interface AircraftPerformance {
 export type FlightRules = 'VFR' | 'IFR';
 
 export type DeparturePhase =
-  | 'PARKED' | 'READY' | 'TAXIING' | 'HOLDING_SHORT' | 'LINE_UP_AND_WAIT'
+  | 'PARKED' | 'PUSHBACK' | 'READY' | 'TAXIING' | 'HOLDING_SHORT' | 'LINE_UP_AND_WAIT'
   | 'CLEARED_FOR_TAKEOFF' | 'TAKEOFF_ROLL' | 'INITIAL_CLIMB' | 'DEPARTURE';
 
 export type ArrivalPhase =
@@ -393,6 +393,11 @@ export interface Clearance {
   fix?: string;                    // DIRECT_FIX target
   ifr?: IfrClearanceDetails;       // IFR_CLEARANCE
   hold?: HoldingInstruction;       // HOLD_AT_FIX
+  /** PUSHBACK: requested tail direction / nose ("face") direction, true degrees. */
+  pushTailDeg?: number;
+  pushFaceDeg?: number;
+  /** TAXI: a progressive-taxi segment (turn, then follow the taxiway to a point). */
+  segment?: boolean;
   starName?: string;               // STAR
   starTransition?: string;
   descendVia?: boolean;
@@ -407,9 +412,11 @@ export interface Clearance {
 export type RadioState = 'IDLE' | 'RECEIVING' | 'TRANSMITTING' | 'WAITING_FOR_READBACK';
 
 export interface PendingRequest {
-  kind: 'TAXI' | 'DEPARTURE' | 'LANDING' | 'FREQUENCY_CHANGE' | 'CROSSING' | 'PATTERN' | 'IFR_CLEARANCE' | 'APPROACH' | 'OTHER';
+  kind: 'TAXI' | 'PUSHBACK' | 'DEPARTURE' | 'LANDING' | 'FREQUENCY_CHANGE' | 'CROSSING' | 'PATTERN' | 'IFR_CLEARANCE' | 'APPROACH' | 'OTHER';
   text: string;
   sinceSec: number;
+  /** TAXI: the pilot asked for progressive taxi instructions (JO 7110.65 3-7-2; AIM 4-3-18). */
+  progressive?: boolean;
 }
 
 export interface GroundRoute {
@@ -418,6 +425,8 @@ export interface GroundRoute {
   /** Node ids where the aircraft must stop until explicitly cleared. */
   stopAtNodeIds: string[];
   progressIndex: number;           // index of the node the aircraft is heading to
+  /** Nodes the aircraft will not pass because the pilot did not read back the hold-short instruction (JO 7110.65 2-4-3, 3-7-2): the first hold line and the hold-short points. */
+  unreadStopNodeIds?: string[];
 }
 
 export interface Aircraft {
@@ -474,7 +483,7 @@ export interface Aircraft {
 // Commands (output of the parser, input to the engine)
 // ---------------------------------------------------------------------------
 
-export type CommandKind = ClearanceKind | 'SAY_AGAIN' | 'UNKNOWN';
+export type CommandKind = ClearanceKind | 'SAY_AGAIN' | 'READ_BACK_HOLD' | 'UNKNOWN';
 
 export interface ParsedCommand {
   kind: CommandKind;
@@ -509,6 +518,13 @@ export interface ParsedCommand {
   fix?: string;
   ifr?: Partial<IfrClearanceDetails>;
   hold?: Partial<HoldingInstruction>;
+  /** PUSHBACK: "tail east" -> 90, "face south" -> nose 180 (compass points as true headings; the sim does not apply magnetic variation to them). */
+  pushTailDeg?: number;
+  pushFaceDeg?: number;
+  /** TAXI: one segment of a progressive taxi ("turn left on Bravo, continue to Charlie"). */
+  segment?: boolean;
+  /** TAXI segment issued by an AI controller: the exact graph node the segment ends at (the intersection where the next taxiway begins). Not parsed from speech. */
+  toNodeId?: string;
   /** STAR: spoken procedure name as parsed ("ROZZE2"), optional transition fix, and whether the clearance is "descend via". */
   starName?: string;
   starTransition?: string;

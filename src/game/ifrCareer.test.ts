@@ -41,7 +41,7 @@ describe('career 8: IFR traffic, Approach then Tower', () => {
     const lands = new Set<string>();
     const names: Record<string, string> = { NKS244: 'Spirit two forty four', AAL1672: 'American sixteen seventy two', NKS377: 'Spirit three seventy seven' };
     let t = 0;
-    while (t < 2100 && !game.isScenarioComplete(e.getState())) {
+    while (t < 2600 && !game.isScenarioComplete(e.getState())) {
       for (const cs of Object.keys(names)) {
         const a = ac(e, cs);
         if (!a) continue;
@@ -56,7 +56,9 @@ describe('career 8: IFR traffic, Approach then Tower', () => {
         } else if (
           toTower.has(cs) && !lands.has(cs) && a.pendingRequest?.kind === 'LANDING' && a.frequencyId === 'TWR' &&
           // Tower clears an arrival only when the runway will be free: nobody that has landed is still on it.
-          Object.keys(names).every((o) => o === cs || !evaluateCheck(e.getState(), `landed:${o}`) || evaluateCheck(e.getState(), `vacated:${o}`))
+          Object.keys(names).every((o) => o === cs || !evaluateCheck(e.getState(), `landed:${o}`) || evaluateCheck(e.getState(), `vacated:${o}`)) &&
+          // ... and no departure is rolling or still low ahead on it (3-10-3).
+          Object.values(e.getState().aircraft).every((o) => !o.isDeparture || !['CLEARED_FOR_TAKEOFF', 'TAKEOFF_ROLL', 'INITIAL_CLIMB'].includes(o.phase))
         ) {
           const r = say(e, `${names[cs]}, runway one three, cleared to land`, 'TWR');
           expect(accepted(r), JSON.stringify(r.outcomes)).toBe(true);
@@ -83,6 +85,8 @@ describe('career 8: IFR traffic, Approach then Tower', () => {
     expect(st.events.some((x) => x.kind === 'GO_AROUND')).toBe(false);
     expect(game.isScenarioComplete(st)).toBe(true);
     const report = game.buildDebrief(st);
+    expect(st.events.filter((x) => ['RUNWAY_INCURSION', 'SEPARATION_VIOLATION'].includes(x.kind) || (x.kind === 'CONFLICT' && x.severity === 'critical')).map((x) => `${x.timeSec} ${x.kind} ${x.text}`)).toEqual([]);
+    expect(report.improvements.filter((x) => /Objective not completed/.test(x))).toEqual([]);
     expect(report.completed).toBe(true);
     expect(['A', 'B', 'C']).toContain(report.grade);
     expect(st.score.unsafeInstructions + st.score.runwayIncursions + st.score.separationViolations).toBe(0);

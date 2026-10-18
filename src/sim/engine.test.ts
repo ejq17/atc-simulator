@@ -5,6 +5,7 @@ import { createEngine } from './engine';
 import { ARRIVING, cmd, find, GA_PARKED, has, HOLDING, makeEngine, makeScenario, run, runUntil } from './__fixtures__/testHelpers';
 import { createTestAirport } from './__fixtures__/testAirport';
 import { createBasicTrafficGenerator } from './traffic';
+import { DEFAULT_PILOT_BEHAVIOUR } from './pilotBehaviour';
 
 describe('readback errors', () => {
   const setup = (rate: number) => makeEngine({ scenario: { spawns: [HOLDING('N723EJ', 'H13', '13')] }, opts: { readbackErrorRate: rate } });
@@ -192,7 +193,8 @@ describe('lifecycle and scoring of completed flights', () => {
     expect(ac.phase).toBe('TAXI_TO_PARKING');
     expect(runUntil(e, () => ac.phase === 'ARRIVED', 400)).toBe(true);
     expect(ac.groundSpeedKt).toBe(0);
-    expect(runUntil(e, () => !has(e, 'N723EJ'), 40)).toBe(true);
+    expect(has(e, 'N723EJ')).toBe(true); // stays at the stand while the stand is occupied (arrivedLingerSec)
+    expect(runUntil(e, () => !has(e, 'N723EJ'), DEFAULT_PILOT_BEHAVIOUR.ground.arrivedLingerSec + 5)).toBe(true);
     const s = e.getState().score;
     expect(s.aircraftHandled).toBe(1);
     expect(s.correctClearances).toBe(3);

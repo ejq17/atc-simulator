@@ -100,6 +100,19 @@ export function taxiToParking(ac: Aircraft, spot: { id: string; category: string
   return clauses(callsign(ac), words('taxi to', where, via.length ? words('via', taxiwayList(via)) : undefined), ...holdShort.map((r) => words('hold short of runway', rwy(r))));
 }
 
+/** "N1AA, pushback approved, tail east" (NON-STANDARD: JO 7110.65 has no pushback phrase; pushback is normally a ramp / company function). */
+export const pushbackApproved = (ac: Aircraft, tail?: string): Phrase => clauses(callsign(ac), 'pushback approved', tail ? `tail ${tail}` : undefined);
+
+/** JO 7110.65 3-7-2 PHRASEOLOGY "READ BACK HOLD INSTRUCTIONS." */
+export const readBackHoldInstructions = (ac: Aircraft): Phrase => clauses(callsign(ac), 'read back hold instructions');
+
+/** One step of a progressive taxi (JO 7110.65 3-7-2: "step-by-step directions and/or directional turns"): "turn left on Bravo, continue to Charlie". */
+export function progressiveStep(ac: Aircraft, s: { taxiways: string[]; turn?: 'left' | 'right'; next?: string }): Phrase {
+  const twy = taxiwayList(s.taxiways);
+  if (s.turn) return clauses(callsign(ac), words('turn', s.turn, 'on', twy), s.next ? words('continue to', taxiwayList([s.next])) : undefined);
+  return clauses(callsign(ac), words('continue taxiing via', twy), s.next ? words('to', taxiwayList([s.next])) : undefined);
+}
+
 export const crossRunway = (ac: Aircraft, runwayId: string): Phrase => clauses(callsign(ac), words('cross runway', rwy(runwayId)));
 
 export const lineUpAndWait = (ac: Aircraft, runwayEnd: string): Phrase => clauses(callsign(ac), words('runway', rwy(runwayEnd)), 'line up and wait');

@@ -269,3 +269,18 @@ Not verified or deliberately left out: the pilot's word for "I have the ATIS" ot
 * Saved sources: `data/sources/raw/phraseology/` (HTML plus text extract of each page listed at the top).
 
 Checks run after the edits: `npx vitest run src/weather src/game/training.test.ts src/game/ifrCareer.test.ts src/game/traffic.test.ts` green, `npx tsc -b --noEmit` clean.
+
+## Ground operations (2026-10-18)
+
+| # | Phrase | Where | FAA basis | Status |
+|---|---|---|---|---|
+| G-1 | "Spirit four fifty one, pushback approved, tail east" / "push back approved, face south" | `rules-tower.ts` `rulePushback`, `ai/phrase.ts` `pushbackApproved` | None: JO 7110.65 has no pushback phrase (searched 3-7, 2-4; pushback is a ramp / company function). The simulator lets Ground issue it. | NON-STANDARD, parsed with reduced confidence and the issue "JO 7110.65 has no pushback phrase" |
+| G-2 | "..., at Gate two, request pushback, IFR to Philadelphia, with information alpha." | `readback.ts` `pushbackRequestCall` | Form after AIM 4-3-18 (identification, location, type of operation, destination) and AIM 4-1-13 (ATIS code). "Request pushback" is not prescribed. | non-standard request wording |
+| G-3 | "..., pushed back from Gate two, ready to taxi, IFR to Philadelphia, with information alpha[, request progressive taxi]." | `readyToTaxiCall` | AIM 4-3-18: "State your aircraft identification, location, type of operation planned (VFR or IFR), and the point of first intended landing." AIM 4-3-18 on progressive taxi. | correct form; the progressive request is plain language |
+| G-4 | "Runway one three, taxi via bravo, hold short of runway four, <callsign>" and the omitted variant | `buildReadback` | 3-7-2 PHRASEOLOGY; AIM 4-3-18 "should always read back ... Any instruction to hold short"; 2-4-3 | omission is a deliberate pilot error (G4) |
+| G-5 | "<callsign>, read back hold instructions" | `ruleReadBackHold`, `ai/phrase.ts` | 3-7-2 PHRASEOLOGY "READ BACK HOLD INSTRUCTIONS." (parser also accepts "read back hold short instructions") | correct |
+| G-6 | "Hold short of runway four, <callsign>" (answer) | `readBackHold` | 2-4-3, AIM 4-3-18 | correct |
+| G-7 | "..., holding position, say again hold short instructions." | `holdShortQueryCall` | none (plain language) | non-standard pilot call |
+| G-8 | "Runway one three, say route, <callsign>" | `sayRouteCall` | none (plain language); the request follows 3-7-2 "must include the specific route" | non-standard pilot call |
+| G-9 | "<callsign>, turn left on Bravo, continue to Charlie" / "continue taxiing via lima to mike" | `ruleContinueSegment`, `ai/phrase.ts` `progressiveStep` | 3-7-2 NOTE "Progressive instructions may include step-by-step directions and/or directional turns"; phrase "TAXI/CONTINUE TAXIING/PROCEED VIA (route), ... TO (location)". "turn left on" is the 3-10-9 turn phrase used on the ground; "continue to <taxiway>" without "taxiing" is shortened | "continue taxiing via ... to ..." correct; "continue to Charlie" non-standard |
+| G-10 | "..., at Lima, request next progressive taxi instructions." | `nextSegmentCall` | AIM 4-3-18 (progressive instructions) | plain language |

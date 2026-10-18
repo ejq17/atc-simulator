@@ -3,7 +3,7 @@
  * bookkeeping lives in per-aircraft `AircraftRuntime` records here so determinism and the public
  * type surface are unaffected.
  */
-import type { Aircraft, AircraftPerformance, ApproachType, Clearance, ClearanceKind, ConflictAlert, ControllerPositionId, FlightPhase, SimEvent, SimulationState } from './types';
+import type { Aircraft, AircraftPerformance, ApproachType, Vec2, Clearance, ClearanceKind, ConflictAlert, ControllerPositionId, FlightPhase, SimEvent, SimulationState } from './types';
 import type { EngineOptions } from './api';
 import type { Rng } from './rng';
 import { getPerformance } from './performance';
@@ -88,7 +88,52 @@ export interface PositionReport {
   distanceNm?: number;
 }
 
+/** A pushback in progress (groundMovement.ts `stepPushback`). */
+export interface PushbackState {
+  /** Stand position and the push point (where the stand lead-in meets the apron lane). */
+  from: Vec2;
+  to: Vec2;
+  /** Graph node at the push point: the taxi route starts here. */
+  nodeId: string;
+  lengthM: number;
+  /** Nose heading when the push is done (true degrees): along the lane, chosen from the lane geometry and the requested direction. */
+  finalHeadingDeg: number;
+  startSec: number;
+  /** Set once the aircraft has stopped at the push point and the heading is final. */
+  stoppedAtSec?: number;
+  /** Requested tail / nose direction as spoken (true degrees), for the record. */
+  requestedTailDeg?: number;
+  requestedFaceDeg?: number;
+}
+
+/** A missing hold-short readback the controller has to obtain (JO 7110.65 2-4-3, 3-7-2; AIM 4-3-18). */
+export interface UnreadHoldShort {
+  clearanceId: string;
+  sinceSec: number;
+  /** The hold-short references of the instruction ("RWY13", "C"). */
+  refs: string[];
+  /** The controller was already charged a communication error for this one. */
+  charged?: boolean;
+}
+
 export interface AircraftRuntime {
+  /** Pushback in progress or completed. */
+  pushback?: PushbackState;
+  /** Nose heading when the push began. */
+  pushStartHeadingDeg?: number;
+  /** The aircraft has been pushed back from its stand (an airliner needs this before it calls ready to taxi). */
+  pushedBack?: boolean;
+  /** An airliner at a gate / cargo stand: pushback is part of its departure. */
+  needsPushback?: boolean;
+  /** When the pilot calls "ready to taxi" (engine start complete). */
+  readyAtSec?: number;
+  /** Time of the last "request pushback" call. */
+  pushbackAskedAtSec?: number;
+  /** The pilot asked for progressive taxi: the controller gives the route in steps. */
+  progressive?: boolean;
+  unreadHoldShort?: UnreadHoldShort;
+  /** "Turn left on Bravo" just heard: the turn constraint for the segment that follows in the same transmission. */
+  segmentTurn?: { dir: 'left' | 'right'; taxiway: string; atSec: number };
   /** Runway exit instruction for the rollout in progress / about to start. */
   exit?: ExitInstruction;
   /** "Hold short of runway N" given during the landing roll / on final: the intersecting runway the rollout must stop short of. */
@@ -218,6 +263,23 @@ export interface SimContext {
   currentAi?: ControllerPositionId;
   /** An AI-issued command has been seen: the score then counts only the player's own actions. */
   aiSeen?: boolean;
+}
+
+/**
+ * Ground behaviour values in force. Pilot mistakes (hold-short readback omissions, wrong taxiways) and unfamiliar pilots belong to the
+ * "imperfect pilots" setting: they are off when the engine's `readbackErrorRate` is 0 (training mode, and the engine tests).
+ */
+export function groundBehaviour(ctx: Pick<SimContext, 'pilotBehaviour' | 'readbackErrorRate' | 'state'>): PilotBehaviour['ground'] {
+  const g = ctx.pilotBehaviour.ground;
+  if (ctx.readbackErrorRate > 0) return g;
+  // A scenario that sets one of these values explicitly (a lesson that teaches hold-short readbacks) turns it on whatever the readback error rate.
+  const ov = ctx.state.scenario.pilotBehaviour?.ground ?? {};
+  return {
+    ...g,
+    holdShortOmitFraction: ov.holdShortOmitFraction !== undefined ? g.holdShortOmitFraction : 0,
+    taxiwayErrorShare: ov.taxiwayErrorShare !== undefined ? g.taxiwayErrorShare : 0,
+    unfamiliarFraction: ov.unfamiliarFraction !== undefined ? g.unfamiliarFraction : 0,
+  };
 }
 
 export function newRuntime(firstCallAtSec: number): AircraftRuntime {

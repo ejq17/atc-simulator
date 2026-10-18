@@ -92,7 +92,7 @@ export function createEngine(opts: EngineOptionsExt): SimulationEngine & Simulat
   setSimulationEpoch(state, opts.utcStartMs ?? Date.now());
   const ctx: SimContext = {
     state,
-    pilotBehaviour: resolvePilotBehaviour(scenario.pilotBehaviour),
+    pilotBehaviour: resolvePilotBehaviour(scenario.pilotBehaviour, scenario.mode),
     rng,
     runtime: new Map(),
     onPilotTransmission: opts.onPilotTransmission,

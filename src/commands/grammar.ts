@@ -3,7 +3,7 @@ import type { ParseContext } from './context';
 import { makeFixMatcher } from './fixes';
 import type { Toks } from './match';
 import {
-  makeClearedToParkingRule, makeContinueTaxiRule, makeHoldShortRule, makeTaxiRule, ruleCancel, ruleCross, ruleHoldPosition, ruleLineUp, ruleTaxiIntoPosition,
+  makeClearedToParkingRule, makeContinueTaxiRule, makeHoldShortRule, makeTaxiRule, ruleCancel, ruleContinueSegment, ruleCross, ruleHoldPosition, ruleLineUp, ruleReadBackHold, ruleTaxiIntoPosition,
 } from './rules-ground';
 import { ruleHoldAtFix, ruleMissedApproach } from './rules-hold';
 import { makeAltitudeRule, ruleHeading, rulePattern, ruleSpeed } from './rules-flight';
@@ -44,7 +44,7 @@ export function buildRules(ctx: Pick<ParseContext, 'fixes' | 'taxiways' | 'runwa
   return [
     ruleAirportInfo, ruleWind, ruleSayAgain, ruleBirdAdvisory, ruleBrakingAdvisory, ruleRvr, ruleRunwayLights, ruleStar(ctx.arrivals ?? [], fixes), ruleTaxiIntoPosition, withLuawTraffic(ruleLineUp), ruleCancelTakeoff, ruleRadarServiceTerminated, ruleFrequencyApproved, ruleSquawk,
     ruleExitRunway, rulePatternInstruction, ruleReportPosition, ruleFollowTraffic, ruleTrafficAdvisory, ruleTakeoff, ruleLand, ruleHoldAtFix(fixes),
-    ruleMissedApproach, ruleGoAround, rulePushback, ruleRadarContact(fixes), ruleResumeNav, makeClearedToParkingRule(ctx.taxiways, ctx.runwayEnds), ruleApproach, ruleDirectFix(fixes),
+    ruleMissedApproach, ruleGoAround, rulePushback, ruleReadBackHold, ruleContinueSegment, ruleRadarContact(fixes), ruleResumeNav, makeClearedToParkingRule(ctx.taxiways, ctx.runwayEnds), ruleApproach, ruleDirectFix(fixes),
     ruleIfrClearance, ruleContact, makeHoldShortRule(ctx.runwayEnds), ruleHoldPosition, ruleCancel, ruleCross, makeContinueTaxiRule(ctx.taxiways, ctx.runwayEnds), makeTaxiRule(ctx.taxiways, ctx.runwayEnds),
     ruleHeading, ruleSpeed, makeAltitudeRule(fixes), rulePattern, ruleContinue, ruleUnsupported,
     ruleRunwayRef, ruleRoute, rulePosition(fixes), ruleFiller,

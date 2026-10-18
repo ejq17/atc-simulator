@@ -9,6 +9,7 @@ import {
   spokenAirportName, spokenHeading, spokenRunway, spokenSpeed, spokenTaxiway, spokenText, titleCase,
 } from './spoken';
 import { cardinal } from '../sim/geo';
+import { seeded01 } from '../sim/rng';
 import { findNavFix } from '../sim/navigation';
 import type { ApproachType } from '../sim/types';
 
@@ -18,10 +19,14 @@ export interface ReadbackEnv {
   rng?: () => number;
   /** Probability per eligible clearance of a readback mistake (default 0). */
   errorRate?: number;
+  /** Share of pilots (seeded per aircraft and clearance) who leave the hold-short part out of a taxi readback (JO 7110.65 2-4-3). Default 0. */
+  holdShortOmitFraction?: number;
+  /** Probability of a wrong taxiway in the route read back, as a share of `errorRate`. Default 0. */
+  taxiwayErrorShare?: number;
 }
 
 export interface ReadbackError {
-  kind: 'runway' | 'heading';
+  kind: 'runway' | 'heading' | 'taxiway';
   /** What should have been read back, e.g. "runway 13" / "heading 270". */
   correct: string;
   /** What the pilot actually said, e.g. "runway 31" / "heading 260". */
@@ -31,6 +36,22 @@ export interface ReadbackError {
 export interface ReadbackResult {
   text: string;
   error?: ReadbackError;
+  /** TAXI / TAXI_TO_PARKING: the hold-short references (runway ids as given, taxiway letters) the pilot left out of the readback. */
+  omittedHoldShort?: string[];
+}
+
+/** Taxiway designators of the airport, sorted ("A", "A1", "B" ...): the pool for a wrong-taxiway readback. */
+function airportTaxiways(airport: Airport): string[] {
+  const set = new Set<string>();
+  for (const e of airport.taxiwayGraph.edges) if (/^[A-Z]{1,2}\d{0,2}$/.test(e.taxiway)) set.add(e.taxiway);
+  return [...set].sort();
+}
+
+const isRunwayRef = (r: string): boolean => /^(RWY|RUNWAY)?\s*\d/i.test(r);
+
+/** The hold-short instructions as read back: "Hold short of runway one three, hold short of Charlie". */
+export function holdShortReadbackText(hs: string[] | undefined): string {
+  return (hs ?? []).map((r) => (isRunwayRef(r) ? `hold short of runway ${runwayRef(r)}` : `hold short of ${spokenTaxiway(r.replace(/^TWY\s*/i, ''))}`)).join(', ');
 }
 
 /** Spoken form of a runway reference that may be an end ("13"), a pair ("13/31") or "RWY22". */
@@ -62,7 +83,7 @@ function viaPhrase(route?: string[]): string {
 
 function holdShortPhrase(hs?: string[]): string {
   if (!hs || !hs.length) return '';
-  return hs.map((r) => (/^(RWY|RUNWAY)?\s*\d/i.test(r) ? `, hold short of runway ${runwayRef(r)}` : `, hold short of ${spokenTaxiway(r.replace(/^TWY\s*/i, ''))}`)).join('');
+  return hs.map((r) => (isRunwayRef(r) ? `, hold short of runway ${runwayRef(r)}` : `, hold short of ${spokenTaxiway(r.replace(/^TWY\s*/i, ''))}`)).join('');
 }
 
 function allEndIds(airport: Airport): string[] {
@@ -107,6 +128,7 @@ function frequencyPhrase(c: Clearance, env: ReadbackEnv): string {
 export function buildReadback(aircraft: Aircraft, c: Clearance, env: ReadbackEnv): ReadbackResult {
   const cs = aircraft.spokenCallsign;
   let error: ReadbackError | undefined;
+  let omittedHoldShort: string[] | undefined;
   const runwaySpoken = (endId: string): string => {
     if (!error && shouldErr(env)) {
       const w = wrongRunway(endId, env);
@@ -138,7 +160,22 @@ export function buildReadback(aircraft: Aircraft, c: Clearance, env: ReadbackEnv
           head = `Taxi to ${park ? spokenParking(park) : twy ? spokenTaxiway(twy) : spokenText(c.destination)}`;
         }
         else head = c.kind === 'TAXI_TO_PARKING' ? 'Taxi to parking' : 'Taxi';
-        return `${head}${viaPhrase(c.route)}${holdShortPhrase(c.holdShort)}`;
+        let route = c.route;
+        // A wrong taxiway in the route read back (seeded from the aircraft, so the shared random stream is untouched).
+        if (!error && route?.length && env.rng && (env.errorRate ?? 0) > 0 && (env.taxiwayErrorShare ?? 0) > 0
+          && seeded01(aircraft.seed, `twy-err:${c.id}`) < (env.errorRate ?? 0) * (env.taxiwayErrorShare ?? 0)) {
+          const pool = airportTaxiways(env.airport).filter((t) => !route!.some((x) => x.toUpperCase() === t));
+          if (pool.length) {
+            const idx = Math.min(route.length - 1, Math.floor(seeded01(aircraft.seed, `twy-idx:${c.id}`) * route.length));
+            const wrong = pool[Math.min(pool.length - 1, Math.floor(seeded01(aircraft.seed, `twy-wrong:${c.id}`) * pool.length))];
+            error = { kind: 'taxiway', correct: `via ${route.map(spokenTaxiway).join(', ')}`, spoken: `via ${route.map((t, k) => spokenTaxiway(k === idx ? wrong : t)).join(', ')}` };
+            route = route.map((t, k) => (k === idx ? wrong : t));
+          }
+        }
+        // Some pilots leave the hold-short out of the readback; the controller must obtain it (JO 7110.65 2-4-3, 3-7-2).
+        const omit = !!c.holdShort?.some(isRunwayRef) && (env.holdShortOmitFraction ?? 0) > 0 && seeded01(aircraft.seed, `hs-omit:${c.id}`) < (env.holdShortOmitFraction ?? 0);
+        if (omit) omittedHoldShort = [...c.holdShort!];
+        return `${head}${viaPhrase(route)}${omit ? '' : holdShortPhrase(c.holdShort)}`;
       }
       case 'HOLD_POSITION':
         return 'Holding position';
@@ -179,7 +216,7 @@ export function buildReadback(aircraft: Aircraft, c: Clearance, env: ReadbackEnv
         return `${leg} runway ${rwy}`;
       }
       case 'PUSHBACK':
-        return 'Pushing back';
+        return c.pushTailDeg !== undefined ? `Pushing back, tail ${cardinal(c.pushTailDeg)}` : c.pushFaceDeg !== undefined ? `Pushing back, facing ${cardinal(c.pushFaceDeg)}` : 'Pushing back';
       case 'IFR_CLEARANCE':
         return ifrClearanceReadback(c);
       case 'APPROACH': {
@@ -236,6 +273,7 @@ export function buildReadback(aircraft: Aircraft, c: Clearance, env: ReadbackEnv
   })();
   const result: ReadbackResult = { text: body === '' ? '' : `${body}, ${cs}` };
   if (error) result.error = error;
+  if (omittedHoldShort) result.omittedHoldShort = omittedHoldShort;
   return result;
 }
 
@@ -354,11 +392,41 @@ function facility(aircraft: Aircraft, env: ReadbackEnv): string {
   return facilityCallName(env.airport, aircraft.frequencyMhz, aircraft.frequencyId);
 }
 
-export function readyToTaxiCall(aircraft: Aircraft, env: ReadbackEnv, parking?: ParkingPosition): string {
-  const at = parking ? `at ${spokenText(parking.name)}` : 'on the ramp';
+export function readyToTaxiCall(aircraft: Aircraft, env: ReadbackEnv, parking?: ParkingPosition, o: { atisLetter?: string; pushedBack?: boolean; progressive?: boolean } = {}): string {
+  const where = parking ? spokenText(parking.name) : 'the ramp';
+  const at = o.pushedBack ? `pushed back from ${where}` : parking ? `at ${where}` : 'on the ramp';
   const rules = aircraft.flightRules === 'IFR' ? 'IFR' : 'VFR';
-  // AIM 4-3-18: aircraft identification, location, type of operation (VFR / IFR) and the point of first intended landing
-  return `${facility(aircraft, env)}, ${aircraft.spokenCallsign}, ${at}, ready to taxi, ${rules} to ${spokenAirportName(aircraft.flightPlan?.destination ?? aircraft.destination)}.`;
+  // AIM 4-3-18: aircraft identification, location, type of operation (VFR / IFR) and the point of first intended landing.
+  // "with information <letter>": AIM 4-1-13 (the pilot states the ATIS code on initial contact).
+  const info = o.atisLetter ? `, with information ${phonetic(o.atisLetter)}` : '';
+  const prog = o.progressive ? ', request progressive taxi' : '';
+  return `${facility(aircraft, env)}, ${aircraft.spokenCallsign}, ${at}, ready to taxi, ${rules} to ${spokenAirportName(aircraft.flightPlan?.destination ?? aircraft.destination)}${info}${prog}.`;
+}
+
+/**
+ * Airliner at its gate asks to push back. NOT FAA phraseology: JO 7110.65 has no pushback phrase (pushback is normally a ramp / company
+ * function; the simulator lets Ground approve it). Form: callsign, location, request, destination and ATIS code as in AIM 4-3-18 / 4-1-13.
+ */
+export function pushbackRequestCall(aircraft: Aircraft, env: ReadbackEnv, parking?: ParkingPosition, o: { atisLetter?: string; repeat?: boolean } = {}): string {
+  const at = parking ? `at ${spokenText(parking.name)}` : 'at the gate';
+  const rules = aircraft.flightRules === 'IFR' ? 'IFR' : 'VFR';
+  const info = o.atisLetter ? `, with information ${phonetic(o.atisLetter)}` : '';
+  return `${facility(aircraft, env)}, ${aircraft.spokenCallsign}, ${at}, ${o.repeat ? 'still requesting pushback' : 'request pushback'}, ${rules} to ${spokenAirportName(aircraft.flightPlan?.destination ?? aircraft.destination)}${info}.`;
+}
+
+/** The pilot of a taxi instruction without a route asks for it. "Say route" is plain language (JO 7110.65 has no phrase for the request). */
+export function sayRouteCall(aircraft: Aircraft, runwayEnd: string | undefined): string {
+  return `${runwayEnd ? `Runway ${runwayRef(runwayEnd)}, ` : ''}say route, ${aircraft.spokenCallsign}`;
+}
+
+/** The pilot stopped short of an unconfirmed hold-short and asks for the instruction again (plain language; JO 7110.65 2-4-3, 3-7-2). */
+export function holdShortQueryCall(aircraft: Aircraft, env: ReadbackEnv, o: { where?: string } = {}): string {
+  return `${facility(aircraft, env)}, ${aircraft.spokenCallsign}, holding position${o.where ? ` at ${o.where}` : ''}, say again hold short instructions.`;
+}
+
+/** Progressive taxi: the pilot has reached the end of the segment and waits for the next one (AIM 4-3-18; plain language). */
+export function nextSegmentCall(aircraft: Aircraft, env: ReadbackEnv, taxiway?: string): string {
+  return `${facility(aircraft, env)}, ${aircraft.spokenCallsign}, ${taxiway ? `at ${spokenTaxiway(taxiway)}, ` : ''}request next progressive taxi instructions.`;
 }
 
 export function holdingShortCall(aircraft: Aircraft, env: ReadbackEnv, runwayEnd: string, readyForDeparture: boolean, o: { requestFullLengthAt?: string } = {}): string {

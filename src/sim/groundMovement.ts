@@ -15,6 +15,7 @@ import { closedTaxiwayHoldCall } from '../radio/readback';
 import type { AircraftRuntime, SimContext } from './context';
 import { findRunwayEnd } from './runways';
 import { runwayCrossingsAlong } from './pathfinding';
+import { seeded01 } from './rng';
 
 export const TAXI_ACCEL_MPS2 = 1.0;
 export const TAXI_DECEL_CAP_MPS2 = 1.2;
@@ -46,7 +47,24 @@ function nodeAuthorized(ac: Aircraft, node: TaxiNode): boolean {
 function isHardStopNode(ac: Aircraft, node: TaxiNode, isLast: boolean): boolean {
   if (isLast) return true;
   const route = ac.route!;
+  // A hold-short the pilot did not read back (JO 7110.65 2-4-3): no authorisation lifts it, only a read-back one.
+  if (route.unreadStopNodeIds?.includes(node.id)) return true;
   return route.stopAtNodeIds.includes(node.id) && !nodeAuthorized(ac, node);
+}
+
+/**
+ * Cruise taxi speed of this aircraft (kt): the type's figure times a seeded factor in [taxiSpeedMinFactor, 1], so a queue of one type does not
+ * move in lockstep. DESIGN VALUE (pilotBehaviour.ground); the type figures are inside the AC 150/5300-13B Chg 1 range for taxiways (13-30 kt).
+ */
+export function taxiSpeedFactor(ctx: SimContext, ac: Aircraft): number {
+  const min = ctx.pilotBehaviour.ground.taxiSpeedMinFactor;
+  return min + (1 - min) * seeded01(ac.seed, 'taxi-speed');
+}
+
+/** Corner speed for a turn of `angleDeg` between route legs: full speed up to 15 degrees, the type's turn speed from 90 degrees, linear in between. */
+export function cornerSpeedMps(angleDeg: number, vFull: number, vTurn: number): number {
+  const k = Math.max(0, Math.min(1, (Math.abs(angleDeg) - 15) / 75));
+  return vFull - (vFull - vTurn) * k;
 }
 
 export function findLeader(ctx: SimContext, ac: Aircraft): { gap: number; minGap: number } | undefined {
@@ -57,7 +75,7 @@ export function findLeader(ctx: SimContext, ac: Aircraft): { gap: number; minGap
     if (o === ac || !o.onGround || o.phase === 'PARKED' || o.phase === 'ARRIVED') continue;
     // An aircraft waiting at its parking position (READY, or standing on a stand with no route) is not traffic on the taxiway: it
     // does not hold up an aircraft passing on the apron connector. Only aircraft on the graph edges count for spacing.
-    if (o.phase === 'READY' || (!o.route && o.groundSpeedKt < 0.1 && ctx.state.airport.parking.some((p) => dist(p.pos, o.pos) < 8))) continue;
+    if ((o.phase === 'READY' && !ctx.runtime?.get(o.id)?.pushedBack) || (!o.route && o.groundSpeedKt < 0.1 && ctx.state.airport.parking.some((p) => dist(p.pos, o.pos) < 8))) continue;
     const r = vSub(o.pos, ac.pos);
     const along = vDot(r, h);
     let gap = along;
@@ -181,6 +199,10 @@ function stepGround(ctx: SimContext, ac: Aircraft, dt: number): void {
     setPhase(ctx, ac, 'TAKEOFF_ROLL');
     return;
   }
+  if (ac.phase === 'PUSHBACK') {
+    stepPushback(ctx, ac, rt, dt);
+    return;
+  }
   if (ac.phase === 'PARKED' || ac.phase === 'ARRIVED') {
     ac.groundSpeedKt = 0;
     ac.airspeedKt = 0;
@@ -213,7 +235,7 @@ function stepGround(ctx: SimContext, ac: Aircraft, dt: number): void {
   // Remain stopped while the hold instruction stands.
   if (rt.stoppedAtNodeId) {
     const node = graph.nodes[rt.stoppedAtNodeId];
-    const blocked = !!route && route.stopAtNodeIds.includes(node.id) && !nodeAuthorized(ac, node);
+    const blocked = !!route && ((route.stopAtNodeIds.includes(node.id) && !nodeAuthorized(ac, node)) || !!route.unreadStopNodeIds?.includes(node.id));
     const routeDone = !route || route.progressIndex >= route.nodeIds.length;
     if (blocked || routeDone) {
       holdStill(ac, v, dt);
@@ -223,7 +245,14 @@ function stepGround(ctx: SimContext, ac: Aircraft, dt: number): void {
   }
 
   const hasPath = !!ac.route && ac.route.progressIndex < ac.route.nodeIds.length;
-  const vmax = ktToMps(lineUpMode ? perf.taxiTurnSpeedKt : perf.taxiSpeedKt);
+  const sf = taxiSpeedFactor(ctx, ac);
+  let vmax = ktToMps((lineUpMode ? perf.taxiTurnSpeedKt : perf.taxiSpeedKt) * sf);
+  // Taxilanes and apron connectors: "not more than 15 mph (13 kts)" (AC 150/5300-13B Chg 1, Appendix 1 glossary "Taxilane").
+  if (ac.route && ac.route.progressIndex < ac.route.nodeIds.length) {
+    const r0 = ac.route;
+    const apronNode = (id: string | undefined) => { const k = id ? graph.nodes[id]?.kind : undefined; return k === 'parking' || k === 'apron'; };
+    if (apronNode(r0.nodeIds[r0.progressIndex]) || apronNode(r0.nodeIds[r0.progressIndex - 1])) vmax = Math.min(vmax, ktToMps(ctx.pilotBehaviour.ground.taxilaneMaxKt));
+  }
   let vTarget = ac.flags.holdingPosition ? 0 : vmax;
   let stopDist = Infinity;
   const pts: Vec2[] = [ac.pos];
@@ -235,7 +264,7 @@ function stepGround(ctx: SimContext, ac: Aircraft, dt: number): void {
     vTarget = 0;
   } else {
     const r = ac.route!;
-    const vt = ktToMps(perf.taxiTurnSpeedKt);
+    const vt = ktToMps(perf.taxiTurnSpeedKt * sf);
     let cum = 0;
     for (let j = 1; j < pts.length; j++) {
       const segLen = dist(pts[j - 1], pts[j]);
@@ -258,8 +287,10 @@ function stepGround(ctx: SimContext, ac: Aircraft, dt: number): void {
       if (cum < 200 && j + 1 < pts.length) {
         const dirIn = segLen > 0.5 ? vecToHeading(vSub(pts[j], pts[j - 1])) : ac.headingDeg;
         const dirOut = vecToHeading(vSub(pts[j + 1], pts[j]));
-        if (Math.abs(headingDiff(dirIn, dirOut)) > 25) {
-          vTarget = Math.min(vTarget, Math.sqrt(vt * vt + 2 * TAXI_DECEL_PLAN_MPS2 * cum));
+        const turnDeg = Math.abs(headingDiff(dirIn, dirOut));
+        if (turnDeg > 15) {
+          const vc = Math.min(vmax, cornerSpeedMps(turnDeg, vmax, Math.min(vt, vmax)));
+          vTarget = Math.min(vTarget, Math.sqrt(vc * vc + 2 * TAXI_DECEL_PLAN_MPS2 * cum));
         }
       }
     }
@@ -360,6 +391,73 @@ function stepGround(ctx: SimContext, ac: Aircraft, dt: number): void {
   ac.verticalSpeedFpm = 0;
   if (ac.groundSpeedKt < 0.05) ac.groundSpeedKt = 0;
   if (ac.groundSpeedKt === 0) ac.airspeedKt = 0;
+}
+
+/** Acceleration / deceleration of the tug, m/s^2. DESIGN VALUE (a tug brings the aircraft to its push speed in a few seconds). */
+const PUSH_ACCEL_MPS2 = 0.4;
+
+/** Another aircraft standing or moving in the way of the tail (the push point and the lane behind it). */
+function pushBlocked(ctx: SimContext, ac: Aircraft, ahead: Vec2, pushTo: Vec2): boolean {
+  const la = perfOf(ac).lengthM;
+  for (const o of Object.values(ctx.state.aircraft)) {
+    if (o === ac || !o.onGround || o.phase === 'ARRIVED' || o.phase === 'PARKED') continue;
+    if (!o.route && o.groundSpeedKt < 0.1 && ctx.state.airport.parking.some((p) => dist(p.pos, o.pos) < 8)) continue; // standing on its own stand
+    const need = (la + perfOf(o).lengthM) / 2 + 8;
+    // The tail swings through half a length either side of the push direction.
+    if (dist(o.pos, ahead) < need || dist(o.pos, pushTo) < need) return true;
+  }
+  return false;
+}
+
+/**
+ * Pushback: the aircraft is moved backwards (heading unchanged, track opposite) along the stand lead-in to the push point at the tug speed
+ * (`pilotBehaviour.ground.pushbackSpeedMps`), swinging its nose onto the lane over the last part of the push, then stands for
+ * `pushSettleSec` (brakes set, tug disconnected). The aircraft is a normal ground target for the spacing logic throughout.
+ */
+function stepPushback(ctx: SimContext, ac: Aircraft, rt: AircraftRuntime, dt: number): void {
+  const pb = rt.pushback;
+  const gb = ctx.pilotBehaviour.ground;
+  if (!pb) { ac.groundSpeedKt = 0; ac.airspeedKt = 0; return; }
+  const now = ctx.state.clock.timeSec;
+  const dir = headingToVec(normHeading(Math.atan2(pb.to.x - pb.from.x, pb.to.y - pb.from.y) * 180 / Math.PI));
+  if (now < pb.startSec) { ac.groundSpeedKt = 0; ac.airspeedKt = 0; return; }
+  const L = Math.max(1e-6, pb.lengthM);
+  const along = Math.min(L, Math.max(0, vDot(vSub(ac.pos, pb.from), dir)));
+  const remaining = L - along;
+  const startHeading = rt.pushStartHeadingDeg ?? (rt.pushStartHeadingDeg = ac.headingDeg);
+  const delta = headingDiff(startHeading, pb.finalHeadingDeg);
+  let v = ktToMps(ac.groundSpeedKt);
+  if (remaining > 1e-3) {
+    const ahead = { x: ac.pos.x + dir.x * Math.min(remaining, 15 + perfOf(ac).lengthM / 2), y: ac.pos.y + dir.y * Math.min(remaining, 15 + perfOf(ac).lengthM / 2) };
+    const blocked = now >= (pb.startSec) && pushBlocked(ctx, ac, ahead, pb.to);
+    const vTarget = blocked ? 0 : Math.min(gb.pushbackSpeedMps, Math.sqrt(2 * PUSH_ACCEL_MPS2 * remaining) + 0.05);
+    v = vTarget > v ? Math.min(vTarget, v + PUSH_ACCEL_MPS2 * dt) : Math.max(vTarget, v - PUSH_ACCEL_MPS2 * dt);
+    const step = Math.min(v * dt, remaining);
+    ac.pos = { x: ac.pos.x + dir.x * step, y: ac.pos.y + dir.y * step };
+  } else {
+    v = 0;
+    ac.pos = { x: pb.to.x, y: pb.to.y };
+  }
+  // The nose swings over the last stretch of the push (and carries on after it stops if the lead-in was too short for the turn).
+  const swingM = Math.min(L, (Math.abs(delta) / Math.max(0.1, gb.pushSwingRateDegPerSec)) * gb.pushbackSpeedMps);
+  const progress = swingM <= 1e-6 ? 1 : Math.max(0, Math.min(1, (along - (L - swingM)) / swingM));
+  const desired = normHeading(startHeading + delta * progress);
+  const err = headingDiff(ac.headingDeg, desired);
+  const maxStep = gb.pushSwingRateDegPerSec * dt;
+  ac.headingDeg = normHeading(ac.headingDeg + Math.max(-maxStep, Math.min(maxStep, err)));
+  ac.groundSpeedKt = mpsToKt(v);
+  ac.airspeedKt = ac.groundSpeedKt;
+  ac.trackDeg = v > 0.01 ? normHeading(Math.atan2(dir.x, dir.y) * 180 / Math.PI) : ac.headingDeg;
+  ac.verticalSpeedFpm = 0;
+  if (ac.groundSpeedKt < 0.05) { ac.groundSpeedKt = 0; ac.airspeedKt = 0; }
+  if (remaining <= 1e-3 && Math.abs(headingDiff(ac.headingDeg, pb.finalHeadingDeg)) < 0.5 && pb.stoppedAtSec === undefined) {
+    ac.headingDeg = pb.finalHeadingDeg;
+    ac.trackDeg = ac.headingDeg;
+    pb.stoppedAtSec = now;
+    rt.pushedBack = true;
+    rt.stoppedAtNodeId = undefined;
+    emitEvent(ctx, { kind: 'INFO', aircraftId: ac.id, callsign: ac.callsign, text: `${ac.callsign} pushed back ${Math.round(L)} m to the lane, nose ${String(Math.round(pb.finalHeadingDeg)).padStart(3, '0')}`, severity: 'info', speaker: 'SYSTEM' });
+  }
 }
 
 function holdStill(ac: Aircraft, v: number, dt: number): void {

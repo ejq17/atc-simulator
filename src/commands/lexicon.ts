@@ -125,7 +125,7 @@ export const FUZZ_PROTECTED: ReadonlySet<string> = new Set([
   'monitor', 'navigation', 'next', 'normal', 'north', 'northeast', 'northwest', 'number', 'option', 'own', 'park', 'passing',
   'pattern', 'please', 'point', 'present', 'proceed', 'published', 'push', 'pushback', 'radar', 'radial', 'reduce', 'repeat',
   'report', 'resume', 'right', 'route', 'runways', 'say', 'shorts', 'slow', 'south', 'southeast', 'southwest', 'speed',
-  'squawk', 'standard', 'start', 'straight', 'switch', 'taxiing', 'taxiway', 'taxiways', 'than', 'that', 'then', 'there',
+  'squawk', 'standard', 'start', 'straight', 'switch', 'tail', 'tails', 'face', 'facing', 'nose', 'taxiing', 'taxiway', 'taxiways', 'than', 'that', 'then', 'there',
   'thousand', 'time', 'touch', 'traffic', 'turn', 'turns', 'until', 'using', 'vectors', 'visual', 'west', 'when', 'will',
   'wind', 'winds', 'with', 'within', 'your', 'ils', 'rnav', 'vor', 'loc', 'fix', 'flight', 'level', 'ready', 'copy', 'wilco',
   'like', 'fine', 'lane', 'date', 'rate', 'mate', 'wine', 'came', 'same', 'name', 'game', 'gave', 'have', 'take',

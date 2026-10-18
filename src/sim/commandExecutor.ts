@@ -12,9 +12,9 @@
 import type {
   Aircraft, Airport, Clearance, ClearanceKind, CommandOutcome, ControllerPositionId, ParsedCommand, Runway, TaxiNode, TaxiwayGraph, Vec2,
 } from './types';
-import { dist, ftToM, headingDiff, magneticToTrue, nmToM } from './geo';
+import { cardinal, dist, ftToM, headingDiff, headingToVec, magneticToTrue, nmToM, vCross, vLen, vSub } from './geo';
 import {
-  activeClearance, advancePhase, completeClearances, emitEvent, getRuntime, perfOf, pilotSay, setPhase, speechDurationSec,
+  activeClearance, advancePhase, completeClearances, emitEvent, getRuntime, groundBehaviour, perfOf, pilotSay, setPhase, speechDurationSec,
 } from './context';
 import type { AircraftRuntime, ReadbackErrorRecord, SimContext } from './context';
 import { findRunway, findRunwayEnd, alongCross, normalizeRunwayEndId } from './runways';
@@ -24,12 +24,14 @@ import type { TaxiRoute } from './pathfinding';
 import { pickRunwayHold, runwayHoldCandidates, runwayRemainingM, takeoffRunM } from './holdSelection';
 import { spokenTaxiway } from '../radio/spoken';
 import { computeStopNodes } from './groundMovement';
+import { pushbackGeometry, pushbackStand, PUSH_DIRECTION_TOLERANCE_DEG } from './pushback';
+import { pilotUnfamiliar } from './pilotBehaviour';
 import { glideAltitudeFt, initiateGoAround } from './flightDynamics';
 import { freeParkingCandidates, parkingOccupant, resolveParkingQuery } from './parkingResolver';
 import { assessClearanceSafety, recordUnsafeClearance } from './conflicts';
 import { crossingGate, releaseGate } from './coordination';
 import { frequencyById, frequencyByMhz, frequencyForPosition, hearsFrequency, formatMhz } from '../radio/frequencies';
-import { buildReadback, buildSayAgain, buildUnable } from '../radio/readback';
+import { buildReadback, buildSayAgain, buildUnable, holdShortReadbackText, sayRouteCall } from '../radio/readback';
 import { spokenRunway } from '../radio/spoken';
 import { SPEED_LIMIT_BELOW_10K_KT, lineUpTimeSec, patternAltitudeFt } from './performance';
 import { findNavFix, indexOfFix } from './navigation';
@@ -119,7 +121,8 @@ export function validateCommand(ctx: SimContext, cmdIn: ParsedCommand, opts?: Ex
   }
 }
 
-function executeInner(ctx: SimContext, cmdIn: ParsedCommand, opts?: ExecOpts): CommandOutcome {
+function executeInner(ctx: SimContext, cmdInput: ParsedCommand, opts?: ExecOpts): CommandOutcome {
+  let cmdIn = cmdInput;
   const { state } = ctx;
   const airport = state.airport;
   const now = state.clock.timeSec;
@@ -173,6 +176,13 @@ function executeInner(ctx: SimContext, cmdIn: ParsedCommand, opts?: ExecOpts): C
       reason: `Not on frequency: ${ac.callsign} is on ${formatMhz(ac.frequencyMhz)}${here ? ` (${here.id})` : ''}; you are transmitting on ${formatMhz(ctrlFreq)}${mine ? ` (${mine.id})` : ` (${position})`}.`,
       commError: true,
     });
+  }
+
+  if (cmdIn.kind === 'READ_BACK_HOLD') return readBackHold(ctx, ac, rt, cmdIn, position);
+
+  // "Turn left on Bravo" is a runway exit on the landing roll but a progressive-taxi turn once the aircraft is taxiing (JO 7110.65 3-7-2, 3-10-9).
+  if (cmdIn.kind === 'EXIT_RUNWAY' && ac.onGround && cmdIn.exitTaxiway && !['LANDING', 'ROLLOUT', 'TAKEOFF_ROLL', 'CLEARED_FOR_TAKEOFF', 'LINE_UP_AND_WAIT'].includes(ac.phase)) {
+    cmdIn = { ...cmdIn, kind: 'TAXI', segment: true, route: [cmdIn.exitTaxiway], exitTaxiway: undefined };
   }
 
   if (cmdIn.kind === 'SAY_AGAIN') {
@@ -277,8 +287,10 @@ function executeInner(ctx: SimContext, cmdIn: ParsedCommand, opts?: ExecOpts): C
     ac.flags.readbackErrorClearanceId = undefined;
   }
 
-  const rb = buildReadback(ac, clr, { airport, rng: ctx.rng, errorRate: ctx.readbackErrorRate });
+  const gb = groundBehaviour(ctx);
+  const rb = buildReadback(ac, clr, { airport, rng: ctx.rng, errorRate: ctx.readbackErrorRate, holdShortOmitFraction: gb.holdShortOmitFraction, taxiwayErrorShare: gb.taxiwayErrorShare });
   if (rb.text) pilotSay(ctx, ac, rb.text, { readback: true, clearanceId: clr.id });
+  if (rb.omittedHoldShort) markUnreadHoldShort(ctx, ac, rt, clr, rb.omittedHoldShort);
   else ac.radioState = rt.readbackError ? 'WAITING_FOR_READBACK' : 'IDLE'; // informational instruction: no readback
   if (rb.error) {
     rt.readbackError = { sinceSec: now, kind: cmd.kind as ReadbackErrorRecord['kind'], clearanceId: clr.id, correct: rb.error.correct, spoken: rb.error.spoken };
@@ -325,7 +337,7 @@ function missingEntities(cmd: ParsedCommand, g?: RunwayEndGeom): string[] {
   const m: string[] = [];
   switch (cmd.kind) {
     case 'TAXI':
-      if (!cmd.destination && !cmd.runwayEnd) m.push('taxi destination');
+      if (!cmd.destination && !cmd.runwayEnd && !cmd.segment) m.push('taxi destination');
       break;
     case 'TAKEOFF':
     case 'LAND':
@@ -475,13 +487,17 @@ function parseRunwayDestination(raw: string): string | undefined {
 // ---------------------------------------------------------------------------
 
 function planTaxi(env: Env): PlanResult {
-  const { ac, rt, cmd, airport, ctx } = env;
+  const { ac, rt, cmd, airport, ctx, now } = env;
   const graph = airport.taxiwayGraph;
   if (!ac.onGround) return unable(env, `${ac.callsign} is airborne; cannot taxi.`, "we're airborne");
-  const departurePhases = ['PARKED', 'READY', 'TAXIING', 'HOLDING_SHORT'];
+  const departurePhases = ['PARKED', 'PUSHBACK', 'READY', 'TAXIING', 'HOLDING_SHORT'];
   const arrivalPhases = ['RUNWAY_EXIT', 'TAXI_TO_PARKING'];
   if (!departurePhases.includes(ac.phase) && !arrivalPhases.includes(ac.phase)) {
     return unable(env, `${ac.callsign} is in phase ${ac.phase}; a taxi instruction cannot be executed now.`, ac.phase === 'ARRIVED' ? "we're parked" : 'not able to taxi now');
+  }
+  if (ac.phase === 'PUSHBACK' && !rt.pushback?.stoppedAtSec) return unable(env, `${ac.callsign} is still being pushed back.`, "we're still pushing back", false);
+  if (ac.phase === 'PARKED' && rt.needsPushback && !rt.pushedBack) {
+    return unable(env, `${ac.callsign} is at its gate and needs a pushback before it can taxi; approve the pushback first (the pilot asks "request pushback").`, "we're still at the gate, we need a pushback first", false);
   }
   const start = currentStartNode(env);
   if (!start) return unable(env, `${ac.callsign} is not on the taxiway system.`, "we're not on a taxiway");
@@ -490,6 +506,13 @@ function planTaxi(env: Env): PlanResult {
   const closedTwy = closedTaxiways(ctx.state);
   const closedVia = (cmd.route ?? []).filter((v) => closedTwy.has(v.toUpperCase()));
   if (closedVia.length) return unable(env, `Taxiway ${closedVia.join(', ')} is closed (NOTAM); ${ac.callsign} cannot be routed over it.`, `taxiway ${closedVia.map(spokenTaxiway).join(', ')} is closed`, false);
+  // Progressive taxi (JO 7110.65 3-7-2, AIM 4-3-18): "turn left on Bravo" fixes the first leg; a following "continue to Charlie" in the same transmission keeps it.
+  const segTurn = cmd.segment && cmd.route?.[0] && (cmd.turnDirection || !cmd.destination)
+    ? { dir: cmd.turnDirection, taxiway: cmd.route[0] }
+    : cmd.segment && !cmd.route?.length && rt.segmentTurn && now - rt.segmentTurn.atSec <= 3 ? { dir: rt.segmentTurn.dir, taxiway: rt.segmentTurn.taxiway } : undefined;
+  let searchStart: TaxiNode = start;
+  let prefix: string[] = [];
+  let walkTarget: { nodeIds: string[] } | undefined;
 
   // Destination.
   let targets: string[] = [];
@@ -498,6 +521,16 @@ function planTaxi(env: Env): PlanResult {
   let destRaw = cmd.destination ?? (cmd.runwayEnd ? `RWY${cmd.runwayEnd}` : undefined);
   let via = cmd.route ?? [];
   let kind = cmd.kind;
+  if (segTurn) {
+    const n1 = firstTurnNode(graph, start, ac, segTurn.dir, segTurn.taxiway);
+    if (!n1) {
+      return unable(env, `There is no taxiway ${segTurn.taxiway} to turn ${segTurn.dir ?? 'onto'} onto from ${start.name ?? start.id}.`, `we can't turn ${segTurn.dir ?? 'on'} on ${spokenTaxiway(segTurn.taxiway)} here`);
+    }
+    prefix = [start.id];
+    searchStart = n1;
+    via = via.filter((v, i) => !(i === 0 && v.toUpperCase() === segTurn.taxiway.toUpperCase()));
+    if (!destRaw) walkTarget = { nodeIds: walkAlong(graph, start, n1, segTurn.taxiway) };
+  }
   // "continue taxiing": the destination of the taxi clearance in force, from here (a hold-short on the way is released).
   if (destRaw === 'CONTINUE') {
     const prev = activeClearance(ac, 'TAXI') ?? activeClearance(ac, 'TAXI_TO_PARKING');
@@ -509,13 +542,18 @@ function planTaxi(env: Env): PlanResult {
   const isRunwayWord = !!destRaw && /^\s*(RWY|RUNWAY)/i.test(destRaw);
   const twyDest = destRaw ? /^TWY\s*([A-Z]{1,2}\d{0,2})$/i.exec(destRaw.trim())?.[1]?.toUpperCase() : undefined;
   const pq = !isRunwayWord && !twyDest && (destRaw || kind === 'TAXI_TO_PARKING') ? resolveParkingQuery(airport, destRaw) : ({ kind: 'unknown' } as const);
-  if (!destRaw && kind !== 'TAXI_TO_PARKING') return unable(env, 'No taxi destination given.', 'say destination', false);
+  if (!destRaw && kind !== 'TAXI_TO_PARKING' && !walkTarget) return unable(env, 'No taxi destination given.', 'say destination', false);
   if (twyDest && closedTwy.has(twyDest)) return unable(env, `Taxiway ${twyDest} is closed (NOTAM).`, `taxiway ${spokenTaxiway(twyDest)} is closed`, false);
-  if (twyDest) {
+  if (walkTarget) {
+    targets = [walkTarget.nodeIds[walkTarget.nodeIds.length - 1]];
+  } else if (cmd.toNodeId && graph.nodes[cmd.toNodeId]) {
+    targets = [cmd.toNodeId];
+    via = [];
+  } else if (twyDest) {
     // "taxi to kilo via bravo": the nearest point of taxiway K (by taxi distance, never over a runway), reached via the route.
     const onTwy = Object.values(graph.nodes).filter((n) => n.kind !== 'runway' && n.kind !== 'parking' && n.taxiways.some((t) => t.toUpperCase() === twyDest) && dist(n.pos, ac.pos) > 5);
     if (!onTwy.length) return unable(env, `Taxiway ${twyDest} does not exist on this airport.`, `we can't find taxiway ${spokenTaxiway(twyDest)}`);
-    const dm = shortestDistances(graph, start.id, { avoidTaxiways: closedTwy });
+    const dm = shortestDistances(graph, searchStart.id, { avoidTaxiways: closedTwy });
     const reachable = onTwy.filter((n) => dm.has(n.id)).sort((a, b) => dm.get(a.id)! - dm.get(b.id)!);
     targets = (reachable.length ? reachable : onTwy).slice(0, 3).map((n) => n.id);
   } else if (pq.kind === 'spot') {
@@ -557,7 +595,11 @@ function planTaxi(env: Env): PlanResult {
     const t = twy.toUpperCase();
     return [nodeId, ...neighborIds(graph, nodeId)].some((id) => graph.nodes[id]?.taxiways.some((x) => x.toUpperCase() === t));
   };
-  for (const attempt of viaAttempts(via)) {
+  if (walkTarget) {
+    const ids = walkTarget.nodeIds;
+    best = { route: { nodeIds: ids, taxiways: [segTurn!.taxiway.toUpperCase()], lengthM: 0, runwayCrossings: [], edgeIds: [] }, target: ids[ids.length - 1] };
+  }
+  for (const attempt of walkTarget ? [] : viaAttempts(via)) {
     // Only a taxiway that merely meets the destination (named as "where it ends": "runway 31 via bravo kilo") may be dropped.
     if (attempt !== via) {
       const dropped = via.find((v, k) => attempt[k] !== v) ?? via[via.length - 1];
@@ -565,12 +607,12 @@ function planTaxi(env: Env): PlanResult {
       if (!ends.some((id) => touchesTarget(dropped, id))) continue;
     }
     if (runwayG) {
-      const r = pickRunwayHold(airport, start.id, runwayG, attempt, closedTwy);
+      const r = pickRunwayHold(airport, searchStart.id, runwayG, attempt, closedTwy);
       if (r.pick) best = { route: r.pick.route, target: r.pick.hold.id };
       else if (!why) why = r.reason ?? '';
     } else {
       for (const t of targets) {
-        const res = findTaxiRoute(graph, start.id, t, { via: attempt, avoidRunways: true, allowedRunwayIds: allRunwayIds(airport), avoidTaxiways: closedTwy });
+        const res = findTaxiRoute(graph, searchStart.id, t, { via: attempt, avoidRunways: true, allowedRunwayIds: allRunwayIds(airport), avoidTaxiways: closedTwy });
         if (res.route && (!best || res.route.lengthM < best.route.lengthM)) best = { route: res.route, target: t };
         else if (!res.route && !why) why = res.reason ?? '';
       }
@@ -580,7 +622,26 @@ function planTaxi(env: Env): PlanResult {
   if (!best) {
     return unable(env, `Invalid taxi route for ${ac.callsign}${via.length ? ` via ${via.join(', ')}` : ''}: ${why}.`, `that route isn't available`);
   }
-  const route = best.route;
+  let route = best.route;
+  if (prefix.length) {
+    if (route.nodeIds.includes(start.id)) return unable(env, `The route from ${start.name ?? start.id} would double back over the taxiway just turned onto.`, `that route isn't available`);
+    route = { ...route, nodeIds: [...prefix, ...route.nodeIds], taxiways: [segTurn!.taxiway.toUpperCase(), ...route.taxiways.filter((t, i) => !(i === 0 && t.toUpperCase() === segTurn!.taxiway.toUpperCase()))] };
+  }
+  // JO 7110.65 3-7-2: "The taxi clearance/route must include the specific route to follow"; to an assigned takeoff runway "state the departure runway followed by the specific taxi route".
+  let routelessFlag: string | undefined;
+  if (runwayG && !(cmd.route?.length) && !cmd.segment && cmd.destination !== 'CONTINUE' && !segTurn) {
+    routelessFlag = `taxi to runway ${runwayEnd} with no route (JO 7110.65 3-7-2: the taxi clearance must include the specific route to follow; to an assigned takeoff runway state the runway followed by the specific taxi route)`;
+    const unfamiliar = pilotUnfamiliar(ac, groundBehaviour(ctx).unfamiliarFraction);
+    const training = ctx.state.scenario.mode === 'training';
+    if (training || unfamiliar) {
+      return {
+        reject: {
+          reason: training ? `Not issued (training mode): ${routelessFlag}.` : `${ac.callsign} is unfamiliar with the airport and asks for the route: ${routelessFlag}.`,
+          pilot: sayRouteCall(ac, runwayEnd), commError: true,
+        },
+      };
+    }
+  }
   const dest = airport.parking.find((p) => p.nodeId === best!.target);
   const flag = usedVia !== via ? `taxi route via ${via.join(', ')} is not usable in that order for ${ac.callsign}; taxiing via ${usedVia.join(', ') || 'the direct route'} (${why})` : undefined;
   const tooShort = runwayG && runwayRemainingM(runwayG, graph.nodes[best.target]) < takeoffRunM(ac)
@@ -589,8 +650,8 @@ function planTaxi(env: Env): PlanResult {
 
   return {
     plan: {
-      patch: { route: usedVia, holdShort: cmd.holdShort, destination: dest?.id ?? (runwayEnd ? `RWY${runwayEnd}` : twyDest ? `TWY${twyDest}` : destRaw), runwayEnd },
-      flag: flag ?? tooShort,
+      patch: { route: usedVia, holdShort: cmd.holdShort, segment: cmd.segment || undefined, destination: dest?.id ?? (runwayEnd ? `RWY${runwayEnd}` : twyDest ? `TWY${twyDest}` : destRaw), runwayEnd },
+      flag: flag ?? routelessFlag ?? tooShort,
       commit: () => {
         const stops = new Set(computeStopNodes(graph, route.nodeIds, ac.runwayAuthorizations));
         for (const rid of cmd.holdShort ?? []) {
@@ -604,6 +665,8 @@ function planTaxi(env: Env): PlanResult {
           if (twyStop) stops.add(twyStop);
         }
         ac.route = { nodeIds: route.nodeIds, taxiways: route.taxiways, stopAtNodeIds: [...stops], progressIndex: 0 };
+        rt.unreadHoldShort = undefined;
+        rt.segmentTurn = cmd.segment && segTurn?.dir ? { dir: segTurn.dir, taxiway: segTurn.taxiway, atSec: now } : undefined;
         rt.stoppedAtNodeId = undefined;
         rt.closedHold = undefined; // a new taxi instruction (planned around the closure) replaces the route that ran into it
         ac.flags.holdingPosition = false;
@@ -617,6 +680,54 @@ function planTaxi(env: Env): PlanResult {
       },
     },
   };
+}
+
+/**
+ * First node of a progressive-taxi turn: the neighbour of `start` along taxiway `twy` on the requested side of the aircraft's heading
+ * (right = clockwise). Without a side, the leg that continues most nearly straight ahead.
+ */
+function firstTurnNode(graph: TaxiwayGraph, start: TaxiNode, ac: Aircraft, dir: 'left' | 'right' | undefined, twy: string): TaxiNode | undefined {
+  const t = twy.toUpperCase();
+  const h = headingToVec(ac.headingDeg);
+  const cands: { n: TaxiNode; side: number; ahead: number }[] = [];
+  for (const e of graph.edges) {
+    if ((e.from !== start.id && e.to !== start.id) || e.taxiway.toUpperCase() !== t || e.onRunwayId || (e.oneWay && e.to === start.id)) continue;
+    const n = graph.nodes[e.from === start.id ? e.to : e.from];
+    if (!n || n.kind === 'runway') continue;
+    const v = vSub(n.pos, start.pos);
+    const len = vLen(v) || 1;
+    cands.push({ n, side: vCross(h, v) / len, ahead: (h.x * v.x + h.y * v.y) / len });
+  }
+  if (!dir) return cands.sort((a, b) => b.ahead - a.ahead)[0]?.n;
+  // x east, y north: a left turn puts the new leg at positive cross product with the heading vector.
+  const sideOk = cands.filter((c) => (dir === 'left' ? c.side > 0.17 : c.side < -0.17));
+  return sideOk.sort((a, b) => Math.abs(b.side) - Math.abs(a.side))[0]?.n;
+}
+
+/** Nodes from `first` along taxiway `twy` to the next intersection (a node another taxiway or a hold line meets) or the taxiway's end. */
+function walkAlong(graph: TaxiwayGraph, from: TaxiNode, first: TaxiNode, twy: string): string[] {
+  const t = twy.toUpperCase();
+  const out = [first.id];
+  let prev = from;
+  let cur = first;
+  for (let i = 0; i < 300; i++) {
+    if (cur.kind === 'holding_position' || cur.kind === 'parking' || cur.taxiways.some((x) => x.toUpperCase() !== t)) break;
+    const h = vSub(cur.pos, prev.pos);
+    let best: { n: TaxiNode; ahead: number } | undefined;
+    for (const e of graph.edges) {
+      if ((e.from !== cur.id && e.to !== cur.id) || e.taxiway.toUpperCase() !== t || e.onRunwayId || (e.oneWay && e.to === cur.id)) continue;
+      const n = graph.nodes[e.from === cur.id ? e.to : e.from];
+      if (!n || n.id === prev.id || n.kind === 'runway' || out.includes(n.id)) continue;
+      const v = vSub(n.pos, cur.pos);
+      const ahead = (h.x * v.x + h.y * v.y) / ((vLen(h) || 1) * (vLen(v) || 1));
+      if (!best || ahead > best.ahead) best = { n, ahead };
+    }
+    if (!best) break;
+    out.push(best.n.id);
+    prev = cur;
+    cur = best.n;
+  }
+  return out;
 }
 
 /** The via list as given, then (when it has 2+ taxiways) the same list with one taxiway dropped, last first. */
@@ -650,7 +761,7 @@ function planHoldPosition(env: Env): PlanResult {
 }
 
 function planHoldShort(env: Env): PlanResult {
-  const { ac, cmd, airport } = env;
+  const { ac, rt, cmd, airport } = env;
   const graph = airport.taxiwayGraph;
   // during the landing roll / on final: stop short of the intersecting runway (JO 7110.65 3-10-9, 3-10-4)
   const landingHold = planLandingHoldShort(env);
@@ -686,6 +797,15 @@ function planHoldShort(env: Env): PlanResult {
           }
         }
         for (const id of twyStops) if (ac.route && !ac.route.stopAtNodeIds.includes(id)) ac.route.stopAtNodeIds.push(id);
+        // A re-issued hold short that covers the one the pilot left out of the readback: this readback is the one 2-4-3 requires.
+        const pending = rt.unreadHoldShort;
+        if (pending) {
+          const covers = pending.refs.some((p) => refs.some((r) => {
+            const a = findRunway(airport, p); const b = findRunway(airport, r);
+            return a && b ? a.id === b.id : p.toUpperCase().replace(/^TWY\s*/, '') === r.toUpperCase().replace(/^TWY\s*/, '');
+          }));
+          if (covers) resolveUnreadHoldShort(env);
+        }
       },
     },
   };
@@ -1245,10 +1365,99 @@ function planPattern(env: Env): PlanResult {
   };
 }
 
+/**
+ * Pushback. JO 7110.65 has no pushback phraseology (it is normally a ramp / company function at towered airports); the simulator lets Ground
+ * approve it ("pushback approved, tail east": NON-STANDARD). Airliners and cargo jets on airline / cargo stands are pushed back along the stand
+ * lead-in to the lane (src/sim/pushback.ts); GA aircraft start and taxi on their own power.
+ */
 function planPushback(env: Env): PlanResult {
-  const { ac, ctx } = env;
-  if (ac.phase !== 'PARKED' && ac.phase !== 'READY') return unable(env, `${ac.callsign} (${ac.phase}) cannot push back.`, "we can't push back now");
-  return { plan: { patch: {}, commit: () => { if (ac.phase === 'PARKED') setPhase(ctx, ac, 'READY', 'pushback'); } } };
+  const { ac, rt, ctx, cmd, airport, now } = env;
+  if (ac.phase === 'READY' && rt.pushedBack) return unable(env, `${ac.callsign} has already pushed back.`, "we've already pushed back", false);
+  if (ac.phase !== 'PARKED') return unable(env, `${ac.callsign} (${ac.phase}) cannot push back.`, "we can't push back now", false);
+  const stand = pushbackStand(airport, ac);
+  if (!stand) {
+    return unable(env, `${ac.callsign} is a ${perfOf(ac).category === 'light' ? 'light aircraft' : 'aircraft'} on a ramp stand: it starts up and taxis under its own power and does not push back.`, "we don't need a pushback, we'll taxi on our own power", false);
+  }
+  const geo = pushbackGeometry(airport, stand, ac, { tailDeg: cmd.pushTailDeg, faceDeg: cmd.pushFaceDeg, departingEnds: ctx.state.activeRunways.departing });
+  if (!geo) return unable(env, `${stand.name} has no lead-in to the apron lane in the airport data; ${ac.callsign} cannot push back.`, "we can't push back from here", false);
+  if (geo.misfitDeg > PUSH_DIRECTION_TOLERANCE_DEG) {
+    const best = cmd.pushTailDeg !== undefined ? cardinal(geo.finalHeadingDeg + 180) : cardinal(geo.finalHeadingDeg);
+    return unable(env, `${stand.name} cannot be pushed ${cmd.pushTailDeg !== undefined ? 'tail' : 'facing'} that way: the lane allows ${cmd.pushTailDeg !== undefined ? 'tail' : 'facing'} ${best} at best.`, `we can only push tail ${cardinal(geo.finalHeadingDeg + 180)} from here`, false);
+  }
+  return {
+    plan: {
+      patch: { pushTailDeg: cmd.pushTailDeg, pushFaceDeg: cmd.pushFaceDeg },
+      commit: () => {
+        rt.pushback = {
+          from: geo.from, to: geo.to, nodeId: geo.nodeId, lengthM: geo.lengthM, finalHeadingDeg: geo.finalHeadingDeg,
+          startSec: now + groundBehaviour(ctx).pushStartDelaySec, requestedTailDeg: cmd.pushTailDeg, requestedFaceDeg: cmd.pushFaceDeg,
+        };
+        rt.pushStartHeadingDeg = undefined;
+        rt.pushedBack = false;
+        setPhase(ctx, ac, 'PUSHBACK', `${Math.round(geo.lengthM)} m to the lane`);
+      },
+    },
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Hold-short readback (JO 7110.65 2-4-3, 3-7-2; AIM 4-3-18)
+// ---------------------------------------------------------------------------
+
+/** Nodes the pilot will not pass until the hold-short is read back: the first hold line on the route and each hold-short point named. */
+function markUnreadHoldShort(ctx: SimContext, ac: Aircraft, rt: AircraftRuntime, clr: Clearance, refs: string[]): void {
+  const route = ac.route;
+  if (!route || ctx.dryRun) return;
+  const graph = ctx.state.airport.taxiwayGraph;
+  const nodes = new Set<string>();
+  for (let k = route.progressIndex; k < route.nodeIds.length; k++) {
+    const n = graph.nodes[route.nodeIds[k]];
+    if (n.kind === 'holding_position' && n.runwayId) { nodes.add(n.id); break; }
+  }
+  for (const r of refs) {
+    const rw = findRunway(ctx.state.airport, r);
+    if (rw) {
+      const hold = route.nodeIds.slice(route.progressIndex).find((id) => graph.nodes[id].kind === 'holding_position' && graph.nodes[id].runwayId === rw.id);
+      if (hold) nodes.add(hold);
+      continue;
+    }
+    const stop = taxiwayStopNode(graph, route.nodeIds, Math.max(0, route.progressIndex - 1), r.toUpperCase().replace(/^TWY\s*/, ''), ac.pos);
+    if (stop) nodes.add(stop);
+  }
+  route.unreadStopNodeIds = [...nodes];
+  rt.unreadHoldShort = { clearanceId: clr.id, sinceSec: ctx.state.clock.timeSec, refs };
+  emitEvent(ctx, { kind: 'INFO', aircraftId: ac.id, callsign: ac.callsign, text: `(hidden from pilot) ${ac.callsign} left the hold-short out of the taxi readback`, severity: 'info', speaker: 'SYSTEM', data: { holdShortOmitted: true } });
+}
+
+/** The hold-short is read back: the pilot may pass the unconfirmed stops. */
+function resolveUnreadHoldShort(env: Env): void {
+  const { ctx, ac, rt } = env;
+  if (!rt.unreadHoldShort) return;
+  const refs = rt.unreadHoldShort.refs;
+  rt.unreadHoldShort = undefined;
+  if (ac.route) ac.route.unreadStopNodeIds = undefined;
+  if (ac.phase === 'HOLDING_SHORT' && ac.route && ac.route.progressIndex < ac.route.nodeIds.length) setPhase(ctx, ac, 'TAXIING', 'hold-short read back');
+  emitEvent(ctx, { kind: 'READBACK_ERROR', aircraftId: ac.id, callsign: ac.callsign, severity: 'info', speaker: 'SYSTEM', text: `Hold-short readback obtained from ${ac.callsign} (${refs.join(', ')})`, data: { corrected: true, holdShortReadback: true } });
+}
+
+/** "Read back hold short instructions" (JO 7110.65 3-7-2, 2-4-3). */
+function readBackHold(ctx: SimContext, ac: Aircraft, rt: AircraftRuntime, cmd: ParsedCommand, position: ControllerPositionId): CommandOutcome {
+  const now = ctx.state.clock.timeSec;
+  const taxi = [...ac.clearances].reverse().find((c) => (c.kind === 'TAXI' || c.kind === 'TAXI_TO_PARKING' || c.kind === 'HOLD_SHORT') && c.holdShort?.length && c.completedAtSec === undefined)
+    ?? [...ac.clearances].reverse().find((c) => c.holdShort?.length && (c.kind === 'TAXI' || c.kind === 'TAXI_TO_PARKING' || c.kind === 'HOLD_SHORT'));
+  const env: Env = { ctx, ac, rt, cmd, airport: ctx.state.airport, now, position };
+  if (!taxi || !taxi.holdShort?.length) {
+    const text = `Negative, no hold short instructions, ${ac.spokenCallsign}`;
+    if (!ctx.dryRun) pilotSay(ctx, ac, text, { readback: true });
+    return { status: 'rejected', reason: `${ac.callsign} has no hold-short instructions to read back.`, pilotResponse: text };
+  }
+  const text = `${holdShortReadbackText(taxi.holdShort).replace(/^h/, 'H')}, ${ac.spokenCallsign}`;
+  if (ctx.dryRun) return { status: 'accepted', clearance: taxi, readback: text };
+  pilotSay(ctx, ac, text, { readback: true, clearanceId: taxi.id });
+  resolveUnreadHoldShort(env);
+  if (rt.readbackError) ac.radioState = 'WAITING_FOR_READBACK'; else ac.radioState = 'IDLE';
+  emitEvent(ctx, { kind: 'COMMAND_ACCEPTED', aircraftId: ac.id, callsign: ac.callsign, text: `${ac.callsign}: hold-short readback requested`, severity: 'info', speaker: 'SYSTEM', data: { kind: 'READ_BACK_HOLD', scored: false } });
+  return { status: 'accepted', clearance: taxi, readback: text };
 }
 
 // ---------------------------------------------------------------------------

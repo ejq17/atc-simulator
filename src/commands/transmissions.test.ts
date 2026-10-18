@@ -137,7 +137,9 @@ run({
     { say: `${S} continue`, cmds: [{ kind: 'CONTINUE_APPROACH', ...NKS }], clean: true },
     { say: `${S} continue approach`, cmds: [{ kind: 'CONTINUE_APPROACH' }], clean: true },
     { say: `${S}, continue, expect late landing clearance`, cmds: [{ kind: 'CONTINUE_APPROACH' }], clean: true },
-    { say: `${S} pushback approved`, cmds: [{ kind: 'PUSHBACK' }], clean: true },
+    { say: `${S} pushback approved`, cmds: [{ kind: 'PUSHBACK' }], issue: 'no pushback phrase' }, // not FAA phraseology: marked non-standard
+    { say: `${S} pushback approved, tail east`, cmds: [{ kind: 'PUSHBACK', pushTailDeg: 90 }], issue: 'no pushback phrase' },
+    { say: `${S} push back approved, face south`, cmds: [{ kind: 'PUSHBACK', pushFaceDeg: 180 }], issue: 'no pushback phrase' },
   ],
 
   'contact / frequency': [

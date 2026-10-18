@@ -3,7 +3,7 @@
  * The engine never assigns a phase directly: every change goes through
  * `assertTransition` so impossible transitions are programming errors that throw.
  *
- * Departure:  PARKED -> READY -> TAXIING <-> HOLDING_SHORT -> LINE_UP_AND_WAIT
+ * Departure:  PARKED [-> PUSHBACK] -> READY -> TAXIING <-> HOLDING_SHORT -> LINE_UP_AND_WAIT
  *             -> CLEARED_FOR_TAKEOFF -> TAKEOFF_ROLL -> INITIAL_CLIMB -> DEPARTURE
  * Arrival:    INBOUND -> APPROACH -> FINAL -> LANDING -> ROLLOUT -> RUNWAY_EXIT
  *             -> TAXI_TO_PARKING -> ARRIVED   (GO_AROUND / PATTERN / HOLDING side branches)
@@ -12,7 +12,8 @@ import type { FlightPhase } from './types';
 
 export const ALLOWED_TRANSITIONS: Readonly<Record<FlightPhase, readonly FlightPhase[]>> = {
   // --- departure ---
-  PARKED: ['READY'],
+  PARKED: ['READY', 'PUSHBACK'],
+  PUSHBACK: ['READY'],
   READY: ['TAXIING'],
   TAXIING: ['HOLDING_SHORT', 'LINE_UP_AND_WAIT', 'CLEARED_FOR_TAKEOFF', 'PARKED'],
   HOLDING_SHORT: ['TAXIING', 'LINE_UP_AND_WAIT', 'CLEARED_FOR_TAKEOFF'],
@@ -37,7 +38,7 @@ export const ALLOWED_TRANSITIONS: Readonly<Record<FlightPhase, readonly FlightPh
 };
 
 export const DEPARTURE_PHASES: readonly FlightPhase[] = [
-  'PARKED', 'READY', 'TAXIING', 'HOLDING_SHORT', 'LINE_UP_AND_WAIT', 'CLEARED_FOR_TAKEOFF', 'TAKEOFF_ROLL', 'INITIAL_CLIMB', 'DEPARTURE',
+  'PARKED', 'PUSHBACK', 'READY', 'TAXIING', 'HOLDING_SHORT', 'LINE_UP_AND_WAIT', 'CLEARED_FOR_TAKEOFF', 'TAKEOFF_ROLL', 'INITIAL_CLIMB', 'DEPARTURE',
 ];
 export const ARRIVAL_PHASES: readonly FlightPhase[] = [
   'INBOUND', 'APPROACH', 'FINAL', 'LANDING', 'ROLLOUT', 'RUNWAY_EXIT', 'TAXI_TO_PARKING', 'ARRIVED',
@@ -95,4 +96,4 @@ export function transitionPath(from: FlightPhase, to: FlightPhase): FlightPhase[
 }
 
 /** Ground phases in which an aircraft is taxiing/standing and therefore may not be on a runway unauthorised. */
-export const TAXI_PHASES: readonly FlightPhase[] = ['PARKED', 'READY', 'TAXIING', 'HOLDING_SHORT', 'RUNWAY_EXIT', 'TAXI_TO_PARKING', 'ARRIVED'];
+export const TAXI_PHASES: readonly FlightPhase[] = ['PARKED', 'PUSHBACK', 'READY', 'TAXIING', 'HOLDING_SHORT', 'RUNWAY_EXIT', 'TAXI_TO_PARKING', 'ARRIVED'];

@@ -105,11 +105,12 @@ export function namedTaxiways(taxiways: string[]): string[] {
 }
 
 /** Candidate `via` lists, most descriptive first, ending with "no via". */
-function viaCandidates(taxiways: string[]): string[][] {
+function viaCandidates(taxiways: string[], allowEmpty = true): string[][] {
   const full = namedTaxiways(taxiways);
   const out: string[][] = [full];
   for (const n of [4, 3, 2, 1]) if (full.length > n) out.push(full.slice(-n));
-  out.push([]);
+  // A taxi to an assigned runway always names its route (JO 7110.65 3-7-2): "no via" only when the route has no named taxiway at all.
+  if (allowEmpty || !full.length) out.push([]);
   return out;
 }
 
@@ -155,7 +156,7 @@ export function planDeparture(airport: Airport, ac: Aircraft, ends: string[], bu
       const remaining = g.lengthM - alongCross(g, h.pos).along;
       const r0 = findTaxiRoute(graph, start.id, h.id, { avoidRunways: true, allowedRunwayIds: allRunwayIds(airport), avoidTaxiways: closed });
       if (!r0.route) continue;
-      for (const via of viaCandidates(r0.route.taxiways)) {
+      for (const via of viaCandidates(r0.route.taxiways, false)) {
         const pick = simulateRunwayTaxiPick(airport, start.id, g, via, closed);
         if (!pick) continue;
         const pickedRemaining = g.lengthM - alongCross(g, pick.hold.pos).along;
@@ -212,6 +213,53 @@ export function planParking(state: SimulationState, ac: Aircraft): ParkingPlan |
     if (r.route) return { spot: best, via, holdShort: r.route.runwayCrossings, lengthM: r.route.lengthM, nodeIds: r.route.nodeIds };
   }
   return undefined;
+}
+
+export interface ProgressiveSegment {
+  /** Taxiways followed in this step, in order (usually one; short runs of changing designators on an apron are merged). */
+  taxiways: string[];
+  /** Side of the turn onto the first taxiway from the aircraft's heading (set only when the first leg of the route is on that taxiway and the step is that one taxiway). */
+  turn?: 'left' | 'right';
+  /** Taxiway to continue to; undefined when the step reaches the end of the route. */
+  next?: string;
+  /** Named taxiways (runs) left on the route including this step's. */
+  remaining: number;
+  /** Graph node where the step ends (the intersection with `next`, or the route's last node). */
+  endNodeId: string;
+}
+
+/** A step is at least this long (m): shorter runs of taxiway designators (apron lanes change letters every few metres) are merged into it. */
+const MIN_SEGMENT_M = 60;
+
+/**
+ * The next step of a progressive taxi (JO 7110.65 3-7-2, AIM 4-3-18) for a route of graph nodes from the aircraft's node: the first named
+ * taxiway, which way to turn onto it, and the next taxiway to continue to.
+ */
+export function nextProgressiveSegment(airport: Airport, nodeIds: string[], headingDeg: number): ProgressiveSegment | undefined {
+  const graph = airport.taxiwayGraph;
+  const runs: { twy: string; firstEdge: number; lengthM: number }[] = [];
+  for (let i = 0; i + 1 < nodeIds.length; i++) {
+    const e = graph.edges.find((x) => (x.from === nodeIds[i] && x.to === nodeIds[i + 1]) || (x.to === nodeIds[i] && x.from === nodeIds[i + 1]));
+    const t = e?.taxiway ?? '';
+    if (!t || /^RWY/i.test(t)) continue;
+    if (!runs.length || runs[runs.length - 1].twy !== t) runs.push({ twy: t, firstEdge: i, lengthM: 0 });
+    runs[runs.length - 1].lengthM += e!.lengthM;
+  }
+  if (!runs.length) return undefined;
+  let k = 0;
+  let len = runs[0].lengthM;
+  while (len < MIN_SEGMENT_M && k + 1 < runs.length) len += runs[++k].lengthM;
+  const first = runs[0];
+  let turn: 'left' | 'right' | undefined;
+  if (k === 0 && first.firstEdge === 0) {
+    const a = graph.nodes[nodeIds[0]].pos;
+    const b = graph.nodes[nodeIds[1]].pos;
+    const d = ((((Math.atan2(b.x - a.x, b.y - a.y) * 180) / Math.PI - headingDeg + 540) % 360) + 360) % 360 - 180; // signed turn, + right
+    if (Math.abs(d) >= 20) turn = d > 0 ? 'right' : 'left';
+  }
+  const taxiways = runs.slice(0, k + 1).map((r) => r.twy).filter((t, i, a) => a.indexOf(t) === i);
+  const endNodeId = runs[k + 1] ? nodeIds[runs[k + 1].firstEdge] : nodeIds[nodeIds.length - 1];
+  return { taxiways, turn, next: runs[k + 1]?.twy, remaining: runs.length - k, endNodeId };
 }
 
 /** Remaining taxi distance (m) along the aircraft's current route, to its last node. */

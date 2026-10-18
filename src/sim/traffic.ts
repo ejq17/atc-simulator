@@ -10,11 +10,12 @@ import {
 import { glideAltitudeFt, finalStartNm } from './flightDynamics';
 import { findRunwayEnd, alongCross } from './runways';
 import { holdTooShort } from './holdSelection';
-import { emitEvent, getRuntime, newRuntime, perfOf, pilotSay, setPhase } from './context';
+import { emitEvent, getRuntime, groundBehaviour, newRuntime, perfOf, pilotSay, setPhase } from './context';
+import { pushbackStand } from './pushback';
 import type { SimContext } from './context';
 import { mulberry32, rngInt, rngPick, seeded01 } from './rng';
 import { LUAW_LIMIT_SEC } from './towerCommands';
-import { DEFAULT_PILOT_BEHAVIOUR } from './pilotBehaviour';
+import { DEFAULT_PILOT_BEHAVIOUR, pilotUnfamiliar } from './pilotBehaviour';
 import { frequencyById, frequencyByMhz, frequencyForPosition, sameFrequency } from '../radio/frequencies';
 import { findNavFix, fixPosition } from './navigation';
 import { findStar } from './star';
@@ -23,6 +24,7 @@ import { spokenCallsign as buildSpokenCallsign } from '../radio/spoken';
 import {
   approachCheckInCall, arrivalTowerCheckInCall, brakingActionCall, lightsRequestCall, checkInCall, clearOfRunwayCall, departureCheckInCall, establishedCall, finalCall, goAroundEstablishedCall,
   holdingShortCall, approachingHoldCall, holdingShortCrossingCall, ifrClearanceRequestCall, inboundCall, missedApproachCheckInCall, readyToTaxiCall, stoppedOnRunwayCall,
+  holdShortQueryCall, nextSegmentCall, pushbackRequestCall,
   luawIntentionsCall, positionReportCall, requestNumbersCall, trafficAcquiredCall,
 } from '../radio/readback';
 import type { ReadbackEnv } from '../radio/readback';
@@ -203,6 +205,7 @@ export function spawnFromSpec(ctx: SimContext, spec: SpawnSpec): Aircraft {
     ac.trackDeg = ac.headingDeg;
     ac.phase = 'PARKED';
     rt.homeParkingCategory = p.category;
+    rt.needsPushback = ctx.pilotBehaviour.ground.airlinerPushback && !!pushbackStand(airport, ac);
     rt.firstCallAtSec = now + 3 + rng() * 5;
   } else if (s.kind === 'holding_short') {
     const node = graph.nodes[s.nodeId];
@@ -487,13 +490,87 @@ export function updatePilotRequests(ctx: SimContext): void {
       }
     }
 
-    // 1. Parked departure asks for taxi.
-    if (ac.phase === 'PARKED' && ac.isDeparture && !rt.calls.has('readyToTaxi') && now >= rt.firstCallAtSec) {
-      rt.calls.add('readyToTaxi');
-      const parking = airport.parking.find((p) => dist(p.pos, ac.pos) < 5);
-      pilotSay(ctx, ac, readyToTaxiCall(ac, env, parking), { request: 'TAXI' });
-      setPhase(ctx, ac, 'READY');
-      ac.pendingRequest = { kind: 'TAXI', text: 'ready to taxi', sinceSec: now };
+    const gb = groundBehaviour(ctx);
+    const atisLetter = pilotNeedsNumbers(ac, ctx.pilotBehaviour.noAtisFraction) ? undefined : state.atis.letter;
+
+    // 0b. A hold-short the pilot did not read back that stands uncorrected is a communication error (JO 7110.65 2-4-3, 3-7-2).
+    if (rt.unreadHoldShort && !rt.unreadHoldShort.charged && now - rt.unreadHoldShort.sinceSec >= gb.holdShortReadbackGraceSec) {
+      rt.unreadHoldShort.charged = true;
+      emitEvent(ctx, {
+        kind: 'READBACK_ERROR', aircraftId: ac.id, callsign: ac.callsign, severity: 'warning', speaker: 'SYSTEM',
+        text: `No hold-short readback from ${ac.callsign} for ${Math.round(now - rt.unreadHoldShort.sinceSec)} s: the controller must request it (JO 7110.65 2-4-3 "Ensure the read back of hold short instructions"; 3-7-2 "READ BACK HOLD INSTRUCTIONS")`,
+        data: { holdShortReadback: true, commError: true },
+      });
+    }
+
+    // 1a. Airliner at its gate: asks for pushback first (and again if it is not approved).
+    if (ac.phase === 'PARKED' && ac.isDeparture && rt.needsPushback && !rt.pushedBack) {
+      const asked = rt.pushbackAskedAtSec;
+      if ((asked === undefined && now >= rt.firstCallAtSec) || (asked !== undefined && !ac.pendingRequest && now - asked >= gb.pushbackRepeatAfterSec)
+        || (asked !== undefined && ac.pendingRequest?.kind === 'PUSHBACK' && now - asked >= gb.pushbackRepeatAfterSec)) {
+        rt.pushbackAskedAtSec = now;
+        const parking = airport.parking.find((p) => dist(p.pos, ac.pos) < 5);
+        pilotSay(ctx, ac, pushbackRequestCall(ac, env, parking, { atisLetter, repeat: asked !== undefined }), { request: 'PUSHBACK' });
+        ac.pendingRequest = { kind: 'PUSHBACK', text: 'request pushback', sinceSec: now };
+      }
+      continue;
+    }
+
+    // 1b. Pushed back: engines running, ready to taxi after the start interval.
+    if (ac.phase === 'PUSHBACK' && ac.isDeparture) {
+      const pb = rt.pushback;
+      if (pb?.stoppedAtSec !== undefined) {
+        if (rt.readyAtSec === undefined) {
+          const [lo, hi] = gb.airlinerReadyAfterPushSec;
+          rt.readyAtSec = pb.stoppedAtSec + gb.pushSettleSec + lo + (hi - lo) * seeded01(ac.seed, 'ready-after-push');
+        }
+        if (now >= rt.readyAtSec && !rt.calls.has('readyToTaxi')) {
+          rt.calls.add('readyToTaxi');
+          const parking = airport.parking.find((p) => dist(p.pos, pb.from) < 5);
+          const progressive = pilotUnfamiliar(ac, gb.unfamiliarFraction);
+          rt.progressive = progressive;
+          pilotSay(ctx, ac, readyToTaxiCall(ac, env, parking, { atisLetter, pushedBack: true, progressive }), { request: 'TAXI' });
+          setPhase(ctx, ac, 'READY', 'engines started');
+          ac.pendingRequest = { kind: 'TAXI', text: progressive ? 'ready to taxi, request progressive taxi' : 'ready to taxi', sinceSec: now, progressive };
+        }
+      }
+      continue;
+    }
+
+    // 1. Parked departure (no pushback): engine start, then asks for taxi. Seeded interval after its first call time.
+    if (ac.phase === 'PARKED' && ac.isDeparture && !rt.needsPushback && !rt.calls.has('readyToTaxi')) {
+      const [lo, hi] = gb.gaStartSec;
+      if (now >= rt.firstCallAtSec + lo + (hi - lo) * seeded01(ac.seed, 'ga-start')) {
+        rt.calls.add('readyToTaxi');
+        const parking = airport.parking.find((p) => dist(p.pos, ac.pos) < 5);
+        const progressive = pilotUnfamiliar(ac, gb.unfamiliarFraction);
+        rt.progressive = progressive;
+        pilotSay(ctx, ac, readyToTaxiCall(ac, env, parking, { atisLetter, progressive }), { request: 'TAXI' });
+        setPhase(ctx, ac, 'READY');
+        ac.pendingRequest = { kind: 'TAXI', text: progressive ? 'ready to taxi, request progressive taxi' : 'ready to taxi', sinceSec: now, progressive };
+      }
+      continue;
+    }
+
+    // 1c. Progressive taxi: the segment is flown; the pilot asks for the next one.
+    if (rt.progressive && ac.onGround && ac.phase === 'TAXIING' && ac.route && ac.route.progressIndex >= ac.route.nodeIds.length && ac.groundSpeedKt < 0.1
+      && rt.stillSince !== undefined && now - rt.stillSince >= 3) {
+      const lastId = ac.route.nodeIds[ac.route.nodeIds.length - 1];
+      const last = graph.nodes[lastId];
+      if (last && last.kind !== 'parking' && last.kind !== 'holding_position' && !rt.calls.has(`seg:${lastId}`)) {
+        rt.calls.add(`seg:${lastId}`);
+        pilotSay(ctx, ac, nextSegmentCall(ac, env, last.taxiways[0]), { request: 'TAXI' });
+        ac.pendingRequest = { kind: 'TAXI', text: 'request next progressive taxi instructions', sinceSec: now, progressive: true };
+        continue;
+      }
+    }
+
+    // 1d. Stopped short of a hold-short that was not read back: the pilot asks for it again.
+    if (rt.unreadHoldShort && ac.onGround && ac.route && rt.stoppedAtNodeId && ac.route.unreadStopNodeIds?.includes(rt.stoppedAtNodeId)
+      && rt.stillSince !== undefined && now - rt.stillSince >= 2 && now >= rt.firstCallAtSec && !rt.calls.has(`unread:${rt.stoppedAtNodeId}`)) {
+      rt.calls.add(`unread:${rt.stoppedAtNodeId}`);
+      pilotSay(ctx, ac, holdShortQueryCall(ac, env), { request: 'OTHER' });
+      ac.pendingRequest = { kind: 'OTHER', text: 'say again hold short instructions', sinceSec: now };
       continue;
     }
 
@@ -684,7 +761,6 @@ export function updatePilotRequests(ctx: SimContext): void {
 // Lifecycle
 // ---------------------------------------------------------------------------
 
-export const ARRIVED_DESPAWN_SEC = 20;
 export const DEPARTURE_EXIT_NM = 15;
 export const LOST_AIRCRAFT_NM = 40;
 export const IFR_EXIT_ALTITUDE_FT = 6000;
@@ -701,7 +777,7 @@ export function updateLifecycle(ctx: SimContext): void {
     const rt = getRuntime(ctx, ac);
     if (ac.phase === 'ARRIVED') {
       rt.arrivedAtSec = rt.arrivedAtSec ?? now;
-      if (now - rt.arrivedAtSec >= ARRIVED_DESPAWN_SEC) removeAircraft(ctx, ac.id, true, 'arrived and shut down');
+      if (now - rt.arrivedAtSec >= ctx.pilotBehaviour.ground.arrivedLingerSec) removeAircraft(ctx, ac.id, true, 'arrived and shut down');
       continue;
     }
     if (!ac.onGround) {

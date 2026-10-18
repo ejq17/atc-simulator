@@ -139,7 +139,9 @@ describe('takeoff roll in gusts', () => {
     const head = liftoff(wx({ windDirDeg: hdg13, windSpeedKt: 14 }), 1);
     const gusty = wx({ windDirDeg: hdg13, windSpeedKt: 14, windGustKt: 28 });
     const runs = [1, 2, 3, 4, 5].map((s) => liftoff(gusty, s));
-    expect(liftoff(wx({}), 2)).toEqual(calm);
+    const again = liftoff(wx({}), 2); // another seed: the per-aircraft taxi speed differs, the roll must not (time is a float sum of ticks)
+    expect(again.sec).toBeCloseTo(calm.sec, 6);
+    expect(again.distM).toBeCloseTo(calm.distM, 3);
     expect(head.distM).toBeLessThan(calm.distM - 30); // the headwind removes ~14 kt of ground speed over a ~35 s roll
     const secs = runs.map((r) => r.sec);
     expect(Math.max(...secs) - Math.min(...secs)).toBeGreaterThan(0.5); // s between the quickest and slowest rotation

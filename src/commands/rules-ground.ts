@@ -208,6 +208,41 @@ export const makeClearedToParkingRule = (taxiways?: readonly string[], runwayEnd
   return cmdHit(parseTaxiBody(d, t, j, taxiways, runwayEnds), d);
 };
 
+/**
+ * "read back hold short instructions" / "readback hold instructions": JO 7110.65 3-7-2 PHRASEOLOGY "READ BACK HOLD INSTRUCTIONS."
+ * (a request for the pilot's readback of the runway hold-short instruction; 2-4-3, AIM 4-3-18).
+ */
+export const ruleReadBackHold: Rule = (t, i) => {
+  const j = seq(t, i, 'read|readback back? hold short? instructions|instruction?');
+  if (j < 0) return null;
+  return cmdHit(j, makeDraft('READ_BACK_HOLD'));
+};
+
+/**
+ * Progressive taxi segment (JO 7110.65 3-7-2: "Progressive instructions may include step-by-step directions and/or directional turns";
+ * AIM 4-3-18): "continue [straight] [on Bravo] to Charlie". The 3-7-2 phrase is "continue taxiing ... to (location)", so this shorter
+ * form is marked non-standard. "Turn left on Bravo" is the runway-exit grammar; the executor reads it as a taxi turn once the aircraft is taxiing.
+ */
+export const ruleContinueSegment: Rule = (t, i) => {
+  if (txt(t, i) !== 'continue' || seq(t, i, 'continue taxi|taxiing') >= 0) return null;
+  let j = skipWords(t, i + 1, ['straight', 'ahead']);
+  const d = makeDraft('TAXI', { segment: true });
+  const on = seq(t, j, 'on|via|along taxiway?');
+  if (on >= 0) {
+    const tw = parseOneTaxiway(t, on);
+    if (tw) { d.fields.route = [tw.id]; j = tw.next; }
+  }
+  const to = seq(t, j, 'to taxiway?');
+  if (to >= 0) {
+    const tw = parseOneTaxiway(t, to);
+    if (tw) { d.fields.destination = `TWY${tw.id}`; j = tw.next; }
+  }
+  if (!d.fields.destination) return null;
+  d.nonstandard++;
+  d.issues.push('non-standard phraseology: expected "continue taxiing to <taxiway>" (JO 7110.65 3-7-2)');
+  return cmdHit(j, d);
+};
+
 /** "cancel [taxi]": there is no cancel instruction for ground traffic; taken as "hold position" (non-standard). */
 export const ruleCancel: Rule = (t, i) => {
   if (txt(t, i) !== 'cancel') return null;

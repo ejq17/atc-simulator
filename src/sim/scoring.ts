@@ -100,6 +100,7 @@ export function applyEventToScore(ctx: SimContext, ev: SimEvent): void {
       break;
     case 'READBACK_ERROR':
       if (d.missed) s.missedReadbackErrors++;
+      if (d.commError) s.communicationErrors++; // a hold-short readback left uncorrected (JO 7110.65 2-4-3, 3-7-2)
       break;
     case 'COMMAND_REJECTED':
     case 'CLARIFICATION':

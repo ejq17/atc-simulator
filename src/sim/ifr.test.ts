@@ -33,7 +33,7 @@ describe('IFR clearance request (Clearance Delivery)', () => {
   it('VFR departures are unchanged: no clearance request, they ask for taxi', () => {
     const e = makeEngine({ scenario: { spawns: [GA_PARKED('N723EJ', 'GA1', 'GND')] } });
     expect(runUntil(e, () => find(e, 'N723EJ').pendingRequest?.kind === 'TAXI', 30)).toBe(true);
-    expect(pilotTexts(e)[0]).toMatch(/ready to taxi, VFR to [A-Za-z' ]+\.$/);
+    expect(pilotTexts(e)[0]).toMatch(/ready to taxi, VFR to [A-Za-z' ]+(, with information [a-z]+)?\.$/);
   });
 
   it('a spec flight plan marked VFR does not need a clearance either', () => {
@@ -156,9 +156,9 @@ describe('IFR_CLEARANCE', () => {
     expect(ac.frequencyId).toBe('GND');
     expect(ac.frequencyMhz).toBe(121.9);
     expect(ac.phase).toBe('READY');
-    expect(pilotTexts(e).pop()).toBe('Atlantic City Ground, Spirit four fifty one, at Gate one, ready to taxi, IFR to Philadelphia.');
+    expect(pilotTexts(e).pop()).toBe('Atlantic City Ground, Spirit four fifty one, at Gate one, ready to taxi, IFR to Philadelphia, with information alpha.');
     // Ground can now taxi it
-    expect(say(e, cmd('TAXI', 'NKS451', { destination: 'RWY13' }), 'GND').status).toBe('accepted');
+    expect(say(e, cmd('TAXI', 'NKS451', { destination: 'RWY13', route: ['A'] }), 'GND').status).toBe('accepted');
   });
 });
 
@@ -202,7 +202,7 @@ describe('IFR departure routing', () => {
     const { e, ac } = clearedDeparture({ scenario: { mode: 'training' } });
     say(e, cmd('IFR_CLEARANCE', 'NKS451', { ifr: {} }), 'CLNC');
     expect(runUntil(e, () => ac.pendingRequest?.kind === 'TAXI', 40)).toBe(true);
-    expect(say(e, cmd('TAXI', 'NKS451', { destination: 'RWY13' }), 'GND').status).toBe('accepted');
+    expect(say(e, cmd('TAXI', 'NKS451', { destination: 'RWY13', route: ['A'] }), 'GND').status).toBe('accepted');
     expect(runUntil(e, () => ac.phase === 'HOLDING_SHORT' && ac.groundSpeedKt < 0.1 && !!ac.pendingRequest, 300)).toBe(true);
     expect(say(e, cmd('CONTACT_FREQUENCY', 'NKS451', { frequencyId: 'TWR' }), 'GND').status).toBe('accepted');
     run(e, 8);

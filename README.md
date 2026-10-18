@@ -199,7 +199,7 @@ See `docs/ARCHITECTURE.md` (module map and contracts) and `docs/PROGRESS.md`
 
 ## Supported ATC instructions
 
-Taxi (with via routes and hold-short), hold position, hold short, cross runway, line up
+Taxi (with via routes and hold-short; the route is required, "read back hold instructions" is understood, progressive steps like "turn left on Bravo, continue to Charlie"), pushback approved (airliners are pushed back to the lane, "tail east" / "face south", non-standard phrase), hold position, hold short, cross runway, line up
 and wait, cleared for takeoff, cleared to land (incl. option / touch-and-go / low
 approach), go around, continue approach, contact/monitor frequency, headings, altitudes,
 speeds, pattern entries, IFR clearances (Clearance Delivery), approach clearances

@@ -45,6 +45,8 @@ export interface HarnessOptions {
    */
   humanAnswers?: 'approve' | false;
   answerAfterSec?: number;
+  /** Pilot behaviour override of the scenario (e.g. unfamiliar pilots, hold-short readback omissions). */
+  pilotBehaviour?: Scenario['pilotBehaviour'];
 }
 
 export interface Harness {
@@ -78,7 +80,7 @@ export function createHarness(o: HarnessOptions): Harness {
       temperatureC: 15, dewpointC: 5, altimeterInHg: 29.92, phenomena: [], flightCategory: 'VFR',
     },
     activeRunways: o.activeRunways ?? { departing: ['13'], landing: ['13'] },
-    controllerPositions: ALL, playerPositions: o.player, spawns: o.spawns,
+    controllerPositions: ALL, playerPositions: o.player, spawns: o.spawns, pilotBehaviour: o.pilotBehaviour,
   };
   const engine = createEngine({ airport: o.airport ?? kacy, scenario, readbackErrorRate: o.readbackErrorRate ?? 0, utcStartMs: Date.UTC(2026, 5, 1, 16, 0, 0) });
   const events: SimEvent[] = [];

@@ -14,7 +14,7 @@ describe('ground movement', () => {
     expect(runUntil(e, () => ac.phase === 'READY', 15)).toBe(true);
     expect(ac.pendingRequest?.kind).toBe('TAXI');
     const call = e.getState().events.find((x) => x.speaker === 'PILOT');
-    expect(call?.text).toMatch(/^Atlantic City Ground, Cessna seven two three echo juliet, at general aviation Ramp one, ready to taxi, VFR to [A-Za-z' ]+\.$/);
+    expect(call?.text).toMatch(/^Atlantic City Ground, Cessna seven two three echo juliet, at general aviation Ramp one, ready to taxi, VFR to [A-Za-z' ]+(, with information [a-z]+)?\.$/);
     const out = e.applyCommand(cmd('TAXI', 'N723EJ', { destination: 'RWY22', runwayEnd: '22', route: ['A'] }), { position: 'GND' });
     expect(out.status).toBe('accepted');
     expect(ac.phase).toBe('TAXIING');

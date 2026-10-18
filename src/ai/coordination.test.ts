@@ -23,7 +23,8 @@ function groundScript(h: Harness) {
     for (const ac of Object.values(h.engine.getState().aircraft)) {
       if (ac.frequencyMhz !== 121.9 || ac.radioState === 'TRANSMITTING') continue;
       const p = ac.pendingRequest?.kind;
-      if (ac.isDeparture && p === 'TAXI') h.say('GND', cmd('TAXI', ac.callsign, { destination: 'RWY13', runwayEnd: '13', route: ['B'], holdShort: ['4/22'] }));
+      if (ac.isDeparture && p === 'PUSHBACK') h.say('GND', cmd('PUSHBACK', ac.callsign));
+      else if (ac.isDeparture && p === 'TAXI') h.say('GND', cmd('TAXI', ac.callsign, { destination: 'RWY13', runwayEnd: '13', route: ['B'], holdShort: ['4/22'] }));
       else if (p === 'CROSSING' && ac.groundSpeedKt < 1) {
         if (!co(h)!.requests.some((r) => r.aircraftId === ac.id && r.topic === 'CROSSING')) api(h).request({ topic: 'CROSSING', from: 'GND', to: 'TWR', aircraftId: ac.id, runwayId: '4/22', source: 'player' });
         else h.say('GND', cmd('CROSS_RUNWAY', ac.callsign, { crossRunwayId: '4/22', runwayId: '4/22' }));
@@ -103,6 +104,7 @@ describe('AI Tower answers Ground\'s crossing request from its own safety view',
     return () => {
       const ac = h.find('N60DX');
       if (!ac) return;
+      if (ac.pendingRequest?.kind === 'PUSHBACK' && ac.isDeparture) h.say('GND', cmd('PUSHBACK', ac.callsign));
       if (ac.pendingRequest?.kind === 'TAXI' && ac.isDeparture) h.say('GND', cmd('TAXI', ac.callsign, { destination: 'RWY13', runwayEnd: '13', route: ['B'], holdShort: ['4/22'] }));
       if (ac.pendingRequest?.kind === 'CROSSING' && ac.groundSpeedKt < 1) api(h).request({ topic: 'CROSSING', from: 'GND', to: 'TWR', aircraftId: ac.id, runwayId: '4/22', source: 'player' });
     };

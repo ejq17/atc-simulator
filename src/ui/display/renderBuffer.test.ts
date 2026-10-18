@@ -5,6 +5,17 @@ import type { Aircraft, SimulationState } from '../../sim/types';
 
 const pose = (x: number, y: number, h: number, alt = 0) => ({ x, y, headingDeg: h, altitudeFt: alt, groundSpeedKt: 10 });
 
+describe('pushback', () => {
+  it('an aircraft pushed back is drawn moving backwards: the position slides opposite to the nose, the heading is unchanged', () => {
+    // nose north (000), pushed south: y decreases while the heading stays 0
+    const p = interpolatePose(pose(0, 0, 0), pose(0, -0.12, 0), 0.5);
+    expect(p.y).toBeCloseTo(-0.06);
+    expect(p.headingDeg).toBeCloseTo(0);
+    // and while the nose swings (299 -> 301 through north) the shortest way is taken
+    expect(interpolatePose(pose(0, 0, 359), pose(0, 0, 1), 0.5).headingDeg).toBeCloseTo(0);
+  });
+});
+
 describe('interpolation', () => {
   it('interpolates position linearly', () => {
     const p = interpolatePose(pose(0, 0, 90, 0), pose(10, -20, 90, 1000), 0.25);
