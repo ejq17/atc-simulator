@@ -16,7 +16,7 @@ import type { AircraftRuntime, SimContext } from './context';
 import { findRunwayEnd } from './runways';
 import { runwayCrossingsAlong } from './pathfinding';
 import { taxiSpeedKtFor } from './rotorcraft';
-import { landerStubs } from './exitStubs';
+import { STUB_HEAD_M, landerStubs } from './exitStubs';
 import { seeded01 } from './rng';
 import { HEAD_ON_LINGER_SEC, findHeadOn, headOnMarginM } from './headOn';
 
@@ -85,6 +85,56 @@ export function cornerSpeedMps(angleDeg: number, vFull: number, vTurn: number): 
   return vFull - (vFull - vTurn) * k;
 }
 
+/**
+ * The remaining route turns away from `p` before it gets there: over the next `aheadM + 20` m of it no point is within `OFF_ROUTE_M` of `p` (and the route has at
+ * least one bend in that stretch, so a leader on a straight route that merely wanders in the cone is still a leader).
+ */
+const OFF_ROUTE_M = 20;
+function routeLeavesBefore(ctx: SimContext, ac: Aircraft, p: Vec2, aheadM: number): boolean {
+  const r = ac.route;
+  if (!r || r.progressIndex >= r.nodeIds.length) return false;
+  const nodes = ctx.state.airport.taxiwayGraph.nodes;
+  let prev = ac.pos;
+  let travelled = 0;
+  let nearest = Infinity;
+  let bend = false;
+  let prevDir: Vec2 | undefined;
+  for (let i = r.progressIndex; i < r.nodeIds.length && travelled <= aheadM + 20; i++) {
+    const q = nodes[r.nodeIds[i]]?.pos;
+    if (!q) return false;
+    const seg = vSub(q, prev);
+    const len = Math.hypot(seg.x, seg.y);
+    if (len > 1e-6) {
+      const t = Math.max(0, Math.min(1, vDot(vSub(p, prev), seg) / (len * len)));
+      nearest = Math.min(nearest, dist(p, { x: prev.x + seg.x * t, y: prev.y + seg.y * t }));
+      const dir = { x: seg.x / len, y: seg.y / len };
+      if (prevDir && vDot(prevDir, dir) < Math.cos((25 * Math.PI) / 180)) bend = true;
+      prevDir = dir;
+    }
+    travelled += len;
+    prev = q;
+  }
+  return bend && nearest > OFF_ROUTE_M;
+}
+
+/** The route ends at a parking position and the remaining way there is shorter than `aheadM` by more than `PARK_CLEAR_M`. */
+const PARK_CLEAR_M = 15;
+function endsAtStandBefore(ctx: SimContext, ac: Aircraft, aheadM: number): boolean {
+  const r = ac.route;
+  if (!r || r.progressIndex >= r.nodeIds.length) return false;
+  const nodes = ctx.state.airport.taxiwayGraph.nodes;
+  if (nodes[r.nodeIds[r.nodeIds.length - 1]]?.kind !== 'parking') return false;
+  let d = 0;
+  let prev = ac.pos;
+  for (let i = r.progressIndex; i < r.nodeIds.length; i++) {
+    const p = nodes[r.nodeIds[i]]?.pos;
+    if (!p) return false;
+    d += dist(prev, p);
+    prev = p;
+  }
+  return d + PARK_CLEAR_M < aheadM;
+}
+
 export function findLeader(ctx: SimContext, ac: Aircraft): { gap: number; minGap: number } | undefined {
   const h = headingToVec(ac.headingDeg);
   const perf = perfOf(ac);
@@ -101,6 +151,12 @@ export function findLeader(ctx: SimContext, ac: Aircraft): { gap: number; minGap
     const along = vDot(r, h);
     let gap = along;
     const inCone = along > 0 && along <= 250 && Math.abs(vCross(h, r)) <= 12 && Math.abs(headingDiff(ac.headingDeg, o.headingDeg)) <= 70;
+    // An aircraft standing beyond the stand this one is taxiing into is not in its way: the follow distance is not kept to something past the end of the route
+    // (soak seed 2: an arrival stopped 7 m short of its stand for an hour behind a departure that stood 32 m beyond it).
+    if (inCone && endsAtStandBefore(ctx, ac, along)) continue;
+    // Nor is an aircraft in line with the nose but off the route: the route turns away at a junction before it gets there (soak seed 3: an airliner queued for the
+    // crossing, stopped for an hour behind a Cessna standing on the stub of the next taxiway, in line with its heading, which its route never used).
+    if (inCone && ac.route && routeLeavesBefore(ctx, ac, o.pos, along)) continue;
     if (!inCone) {
       // A STOPPED aircraft (hold-short queue, a lined-up leader) that sits on the route ahead blocks it whatever its nose points at: the
       // follower is still turning toward the hold, and the leader faces the runway, so the heading cone above does not see it.
@@ -122,6 +178,9 @@ export function findLeader(ctx: SimContext, ac: Aircraft): { gap: number; minGap
       const lander = ctx.state.aircraft[s.aircraftId];
       const spot = ctx.state.airport.taxiwayGraph.nodes[s.holdNodeId]?.pos;
       if (!lander || !spot) continue;
+      // An aircraft standing at the head of that stub (the lander that got there first, 25 m of its hold line) is not held by the next lander's reservation of the
+      // same stub: the second waits behind it (the same exemption as `landerStubOnRoute`; without it the first would wait for the second for good, soak seed 3).
+      if (dist(ac.pos, spot) < STUB_HEAD_M) continue;
       const g = gapAlongRoute(ctx, ac, spot);
       if (g === undefined) continue;
       if (!best || g < best.gap) best = { gap: g, minGap: 1.5 * Math.max(perf.lengthM * (ac.formation?.size ?? 1), perfOf(lander).lengthM) + 20 };
@@ -263,11 +322,11 @@ function stepGround(ctx: SimContext, ac: Aircraft, dt: number): void {
         rt.turnAround = undefined;
         emitEvent(ctx, { kind: 'INFO', aircraftId: ac.id, callsign: ac.callsign, text: `${ac.callsign} turned around, holding position`, severity: 'info', speaker: 'SYSTEM' });
         pilotSay(ctx, ac, `${ac.spokenCallsign}, one eighty complete, holding position.`);
-        if (rt.headOnCalled !== undefined || rt.headOn?.lastCallSec !== undefined) {
-          rt.headOnCalled = undefined;
-          rt.headOn = undefined;
-          ac.pendingRequest = { kind: 'TAXI', text: 'turned around, request taxi instructions', sinceSec: now, resume: true };
-        }
+        // The pilot asks for new instructions whether or not it was the one that called the head-on: AI Ground turns the aircraft that can (a departure
+        // by preference), which is often the one that did not call, and an aircraft with no request and no route stays where it is for good.
+        rt.headOnCalled = undefined;
+        rt.headOn = undefined;
+        if (!ac.pendingRequest || ac.pendingRequest.kind === 'TAXI') ac.pendingRequest = { kind: 'TAXI', text: 'turned around, request taxi instructions', sinceSec: now, resume: true };
       }
     }
     ac.trackDeg = ac.headingDeg;

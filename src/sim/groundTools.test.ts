@@ -119,9 +119,11 @@ describe('the engine waits short of the exit stub a lander is about to use', () 
     const stubs = landerStubs(state);
     expect(stubs).toHaveLength(1);
     const t1 = find(e, 'T1');
-    expect(landerStubOnRoute(state, t1.route!.nodeIds, t1.id)?.aircraftId).toBe(find(e, 'X1').id);
+    // the whole route from the ramp reaches the stub far down it (the reservation applies within 300 m of the aircraft, `STUB_RESERVE_LEAD_M`); the part of it nearer the stub does
+    expect(landerStubOnRoute(state, t1.route!.nodeIds, t1.id)).toBeUndefined();
     const i = t1.route!.nodeIds.indexOf(stubs[0].holdNodeId);
     expect(i).toBeGreaterThan(1);
+    expect(landerStubOnRoute(state, t1.route!.nodeIds.slice(i - 1), t1.id)?.aircraftId).toBe(find(e, 'X1').id);
     t1.pos = { ...state.airport.taxiwayGraph.nodes[t1.route!.nodeIds[i - 1]].pos };
     t1.route!.progressIndex = i;
     expect(findLeader({ state, runtime: (e as unknown as { runtime: never }).runtime } as never, t1)).toBeDefined();

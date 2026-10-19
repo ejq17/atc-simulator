@@ -56,7 +56,7 @@ export const MIN_SPAWN_SPACING_SEC = 45;
  * (docs/PROGRESS.md, "Free-play jam"): without it the Poisson clock puts several light aircraft on the same final within minutes, and the
  * Tower can only send them around or hold them on an extended downwind.
  */
-export const ARRIVAL_SLOT_SEC = 160;
+export const ARRIVAL_SLOT_SEC = 200;
 export const MAX_ARRIVALS_IN_FLIGHT = 6;
 /**
  * Departure flow control (design value): no new departure appears at a gate while this many departures are on the ground and not yet airborne

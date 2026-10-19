@@ -132,7 +132,8 @@ describe('AI Tower answers Ground\'s crossing request from its own safety view',
     const h = towerSetup(undefined);
     const gp = groundPlayer(h);
     h.runUntil(() => h.find('N60DX')?.pendingRequest?.kind === 'CROSSING' && h.find('N60DX')!.groundSpeedKt < 1, 600, () => { if (h.find('N60DX')?.pendingRequest?.kind === 'TAXI') gp(); });
-    h.engine.spawnAircraft({ ...arrival(2.4), atSec: h.now() });
+    // (1.2 nm at 80 kt is 54 s: inside the 60 s crossing window; at 2.4 nm, 108 s, the crossing is approved at once since it takes 30 s)
+    h.engine.spawnAircraft({ ...arrival(1.2), atSec: h.now() });
     gp();
     h.runUntil(() => msgs(h, 'CROSS_APPROVED').length > 0, 60);
     const ok = msgs(h, 'CROSS_APPROVED')[0];
@@ -150,8 +151,8 @@ describe('AI Tower answers Ground\'s crossing request from its own safety view',
     const h = towerSetup(undefined);
     const gp = groundPlayer(h);
     h.runUntil(() => h.find('N60DX')?.pendingRequest?.kind === 'CROSSING' && h.find('N60DX')!.groundSpeedKt < 1, 600, () => { if (h.find('N60DX')?.pendingRequest?.kind === 'TAXI') gp(); });
-    h.engine.spawnAircraft({ ...arrival(2.4), atSec: h.now() });
-    h.engine.spawnAircraft({ ...arrival(5), callsign: 'N77LB', atSec: h.now() });
+    h.engine.spawnAircraft({ ...arrival(1.2), atSec: h.now() });
+    h.engine.spawnAircraft({ ...arrival(3.4), callsign: 'N77LB', atSec: h.now() });
     gp();
     h.runUntil(() => msgs(h, 'CROSS_STANDBY').length > 0 || msgs(h, 'CROSS_APPROVED').length > 0, 60);
     const standby = msgs(h, 'CROSS_STANDBY')[0];

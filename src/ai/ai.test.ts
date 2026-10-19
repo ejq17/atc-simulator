@@ -154,7 +154,8 @@ describe('(1) Ground-only player: AI Clearance, Tower, Approach and Departure wo
       'American two twelve, contact tower one two zero point three',
       'American two twelve, continue approach',
       'American two twelve, runway one three, cleared to land',
-      'American two twelve, turn right at alpha, contact ground point niner',
+      // Hotel, not Alpha: the departure taxiing to the hold is on the lane the Alpha exit leads into, in the other direction (throughput round: `exitChoice.exitBlockage` sees the whole way to the ramp)
+      'American two twelve, turn right at hotel, contact ground point niner',
     ]);
     const positions = h.atc().filter((e) => e.callsign === 'AAL212').map((e) => e.aiPosition);
     expect(positions).toEqual(['APP', 'APP', 'APP', 'TWR', 'TWR', 'TWR']);
@@ -254,7 +255,8 @@ describe('(3) Approach-only player: AI Tower, Ground and Clearance Delivery hand
     expect(texts(atcAi(h, 'AAL212', 'TWR'))).toEqual([
       'American two twelve, continue approach',
       'American two twelve, runway one three, cleared to land',
-      'American two twelve, turn right at alpha, contact ground point niner',
+      // Hotel, not Alpha: the departure taxiing to the hold is on the lane the Alpha exit leads into, in the other direction (throughput round: `exitChoice.exitBlockage` sees the whole way to the ramp)
+      'American two twelve, turn right at hotel, contact ground point niner',
     ]);
     const clearedTo = (cs: string) => atcAi(h, cs, 'TWR').find((e) => /cleared to land/.test(e.text))!.timeSec;
     const takeoff = atcAi(h, 'NKS451', 'TWR').find((e) => /cleared for takeoff/.test(e.text))!.timeSec;

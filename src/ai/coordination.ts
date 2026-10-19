@@ -27,11 +27,10 @@ import { bearingDeg, cardinal, dist, mToNm } from '../sim/geo';
 import { numberWords } from '../radio/spoken';
 import { hasActive, landingHoldShort, mkCmd } from './core';
 import type { Agent, AgentView, Plan } from './core';
-import { runwayInUse } from './ground';
+import { CROSSING_ARRIVAL_SEC, runwayInUse } from './ground';
 import { assignedEnd, distToThresholdNm, etaToThresholdSec, interactingRunways, isInboundArrival } from './world';
 
-/** The arrival window of Ground's own rule (ground.ts CROSSING_ARRIVAL_SEC): the same number, so Tower and Ground agree. */
-const CROSSING_ARRIVAL_SEC = 90;
+
 /** The engine's own crossing rule keeps a crossing off a runway with an arrival inside this many nm on final (conflicts.ts FINAL_CROSSING_NM, with a margin). DESIGN VALUE. */
 const CROSSING_FINAL_NM = 3.5;
 /** A second arrival this soon (s) after the first leaves no gap behind it: Tower does not promise a crossing "behind the landing" aircraft. DESIGN VALUE. */

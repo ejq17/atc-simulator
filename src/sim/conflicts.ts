@@ -181,7 +181,10 @@ export interface DepartureTrailConflict {
   leaderAlongNm: number;
 }
 
-export function departureTrailConflict(state: SimulationState, ac: Aircraft, g: RunwayEndGeom): DepartureTrailConflict | undefined {
+export function departureTrailConflict(state: SimulationState, ac: Aircraft, g: RunwayEndGeom, ownTrackTrueDeg?: number): DepartureTrailConflict | undefined {
+  // The takeoff clearance carries a departure heading that diverges from the runway heading by 15 degrees or more (JO 7110.65 5-8-2 INITIAL HEADING, 5-8-3 (a):
+  // diverging courses): the follower is not on the leader's track, however much faster it is. The engine flies the heading from 400 ft AGL.
+  if (ownTrackTrueDeg !== undefined && Math.abs(headingDiff(ownTrackTrueDeg, g.headingDeg)) >= DEPARTURE_DIVERGE_DEG) return undefined;
   const pF = getPerformance(ac.type);
   const vF = pF.climbSpeedKt;
   const startAlong = Math.max(0, alongCross(g, ac.pos).along);
@@ -450,7 +453,7 @@ export function assessClearanceSafety(state: SimulationState, cmd: ParsedCommand
     const gEnd = findRunwayEnd(airport, cmd.runwayEnd ?? cmd.runwayId ?? ac.assignedRunwayEnd);
     if (gEnd) issues.push(...airborneBlockers(state, ac, gEnd, alongCross(gEnd, ac.pos).along, verb, REF_SAME_RUNWAY));
     if (cmd.kind === 'TAKEOFF' && gEnd) {
-      const trail = departureTrailConflict(state, ac, gEnd);
+      const trail = departureTrailConflict(state, ac, gEnd, cmd.departureHeading !== undefined ? magneticToTrue(cmd.departureHeading, airport.magneticVariationDeg) : undefined);
       if (trail) {
         push(`Takeoff clearance for ${ac.callsign} (${ac.type}) behind slower ${trail.leader.callsign} (${trail.leader.type}), ${trail.leaderAlongNm.toFixed(1)} nm out on the same track: it would close to ${Math.max(0, trail.minGapNm).toFixed(1)} nm before the leader is ${DEPARTURE_TRAIL_RANGE_NM} nm out; 3-9-6 / 5-8-3 need ${DEPARTURE_TRAIL_NM} nm, a departure interval or diverging courses`, REF_SAME_RUNWAY, [trail.leader.id]);
       }
@@ -565,7 +568,10 @@ const CROSSING_MARGIN_SEC = 4;
 /** Lateral offset beyond which an arrival is not on the final of the runway (pattern / other approach). */
 const FINAL_LATERAL_M = 900;
 
-const isArriving = (o: Aircraft): boolean => !o.onGround && (o.phase === 'FINAL' || o.phase === 'LANDING' || !!activeClearance(o, 'LAND'));
+// (A departure is never an arrival: an aircraft that landed, taxied back for another takeoff - pilot request TAXI_BACK - and is climbing out still carries its first
+// landing clearance as "active", and counted as a preceding arrival "landing in 3 minutes" for every real arrival behind it, which then went around: soak seed 3,
+// 40 go-arounds and an hour of circling.)
+const isArriving = (o: Aircraft): boolean => !o.onGround && !o.isDeparture && (o.phase === 'FINAL' || o.phase === 'LANDING' || !!activeClearance(o, 'LAND'));
 
 /** Airborne arrivals (LANDING / FINAL / cleared to land) that are over the surface of the runway: they occupy it for the departure rules. */
 function arrivalsOverRunway(state: SimulationState, rw: Runway, excludeId: string): Aircraft[] {

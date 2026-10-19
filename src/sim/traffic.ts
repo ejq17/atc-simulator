@@ -10,7 +10,7 @@ import {
 import { glideAltitudeFt, finalStartNm } from './flightDynamics';
 import { findRunwayEnd, alongCross } from './runways';
 import { holdTooShort } from './holdSelection';
-import { emitEvent, getRuntime, groundBehaviour, newRuntime, perfOf, pilotSay, setPhase } from './context';
+import { activeClearance, emitEvent, getRuntime, groundBehaviour, newRuntime, perfOf, pilotSay, setPhase } from './context';
 import { pushbackStand } from './pushback';
 import type { SimContext } from './context';
 import { mulberry32, rngInt, rngPick, seeded01 } from './rng';
@@ -784,6 +784,9 @@ export function updatePilotRequests(ctx: SimContext): void {
       const routeDone = !ac.route || ac.route.progressIndex >= ac.route.nodeIds.length;
       if (g && routeDone) {
         rt.calls.add('clear');
+        // The check-in on Ground (step 6 below) already asked to taxi back for another departure: this call must not replace that request with "taxi to parking"
+        // (the aircraft is a departure again by then, and no Ground controller answers an arrival that is flagged as a departure).
+        if (ac.pendingRequest?.request === 'TAXI_BACK') continue;
         if (rt.calls.has('stoppedOnRunway')) {
           pilotSay(ctx, ac, stoppedOnRunwayCall(ac, env, g.runway.id), { request: 'OTHER' });
           ac.pendingRequest = { kind: 'OTHER', text: 'stopped on runway, unable to exit', sinceSec: now };
@@ -848,6 +851,8 @@ export function updatePilotRequests(ctx: SimContext): void {
       pilotSay(ctx, ac, checkInCall(ac, env, { taxiway, wantsTaxiToParking: wantsTaxi, taxiBackRunway: taxiBackEnd }), { checkIn: true });
       if (taxiBackEnd) ac.pendingRequest = { kind: 'TAXI', request: 'TAXI_BACK', runwayEnd: taxiBackEnd, text: `request taxi back to runway ${taxiBackEnd} for departure`, sinceSec: now };
       else if (wantsTaxi) ac.pendingRequest = { kind: 'TAXI', text: 'request taxi to parking', sinceSec: now };
+      // A pushed-back departure that was sent to the wrong frequency and back (its "ready to taxi" went with the change): the check-in is the request again.
+      else if (ac.onGround && ac.isDeparture && ac.phase === 'READY' && pos === 'GND' && !ac.pendingRequest && !activeClearance(ac, 'TAXI')) ac.pendingRequest = { kind: 'TAXI', text: 'ready to taxi', sinceSec: now };
       continue;
     }
   }

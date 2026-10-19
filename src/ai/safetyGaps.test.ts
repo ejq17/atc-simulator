@@ -4,11 +4,12 @@
  * threshold (5-5-4 / 3-10-3), and a go-around re-cleared to land while still climbing out.
  */
 import { describe, expect, it } from 'vitest';
-import { ftToM, mToNm } from '../sim/geo';
-import { alongCross, findRunwayEnd } from '../sim/runways';
+import { ftToM } from '../sim/geo';
+import { findRunwayEnd } from '../sim/runways';
 import { createEngine } from '../sim/engine';
 import { createAiControllers } from './index';
 import type { Aircraft, Scenario, ScenarioAircraftSpawn } from '../sim/types';
+import { assessClearanceSafety } from '../sim/conflicts';
 import { cmd, createHarness, IFR_ARR, kacy } from './testkit';
 import type { Harness } from './testkit';
 import { assignedEnd, distToThresholdNm } from './world';
@@ -52,15 +53,17 @@ function departures(leaderType: string, followerType: string, leaderNm: number) 
 }
 
 describe('departure behind a slower departure on the same track (3-9-6 / 5-8-3)', () => {
-  it('A320 behind a C172 2 nm out: Tower withholds the takeoff clearance until the A320 cannot close inside 3 nm', () => {
+  it('A320 behind a C172 2 nm out: without a heading the takeoff is unsafe (3-9-6 / 5-8-3); Tower gives the A320 a departure heading 30 degrees off and clears it at once (5-8-2)', () => {
     const { h, takeoffAt } = departures('C172', 'A320', 2);
-    h.run(60);
-    expect(takeoffAt()).toBeUndefined();
-    expect(h.runUntil(() => takeoffAt() !== undefined, 900)).toBe(true);
-    // released only when the C172 was far enough along that the A320 cannot catch it inside 3 nm within 10 nm of the field
-    const lead = h.find('LEAD1')!;
-    expect(mToNm(alongCross(g13, lead.pos).along)).toBeGreaterThan(5);
+    const foll = h.find('FOLL1')!;
+    const plain = cmd('TAKEOFF', 'FOLL1', { runwayEnd: '13', runwayId: '13/31' });
+    expect(assessClearanceSafety(h.engine.getState(), plain).issues.some((i) => /behind slower LEAD1/.test(i.text))).toBe(true);
+    expect(foll).toBeDefined();
+    expect(h.runUntil(() => takeoffAt() !== undefined, 120)).toBe(true);
+    const text = h.atc('TWR').find((e) => e.callsign === 'FOLL1' && /cleared for takeoff/.test(e.text))!.text;
+    expect(text).toMatch(/, turn right heading [a-z ]+, runway one three, cleared for takeoff$/);
     h.run(400);
+    // the leader was 2 nm out: with the follower on a diverging heading nothing comes closer than the near-miss alert
     expect(h.events.filter((e) => e.kind === 'CONFLICT' && /Near-miss/.test(e.text))).toEqual([]);
   }, 60_000);
 

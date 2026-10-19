@@ -33,6 +33,25 @@ const SLOW_FROM_NM = 5;
 const SLOW_STEPS_KT = [160, SLOW_SPEED_KT];
 /** The projected in-trail gap never drops below the radar minimum (JO 7110.65 5-5-4: 3 nm). */
 const MIN_PROJECTED_GAP_NM = 3;
+/**
+ * The most an aircraft descends per nm flown on the approach (DESIGN VALUE: 450 ft per nm is 1,050 fpm at 140 kt, the airliner's descent in the engine) and the
+ * allowance above that before the final approach fix (1,000 ft, a stabilised-approach allowance). An approach clearance is not given to an aircraft that cannot get
+ * down to the altitude of the final approach fix by the fix: it would cross the threshold high and float down the runway (soak: an airliner cleared 3.8 nm out at
+ * 3,900 ft - 2,600 ft above the path - touched down 6.9 km past the threshold and stopped there).
+ */
+export const DESCENT_FT_PER_NM = 450;
+export const FAF_HIGH_MARGIN_FT = 1000;
+/** Is an aircraft `aboveFafFt` above the altitude of the final approach fix, `distNm` from it, too high to be cleared for the approach? */
+export const tooHighForFaf = (aboveFafFt: number, distNm: number): boolean => aboveFafFt > DESCENT_FT_PER_NM * Math.max(0, distNm) + FAF_HIGH_MARGIN_FT;
+
+/** The altitude (ft MSL) the procedure has at its final approach fix: the plate's minimum / mandatory figure, else a 3 degree path from the fix distance. */
+function fafAltitudeFt(airport: AgentView['airport'], info: ProcedureInfo | undefined): number | undefined {
+  const faf = info?.faf;
+  if (!faf) return undefined;
+  const fa = info!.procedure.fixAltitudes?.find((f) => f.fix.toUpperCase() === faf.id.toUpperCase());
+  return fa?.minAltitudeFt ?? fa?.mandatoryAltitudeFt ?? airport.elevationFt + 318 * (faf.dM / 1852);
+}
+
 /** Speed alone cannot build the gap and the projected gap is short by more than this (nm): hold at the published fix instead of flying on. */
 const HOLD_SHORTFALL_NM = 1.5;
 
@@ -217,7 +236,12 @@ export function createApproachAgent(handleDepartures: (v: AgentView) => boolean)
       const proj = lead ? projectedGapNm(ac, lead.leader, choice.end) : undefined;
       const gapOk = !lead || (lead.gapNm >= ARRIVAL_SPACING_NM && proj!.atLeaderThresholdNm >= need && proj!.minNm >= MIN_PROJECTED_GAP_NM);
       const clearance = mkCmd('APPROACH', ac, { approachType: choice.type, runwayEnd: choice.end.end.id, runwayId: choice.end.runway.id });
-      if (gapOk && assessClearanceSafety(v.state, clearance).safe) {
+      // Not while the aircraft is too high to get down to the final approach fix altitude (`tooHighForFaf`): it keeps descending to its assigned altitude and is cleared
+      // when the fix is within reach.
+      const fafAlt = fafAltitudeFt(airport, choice.info);
+      const dFaf = choice.info?.faf ? distanceToFixNm(airport, ac.pos, choice.info.faf.id) : undefined;
+      const tooHigh = fafAlt !== undefined && dFaf !== undefined && tooHighForFaf(ac.altitudeFt - fafAlt, dFaf);
+      if (gapOk && !tooHigh && assessClearanceSafety(v.state, clearance).safe) {
         plans.push({
           key: `${ac.id}:approach`, aircraftId: ac.id, callsign: ac.callsign, priority: 55, cooldownSec: 20, cmds: [clearance],
           phrase: say.clauses(say.callsign(ac), say.clearedApproach(choice.type, choice.end.end.id)),

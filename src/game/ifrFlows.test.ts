@@ -81,7 +81,8 @@ describe('traffic generator IFR flows', () => {
       const recs = simulate(sc, 1800);
       const proc = arrivalProcedure(airport, rwy)!;
       // A jets-only run for fix selection and counts (unmanaged Cessnas circling near the final would otherwise block the fixes).
-      const jetRecs = simulate(flowScenario(rwy, dep, { aircraftTypes: ['A320'], gaFraction: 0, arrivalsPerHour: 45 }), 1800);
+      // (2400 s: with the arrival slot at 200 s (game/traffic.ts ARRIVAL_SLOT_SEC) one runway takes at most 18 an hour, whatever the rate asked for)
+      const jetRecs = simulate(flowScenario(rwy, dep, { aircraftTypes: ['A320'], gaFraction: 0, arrivalsPerHour: 45 }), 2400);
       const jetArr = [...recs, ...jetRecs].filter((r) => !r.spec.isDeparture && r.spec.type === 'A320');
       const jetOnly = jetRecs.filter((r) => !r.spec.isDeparture);
 
@@ -161,7 +162,7 @@ describe('traffic generator IFR flows', () => {
 
       it('is deterministic', () => {
         expect(simulate(flowScenario(rwy, dep), 1800).map((r) => r.spec)).toEqual(recs.map((r) => r.spec));
-        expect(simulate(flowScenario(rwy, dep, { aircraftTypes: ['A320'], gaFraction: 0, arrivalsPerHour: 45 }), 1800).map((r) => r.spec)).toEqual(jetRecs.map((r) => r.spec));
+        expect(simulate(flowScenario(rwy, dep, { aircraftTypes: ['A320'], gaFraction: 0, arrivalsPerHour: 45 }), 2400).map((r) => r.spec)).toEqual(jetRecs.map((r) => r.spec));
       });
     });
   }
@@ -204,7 +205,9 @@ describe('traffic generator IFR flows', () => {
 
   it('IFR arrivals and departures from the generator can be worked: clearance, taxi request and approach clearance are accepted', () => {
     for (const rwy of ['13', '31']) {
-      const sc = { ...flowScenario(rwy, rwy, { aircraftCount: 0, arrivalsPerHour: 24, departuresPerHour: 20, seed: 23, gaFraction: 0.2 }), pilotRealism: 'off' as const }; // scripted answers: clean pilots
+      const base = flowScenario(rwy, rwy, { aircraftCount: 0, arrivalsPerHour: 24, departuresPerHour: 20, seed: 23, gaFraction: 0.2 });
+      // scripted answers: clean pilots; raw clocks (nothing lands in this run, so the arrival slots and the airborne cap of the flow control would stop the arrivals after the first)
+      const sc = { ...base, pilotRealism: 'off' as const, traffic: { ...base.traffic!, flowControl: false } };
       const e = createEngine({ airport, scenario: sc, readbackErrorRate: 0, trafficGenerator: game.createTrafficGenerator(sc, airport) });
       let gotClearance = 0;
       let gotApproach = 0;

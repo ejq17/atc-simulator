@@ -778,3 +778,11 @@ New aircraft types (`performance.ts`): `H65` (`craft: 'rotorcraft'`), `F16` (`mi
 * **Helicopter separation (`helicopterSeparation.ts`)**: helicopters work at 400 ft AGL; `assessClearanceSafety` refuses a runway takeoff / landing with a low helicopter within 1.8 nm of the departure track / final course, and a helicopter lift-off (TAKEOFF without a runway) with fixed-wing traffic rolling / on final / low, or another helicopter airborne, near its 8 nm track. Rule, sources and measured effect: docs/BEHAVIOUR-ACCURACY.md V13.
 * **Pilot calls** for all of these are in `src/radio/specialCalls.ts`, made from `traffic.ts updatePilotRequests` (vehicles and helicopters skip the aeroplane logic entirely).
 * Tests: `rotorcraft.test.ts`, `vehicles.test.ts`, `special.test.ts`; behaviour table rows V1-V12 in docs/BEHAVIOUR-ACCURACY.md.
+
+### Exit stubs and shared lanes (throughput round)
+
+- `exitChoice.exitBlockage` rejects an exit whose stub a departure route enters in the opposite direction (`sharesLaneInReverse`, full order) and `exitStubs.landerStubOnRoute` reserves the stub `STUB_RESERVE_LEAD_M` (300 m) ahead of the lander; `STUB_HEAD_M` is exempt in `groundMovement.findLeader`.
+- `pathfinding.routeStartNode` / `edgeAheadNode` (snap `NODE_SNAP_M`) give the start node of a route for an aircraft standing on an edge; `headOn.standsAheadOnPath` ignores a stand the route does not reach.
+- `conflicts.departureTrailConflict` takes the cleared departure heading (true track) when a TAKEOFF carries `departureHeading`; a departure is not an "arriving" aircraft for the check. `runwayOccupancy` default case requires `!ac.isDeparture`.
+- `commandExecutor`: TAXI_BACK completes a LAND clearance; `traffic`: a READY departure that checks in on Ground re-requests taxi, and no pilot call is made while a TAXI_BACK request is pending.
+- Tests: `throughputSim.test.ts`.

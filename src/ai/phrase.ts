@@ -176,6 +176,12 @@ export function airportInfo(ac: Aircraft, dirDeg: number | undefined, speedKt: n
 export const clearedForTakeoff = (ac: Aircraft, runwayEnd: string, runwayHeading: boolean): Phrase =>
   clauses(callsign(ac), words('runway', rwy(runwayEnd)), runwayHeading && 'fly runway heading', 'cleared for takeoff');
 
+/** "<callsign>, turn right heading two five zero, runway N, cleared for takeoff" (JO 7110.65 5-8-2 INITIAL HEADING, 3-9-10). */
+export const clearedForTakeoffHeading = (ac: Aircraft, runwayEnd: string, headingMag: number, turn: 'left' | 'right'): Phrase => {
+  const h = String(Math.round(headingMag) || 360).padStart(3, '0');
+  return clauses(callsign(ac), { text: `turn ${turn} heading ${h}`, spoken: `turn ${turn} heading ${digitsSpoken(h)}` }, words('runway', rwy(runwayEnd)), 'cleared for takeoff');
+};
+
 /**
  * "<callsign>, [runway N RVR two thousand four hundred,] [braking action medium, reported by a Boeing seven thirty seven,] runway N, cleared to land."
  * The RVR (JO 7110.65 2-8-2: local control issues the current RVR to each aircraft prior to landing, 2-8-3 wording) and the braking action

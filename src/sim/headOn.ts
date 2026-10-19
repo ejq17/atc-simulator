@@ -140,6 +140,27 @@ function movingOnLane(o: Aircraft): boolean {
   return o.onGround && !!o.route && o.phase !== 'PARKED' && o.phase !== 'ARRIVED' && o.phase !== 'PUSHBACK' && o.phase !== 'TAKEOFF_ROLL' && o.phase !== 'ROLLOUT';
 }
 
+/**
+ * `p` lies on the path within the lane width and at most `STANDS_AHEAD_M` ahead of the aircraft the path belongs to, stand lead-in included: the aircraft that
+ * owns the path is held up behind whatever stands there (the taxi spacing of `groundMovement.findLeader`).
+ */
+const STANDS_AHEAD_M = 100;
+function standsAheadOnPath(graph: TaxiwayGraph, path: Path, p: Vec2): boolean {
+  for (let i = 0; i + 1 < path.ids.length; i++) {
+    const a = graph.nodes[path.ids[i]];
+    const b = graph.nodes[path.ids[i + 1]];
+    if (!a || !b) continue;
+    const dx = b.pos.x - a.pos.x;
+    const dy = b.pos.y - a.pos.y;
+    const len2 = dx * dx + dy * dy;
+    const t = len2 > 0 ? Math.max(0, Math.min(1, ((p.x - a.pos.x) * dx + (p.y - a.pos.y) * dy) / len2)) : 0;
+    if (Math.hypot(p.x - (a.pos.x + dx * t), p.y - (a.pos.y + dy * t)) > 12) continue;
+    const ahead = path.cum[i] + t * Math.sqrt(len2);
+    if (ahead > 0 && ahead <= STANDS_AHEAD_M) return true;
+  }
+  return false;
+}
+
 /** The first shared stretch of `ac`'s route against `o`'s that the two traverse in opposite directions, with where each aircraft stands relative to it. */
 export function findHeadOn(ctx: SimContext, ac: Aircraft): HeadOn | undefined {
   return findHeadOnIn(ctx.state, ac);
@@ -189,6 +210,7 @@ export function findHeadOnIn(state: SimulationState, ac: Aircraft): HeadOn | und
       let hit: HeadOn | undefined;
       if (inMe && inThem) hit = { other: o, role: 'meet', gapM: gap, marginM: margin, stopDistM: 0, taxiway, laneNodeIds: lane };
       else if (inMe) hit = undefined; // I am on it and go on; the other waits (its own evaluation)
+      else if (o.groundSpeedKt < 1 && standsAheadOnPath(graph, theirs, ac.pos)) hit = undefined; // the other is stopped BEHIND me on its own way (its leader is me): it cannot go first, I do
       else if (inThem || yieldsToOther(ac, o, sA, tC)) hit = { other: o, role: 'wait', gapM: gap, marginM: margin, stopDistM: Math.max(0, sA - holdBack), taxiway, laneNodeIds: lane };
       if (hit && (!best || hit.gapM < best.gapM)) best = hit;
       k = kEnd + 1;

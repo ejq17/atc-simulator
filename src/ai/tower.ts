@@ -6,14 +6,14 @@
  * (and never logs) a clearance the engine would refuse in training mode or flag outside it. On top of that the AI applies
  * its own, more conservative arrival/departure spacing (`releaseSlackSec`).
  */
-import type { Aircraft } from '../sim/types';
-import { assessClearanceSafety, departureTrailConflict, landedDistanceExceptionApplies, precedingArrivalBlockers } from '../sim/conflicts';
+import type { Aircraft, Airport } from '../sim/types';
+import { AIRBORNE_PROXIMITY_NM, assessClearanceSafety, departureTrailConflict, landedDistanceExceptionApplies, precedingArrivalBlockers, srsMinimumFt } from '../sim/conflicts';
 import { projectArrival, timeToThreshold } from '../sim/runwayTiming';
 import { COORDINATION_DESIGN, findOpenRequest, releaseNeeded, validApproval } from '../sim/coordination';
 import { findRunwayEnd, isOnFinal } from '../sim/runways';
 import type { RunwayEndGeom } from '../sim/runways';
 import { frequencyForPosition } from '../radio/frequencies';
-import { KT_TO_MPS, trueToMagnetic } from '../sim/geo';
+import { KT_TO_MPS, ftToM, nmToM, trueToMagnetic } from '../sim/geo';
 import { predictedExit } from '../sim/flightDynamics';
 import { describeTraffic, luawTraffic } from '../sim/towerCommands';
 import { stoppedExitOptionsFor } from '../sim/runwayStop';
@@ -62,6 +62,15 @@ const CROSSING_WINDOW_SEC = 75;
 /** Distance from the threshold beyond which a departure no longer blocks the landing runway for a following arrival (7110.65 3-10-3: 6,000 ft, category III). */
 const DEPARTURE_CLEAR_M = 1829;
 
+/** Turn (degrees) from the runway heading of the departure heading given to a follower that would overtake a slower departure. DESIGN VALUE (5-8-3 needs 15; 30 leaves a margin for the wind and the turn). */
+const DIVERGE_TURN_DEG = 30;
+
+/** The diverging departure heading (magnetic, rounded to 10) and the turn direction (right: away from the left-hand pattern). */
+export function divergingDeparture(airport: Airport, g: RunwayEndGeom): { headingMag: number; turn: 'right' } {
+  const rwyMag = trueToMagnetic(g.headingDeg, airport.magneticVariationDeg);
+  return { headingMag: ((Math.round((rwyMag + DIVERGE_TURN_DEG) / 10) * 10) % 360 + 360) % 360 || 360, turn: 'right' };
+}
+
 /** Times (seconds after the clearance) at which a released departure lifts off and is 6,000 ft from the threshold (the engine's categorical distance). */
 export function departureTimes(ac: Aircraft, lined: boolean): { liftoff: number; beyond6000: number } {
   const perf = getPerformance(ac.type);
@@ -90,16 +99,55 @@ const EXIT_CALL_MAX_KT = 70;
 /** Aircraft in the traffic pattern closer than this to the threshold (nm) block departures. */
 const PATTERN_BLOCK_NM = 3.5;
 
-/** A released departure and an arrival on short final stay at least this far apart (nm) when the departure lifts off (engine near-miss alert: 1.5 nm / 500 ft). */
-const LIFTOFF_SEPARATION_NM = 2.4;
+/**
+ * Touchdown comes this long (s) after the threshold crossing (flare and float, about 300 m at approach speed). DESIGN VALUE. Until then the arrival is
+ * airborne and the engine's near-miss alert (`AIRBORNE_PROXIMITY_NM` / 500 ft) can see it against a departure that is airborne too.
+ */
+const TOUCHDOWN_AFTER_THRESHOLD_SEC = 8;
+/** Lateral margin (nm) added to the near-miss alert distance when the gap to an arrival is projected (the departure's speed between lift-off and climb speed is not modelled). DESIGN VALUE. */
+const ALERT_PROJECTION_MARGIN_NM = 0.2;
+
+/** Distance (m) a departure has rolled at lift-off, and its climb speed (m/s). */
+function departureProfile(ac: Aircraft): { rollM: number; climbMps: number } {
+  const perf = getPerformance(ac.type);
+  const accel = perf.accelKtPerSec * KT_TO_MPS;
+  const tRoll = perf.rotateSpeedKt / perf.accelKtPerSec;
+  return { rollM: 0.5 * accel * tRoll * tRoll, climbMps: perf.climbSpeedKt * KT_TO_MPS };
+}
+
+/**
+ * Seconds after the release until an arrival of `arrType` flying at `arrKt` must still be short of its threshold for the departure to be released
+ * (the smaller `releaseSlackSec` is, the less room). Two conditions, the larger governs:
+ *
+ *  1. Same runway separation, JO 7110.65 3-9-5 (anticipating separation) with 3-10-3 / 3-9-6: the landing aircraft does not cross the threshold until the
+ *     departure is airborne and the categorical distance (`srsMinimumFt`: 3,000 ft light behind light, 4,500 ft, 6,000 ft if either is category III)
+ *     down the runway, plus the time the engine's landing check needs to see it (`goAroundSec`: the arrival is sent around inside the larger of 1 nm and
+ *     30 s unless the departure is that far ahead by then), `RELEASE_MARGIN_SEC` being the 30 s of it.
+ *  2. The engine's near-miss alert (1.5 nm / 500 ft, both aircraft airborne): the gap between the two is linear in time once the departure is airborne
+ *     and the arrival has not touched down, so it is smallest at lift-off or at touchdown; both must stay at or above 1.5 nm plus
+ *     `ALERT_PROJECTION_MARGIN_NM`. (Before this, a flat 2.4 nm at lift-off was demanded, which is 108 s at 80 kt and fits no gap between arrivals
+ *     160 s apart. The rule has no lateral figure at all; this is the engine's alert, not the separation minimum.)
+ */
+export function neededEtaSec(dep: Aircraft, lined: boolean, arrType: string, arrKt: number): number {
+  const t = departureTimes(dep, lined);
+  const { rollM, climbMps } = departureProfile(dep);
+  const vA = arrKt * KT_TO_MPS;
+  const srsM = ftToM(srsMinimumFt(arrType, dep.type));
+  const dClimb = Math.max(0, srsM - rollM);
+  const goAroundSec = Math.max(RELEASE_MARGIN_SEC, (nmToM(GO_AROUND_NM) / vA));
+  const needSrs = t.liftoff + dClimb / climbMps + goAroundSec;
+  const alertM = nmToM(AIRBORNE_PROXIMITY_NM + ALERT_PROJECTION_MARGIN_NM);
+  const needLiftoff = t.liftoff + Math.max(0, alertM - rollM) / vA;
+  const needTouchdown = t.liftoff - TOUCHDOWN_AFTER_THRESHOLD_SEC + Math.max(0, alertM - rollM + vA * TOUCHDOWN_AFTER_THRESHOLD_SEC) / climbMps;
+  return Math.max(needSrs, needLiftoff, needTouchdown);
+}
 
 /**
  * Smallest "slack" (seconds) over all arrivals that use `end`'s runway or one intersecting it: how much longer than needed the arrival
- * takes to reach its threshold if `dep` is released now. Negative = releasing the departure would put it too close to an arrival.
+ * takes to reach its threshold if `dep` is released now (`neededEtaSec`). Negative = releasing the departure would put it too close to an arrival.
  */
 export function releaseSlackSec(v: AgentView, end: RunwayEndGeom, dep: Aircraft, lined: boolean): number {
   const rws = interactingRunways(v.airport, end.runway.id);
-  const t = departureTimes(dep, lined);
   let best = Infinity;
   for (const o of Object.values(v.state.aircraft)) {
     if (o.id === dep.id || !isInboundArrival(o)) continue;
@@ -117,11 +165,7 @@ export function releaseSlackSec(v: AgentView, end: RunwayEndGeom, dep: Aircraft,
         if (leg === 'DOWNWIND' && !turnsBaseSoon(o, g)) continue;
       }
     }
-    const eta = etaToThresholdSec(o, g);
-    const kt = Math.max(o.groundSpeedKt, 60);
-    const needBeyond = t.beyond6000 + RELEASE_MARGIN_SEC; // the departure is 6,000 ft down the runway (landing behind a departure)
-    const needLiftoff = t.liftoff + (LIFTOFF_SEPARATION_NM / kt) * 3600; // the arrival is still >= 2.4 nm out when it lifts off
-    best = Math.min(best, eta - Math.max(needBeyond, needLiftoff));
+    best = Math.min(best, etaToThresholdSec(o, g) - neededEtaSec(dep, lined, o.type, Math.max(o.groundSpeedKt, 60)));
   }
   return best;
 }
@@ -204,7 +248,10 @@ export function crossingWaiting(v: AgentView, g: RunwayEndGeom, exceptId: string
   for (const o of Object.values(v.state.aircraft)) {
     if (o.id === exceptId || !o.onGround || o.pendingRequest?.kind !== 'CROSSING' || o.groundSpeedKt >= 1) continue;
     if (v.now - o.pendingRequest.sinceSec < CROSSING_WAIT_SEC) continue;
-    if (holdNodeAt(v.airport, o)?.runwayId === g.runway.id) return o;
+    // (a hold line of an INTERSECTING runway counts too: an aircraft waiting to cross 13/31 needs the same gap in the landings on 4/22, soak seed 3: a crossing that
+    // waited twenty minutes because the landing clearances were only held back for the landing runway's own hold lines)
+    const rid = holdNodeAt(v.airport, o)?.runwayId;
+    if (rid && interactingRunways(v.airport, g.runway.id).includes(rid)) return o;
   }
   return undefined;
 }
@@ -262,7 +309,10 @@ export function createTowerAgent(): Agent {
     for (const { ac, g } of queue) {
       if (firstPerRunway.has(g.runway.id)) continue;
       firstPerRunway.add(g.runway.id);
-      const takeoff = mkCmd('TAKEOFF', ac, { runwayEnd: g.end.id, runwayId: g.runway.id });
+      // A follower that would overtake a slower departure on the same track (5-8-3) is given a departure heading that diverges from it (5-8-2, DIVERGE_TURN_DEG), as a
+      // controller does, instead of waiting until the leader is 10 nm out (soak: 13-18 % of the time a departure stood at the hold was this).
+      const heading = departureTrailConflict(state, ac, g) ? divergingDeparture(airport, g) : undefined;
+      const takeoff = mkCmd('TAKEOFF', ac, { runwayEnd: g.end.id, runwayId: g.runway.id, ...(heading ? { departureHeading: heading.headingMag, turnDirection: heading.turn } : {}) });
       const slack = releaseSlackSec(v, g, ac, isLinedUp(ac));
       const ifr = ac.flightPlan?.flightRules === 'IFR';
       const relPos = releaseNeeded(state, 'TWR', ac);
@@ -292,10 +342,10 @@ export function createTowerAgent(): Agent {
       } else if (takeoffOk) {
         plans.push({
           key: `${ac.id}:takeoff`, aircraftId: ac.id, callsign: ac.callsign, priority: 80, cmds: [takeoff],
-          phrase: say.clearedForTakeoff(ac, g.end.id, ifr), cooldownSec: 20,
-          summary: `${ac.callsign} cleared for takeoff runway ${g.end.id}`,
+          phrase: heading ? say.clearedForTakeoffHeading(ac, g.end.id, heading.headingMag, heading.turn) : say.clearedForTakeoff(ac, g.end.id, ifr), cooldownSec: 20,
+          summary: `${ac.callsign} cleared for takeoff runway ${g.end.id}${heading ? `, turn ${heading.turn} heading ${heading.headingMag} (diverging from the departure ahead)` : ''}`,
         });
-      } else if (ac.phase === 'HOLDING_SHORT' && slack >= LINEUP_EXTRA_SEC && !departureTrailConflict(state, ac, g) && !(relPos && !validApproval(state, 'RELEASE', ac.id))) {
+      } else if (ac.phase === 'HOLDING_SHORT' && slack >= LINEUP_EXTRA_SEC && !(relPos && !validApproval(state, 'RELEASE', ac.id))) {
         // JO 7110.65 3-9-4: the aircraft authorised to line up and wait is told about the closest traffic within 6 miles for the same runway.
         const near = luawTraffic({ state }, ac, g);
         const luaw = mkCmd('LINE_UP_AND_WAIT', ac, { runwayEnd: g.end.id, runwayId: g.runway.id, ...(near ? { trafficAdvised: true } : {}) });
@@ -440,6 +490,20 @@ export function createTowerAgent(): Agent {
           });
         }
         continue;
+      }
+
+      // A departure on the ground that asks for taxi or pushback on Tower's frequency (a pilot who took another aircraft's frequency change, a call that went to the
+      // wrong frequency): Tower works aircraft at the runway, not at the gate. Back to Ground (3-7-2 is Ground's); nobody else would answer it, soak seed 4.
+      if (ac.isDeparture && ac.onGround && (ac.pendingRequest?.kind === 'TAXI' || ac.pendingRequest?.kind === 'PUSHBACK') && ac.occupyingRunways.length === 0 && !holdNodeAt(airport, ac, 60) && v.staffed.has('GND')) {
+        const gnd = frequencyForPosition(airport, 'GND');
+        if (gnd) {
+          plans.push({
+            key: `${ac.id}:misrouted-to-gnd`, aircraftId: ac.id, callsign: ac.callsign, priority: 54, cooldownSec: 60,
+            cmds: [mkCmd('CONTACT_FREQUENCY', ac, { frequencyId: gnd.id })],
+            phrase: say.contact(ac, airport, gnd.id, gnd.mhz), summary: `${ac.callsign} is not at a runway, back to Ground`,
+          });
+          continue;
+        }
       }
 
       // Departures that are airborne: handoff to Departure (IFR: the sector frequency of the clearance).

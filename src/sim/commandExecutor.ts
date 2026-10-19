@@ -20,7 +20,7 @@ import {
 import type { AircraftRuntime, ReadbackErrorRecord, SimContext } from './context';
 import { findRunway, findRunwayEnd, alongCross, normalizeRunwayEndId } from './runways';
 import type { RunwayEndGeom } from './runways';
-import { findTaxiRoute, nearestNode, neighborIds, runwayCrossingsAlong, shortestDistances } from './pathfinding';
+import { findTaxiRoute, nearestNode, routeStartNode, neighborIds, runwayCrossingsAlong, shortestDistances } from './pathfinding';
 import type { TaxiRoute } from './pathfinding';
 import { stoppedOnRunway, runwayChainPosition } from './runwayStop';
 import { pickRunwayHold, runwayHoldCandidates, runwayRemainingM, takeoffRunM } from './holdSelection';
@@ -753,7 +753,7 @@ function currentStartNode(env: Env): TaxiNode | undefined {
   const near = nearestNode(graph, ac.pos, { maxDistM: 2 });
   if (near) return near;
   if (ac.route && ac.route.progressIndex < ac.route.nodeIds.length) return graph.nodes[ac.route.nodeIds[ac.route.progressIndex]];
-  return nearestNode(graph, ac.pos, { maxDistM: 150 });
+  return routeStartNode(graph, ac.pos, ac.headingDeg);
 }
 
 function runwayEntryNode(env: Env, hold: TaxiNode, g: RunwayEndGeom): TaxiNode | undefined {
@@ -989,7 +989,10 @@ function planTaxi(env: Env): PlanResult {
         rt.takeoffCleared = false;
         completeClearances(ctx, ac, ['TAXI', 'TAXI_TO_PARKING', 'HOLD_POSITION']);
         if (runwayEnd) ac.assignedRunwayEnd = runwayEnd;
-        if (ac.phase === 'RUNWAY_EXIT' && ac.isDeparture && runwayEnd) setPhase(ctx, ac, 'TAXIING', 'taxi back for departure'); // pilot realism TAXI_BACK
+        if (ac.phase === 'RUNWAY_EXIT' && ac.isDeparture && runwayEnd) {
+          completeClearances(ctx, ac, ['LAND']); // the landing is over: a LAND clearance left active would make the climbing departure an "arrival" for everything behind it
+          setPhase(ctx, ac, 'TAXIING', 'taxi back for departure'); // pilot realism TAXI_BACK
+        }
         else if (arrivalPhases.includes(ac.phase)) setPhase(ctx, ac, 'TAXI_TO_PARKING');
         else if (ac.phase === 'HOLDING_SHORT') setPhase(ctx, ac, 'TAXIING', 'taxi instruction');
         else advancePhase(ctx, ac, 'TAXIING');

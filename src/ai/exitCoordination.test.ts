@@ -75,11 +75,16 @@ describe('AI Ground does not route onto the exit stub of a lander inside 2 nm', 
     const dep = { type: 'C172', id: 'dd', callsign: 'D1', pos: st.airport.taxiwayGraph.nodes['PK-GA-1'].pos } as never;
     const plan = planDeparture(st.airport, dep, ['22'])!;
     expect(landerStubs(st)).toHaveLength(1);
-    expect(opposingTraffic(st, plan.nodeIds, 'dd')?.callsign).toBe('N60DX');
+    // a route that reaches the stub within 300 m of where it starts is blocked; one that comes to it after the whole length of the ramp lane is not (STUB_RESERVE_LEAD_M)
+    const onStub = new Set(landerStubs(st)[0].nodeIds);
+    const first = plan.nodeIds.findIndex((id) => onStub.has(id));
+    expect(first).toBeGreaterThan(0);
+    expect(opposingTraffic(st, plan.nodeIds.slice(first), 'dd')?.callsign).toBe('N60DX');
+    expect(opposingTraffic(st, plan.nodeIds, 'dd')).toBeUndefined();
     const far = createHarness({ player: ['TWR'], ai: ['GND'], mode: 'free_play', activeRunways: { departing: ['22'], landing: ['22'] }, spawns: [arr('N60DX', 'C172', '22', 6)] });
     far.run(2);
     expect(landerStubs(far.engine.getState())).toHaveLength(0);
-    expect(opposingTraffic(far.engine.getState(), plan.nodeIds, 'dd')).toBeUndefined();
+    expect(opposingTraffic(far.engine.getState(), plan.nodeIds.slice(first), 'dd')).toBeUndefined();
   });
 
   it('Tower tells a Ground controller who is a person when the exit it will use needs a runway crossing to the parking (landline information, 3-1-4)', () => {

@@ -7,7 +7,8 @@ import type { Aircraft, Airport, ParkingPosition, SimulationState, TaxiNode } fr
 import { dist, ftToM, mToNm } from '../sim/geo';
 import { alongCross, crossingRunways, findRunwayEnd, normalizeRunwayEndId } from '../sim/runways';
 import type { RunwayEndGeom } from '../sim/runways';
-import { findTaxiRoute, nearestNode, shortestDistances } from '../sim/pathfinding';
+import { pushbackGeometry } from '../sim/pushback';
+import { findTaxiRoute, nearestNode, routeStartNode, shortestDistances } from '../sim/pathfinding';
 import type { TaxiRoute } from '../sim/pathfinding';
 import { assignedStandOf, freeParkingCandidates } from '../sim/parkingResolver';
 import { getPerformance } from '../sim/performance';
@@ -94,7 +95,7 @@ export function taxiStartNode(airport: Airport, ac: Aircraft): TaxiNode | undefi
   const near = nearestNode(graph, ac.pos, { maxDistM: 2 });
   if (near) return near;
   if (ac.route && ac.route.progressIndex < ac.route.nodeIds.length) return graph.nodes[ac.route.nodeIds[ac.route.progressIndex]];
-  return nearestNode(graph, ac.pos, { maxDistM: 150 });
+  return routeStartNode(graph, ac.pos, ac.headingDeg);
 }
 
 /** Spoken-name taxiways of a route: named only, repeated names collapsed to their LAST use ([L N L M L M P B] -> [N L M P B]). */
@@ -436,7 +437,8 @@ export function busyHoldIds(state: SimulationState, exceptId: string): Map<strin
   for (const o of Object.values(state.aircraft)) {
     // An arrival standing at a runway hold line after its exit (waiting for taxi instructions) occupies that hold: a departure sent to it would end nose to
     // nose with the arrival, which cannot leave until the departure has gone by (free-play soak, docs/PROGRESS.md). Counted as a full queue.
-    if (o.id !== exceptId && o.onGround && !o.isDeparture && o.phase === 'RUNWAY_EXIT') {
+    // (also when it has been given its taxi instructions and still stands there: the lane in front of it is occupied by the aircraft it waits for, soak seed 3)
+    if (o.id !== exceptId && o.onGround && !o.isDeparture && (o.phase === 'RUNWAY_EXIT' || (o.phase === 'TAXI_TO_PARKING' && o.groundSpeedKt < 1))) {
       const at = nearestNode(graph, o.pos, { kinds: ['holding_position'], maxDistM: 60 });
       if (at) { out.set(at.id, (out.get(at.id) ?? 0) + MAX_QUEUE); continue; }
     }
@@ -456,11 +458,11 @@ export function busyHoldIds(state: SimulationState, exceptId: string): Map<strin
  */
 /** `p` lies within `LANE_WIDTH_M` of a segment of the node path and is not at a parking position (aircraft on their stand are not on the lane). */
 const LANE_WIDTH_M = 12;
-function onRoute(graph: SimulationState['airport']['taxiwayGraph'], nodeIds: string[], p: { x: number; y: number }, facingDeg?: number): boolean {
+function onRoute(graph: SimulationState['airport']['taxiwayGraph'], nodeIds: string[], p: { x: number; y: number }, facingDeg?: number, withStandLeadIn = false): boolean {
   for (let i = 1; i < nodeIds.length; i++) {
     const a = graph.nodes[nodeIds[i - 1]];
     const b = graph.nodes[nodeIds[i]];
-    if (!a || !b || a.kind === 'parking' || b.kind === 'parking') continue;
+    if (!a || !b || (!withStandLeadIn && (a.kind === 'parking' || b.kind === 'parking'))) continue;
     const dx = b.pos.x - a.pos.x;
     const dy = b.pos.y - a.pos.y;
     const len2 = dx * dx + dy * dy;
@@ -488,7 +490,126 @@ function pathBearingAt(graph: SimulationState['airport']['taxiwayGraph'], nodeId
   return undefined;
 }
 
-export function opposingTraffic(state: SimulationState, nodeIds: string[], exceptId: string, opts: { ignoreStopped?: boolean } = {}): Aircraft | undefined {
+/**
+ * What stands between a departure taxiing toward its runway hold and the hold line, so that Tower could not move it if it were handed over now: an arrival
+ * that left the runway and waits on the route (the exit stub of the hold the departure is bound for), an aircraft stopped or coming the other way on it
+ * (`opposingTraffic`, which includes the stub a lander is about to use), or a pushed-back aircraft standing on it. A departure queued behind another departure
+ * (same direction) is not blocked: the queue moves in order. JO 7110.65 3-7-2 (taxi instructions that keep aircraft apart are Ground's): the switch to Tower is made when the
+ * aircraft is holding short or approaching the hold with no conflict ahead; with one ahead Ground keeps the aircraft, because only Ground can taxi it aside
+ * or turn it around (docs/PROGRESS.md "Throughput").
+ */
+export function blockedBeforeHold(state: SimulationState, ac: Aircraft): Aircraft | undefined {
+  const r = ac.route;
+  if (!r) return undefined;
+  const rest = r.nodeIds.slice(Math.max(0, r.progressIndex - 1));
+  if (rest.length < 2) return undefined;
+  const opp = opposingTraffic(state, rest, ac.id);
+  if (opp) return opp;
+  const graph = state.airport.taxiwayGraph;
+  for (const o of Object.values(state.aircraft)) {
+    if (o.id === ac.id || !o.onGround || o.occupyingRunways.length > 0 || o.phase === 'PARKED' || o.phase === 'ARRIVED') continue;
+    if (o.isDeparture ? o.groundSpeedKt < 1 && onRoute(graph, rest, o.pos, o.headingDeg) : (o.phase === 'RUNWAY_EXIT' || o.phase === 'TAXI_TO_PARKING') && onRoute(graph, rest, o.pos)) return o;
+  }
+  return undefined;
+}
+
+/**
+ * Another aircraft stands (or taxis) so close to the pushback path that the push would stop at once (`groundMovement.pushBlocked`: half the two lengths plus 8 m from
+ * the push point or the point ahead of the tail). Ground approves the push when nobody is in the way instead: an approved push that cannot start holds the aircraft in
+ * PUSHBACK, and the aircraft in the way - waiting for its own taxi clearance, which is held for the pushing aircraft - never leaves (soak seed 1: two airliners at
+ * neighbouring gates, an hour).
+ */
+export function pushbackBlockedBy(state: SimulationState, ac: Aircraft, from: { x: number; y: number }, to: { x: number; y: number }): Aircraft | undefined {
+  const la = getPerformance(ac.type).lengthM;
+  const dx = to.x - from.x;
+  const dy = to.y - from.y;
+  const len2 = dx * dx + dy * dy;
+  for (const o of Object.values(state.aircraft)) {
+    if (o.id === ac.id || !o.onGround || o.phase === 'ARRIVED' || o.phase === 'PARKED') continue;
+    if (!o.route && o.groundSpeedKt < 0.1 && state.airport.parking.some((p) => dist(p.pos, o.pos) < 8)) continue; // on its own stand
+    // a push already in progress nearby: two pushes onto the same stretch of lane stop each other
+    const need = (la + getPerformance(o.type).lengthM) / 2 + 8;
+    if (o.phase === 'PUSHBACK') {
+      const dest = pushDestination(state, o);
+      if (dest && dist(dest, to) < need) return o;
+      continue; // (the pushing aircraft itself, mid-way, is judged by its destination: the engine's push only stops for what stands near the push point)
+    }
+    const t = len2 > 0 ? Math.max(0, Math.min(1, ((o.pos.x - from.x) * dx + (o.pos.y - from.y) * dy) / len2)) : 0;
+    if (Math.hypot(o.pos.x - (from.x + dx * t), o.pos.y - (from.y + dy * t)) < need) return o;
+  }
+  return undefined;
+}
+
+/** Distance (m) within which a pushback in progress counts as standing on a route (the longest lead-in from a stand to the lane at KACY is 55 m; ground.ts `PUSHBACK_LANE_CLEAR_M` keeps 90 m for the reverse check). DESIGN VALUE. */
+const PUSHBACK_LEAD_IN_M = 70;
+
+/** Where a pushback in progress ends (the lane end of its stand's lead-in, `pushback.pushbackGeometry`): the nearest stand to the aircraft. */
+function pushDestination(state: SimulationState, o: Aircraft): { x: number; y: number } | undefined {
+  let stand: ParkingPosition | undefined;
+  let best = 80;
+  for (const p of state.airport.parking) {
+    const d = dist(p.pos, o.pos);
+    if (d < best) { best = d; stand = p; }
+  }
+  return stand ? pushbackGeometry(state.airport, stand, o, { departingEnds: state.activeRunways.departing })?.to : undefined;
+}
+
+/** `me` stands in a lane within the reach of the push of `o` (half the two lengths plus 8 m of its destination or of its path): the push is held up by it, so it has to go first. */
+function blocksPush(state: SimulationState, me: Aircraft, o: Aircraft): boolean {
+  if (state.airport.parking.some((p) => dist(p.pos, me.pos) < 8)) return false; // on its own stand
+  const need = (getPerformance(me.type).lengthM + getPerformance(o.type).lengthM) / 2 + 8;
+  const dest = pushDestination(state, o);
+  if (!dest) return dist(me.pos, o.pos) < need;
+  const dx = dest.x - o.pos.x;
+  const dy = dest.y - o.pos.y;
+  const len2 = dx * dx + dy * dy;
+  const t = len2 > 0 ? Math.max(0, Math.min(1, ((me.pos.x - o.pos.x) * dx + (me.pos.y - o.pos.y) * dy) / len2)) : 0;
+  return Math.hypot(me.pos.x - (o.pos.x + dx * t), me.pos.y - (o.pos.y + dy * t)) < need;
+}
+
+/** Some segment of the node path passes within `radiusM` of `p` (parking nodes included: the lead-in itself is the thing being asked about). */
+function routeWithin(graph: SimulationState['airport']['taxiwayGraph'], nodeIds: string[], p: { x: number; y: number }, radiusM: number): boolean {
+  for (let i = 1; i < nodeIds.length; i++) {
+    const a = graph.nodes[nodeIds[i - 1]];
+    const b = graph.nodes[nodeIds[i]];
+    if (!a || !b) continue;
+    const dx = b.pos.x - a.pos.x;
+    const dy = b.pos.y - a.pos.y;
+    const len2 = dx * dx + dy * dy;
+    const t = len2 > 0 ? Math.max(0, Math.min(1, ((p.x - a.pos.x) * dx + (p.y - a.pos.y) * dy) / len2)) : 0;
+    if (Math.hypot(p.x - (a.pos.x + dx * t), p.y - (a.pos.y + dy * t)) <= radiusM) return true;
+  }
+  return false;
+}
+
+/**
+ * A departure on a progressive taxi (AIM 4-3-18) holds only the segment it was told, but it is going to the runway entry Ground plans for it: that whole way
+ * is its route for the purpose of keeping traffic off the lane (an arrival sent along the lane while the next segment is still to be issued meets it head-on,
+ * as the soak showed). The planned rest is `planDeparture` from the segment's end node.
+ */
+function withPlannedRoute(state: SimulationState, o: Aircraft): Aircraft {
+  const r = o.route;
+  if (!r || !o.isDeparture || o.phase !== 'TAXIING') return o;
+  const seg = lastClearanceOf(o, 'TAXI');
+  if (!seg?.segment || seg.completedAtSec !== undefined) return o;
+  const graph = state.airport.taxiwayGraph;
+  const endN = graph.nodes[r.nodeIds[r.nodeIds.length - 1]];
+  const prevN = graph.nodes[r.nodeIds[Math.max(0, r.nodeIds.length - 2)]];
+  if (!endN || !prevN || endN.kind === 'holding_position' || endN.kind === 'parking') return o;
+  const virtual: Aircraft = { ...o, pos: endN.pos, route: undefined, headingDeg: (Math.atan2(endN.pos.x - prevN.pos.x, endN.pos.y - prevN.pos.y) * 180 / Math.PI + 360) % 360 };
+  const dep = planDeparture(state.airport, virtual, state.activeRunways.departing, new Map(), closedTaxiways(state));
+  if (!dep) return o;
+  const start = dep.nodeIds.indexOf(endN.id);
+  const rest = start >= 0 ? dep.nodeIds.slice(start + 1) : dep.nodeIds;
+  return { ...o, route: { ...r, nodeIds: [...r.nodeIds, ...rest] } };
+}
+
+function lastClearanceOf(o: Aircraft, kind: string) {
+  for (let i = o.clearances.length - 1; i >= 0; i--) if (o.clearances[i].kind === kind) return o.clearances[i];
+  return undefined;
+}
+
+export function opposingTraffic(state: SimulationState, nodeIds: string[], exceptId: string, opts: { ignoreStopped?: boolean; ignoreStoppedAhead?: boolean } = {}): Aircraft | undefined {
   // The exit stub a lander inside 2 nm (or rolling out) is about to use is as good as occupied: a route over it ends head-on with the lander
   // (exitStubs.ts). AI Ground waits; the lander is returned as the blocker.
   const lander = landerStubOnRoute(state, nodeIds, exceptId);
@@ -496,16 +617,26 @@ export function opposingTraffic(state: SimulationState, nodeIds: string[], excep
   const graph = state.airport.taxiwayGraph;
   const mine = new Map<string, number>();
   nodeIds.forEach((id, i) => mine.set(id, i));
-  for (const o of Object.values(state.aircraft)) {
-    if (o.id === exceptId || !o.onGround) continue;
+  const me = state.aircraft[exceptId];
+  for (const o0 of Object.values(state.aircraft)) {
+    if (o0.id === exceptId || !o0.onGround) continue;
+    const o = withPlannedRoute(state, o0);
     // `ignoreStopped`: an aircraft that stands still on the route is no reason to wait when it is itself held up by this one (an arrival at the head of an exit stub
     // and a departure that stopped short of the stub because of it): the route is issued, the engine stops the pair nose to nose and the pilot's call is answered
     // (ai/headOn.ts) instead of both waiting for good.
     if (opts.ignoreStopped && o.groundSpeedKt < 1 && o.route) continue;
+    // `ignoreStoppedAhead`: the stopped one is not waiting for something else, it is waiting for THIS aircraft, which stands on the part of its route still ahead
+    // (a departure that came up behind an arrival at the head of its exit stub): that is the mutual wait, the pair is released and the head-on resolution answers.
+    if (opts.ignoreStoppedAhead && o.groundSpeedKt < 1 && o.route && me && onRoute(graph, o.route.nodeIds.slice(Math.max(0, o.route.progressIndex - 1)), me.pos, undefined, true)) continue;
     if (!o.route) {
       // A pushed-back aircraft standing on the lane (READY / PUSHBACK, no route yet) blocks every route over its position just as a stopped one would:
       // an arrival sent past it would wait behind it while it waits for the arrival to clear (free-play soak, docs/PROGRESS.md "Free-play jam").
       if ((o.phase === 'READY' || o.phase === 'PUSHBACK') && onRoute(graph, nodeIds, o.pos)) return o;
+      // An aircraft being pushed back is moving onto the lane (its push point is up to ~55 m from where it is now): a route that passes within the pushback lead-in
+      // of it would find it standing in the lane within the minute (soak seed 2: a taxi clearance 10 s after a pushback approval, both stopped for an hour).
+      // (not when the requester itself stands in the lane within reach of the push - a pushed-back airliner waiting for its own taxi clearance: the push is held up by it
+      // (`groundMovement.pushBlocked`), so it has to go first: two gates, each pushed-back airliner waiting for its taxi clearance behind the other, stopped for an hour in the soak)
+      if (o.phase === 'PUSHBACK' && routeWithin(graph, nodeIds, o.pos, PUSHBACK_LEAD_IN_M) && !(me && me.groundSpeedKt < 1 && blocksPush(state, me, o))) return o;
       continue;
     }
     if (o.phase === 'PARKED' || o.phase === 'ARRIVED') continue;
@@ -539,7 +670,10 @@ export function opposingTraffic(state: SimulationState, nodeIds: string[], excep
       if (prevMine >= 0 && k < prevMine && j > prevTheirs) {
         // They pass the shared nodes in the reverse order. Time-based: the two only meet if both are on the shared stretch in the same minutes
         // (a lane the other aircraft clears long before this one reaches it is no obstacle; the engine's head-on logic is the backstop).
-        return sharedLaneInSameWindow(state, nodeIds, o) ? o : undefined;
+        // (Only this aircraft is cleared by the window test: the others are still to be looked at - returning here would let every aircraft after it in the
+        // list through, soak seed 1: an arrival sent along the lane towards a departure that was listed after one whose window did not overlap.)
+        if (sharedLaneInSameWindow(state, nodeIds, o)) return o;
+        break;
       }
       prevMine = k;
       prevTheirs = j;
@@ -632,6 +766,9 @@ function plannedOpposingTraffic(state: SimulationState, nodeIds: string[], excep
     const plan = exitWaiter ? planParking(state, o)?.nodeIds : planDeparture(state.airport, o, state.activeRunways.departing, busyHoldIds(state, o.id), closedTaxiways(state))?.nodeIds;
     if (!plan) continue;
     const graph = state.airport.taxiwayGraph;
+    // I stand IN the way of that aircraft's planned route (a pushed-back departure on the lane the arrival's route follows): it cannot go before me, so it
+    // is no reason for me to wait (the other way round it is: `opposingTraffic` holds the arrival back for an aircraft standing on its route).
+    if (me && me.groundSpeedKt < 1 && onRoute(graph, plan, me.pos)) continue;
     const pcum: number[] = [0];
     for (let i = 1; i < plan.length; i++) pcum.push(pcum[i - 1] + dist(graph.nodes[plan[i - 1]].pos, graph.nodes[plan[i]].pos));
     const theirs: Path = { ids: plan, cum: pcum };

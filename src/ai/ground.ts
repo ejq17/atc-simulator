@@ -20,7 +20,7 @@ import { createClearanceAgent } from './clnc';
 import type { ClearanceStore } from './clnc';
 import { closedTaxiways } from '../sim/airportOps';
 import { HOLD_START_SNAP_M } from '../sim/groundMovement';
-import { aheadInCrossingQueue, busyHoldIds, etaToThresholdSec, holdNodeAt, interactingRunways, nextProgressiveSegment, opposingTraffic, pendingIntermediateStops, planDeparture, planParking, remainingRouteM, routePassesNear, starvingDeparture, taxiStartNode } from './world';
+import { aheadInCrossingQueue, blockedBeforeHold, busyHoldIds, landingExitHoldIds, pushbackBlockedBy, etaToThresholdSec, holdNodeAt, interactingRunways, nextProgressiveSegment, opposingTraffic, pendingIntermediateStops, planDeparture, planParking, remainingRouteM, routePassesNear, starvingDeparture, taxiStartNode } from './world';
 import { holdTooShort } from '../sim/holdSelection';
 import { resolveHeadOn } from './headOn';
 import * as say from './phrase';
@@ -30,26 +30,38 @@ const HANDOFF_WITHIN_M = 400;
 /** A taxi request waits at most this long (s) for traffic on the route to clear before Ground stops checking (the engine's spacing and the nose-to-nose resolution take over). DESIGN VALUE. */
 export const GROUND_PATIENCE_SEC = Infinity;
 /** A taxi request that has waited this long (s) is answered although an aircraft stands still on the route (the nose-to-nose resolution takes over if they meet). DESIGN VALUE. */
-export const STOPPED_PATIENCE_SEC = 60;
+export const STOPPED_PATIENCE_SEC = Infinity;
 /** Pushback is held while another aircraft's remaining route passes within this distance of the stand (DESIGN VALUE: the lead-in plus a tug and tail). */
 const PUSHBACK_LANE_CLEAR_M = 90;
 /** A second aircraft is not released onto a route within this distance of a freshly released one for this long. */
 const TAXI_FOLLOW_SEC = 60;
 const TAXI_FOLLOW_M = 300;
-/** A runway is "about to be used" for a landing when a cleared / established arrival will cross its threshold within this many seconds. */
-const CROSSING_ARRIVAL_SEC = 90;
+/**
+ * A runway is "about to be used" for a landing when a cleared / established arrival will cross its threshold within this many seconds. DESIGN VALUE: the crossing
+ * itself takes about 30 s on the runway (`conflicts.surfaceWindow`) and the engine keeps a margin on top; 90 s (the first value) left no gap at all between
+ * arrivals 130-160 s apart (soak: crossing waits of 20 minutes at the 13/31 hold line).
+ */
+export const CROSSING_ARRIVAL_SEC = 60;
 
 /**
- * Is a runway in (or about to be in) use, so Ground must not walk an aircraft across it? Operations on a runway that intersects it count
- * too: a landing roll or a takeoff roll on 13/31 passes through the 4/22 surface, and the engine only checks the crossed runway itself.
+ * Is a runway in (or about to be in) use, so Ground must not walk an aircraft across it? On the crossed runway itself: anything departing, in position, landing or
+ * standing on it. Operations on a runway that intersects it (a landing roll or a takeoff roll on 4/22 passes through the 13/31 surface) are judged by the engine's own
+ * time-based check of the crossing (`conflicts.crossingTrafficIssues`: the crossing aircraft must be clear of the intersection before the traffic reaches it), which both
+ * callers apply on top of this; only an arrival that will reach the threshold inside the crossing window counts here, the rest of the approach does not.
  */
 export function runwayInUse(v: AgentView, runwayId: string, exceptId: string): boolean {
   const rws = interactingRunways(v.airport, runwayId);
-  for (const rid of rws) {
-    const occ = v.state.runwayOccupancy[rid];
-    if (!occ) continue;
-    for (const id of [occ.departingId, occ.landingId, occ.lineUpId]) if (id && id !== exceptId) return true;
-    if (rid !== runwayId && occ.occupants.some((id) => id !== exceptId)) return true;
+  const occ = v.state.runwayOccupancy[runwayId];
+  if (occ) {
+    for (const id of [occ.departingId, occ.landingId, occ.lineUpId]) {
+      if (!id || id === exceptId) continue;
+      // `landingId` is set from the landing clearance (5 nm out, four minutes at 70 kt): an arrival that is still in the air counts through the ETA window below
+      // (CROSSING_ARRIVAL_SEC), not for the whole approach, or a crossing would wait for the gap between a landing and the NEXT landing clearance (docs/PROGRESS.md "Throughput").
+      const lander = id === occ.landingId ? v.state.aircraft[id] : undefined;
+      if (lander && !lander.onGround && lander.phase !== 'LANDING') continue;
+      return true;
+    }
+    if (occ.occupants.some((id) => id !== exceptId)) return true;
   }
   for (const o of Object.values(v.state.aircraft)) {
     if (o.id === exceptId || o.onGround || o.isDeparture) continue;
@@ -93,11 +105,11 @@ export function createGroundAgent(store: ClearanceStore): Agent {
     // Patience: Ground's own check for traffic the route would meet head-on is conservative (the engine stops aircraft short of each other on a shared lane and
     // Ground resolves a nose-to-nose, ai/headOn.ts). A request that has waited longer than GROUND_PATIENCE_SEC is answered without it, so a pair of aircraft that each
     // wait for the other, or a queue behind an aircraft that stands in the lane, cannot hold a request for good (free-play soak, docs/PROGRESS.md).
-    const opposing = (ac: Aircraft, nodeIds: string[], opts: { ignoreStopped?: boolean } = {}) => {
+    const opposing = (ac: Aircraft, nodeIds: string[], opts: { ignoreStopped?: boolean; ignoreStoppedAhead?: boolean } = {}) => {
       const waited = v.now - (ac.pendingRequest?.sinceSec ?? v.now);
       if (waited >= GROUND_PATIENCE_SEC) return undefined;
       // after STOPPED_PATIENCE_SEC an aircraft that merely stands on the route is no reason to go on waiting: it is stuck too (see `opposingTraffic`, ignoreStopped)
-      return opposingTraffic(state, nodeIds, ac.id, { ignoreStopped: opts.ignoreStopped ?? waited >= STOPPED_PATIENCE_SEC });
+      return opposingTraffic(state, nodeIds, ac.id, { ignoreStopped: opts.ignoreStopped ?? waited >= STOPPED_PATIENCE_SEC, ignoreStoppedAhead: opts.ignoreStoppedAhead ?? true });
     };
     // Delivery closed (nobody works CLNC): Ground issues the clearance too.
     if (!v.staffed.has('CLNC')) plans.push(...clearanceAgent(v));
@@ -110,6 +122,7 @@ export function createGroundAgent(store: ClearanceStore): Agent {
         if (!starvingDeparture(state, ac) && routePassesNear(state, ac.pos, PUSHBACK_LANE_CLEAR_M, ac.id)) continue; // an aircraft is taxiing over the lane the push ends in: wait until it has passed
         const stand = pushbackStand(airport, ac);
         const geo = stand ? pushbackGeometry(airport, stand, ac, { departingEnds: state.activeRunways.departing }) : undefined;
+        if (geo && pushbackBlockedBy(state, ac, geo.from, geo.to)) continue; // somebody stands in the way of the push: the pilot asks again
         const tail = geo ? cardinal(geo.finalHeadingDeg + 180) : undefined;
         const tailDeg = tail ? Math.round(((geo!.finalHeadingDeg + 180) % 360) / 45) * 45 % 360 : undefined;
         plans.push({
@@ -144,7 +157,12 @@ export function createGroundAgent(store: ClearanceStore): Agent {
         }
         if (req.resume && !(ac.phase === 'PARKED' || ac.phase === 'READY')) {
           if (ac.isDeparture) {
-            const dep = planDeparture(airport, ac, state.activeRunways.departing, busyHoldIds(state, ac.id), closedTaxiways(state));
+            // (no queue limit here: the aircraft stands in somebody's way and has to go somewhere - every hold "full" because of the arrival that waits for it
+            // to move was a deadlock, soak seed 3)
+            // An exit hold of the landing runway is not a way out of a head-on with an arrival (the queue limit lets a light aircraft use it when the end entry is full): the
+            // full-length entry, whatever its queue.
+            const queued = planDeparture(airport, ac, state.activeRunways.departing, busyHoldIds(state, ac.id), closedTaxiways(state));
+            const dep = (queued && !landingExitHoldIds(state).has(queued.holdId) ? queued : undefined) ?? planDeparture(airport, ac, state.activeRunways.departing, new Map(), closedTaxiways(state));
             if (dep && !opposing(ac, dep.nodeIds)) {
               plans.push({
                 key: `${ac.id}:resume:${req.sinceSec}`, aircraftId: ac.id, callsign: ac.callsign, priority: 52, once: true,
@@ -328,11 +346,19 @@ export function createGroundAgent(store: ClearanceStore): Agent {
         continue;
       }
 
-      // 3. Departure close to (or at) its runway hold with nothing left to cross: switch to Tower.
+      // 3. Departure close to (or at) its runway hold with nothing left to cross and nothing between it and the hold (an arrival on the exit stub, a head-on):
+      // switch to Tower. With something in the way it stays with Ground, the only controller that can taxi it aside or turn it around (ai/headOn.ts); it is handed
+      // over when it stands at the hold line (the taxi instruction is complete by then) or as soon as the way is clear.
       if (ac.isDeparture && (ac.phase === 'TAXIING' || ac.phase === 'HOLDING_SHORT') && v.staffed.has('TWR')) {
         const taxi = lastClearance(ac, 'TAXI');
-        if (taxi && taxi.completedAtSec === undefined && taxi.destination?.startsWith('RWY') && ac.route && pendingIntermediateStops(airport, ac).length === 0
-          && remainingRouteM(airport, ac) <= HANDOFF_WITHIN_M) {
+        const toRunway = !!taxi?.destination?.startsWith('RWY');
+        const g = findRunwayEnd(airport, ac.assignedRunwayEnd);
+        const hold = ac.phase === 'HOLDING_SHORT' && ac.groundSpeedKt < 1 ? holdNodeAt(airport, ac) : undefined;
+        // (a person's vehicle, a helicopter, and an aircraft that asks Ground for something - taxi, a crossing - are not departures at their hold)
+        const atDepartureHold = !!hold && !!g && hold.runwayId === g.runway.id && !isVehicleType(ac.type) && !isRotorcraftType(ac.type) && pending !== 'CROSSING' && pending !== 'TAXI' && pending !== 'PUSHBACK';
+        const approaching = toRunway && taxi!.completedAtSec === undefined && !!ac.route && pendingIntermediateStops(airport, ac).length === 0
+          && remainingRouteM(airport, ac) <= HANDOFF_WITHIN_M && !blockedBeforeHold(state, ac);
+        if (approaching || atDepartureHold) {
           const twr = frequencyForPosition(airport, 'TWR');
           if (twr) {
             plans.push({
@@ -348,7 +374,7 @@ export function createGroundAgent(store: ClearanceStore): Agent {
       // 4. Arrival that left the runway and asks to taxi to parking.
       if (!ac.isDeparture && !isRotorcraftType(ac.type) && ac.phase === 'RUNWAY_EXIT' && pending === 'TAXI' && !hasActive(ac, 'TAXI_TO_PARKING')) {
         const p = planParking(state, ac);
-        if (!p || opposing(ac, p.nodeIds, { ignoreStopped: true })) continue;
+        if (!p || opposing(ac, p.nodeIds, { ignoreStoppedAhead: true })) continue;
         plans.push({
           key: `${ac.id}:to-parking`, aircraftId: ac.id, callsign: ac.callsign, priority: 50,
           cmds: [mkCmd('TAXI_TO_PARKING', ac, { destination: p.spot.id, route: p.via, holdShort: p.holdShort })],

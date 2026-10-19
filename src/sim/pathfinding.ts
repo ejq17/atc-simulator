@@ -275,6 +275,47 @@ export function validateRoute(graph: TaxiwayGraph, route: { nodeIds: string[] } 
   return { valid: true, taxiways, runwayCrossings };
 }
 
+/**
+ * The end node, ahead of an aircraft standing on a taxiway edge (within `lateralM` of the segment) with its nose toward `headingDeg`, of that edge.
+ * For an aircraft far from every node (the data has taxiway edges of 600 m: a "make a one eighty" or a stop in the middle of one) that must be routed again:
+ * it drives on to this node and the route starts there.
+ */
+export function edgeAheadNode(graph: TaxiwayGraph, pos: Vec2, headingDeg: number, lateralM = 12): TaxiNode | undefined {
+  const hx = Math.sin((headingDeg * Math.PI) / 180);
+  const hy = Math.cos((headingDeg * Math.PI) / 180);
+  let best: { node: TaxiNode; lateral: number } | undefined;
+  for (const e of graph.edges) {
+    const a = graph.nodes[e.from];
+    const b = graph.nodes[e.to];
+    if (!a || !b || a.kind === 'runway' || b.kind === 'runway') continue;
+    const dx = b.pos.x - a.pos.x;
+    const dy = b.pos.y - a.pos.y;
+    const len2 = dx * dx + dy * dy;
+    if (len2 <= 0) continue;
+    const t = ((pos.x - a.pos.x) * dx + (pos.y - a.pos.y) * dy) / len2;
+    if (t < 0 || t > 1) continue;
+    const lateral = Math.hypot(pos.x - (a.pos.x + dx * t), pos.y - (a.pos.y + dy * t));
+    if (lateral > lateralM || (best && lateral >= best.lateral)) continue;
+    const node = dx * hx + dy * hy >= 0 ? b : a; // the end of the segment the nose points toward
+    best = { node, lateral };
+  }
+  return best?.node;
+}
+
+/** An aircraft this close (m) to a node starts a new route at it; further out on a lane it starts at the end of the edge its nose points to (`routeStartNode`). */
+export const NODE_SNAP_M = 15;
+
+/**
+ * Where a new taxi route for an aircraft that has no route (or finished it) starts: the node it stands at (within `NODE_SNAP_M`), else, standing in a lane, the end
+ * of that edge the nose points to - it drives on and the route begins there; the nearest node used to be taken whichever side it was on, and an aircraft just turned
+ * around (a head-on) was sent back to the node behind it, nose to nose with the aircraft it had turned away from (soak seed 3: ten minutes of one-eighties).
+ */
+export function routeStartNode(graph: TaxiwayGraph, pos: Vec2, headingDeg: number): TaxiNode | undefined {
+  const near = nearestNode(graph, pos, { maxDistM: 150 });
+  if (near && dist(near.pos, pos) <= NODE_SNAP_M) return near;
+  return edgeAheadNode(graph, pos, headingDeg) ?? near;
+}
+
 export function nearestNode(
   graph: TaxiwayGraph,
   pos: Vec2,

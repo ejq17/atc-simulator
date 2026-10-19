@@ -30,6 +30,9 @@ function meetOnTheLane(h: Harness, airport: Airport, a: Aircraft, b: Aircraft): 
   b.route = { nodeIds: ids, taxiways: [], stopAtNodeIds: [], progressIndex: 1 };
   b.phase = 'TAXIING';
   b.pendingRequest = undefined;
+  // (it stood at its hold line, so AI Ground has already handed it to Tower; put on the lane, it is Ground's again)
+  b.frequencyId = a.frequencyId;
+  b.frequencyMhz = a.frequencyMhz;
   void h;
 }
 

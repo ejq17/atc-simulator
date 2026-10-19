@@ -164,6 +164,19 @@ function distToStub(state: SimulationState, nodeIds: readonly string[], p: Vec2)
   return best;
 }
 
+/** Does `theirs` traverse at least two nodes of `mine` (index map of the lander's way) in the opposite order (a lane used in the opposite direction)? Parking nodes do not count. */
+function sharesLaneInReverse(graph: SimulationState['airport']['taxiwayGraph'], mine: ReadonlyMap<string, number>, theirs: readonly string[]): boolean {
+  let prev = -1;
+  let shared = 0;
+  for (const id of theirs) {
+    const k = mine.get(id);
+    if (k === undefined || graph.nodes[id]?.kind === 'parking') continue;
+    if (prev >= 0 && k < prev) shared++;
+    prev = k;
+  }
+  return shared >= 1;
+}
+
 export interface ExitBlockage {
   aircraftId: string;
   callsign: string;
@@ -180,6 +193,8 @@ export function exitBlockage(state: SimulationState, exceptId: string, routeNode
   if (stub.length < 1) return undefined;
   const order = new Map<string, number>();
   stub.forEach((id, i) => order.set(id, i));
+  const fullOrder = new Map<string, number>();
+  routeNodeIds.forEach((id, i) => fullOrder.set(id, i));
   const graph = state.airport.taxiwayGraph;
   for (const o of Object.values(state.aircraft ?? {})) {
     if (o.id === exceptId || !o.onGround || o.phase === 'PARKED' || o.phase === 'ARRIVED' || o.occupyingRunways.length > 0) continue;
@@ -194,6 +209,10 @@ export function exitBlockage(state: SimulationState, exceptId: string, routeNode
     // (free-play soak: departures sent to the Bravo hold while arrivals exited there, for hours). The route ends at the hold line, so the
     // reverse-order test below, which needs two shared nodes, does not see it.
     if (o.isDeparture && rest.length > 0 && rest[rest.length - 1] === stub[0] && o.phase !== 'LINE_UP_AND_WAIT') return { aircraftId: o.id, callsign: o.callsign, why: 'opposing' };
+    // The rest of the way to parking beyond the stub is a single-width lane shared with the departures on their way to the runway (KACY: taxiway A / B between the
+    // ramp and the Bravo hold): a departure that is routed over it toward the runway, standing in a queue or moving, meets the lander head-on, and the lander cannot
+    // pass the queue. It is not "on the stub" (400 m), but the exit that leads into it is as blocked as one with the departure on the stub.
+    if (o.isDeparture && (o.phase === 'TAXIING' || o.phase === 'HOLDING_SHORT') && sharesLaneInReverse(graph, fullOrder, rest)) return { aircraftId: o.id, callsign: o.callsign, why: 'opposing' };
     if (o.groundSpeedKt < 1) continue;
     let prevMine = -1;
     for (const id of rest) {

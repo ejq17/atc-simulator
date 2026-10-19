@@ -69,7 +69,7 @@ export function computeRunwayActivity(state: SimulationState): Record<string, Ru
           a.landing.push(ac.id);
           break;
         default:
-          if (!ac.onGround && activeClearance(ac, 'LAND')) a.landing.push(ac.id);
+          if (!ac.onGround && !ac.isDeparture && activeClearance(ac, 'LAND')) a.landing.push(ac.id);
       }
       if (ac.phase === 'INITIAL_CLIMB' && !ac.onGround && agl < 200 && pointInPolygon(ac.pos, airport.runways.find((r) => r.id === assigned)!.polygon)) {
         a.departing.push(ac.id);

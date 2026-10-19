@@ -64,9 +64,10 @@ describe('AI Tower: traffic information with line up and wait', () => {
 
 describe('AI Tower: the numbers for a pilot without the ATIS', () => {
   it('answers "request wind and altimeter" with the wind (magnetic) and altimeter from the observation, once', () => {
-    let h = createHarness({ player: ['GND'], spawns: [vfrHold('N482KB'), vfrArrival('N999AA', 3)] });
+    // (the arrival is 2 nm out: 3 nm, 154 s, leaves the room a takeoff needs since the release rule of 3-9-5 / 3-10-3 replaced the flat 2.4 nm, and the pilot would be gone before it asks)
+    let h = createHarness({ player: ['GND'], spawns: [vfrHold('N482KB'), vfrArrival('N999AA', 2)] });
     for (let seed = 1; seed < 200; seed++) {
-      h = createHarness({ player: ['GND'], seed, spawns: [vfrHold('N482KB'), vfrArrival('N999AA', 3)] });
+      h = createHarness({ player: ['GND'], seed, spawns: [vfrHold('N482KB'), vfrArrival('N999AA', 2)] });
       if (pilotNeedsNumbers(h.find('N482KB')!)) break;
     }
     expect(pilotNeedsNumbers(h.find('N482KB')!)).toBe(true);

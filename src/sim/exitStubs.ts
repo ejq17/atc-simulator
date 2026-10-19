@@ -12,7 +12,10 @@ import { findOpenRequest } from './coordination';
 import { mToNm } from './geo';
 
 /** An aircraft this close (m) to a stub's hold line is at the head of that stub. DESIGN VALUE. */
-const STUB_HEAD_M = 25;
+export const STUB_HEAD_M = 25;
+
+/** A route reaches a reserved stub inside this distance (m) along it, or the reservation does not apply to it. DESIGN VALUE: about 45 s of taxi at 13 kt. */
+export const STUB_RESERVE_LEAD_M = 300;
 
 /** A lander this close to its threshold (nm) reserves the exit stub it will use. */
 export const LANDER_STUB_NM = 2;
@@ -70,7 +73,18 @@ function isExiting(ac: Aircraft): boolean {
 export function landerStubOnRoute(state: SimulationState, nodeIds: readonly string[], exceptId: string): LanderStub | undefined {
   const stubs = landerStubs(state);
   if (!stubs.length) return undefined;
-  const on = new Set(nodeIds);
+  // Only the part of the route within `STUB_RESERVE_LEAD_M` counts: an aircraft that reaches the stub's lane further on is there minutes from now, long after the
+  // lander has been taxied off it (or waits for it as any traffic does, `opposingTraffic`); reserving the lane for a whole route kept every departure on the ramp
+  // waiting for the next lander (soak: 100 % of the departures' route checks, 40-60 minute waits at the gates).
+  const nodes0 = state.airport.taxiwayGraph.nodes;
+  let run = 0;
+  const near: string[] = [];
+  for (let i = 0; i < nodeIds.length; i++) {
+    if (i > 0) run += Math.hypot(nodes0[nodeIds[i]].pos.x - nodes0[nodeIds[i - 1]].pos.x, nodes0[nodeIds[i]].pos.y - nodes0[nodeIds[i - 1]].pos.y);
+    if (run > STUB_RESERVE_LEAD_M) break;
+    near.push(nodeIds[i]);
+  }
+  const on = new Set(near);
   // An aircraft standing at the head of a stub (the lander that got there first) is not blocked by the next lander's reservation of the same stub: the
   // second one waits behind it, and the first would wait for the second for good (free-play soak seed 3: four landers queued on the Bravo stub).
   const me = state.aircraft[exceptId];
