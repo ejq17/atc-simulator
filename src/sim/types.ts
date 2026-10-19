@@ -456,6 +456,12 @@ export interface PendingRequest {
   runwayEnd?: string;
   /** TAXI: the pilot asked for progressive taxi instructions (JO 7110.65 3-7-2; AIM 4-3-18). */
   progressive?: boolean;
+  /** The call that made this request was blocked (RADIO_BLOCKED) and the retry has not been heard yet: the controller has not received it, so the strips and labels do not show it. */
+  unheard?: boolean;
+  /** TAXI: the aircraft stands clear after a head-on or a one eighty and asks Ground to route it again from where it is (ai/ground.ts). */
+  resume?: boolean;
+  /** TAXI: id of the aircraft this one stands nose to nose with (sim/headOn.ts). */
+  headOnWith?: string;
 }
 
 export interface GroundRoute {
@@ -521,6 +527,14 @@ export interface Aircraft {
 
   /** Flown by a student pilot: slower, wordier, asks for progressive taxi, says "student pilot" on initial contact (AIM 4-2-4). Read by the ground task. */
   student?: boolean;
+  /**
+   * An arrival's parking stand (`parkingResolver.refreshArrivalStands`): the nearest free stand of the category it parks in, assigned in the engine while it
+   * is inbound and re-resolved when something else takes the stand. The exit prediction and AI Ground's taxi-in use it instead of a guess from the type.
+   * `category` is the intent the spawn carried (the generator's cargo / military choice), else the type's natural category.
+   */
+  assignedStand?: { parkingId: string; category: ParkingPosition['category'] };
+  /** The category the spawn says this arrival parks in (a Caravan on a cargo flight: 'cargo'). Unset: `naturalCategory`. */
+  parkingIntent?: ParkingPosition['category'];
 }
 
 // ---------------------------------------------------------------------------
@@ -760,6 +774,8 @@ export interface ScenarioAircraftSpawn {
   flightPlan?: Omit<FlightPlan, 'ifrClearance'>;
   /** Where a generated flight comes from (arrivals) / goes to (departures), ICAO. Unset: the engine picks from its own origin lists (KACY). */
   remoteAirport?: string;
+  /** Arrivals: the kind of stand this flight parks at (the generator's choice: cargo apron for a freighter or a Caravan on a cargo flight). Unset: by type. */
+  parkingCategory?: ParkingPosition['category'];
   /** Special traffic behaviour (src/sim/specialTraffic.ts): vehicle task, VFR transit, flight training, formation / overhead, helicopter mission. */
   behavior?: SpawnBehavior;
 }

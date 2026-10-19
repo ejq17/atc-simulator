@@ -4,6 +4,7 @@
  * Per tick: scheduled spawns / traffic generator -> pending frequency changes -> pilot requests ->
  * ground movement -> flight dynamics -> runway occupancy -> conflicts -> lifecycle (despawn) -> scoring.
  */
+import { refreshArrivalStands } from './arrivalStand';
 import type { SimulationEngine, EngineOptions, Unsubscribe } from './api';
 import type {
   Aircraft, Atis, CommandOutcome, ControllerPositionId, ParsedCommand, Scenario, SimEvent, SimulationState, Weather,
@@ -150,6 +151,7 @@ export function createEngine(opts: EngineOptionsExt): SimulationEngine & Simulat
     updateRunwayOccupancy(ctx);
     detectConflicts(ctx);
     updateLifecycle(ctx);
+    refreshArrivalStands(ctx);
     updateCoordination(ctx);
     announceClosureChanges(ctx);
     if (state.ops.birds && state.clock.timeSec >= state.ops.birds.untilSec) state.ops.birds = undefined;

@@ -156,6 +156,12 @@ export interface AircraftRuntime {
   exit?: ExitInstruction;
   /** "Make a one eighty" on a taxiway: the aircraft stops, then turns to this heading (groundMovement.ts) and holds position for new instructions. */
   turnAround?: { headingDeg: number };
+  /** Nose to nose with `otherId` on a shared lane (headOn.ts): set while both stand on the stretch, cleared two seconds after the conflict is gone. */
+  /** The pilot called "nose to nose" and the conflict has since ended: he asks for new taxi instructions when he stands still (traffic.ts). */
+  headOnCalled?: number;
+  /** A head-on just ended: wait for the counterpart to move off before driving up to it (groundMovement.ts). */
+  headOnLinger?: { otherId: string; untilSec: number };
+  headOn?: { otherId: string; taxiway: string; sinceSec: number; laneNodeIds: string[]; lastSeenSec?: number; lastCallSec?: number; resumeCall?: boolean };
   /** "Hold short of runway N" given during the landing roll / on final: the intersecting runway the rollout must stop short of. */
   exitHoldShort?: string;
   /** Touch-and-go ground roll in progress (phase ROLLOUT, runway occupied): see `stepTouchAndGo` in flightDynamics.ts. */
@@ -294,6 +300,8 @@ export interface AircraftRuntime {
 
 export interface SimContext {
   state: SimulationState;
+  /** Second at which `refreshArrivalStands` last ran (parkingResolver.ts). */
+  standCheckSec?: number;
   /** Resolved `Scenario.pilotBehaviour` (design values, pilotBehaviour.ts). */
   pilotBehaviour: PilotBehaviour;
   rng: Rng;

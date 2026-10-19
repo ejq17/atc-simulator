@@ -685,6 +685,19 @@ export function closedTaxiwayHoldCall(aircraft: Aircraft, env: ReadbackEnv, taxi
   return `${facility(aircraft, env)}, ${aircraft.spokenCallsign}, holding short of ${spokenTaxiway(taxiway)}, taxiway closed, request taxi instructions.`;
 }
 
+/**
+ * Stopped nose to nose with another aircraft on a taxiway. Plain wording, NOT FAA phraseology (JO 7110.65 and the AIM give pilots no phrase for it);
+ * `ai/headOn.ts` and the engine (`sim/headOn.ts`) treat it as a request for instructions.
+ */
+export function noseToNoseCall(aircraft: Aircraft, env: ReadbackEnv, otherSpoken: string, taxiway: string): string {
+  return `${facility(aircraft, env)}, ${aircraft.spokenCallsign}, nose to nose with ${otherSpoken}${taxiway ? ` on ${spokenTaxiway(taxiway)}` : ''}, request instructions.`;
+}
+
+/** After a head-on has been resolved (or a one eighty): the aircraft stands clear and asks to be routed again. Plain wording, not FAA phraseology. */
+export function clearOfCall(aircraft: Aircraft, env: ReadbackEnv, taxiway?: string): string {
+  return `${facility(aircraft, env)}, ${aircraft.spokenCallsign}, clear${taxiway ? ` on ${spokenTaxiway(taxiway)}` : ''}, request taxi instructions.`;
+}
+
 /** Established on the approach course while still on the Approach frequency (asks for the tower). */
 export function establishedCall(aircraft: Aircraft, env: ReadbackEnv, o: { type?: ApproachType; runwayEnd: string }): string {
   const what = o.type === 'VISUAL' ? 'visual approach' : approachWord(o.type);

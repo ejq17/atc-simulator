@@ -22,7 +22,7 @@ import { dist, vDot, vSub } from './geo';
 import { findTaxiRoute, shortestDistances } from './pathfinding';
 import type { TaxiRoute } from './pathfinding';
 import { closedTaxiways } from './airportOps';
-import { freeParkingCandidates } from './parkingResolver';
+import { assignedStandOf, freeParkingCandidates } from './parkingResolver';
 import { getPerformance } from './performance';
 import { alongCross } from './runways';
 import type { RunwayEndGeom } from './runways';
@@ -54,7 +54,10 @@ const NO_ROUTE_COST_M = 1e6;
 export function arrivalParkingTargets(state: SimulationState, ac: Aircraft): ParkingPosition[] {
   const perf = getPerformance(ac.type);
   // (prediction helpers are called with a bare state in tests: no aircraft means nothing is occupied)
-  const free = state.aircraft ? freeParkingCandidates(state, ac, undefined, undefined) : state.airport.parking;
+  // The stand the arrival is bound for (parkingResolver.refreshArrivalStands); an aircraft without one (not yet assigned, a probe) falls back to the type's category.
+  const stand = state.aircraft ? assignedStandOf(state, ac) : undefined;
+  if (stand) return [stand];
+  const free = state.aircraft ? freeParkingCandidates(state, ac, ac.parkingIntent, undefined, ac.parkingIntent === 'military' ? (ac.type === 'H65' ? 'USCG-' : 'ANG-') : undefined) : state.airport.parking;
   return free.filter((p) => p.category !== 'military' || perf.category === 'light' || !!perf.military);
 }
 
@@ -185,8 +188,13 @@ export function exitBlockage(state: SimulationState, exceptId: string, routeNode
     const near = distToStub(state, stub, o.pos) <= STUB_LANE_M;
     if (near && (o.phase === 'PUSHBACK' || (o.phase === 'READY' && !o.route))) return { aircraftId: o.id, callsign: o.callsign, why: 'pushback' };
     if (near && o.groundSpeedKt < 1) return { aircraftId: o.id, callsign: o.callsign, why: 'stopped' };
-    if (!o.route || o.groundSpeedKt < 1) continue;
+    if (!o.route) continue;
     const rest = o.route.nodeIds.slice(Math.max(0, o.route.progressIndex - 1));
+    // A departure taxiing (or queued) to this very hold line: the lander would stop nose to nose with it on the stub, and neither could get by
+    // (free-play soak: departures sent to the Bravo hold while arrivals exited there, for hours). The route ends at the hold line, so the
+    // reverse-order test below, which needs two shared nodes, does not see it.
+    if (o.isDeparture && rest.length > 0 && rest[rest.length - 1] === stub[0] && o.phase !== 'LINE_UP_AND_WAIT') return { aircraftId: o.id, callsign: o.callsign, why: 'opposing' };
+    if (o.groundSpeedKt < 1) continue;
     let prevMine = -1;
     for (const id of rest) {
       const k = order.get(id);

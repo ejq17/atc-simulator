@@ -18,6 +18,7 @@ import { runwayCrossingsAlong } from './pathfinding';
 import { taxiSpeedKtFor } from './rotorcraft';
 import { landerStubs } from './exitStubs';
 import { seeded01 } from './rng';
+import { HEAD_ON_LINGER_SEC, findHeadOn, headOnMarginM } from './headOn';
 
 export const TAXI_ACCEL_MPS2 = 1.0;
 export const TAXI_DECEL_CAP_MPS2 = 1.2;
@@ -262,6 +263,11 @@ function stepGround(ctx: SimContext, ac: Aircraft, dt: number): void {
         rt.turnAround = undefined;
         emitEvent(ctx, { kind: 'INFO', aircraftId: ac.id, callsign: ac.callsign, text: `${ac.callsign} turned around, holding position`, severity: 'info', speaker: 'SYSTEM' });
         pilotSay(ctx, ac, `${ac.spokenCallsign}, one eighty complete, holding position.`);
+        if (rt.headOnCalled !== undefined || rt.headOn?.lastCallSec !== undefined) {
+          rt.headOnCalled = undefined;
+          rt.headOn = undefined;
+          ac.pendingRequest = { kind: 'TAXI', text: 'turned around, request taxi instructions', sinceSec: now, resume: true };
+        }
       }
     }
     ac.trackDeg = ac.headingDeg;
@@ -360,6 +366,44 @@ function stepGround(ctx: SimContext, ac: Aircraft, dt: number): void {
     const avail = leader.gap - leader.minGap;
     vTarget = Math.min(vTarget, Math.sqrt(2 * TAXI_DECEL_PLAN_MPS2 * Math.max(0, avail)));
     if (avail <= 0) vTarget = 0;
+  }
+
+  // Head-on traffic on a shared lane (headOn.ts): hold short of the stretch for the aircraft that has priority, or brake with the other to the margin.
+  const ho = findHeadOn(ctx, ac);
+  if (ho) {
+    if (ho.role === 'wait') {
+      vTarget = Math.min(vTarget, Math.sqrt(2 * TAXI_DECEL_PLAN_MPS2 * ho.stopDistM));
+      if (ho.stopDistM <= 0) vTarget = 0;
+    } else {
+      const half = (ho.gapM - ho.marginM) / 2;
+      vTarget = Math.min(vTarget, Math.sqrt(2 * TAXI_DECEL_PLAN_MPS2 * Math.max(0, half)));
+      if (half <= 0) vTarget = 0;
+      if (!rt.headOn || rt.headOn.otherId !== ho.other.id) rt.headOn = { otherId: ho.other.id, taxiway: ho.taxiway, sinceSec: now, laneNodeIds: ho.laneNodeIds };
+      rt.headOn.lastSeenSec = now;
+    }
+  }
+  if (rt.headOn && !(ho && ho.role === 'meet')) rt.headOnLinger ??= { otherId: rt.headOn.otherId, untilSec: now + HEAD_ON_LINGER_SEC };
+  if (rt.headOn && now - (rt.headOn.lastSeenSec ?? rt.headOn.sinceSec) > 2) {
+    // the conflict is gone; a pilot who had called for instructions asks for new ones once he stands clear (traffic.ts)
+    rt.headOnCalled = now; // whichever aircraft was moved aside asks for new instructions when it stands still at the end of its short route (traffic.ts)
+    if (ac.pendingRequest?.headOnWith) ac.pendingRequest = undefined; // the way is clear: the request is moot
+    rt.headOn = undefined;
+  }
+  // After a head-on the aircraft that was not moved aside waits until the other has left the lane: it does not drive up to a counterpart that is only
+  // just moving off (headOn.ts, HEAD_ON_LINGER_SEC); the counterpart itself moves away, it is not ahead of it.
+  if (rt.headOnLinger) {
+    const o = ctx.state.aircraft[rt.headOnLinger.otherId];
+    if (!o || now >= rt.headOnLinger.untilSec) rt.headOnLinger = undefined;
+    else {
+      const r = vSub(o.pos, ac.pos);
+      const d = Math.hypot(r.x, r.y);
+      const margin = headOnMarginM(ac, o);
+      if (d < 2 * margin && vDot(headingToVec(ac.headingDeg), r) > 0.17 * d) {
+        const avail = d - margin;
+        vTarget = Math.min(vTarget, Math.sqrt(2 * TAXI_DECEL_PLAN_MPS2 * Math.max(0, avail)));
+        if (avail <= 0) vTarget = 0;
+      } else if (d >= 2 * margin) rt.headOnLinger = undefined;
+    }
   }
 
   // Desired heading: look ahead along the route so the nose swings smoothly into corners.

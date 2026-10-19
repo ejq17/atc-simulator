@@ -11,6 +11,9 @@ import { arrivalParkingTargets, holdToParking, stubNodes } from './exitChoice';
 import { findOpenRequest } from './coordination';
 import { mToNm } from './geo';
 
+/** An aircraft this close (m) to a stub's hold line is at the head of that stub. DESIGN VALUE. */
+const STUB_HEAD_M = 25;
+
 /** A lander this close to its threshold (nm) reserves the exit stub it will use. */
 export const LANDER_STUB_NM = 2;
 
@@ -68,5 +71,9 @@ export function landerStubOnRoute(state: SimulationState, nodeIds: readonly stri
   const stubs = landerStubs(state);
   if (!stubs.length) return undefined;
   const on = new Set(nodeIds);
-  return stubs.find((s) => s.aircraftId !== exceptId && s.nodeIds.some((id) => on.has(id)));
+  // An aircraft standing at the head of a stub (the lander that got there first) is not blocked by the next lander's reservation of the same stub: the
+  // second one waits behind it, and the first would wait for the second for good (free-play soak seed 3: four landers queued on the Bravo stub).
+  const me = state.aircraft[exceptId];
+  const nodes = state.airport.taxiwayGraph.nodes;
+  return stubs.find((s) => s.aircraftId !== exceptId && s.nodeIds.some((id) => on.has(id)) && !(me?.onGround && nodes[s.holdNodeId] && Math.hypot(me.pos.x - nodes[s.holdNodeId].pos.x, me.pos.y - nodes[s.holdNodeId].pos.y) < STUB_HEAD_M));
 }

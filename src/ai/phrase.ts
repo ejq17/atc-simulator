@@ -113,6 +113,18 @@ export function progressiveStep(ac: Aircraft, s: { taxiways: string[]; turn?: 'l
   return clauses(callsign(ac), words('continue taxiing via', twy), s.next ? words('to', taxiwayList([s.next])) : undefined);
 }
 
+/**
+ * "N1AA, pull off onto Charlie, let Cessna N2BB pass" - answer to a "nose to nose" call. Plain wording: JO 7110.65 has no phrase for it
+ * (NON-STANDARD); the aircraft is taxied onto the branch with an ordinary taxi instruction.
+ */
+export function headOnPullAside(ac: Aircraft, other: Pick<Aircraft, 'spokenCallsign'>, taxiway: string, toStand?: string): Phrase {
+  const where = toStand ? words('into', { text: toStand, spoken: toStand }) : words('onto', taxiwayList([taxiway]));
+  return clauses(callsign(ac), words('pull off', where), words('let', callsign(other), 'pass'));
+}
+
+/** "N1AA, make a one eighty, let Cessna N2BB pass" (NON-STANDARD: common usage, the parser flags it too). */
+export const headOnTurnAround = (ac: Aircraft, other: Pick<Aircraft, 'spokenCallsign'>): Phrase => clauses(callsign(ac), 'make a one eighty', words('let', callsign(other), 'pass'));
+
 export const crossRunway = (ac: Aircraft, runwayId: string): Phrase => clauses(callsign(ac), words('cross runway', rwy(runwayId)));
 
 export const lineUpAndWait = (ac: Aircraft, runwayEnd: string): Phrase => clauses(callsign(ac), words('runway', rwy(runwayEnd)), 'line up and wait');

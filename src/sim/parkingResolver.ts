@@ -98,3 +98,21 @@ export function freeParkingCandidates(
   }
   return free;
 }
+
+// ---------------------------------------------------------------------------------------------------------------------
+// An arrival's own stand
+// ---------------------------------------------------------------------------------------------------------------------
+
+/** The stand an inbound arrival is bound for, when it is assigned, still exists and nothing stands on it (or is cleared to it). */
+export function assignedStandOf(state: SimulationState, ac: Aircraft): ParkingPosition | undefined {
+  const id = ac.assignedStand?.parkingId;
+  const p = id ? state.airport.parking.find((x) => x.id === id) : undefined;
+  return p && !parkingOccupant(state, p, ac.id) ? p : undefined;
+}
+
+/** Stands other inbound aircraft are bound for. */
+export function standsReservedByOthers(state: SimulationState, exceptId: string): Set<string> {
+  const out = new Set<string>();
+  for (const o of Object.values(state.aircraft)) if (o.id !== exceptId && !o.isDeparture && o.assignedStand) out.add(o.assignedStand.parkingId);
+  return out;
+}

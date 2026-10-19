@@ -52,7 +52,7 @@ function StripView({ strip, ac, board, startUtcMs, selected, owner, fresh, dropM
   const f = strip.fields;
   const tone = ac ? statusTone(ac) : 'idle';
   const finished = strip.struck || strip.gone;
-  const request = ac?.pendingRequest;
+  const request = ac?.pendingRequest?.unheard ? undefined : ac?.pendingRequest;
   const onKey = (e: KeyboardEvent<HTMLDivElement>) => {
     if (e.target !== e.currentTarget) return;
     if (e.key === 'Enter') { e.preventDefault(); onSelect(); }

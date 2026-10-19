@@ -19,6 +19,8 @@ export interface Token {
   /** Raw word range [rawStart, rawEnd) in `NormalizedText.rawWords`. */
   rawStart: number;
   rawEnd: number;
+  /** The raw word this token ends carries a comma or semicolon: a clause ends here. */
+  comma?: boolean;
 }
 
 export interface NormalizedText {

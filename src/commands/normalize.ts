@@ -49,6 +49,10 @@ export function normalize(raw: string, opts: NormalizeOptions = {}): NormalizedT
   items = numberPass(items, lead);
   items = crossCleanup(items, opts.runwayEnds);
   const tokens = resolveTokens(items, airlines);
+  tokens.forEach((tk, k) => {
+    const next = tokens[k + 1];
+    if (/[,;]$/.test(rawWords[tk.rawEnd - 1] ?? '') && (!next || next.rawStart >= tk.rawEnd)) tk.comma = true;
+  });
   return { raw, rawWords, tokens, text: tokens.map((t) => t.text).join(' ') };
 }
 

@@ -43,12 +43,13 @@ describe('AI Tower: exit instruction with the handoff to Ground', () => {
 });
 
 describe('AI Tower: traffic information with line up and wait', () => {
+  // (6.4 nm: the line-up waits for Departure's release since the release-first rule, a few seconds later than before, so the arrival is nearer when it is given)
   it('an IFR departure without its clearance is lined up (the takeoff is not possible yet) and told about the arrival inside 6 miles (not yet cleared to land); training mode accepts it', () => {
     const h = createHarness({
       player: ['GND'],
       spawns: [
         { atSec: 0, callsign: 'NKS451', type: 'A320', flightRules: 'IFR', isDeparture: true, initialFrequencyId: 'TWR', start: { kind: 'holding_short', nodeId: 'HP13-31-B-1', runwayEnd: '13' }, flightPlan: { flightRules: 'IFR', origin: 'KACY', destination: 'KPHL', cruiseAltitudeFt: 10000, route: ['VCN'] } },
-        vfrArrival('N723EJ', 5.8),
+        vfrArrival('N723EJ', 6.4),
       ],
     });
     expect(h.runUntil(() => h.outcomes.some((o) => o.cmd.kind === 'LINE_UP_AND_WAIT'), 120)).toBe(true);

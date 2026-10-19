@@ -267,7 +267,11 @@ export function createTowerAgent(): Agent {
       const ifr = ac.flightPlan?.flightRules === 'IFR';
       const relPos = releaseNeeded(state, 'TWR', ac);
       const takeoffOk = safe(takeoff) && slack >= 0 && !(ifr && !ac.flightPlan?.ifrClearance && state.scenario.mode === 'training');
-      if (takeoffOk && relPos && !validApproval(state, 'RELEASE', ac.id)) {
+      // An aircraft that needs a release is not lined up before it has one: lined up, it blocks the runway for the arrivals behind it (they go around) while
+      // Departure holds the release because of those go-arounds - a cycle (free-play soak, docs/PROGRESS.md). The release is asked for at the hold line as soon
+      // as the line-up itself would be possible.
+      const wantRelease = relPos && !validApproval(state, 'RELEASE', ac.id) && (takeoffOk || (ac.phase === 'HOLDING_SHORT' && slack >= LINEUP_EXTRA_SEC && safe(takeoff)));
+      if (wantRelease) {
         // The takeoff would be possible, but Departure/Approach has not released the aircraft (LOA concept, 7110.65 4-3-4): ask, and keep
         // asking every reask interval until it is answered. The aircraft simply stays at the hold line meanwhile.
         const open = findOpenRequest(state, 'RELEASE', ac.id);
@@ -291,7 +295,7 @@ export function createTowerAgent(): Agent {
           phrase: say.clearedForTakeoff(ac, g.end.id, ifr), cooldownSec: 20,
           summary: `${ac.callsign} cleared for takeoff runway ${g.end.id}`,
         });
-      } else if (ac.phase === 'HOLDING_SHORT' && slack >= LINEUP_EXTRA_SEC && !departureTrailConflict(state, ac, g)) {
+      } else if (ac.phase === 'HOLDING_SHORT' && slack >= LINEUP_EXTRA_SEC && !departureTrailConflict(state, ac, g) && !(relPos && !validApproval(state, 'RELEASE', ac.id))) {
         // JO 7110.65 3-9-4: the aircraft authorised to line up and wait is told about the closest traffic within 6 miles for the same runway.
         const near = luawTraffic({ state }, ac, g);
         const luaw = mkCmd('LINE_UP_AND_WAIT', ac, { runwayEnd: g.end.id, runwayId: g.runway.id, ...(near ? { trafficAdvised: true } : {}) });

@@ -218,7 +218,7 @@ realised -> released, and everything the shared normaliser already fixes (NATO l
 
 ## Known limits
 
-* `ParsedCommand` has no field for "at or below" altitude restrictions or pattern side on `base`; these are encoded in `turnDirection`/`destination` or dropped. Not parsed: "unable closed traffic", "circle the airport", "cleared ... , traffic holding in position" as an instruction of its own, the pilot's "have numbers".
+* `ParsedCommand` has no field for "at or below" altitude restrictions or pattern side on `base`; these are encoded in `turnDirection`/`destination` or dropped. Not parsed: "circle the airport", "cleared ... , traffic holding in position" as an instruction of its own, the pilot's "have numbers".
 * Traffic descriptions are matched by the engine, not the parser: the parser only keeps the words ("boeing 737", "skyhawk") and the position clause.
 * Conditional clauses ("behind the landing traffic", "after departure") are not modelled; their words show up as `unrecognised words`.
 * Two-letter taxiway names and runway designators with parallel suffixes are only lightly supported.
@@ -229,8 +229,8 @@ realised -> released, and everything the shared normaliser already fixes (NATO l
   existing suffix rule) for an aircraft that has not called yet scores 0.25 lower and is not accepted (AIM 4-2-4: abbreviate only after communications are established). `CallsignResolution.abbreviated`
   and `ParsedCommand.callsignAbbreviated` tell the engine that the controller abbreviated, so the pilot may too.
 * `ParsedCommand.groupSize`: the number of instructions in the transmission (set for multi-instruction transmissions); long ones draw "say again" at higher pilot realism.
-* New commands: `DID_YOU_COPY` ("did you copy", "do you copy", "how do you hear me"; the controller calls an aircraft that did not answer) and `UNABLE` ("unable", "request denied", "not approved"; swallows the rest
-  of the transmission, so "unable, traffic on the runway" is not read as instructions). Neither is an FAA phraseology item; they are plain controller language.
+* New commands: `DID_YOU_COPY` ("did you copy", "do you copy", "how do you hear me"; the controller calls an aircraft that did not answer) and `UNABLE` ("unable", "request denied", "not approved"; takes only its own clause - up to the next comma
+  (`Token.comma`, from the raw word) - and only when that clause holds no instruction word: "unable, traffic on the runway" is not read as instructions, "unable, runway one three cleared to land" is an UNABLE and a landing clearance). Neither is an FAA phraseology item; they are plain controller language.
 
 ## Traffic variety grammar (`rules-special.ts`)
 

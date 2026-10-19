@@ -33,6 +33,7 @@ import { resolvePilotBehaviour } from '../sim/pilotBehaviour';
 import { NM, callsignTail, randomNNumber, runwayLongEnoughFor } from './world';
 import { pickFlight, pickGaType, pickLeg, profileFor, resolveTypeSelection, usableAirlines } from './airportProfile';
 import type { Flight } from './airportProfile';
+import { CARGO_PREFIXES } from './airportProfile';
 import { localHourAt } from './trafficDensity';
 import { simUtcMs } from '../sim/solar';
 import { pickArrivalStart, pickParking } from './placement';
@@ -217,6 +218,17 @@ export function createTrafficGenerator(scenario: Scenario, airport: Airport, opt
     return inFlight < MAX_ARRIVALS_IN_FLIGHT;
   };
 
+  /**
+   * Freight flights park at the cargo apron when the airport has one: UPS / FedEx jets, and the Wiggins Caravan (a FedEx feeder; its departures
+   * leave from the GA ramp / FBO, as `parkingPoolFor` has always chosen, only the arrival is bound for the cargo apron). The engine resolves the stand.
+   */
+  const withParkingIntent = (spec: SpawnSpec, flight: Flight): SpawnSpec => {
+    const cargo = CARGO_PREFIXES.has(flight.callsign.slice(0, 3)) || flight.entry?.icao3 === 'WIG';
+    return cargo && airport.parking.some((p) => p.category === 'cargo') ? { ...spec, parkingCategory: 'cargo' } : spec;
+  };
+
+  const withParkingOpt = (spec: SpawnSpec | undefined, flight: Flight): SpawnSpec | undefined => (spec ? withParkingIntent(spec, flight) : spec);
+
   const trySpawnArrival = (state: Readonly<SimulationState>): SpawnSpec | undefined => {
     const ends = state.activeRunways.landing.length ? state.activeRunways.landing : state.activeRunways.departing;
     if (!ends.length) return undefined;
@@ -226,8 +238,8 @@ export function createTrafficGenerator(scenario: Scenario, airport: Airport, opt
     const type = flight.type;
     const endId = ends[Math.min(ends.length - 1, Math.floor(rng!() * ends.length))];
     if (!arrivalFits(state, endId, flight.type)) return undefined;
-    if (!ga && flows.arrivals && isTurbojet(type) && starArrival(airport, endId)) return trySpawnStarArrival(state, flight, endId);
-    if (!ga && flows.arrivals && arrivalProcedure(airport, endId)) return trySpawnIfrArrival(state, flight, endId);
+    if (!ga && flows.arrivals && isTurbojet(type) && starArrival(airport, endId)) return withParkingOpt(trySpawnStarArrival(state, flight, endId), flight);
+    if (!ga && flows.arrivals && arrivalProcedure(airport, endId)) return withParkingOpt(trySpawnIfrArrival(state, flight, endId), flight);
     const others: AirbornePoint[] = Object.values(state.aircraft)
       .filter((a) => !a.onGround)
       .map((a) => ({ pos: a.pos, type: a.type, runwayEnd: a.isDeparture ? undefined : a.assignedRunwayEnd }));
@@ -236,11 +248,11 @@ export function createTrafficGenerator(scenario: Scenario, airport: Airport, opt
     const leg = pickLeg(rng!, icao, flight);
     // Flight training: a seeded share of the GA arrivals fly touch-and-go circuits (decided from the callsign: no random number is drawn)
     const training = ga && specialSel.training && isTrainingFlight(flight.callsign, trainingShare);
-    return {
+    return withParkingIntent({
       atSec: state.clock.timeSec, callsign: commit(flight), type, flightRules: ga ? 'VFR' : 'IFR', start,
       isDeparture: false, initialFrequencyId: arrivalFreq, initialRequest: 'LANDING', ...(leg.remoteAirport ? { remoteAirport: leg.remoteAirport } : {}),
       ...(training ? { behavior: { kind: 'training' as const, circuits: trainingCircuits(flight.callsign) } } : {}),
-    };
+    }, flight);
   };
 
   /**

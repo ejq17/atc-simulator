@@ -54,14 +54,27 @@ export const ruleDidYouCopy: Rule = (t, i) => {
   return cmdHit(skipWords(t, j, ['me', 'that', 'please', 'callsign']), makeDraft('DID_YOU_COPY'));
 };
 
+/** Words that start an instruction: a clause containing one is an instruction, not the explanation of an "unable". */
+const INSTRUCTION_WORDS = new Set([
+  'cleared', 'clear', 'taxi', 'hold', 'cross', 'turn', 'climb', 'descend', 'maintain', 'contact', 'monitor', 'line', 'continue', 'expedite', 'reduce', 'increase',
+  'proceed', 'exit', 'make', 'enter', 'report', 'squawk', 'fly', 'depart', 'land', 'go', 'extend', 'follow', 'join', 'resume', 'cancel', 'sidestep', 'position',
+]);
+
 /**
- * "unable" / "request denied" / "not approved": the controller declines a pilot request. The words after it are the explanation
- * ("unable, traffic on a two mile final", "unable closed traffic") and are not read as instructions.
+ * "unable" / "request denied" / "not approved": the controller declines a pilot request. The words after it up to the next comma are the
+ * explanation ("unable, traffic on a two mile final", "unable closed traffic") and are not read as instructions. A clause that holds an
+ * instruction is no explanation: "unable, runway one three cleared to land" is an UNABLE and a landing clearance, and
+ * "unable, traffic on final, cleared to land" an UNABLE with its explanation and the clearance.
  */
 export const ruleUnable: Rule = (t, i) => {
   const j = seq(t, i, 'unable') >= 0 ? i + 1 : seq(t, i, 'request denied') >= 0 ? i + 2 : seq(t, i, 'not approved') >= 0 ? i + 2 : -1;
   if (j < 0) return null;
-  return cmdHit(t.length, makeDraft('UNABLE'));
+  // the clause after it runs to the first token that carries a comma, or to the end
+  let end = j;
+  while (end < t.length && !t[end].comma) end++;
+  end = Math.min(t.length, end + 1);
+  for (let x = j; x < end; x++) if (INSTRUCTION_WORDS.has(txt(t, x))) return cmdHit(j, makeDraft('UNABLE'));
+  return cmdHit(end, makeDraft('UNABLE'));
 };
 
 /** "wind calm", "wind two one zero at eight [gusts 15]" -> information only */

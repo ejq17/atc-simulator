@@ -126,6 +126,16 @@ export function styleCall(ctx: SimContext, ac: Aircraft, text: string, data: Rec
 
 const RESPONSE_FLAGS = ['readback', 'rejection', 'clarify', 'correction', 'repeated'] as const;
 
+/** A blocked call that carries the pilot's request: the controller has not heard it, so the request is not shown until the retry is on the air. */
+export function markBlockedRequest(ac: Aircraft, m: Pick<ScheduledSpeech, 'answer' | 'data'>): void {
+  if (!m.answer && (m.data?.request || m.data?.pilotRequest) && ac.pendingRequest) ac.pendingRequest.unheard = true;
+}
+
+/** The pilot's own call went out: a request held back by a block is heard now. */
+export function markRequestHeard(ac: Aircraft, data?: Record<string, unknown>): void {
+  if (ac.pendingRequest?.unheard && (data?.request || data?.pilotRequest)) ac.pendingRequest.unheard = false;
+}
+
 /** Speak now: log the TRANSMISSION event, update the radio state, notify the voice layer. */
 export function speakNow(ctx: SimContext, ac: Aircraft, text: string, data?: Record<string, unknown>, frequencyMhz = ac.frequencyMhz): SimEvent {
   const rt = getRuntime(ctx, ac);
@@ -133,6 +143,7 @@ export function speakNow(ctx: SimContext, ac: Aircraft, text: string, data?: Rec
   const isAnswer = RESPONSE_FLAGS.some((f) => data?.[f]);
   const initial = !isAnswer && !rt.contacted.has(key);
   rt.contacted.add(key);
+  if (!isAnswer) markRequestHeard(ac, data);
   if (ctx.pilotBehaviour.realism.level !== 'off') ac.flags.inContact = true;
   const spoken = styleCall(ctx, ac, text, data, initial);
   const ev = emitEvent(ctx, {
@@ -368,6 +379,8 @@ function blockGroup(ctx: SimContext, group: ScheduledSpeech[]): void {
   ctx.onPilotTransmission?.({ aircraftId: acs[0].id, callsign: acs[0].callsign, text: '[blocked]', frequencyMhz: freq, voiceId: acs[0].voiceId, event: ev, blocked: true });
   members.forEach((m, i) => {
     const rt = getRuntime(ctx, acs[i]);
+    // A blocked request was never heard: the badge stays off until the retry is on the air (`speakNow` clears this).
+    markBlockedRequest(acs[i], m);
     const next: ScheduledSpeech = { ...m, id: ++ctx.speechSeq, keyedAtSec: retryAt[i], emitAtSec: retryAt[i] + R.blockWindowSec, attempt: m.attempt + 1 };
     ctx.scheduledSpeech.push(next);
     acs[i].radioState = 'TRANSMITTING';

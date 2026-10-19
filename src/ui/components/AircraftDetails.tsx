@@ -188,12 +188,12 @@ export function AircraftDetails() {
 
         {ac.student && <div className="border border-atc-amber/60 bg-atc-amber/10 px-2 py-1 text-[11px] text-atc-amber" data-testid="detail-student">Student pilot: slower to respond, wordier, may ask for progressive taxi and misread pattern instructions.</div>}
 
-        {(ac.flags.readbackErrorPending || ac.pendingRequest) && (
+        {(ac.flags.readbackErrorPending || (ac.pendingRequest && !ac.pendingRequest.unheard)) && (
           <div className="flex flex-col gap-1">
             {ac.flags.readbackErrorPending && !['no_readback', 'callsign'].includes(ac.flags.readbackErrorKind ?? '') && (
               <div className="border border-atc-red/70 bg-atc-red/10 px-2 py-1 text-[11px] text-atc-red">Readback error: the pilot read back something different. Re-issue the instruction to correct it.</div>
             )}
-            {ac.pendingRequest && (
+            {ac.pendingRequest && !ac.pendingRequest.unheard && (
               <div className="border border-atc-amber/60 bg-atc-amber/10 px-2 py-1 text-[11px] text-atc-amber" data-testid="detail-request"><b>{requestBadge(ac.pendingRequest.kind)}</b> ({formatElapsed(state.clock.timeSec - ac.pendingRequest.sinceSec).slice(3)} ago): {ac.pendingRequest.text}</div>
             )}
           </div>

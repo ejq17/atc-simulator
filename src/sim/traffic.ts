@@ -27,10 +27,11 @@ import { spokenCallsign as buildSpokenCallsign, spokenRunway } from '../radio/sp
 import {
   approachCheckInCall, arrivalTowerCheckInCall, brakingActionCall, lightsRequestCall, checkInCall, clearOfRunwayCall, departureCheckInCall, establishedCall, finalCall, goAroundEstablishedCall,
   holdingShortCall, approachingHoldCall, holdingShortCrossingCall, ifrClearanceRequestCall, inboundCall, missedApproachCheckInCall, readyToTaxiCall, stoppedOnRunwayCall,
-  holdShortQueryCall, nextSegmentCall, pushbackRequestCall,
+  holdShortQueryCall, nextSegmentCall, pushbackRequestCall, noseToNoseCall, clearOfCall,
   luawIntentionsCall, positionReportCall, requestNumbersCall, trafficAcquiredCall,
 } from '../radio/readback';
 import type { ReadbackEnv } from '../radio/readback';
+import { mustGiveWay } from './headOn';
 import { isVehicle, initVehicle, vehiclePilotCalls } from './vehicles';
 import { heliPilotCalls, isRotorcraft } from './rotorcraft';
 import { initSpecial, specialPilotCalls, trainingClearCall } from './special';
@@ -150,6 +151,12 @@ function resolveFrequency(ctx: SimContext, id: string | undefined): { mhz: numbe
   return { mhz: ctx.state.controllerFrequencyMhz };
 }
 
+/** A pilot stopped nose to nose waits this long (s) after standing still before calling, and calls again after `HEAD_ON_RECALL_SEC` if nobody answers. DESIGN VALUES. */
+const HEAD_ON_CALL_AFTER_SEC = 4;
+const HEAD_ON_RECALL_SEC = 90;
+/** An aircraft moved aside after a head-on asks for new instructions only within this many seconds of the conflict ending. DESIGN VALUE. */
+const HEAD_ON_RESUME_WINDOW_SEC = 300;
+
 export function spawnFromSpec(ctx: SimContext, spec: SpawnSpec): Aircraft {
   const { state, rng } = ctx;
   const airport = state.airport;
@@ -196,6 +203,7 @@ export function spawnFromSpec(ctx: SimContext, spec: SpawnSpec): Aircraft {
   // A student pilot: forced by the spawn, else a seeded share of light VFR aircraft (pilot realism studentShare). Own seeded draw: the sim's generator is untouched.
   const student = spec.student ?? (spec.flightRules === 'VFR' && perf.category === 'light' && !perf.craft && !perf.military && seeded01(ac.seed, 'student') < ctx.pilotBehaviour.realism.studentShare);
   if (student) ac.student = true;
+  if (!spec.isDeparture && spec.parkingCategory) ac.parkingIntent = spec.parkingCategory;
   if (ctx.pilotBehaviour.realism.level !== 'off') ac.flags.inContact = false;
   const rt = newRuntime(now + 2 + rng() * 4);
   ctx.runtime.set(id, rt);
@@ -620,6 +628,31 @@ export function updatePilotRequests(ctx: SimContext): void {
         ac.pendingRequest = { kind: 'TAXI', text: 'request next progressive taxi instructions', sinceSec: now, progressive: true };
         continue;
       }
+    }
+
+    // 1e. Nose to nose with another aircraft on a shared lane (headOn.ts): the pilot who must give way asks for instructions, and asks again if nobody answers.
+    if (rt.headOn && ac.onGround && ac.groundSpeedKt < 0.1 && rt.stillSince !== undefined && now - rt.stillSince >= HEAD_ON_CALL_AFTER_SEC) {
+      const other = state.aircraft[rt.headOn.otherId];
+      if (other && mustGiveWay(ac, other) === ac && (rt.headOn.lastCallSec === undefined || now - rt.headOn.lastCallSec >= HEAD_ON_RECALL_SEC)) {
+        rt.headOn.lastCallSec = now;
+        pilotSay(ctx, ac, noseToNoseCall(ac, env, other.spokenCallsign, rt.headOn.taxiway), { request: 'TAXI', headOn: true, nonStandard: true });
+        ac.pendingRequest = { kind: 'TAXI', text: `nose to nose with ${other.callsign}${rt.headOn.taxiway ? ` on ${rt.headOn.taxiway}` : ''}, request instructions`, sinceSec: now, headOnWith: other.id };
+        emitEvent(ctx, { kind: 'INFO', aircraftId: ac.id, callsign: ac.callsign, text: `${ac.callsign} and ${other.callsign} stopped nose to nose on ${rt.headOn.taxiway || 'a taxiway'}`, severity: 'warning', speaker: 'SYSTEM', data: { headOn: true, otherId: other.id, taxiway: rt.headOn.taxiway } });
+        continue;
+      }
+    }
+
+    // 1f. The head-on is over (the other aircraft passed): the aircraft that stepped aside asks for new taxi instructions from where it stands.
+    if (rt.headOnCalled !== undefined && now - rt.headOnCalled > HEAD_ON_RESUME_WINDOW_SEC) rt.headOnCalled = undefined;
+    if (rt.headOnCalled !== undefined && !rt.headOn && !rt.progressive && ac.onGround && ac.route && ac.route.progressIndex >= ac.route.nodeIds.length && ac.groundSpeedKt < 0.1
+      && rt.stillSince !== undefined && now - rt.stillSince >= 3 && (ac.phase === 'TAXIING' || ac.phase === 'TAXI_TO_PARKING')) {
+      const lastNode = graph.nodes[ac.route.nodeIds[ac.route.nodeIds.length - 1]];
+      if (!lastNode || lastNode.kind === 'parking' || lastNode.kind === 'holding_position') { rt.headOnCalled = undefined; continue; }
+      rt.headOnCalled = undefined;
+      const where = lastNode?.taxiways[0];
+      pilotSay(ctx, ac, clearOfCall(ac, env, where), { request: 'TAXI', nonStandard: true });
+      ac.pendingRequest = { kind: 'TAXI', text: `clear${where ? ` on ${where}` : ''}, request taxi instructions`, sinceSec: now, resume: true };
+      continue;
     }
 
     // 1d. Stopped short of a hold-short that was not read back: the pilot asks for it again.

@@ -601,7 +601,7 @@ function drawAircraft(ctx: CanvasRenderingContext2D, v: View, frame: Frame, laye
     if (close) drawGlyphDetail(ctx, size.halfLenPx, ac.type);
     ctx.restore();
 
-    if (ac.pendingRequest) {
+    if (ac.pendingRequest && !ac.pendingRequest.unheard) {
       ctx.fillStyle = C.amber;
       ctx.beginPath();
       ctx.arc(d.x + size.halfLenPx * 0.8 + 3, d.y - size.halfLenPx * 0.8 - 3, 3.5, 0, Math.PI * 2);

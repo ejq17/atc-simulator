@@ -13,6 +13,8 @@ const enabled = process.env.FREEPLAY_SOAK === '1';
 const seeds = (process.env.FREEPLAY_SEEDS ?? '1,2,3,4').split(',').map(Number);
 const hours = Number(process.env.FREEPLAY_HOURS ?? 2);
 const report = process.env.FREEPLAY_REPORT === '1';
+/** Longest single wait allowed (minutes): the 15-minute target of the fairness rule (ai/world.ts DEPARTURE_WAIT_BOUND_SEC is 8 minutes). */
+const maxWaitMin = Number(process.env.FREEPLAY_MAX_WAIT_MIN ?? 15);
 const realisms = (process.env.FREEPLAY_REALISM ?? 'off,moderate').split(',') as ('off' | 'moderate')[];
 
 describe.skipIf(!enabled)('free play at 10 + 10 per hour, 14 aircraft, every AI position', () => {
@@ -23,11 +25,11 @@ describe.skipIf(!enabled)('free play at 10 + 10 per hour, 14 aircraft, every AI 
         if (process.env.FREEPLAY_REPORT_FILE) appendFileSync(process.env.FREEPLAY_REPORT_FILE, `--- seed ${seed} realism ${realism}\n${r.rows.join('\n')}\nmax wait ${r.maxWaitText}\nsafety events ${r.safety.length}\n${r.stallDump ?? ''}\n`);
         if (report || r.stallDump) console.log(`--- seed ${seed} realism ${realism}\n${r.rows.join('\n')}\nmax wait ${r.maxWaitText}\nsafety events ${r.safety.length}\n${r.stallDump ?? ''}`);
         expect(r.stallDump, r.rows.join('\n')).toBeUndefined();
-        // Landed and departed counts rise over the run, and nobody waits an hour (the longest wait seen in the 8 runs is about 46 min, a departure whose taxi
-        // is held while arrivals use the same lanes: docs/PROGRESS.md "Free-play jam", unresolved items).
+        // Landed and departed counts rise over the run, and nobody waits longer than the target (docs/PROGRESS.md "Last limits": the longest single wait of the 8 runs
+        // is still far above it, 47 to 101 minutes, so this fails today; FREEPLAY_MAX_WAIT_MIN=120 shows the rest of the guard).
         expect(r.landed[r.landed.length - 1]).toBeGreaterThan(r.landed[Math.floor(r.landed.length / 2)]);
         expect(r.departed[r.departed.length - 1]).toBeGreaterThan(r.departed[Math.floor(r.departed.length / 2)]);
-        expect(r.maxWaitSec, r.maxWaitText).toBeLessThan(3600);
+        expect(r.maxWaitSec, r.maxWaitText).toBeLessThan(maxWaitMin * 60);
       }, 900000);
     }
   }

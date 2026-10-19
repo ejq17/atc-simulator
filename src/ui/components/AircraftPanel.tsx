@@ -14,8 +14,8 @@ const HIDDEN_READBACK_KINDS: ReadonlySet<string> = new Set(['no_readback', 'call
 
 export function sortAircraft(list: Aircraft[]): Aircraft[] {
   return [...list].sort((a, b) => {
-    const pa = a.pendingRequest ? 0 : 1;
-    const pb = b.pendingRequest ? 0 : 1;
+    const pa = a.pendingRequest && !a.pendingRequest.unheard ? 0 : 1;
+    const pb = b.pendingRequest && !b.pendingRequest.unheard ? 0 : 1;
     if (pa !== pb) return pa - pb;
     const ta = TONE_ORDER.indexOf(statusTone(a));
     const tb = TONE_ORDER.indexOf(statusTone(b));
@@ -80,7 +80,7 @@ export function AircraftPanel() {
                   {navLetter(ac) && <span title="Navigation: V vectors, R route, A approach" className="border border-atc-border px-1 text-[9.5px] leading-4 text-atc-text">{navLetter(ac)}</span>}
                   {ac.radarIdentified && <span title="Radar identified" className="text-[9.5px] text-atc-green">RADAR ID</span>}
                 </span>
-                {ac.pendingRequest ? (
+                {ac.pendingRequest && !ac.pendingRequest.unheard ? (
                   <span data-testid="request-badge" data-kind={ac.pendingRequest.kind} title={ac.pendingRequest.text} className="atc-blink border border-atc-amber/70 px-1 text-[9.5px] font-semibold uppercase leading-4 tracking-wider text-atc-amber">
                     {requestBadge(ac.pendingRequest.kind)}
                   </span>

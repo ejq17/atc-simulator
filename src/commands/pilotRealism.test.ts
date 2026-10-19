@@ -51,6 +51,18 @@ describe('talking to the pilot', () => {
     const p = parse('N723EJ, unable, runway one three is closed to landing traffic', CTX);
     expect(p.commands.map((c) => c.kind)).toEqual(['UNABLE']);
   });
+  it('"unable" takes only its own clause: the clearance after it is still read', () => {
+    const a = parse('N723EJ, unable, runway one three cleared to land', CTX);
+    expect(a.commands.map((c) => c.kind)).toEqual(['UNABLE', 'LAND']);
+    expect(a.commands[1].runwayEnd ?? a.commands[1].runwayId).toBeDefined();
+    const b = parse('N723EJ, unable, traffic on a two mile final, cleared to land runway one three', CTX);
+    expect(b.commands.map((c) => c.kind)).toEqual(['UNABLE', 'LAND']);
+    const c = parse('N723EJ, request denied, hold short of runway one three', CTX);
+    expect(c.commands.map((x) => x.kind)).toContain('UNABLE');
+    expect(c.commands.length).toBeGreaterThan(1);
+    const d = parse('N723EJ, unable closed traffic', CTX);
+    expect(d.commands.map((x) => x.kind)).toEqual(['UNABLE']);
+  });
 });
 
 describe('transmission size', () => {

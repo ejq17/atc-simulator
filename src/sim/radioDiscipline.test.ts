@@ -6,7 +6,7 @@ import type { PilotRealismOverride } from './pilotBehaviour';
 import { ARRIVING, cmd, find, makeEngine, pilotTexts, run, runUntil } from './__fixtures__/testHelpers';
 import type { Scenario, SimEvent } from './types';
 import type { SimulationEngine } from './api';
-import { BLOCKED_SQUEAL_SEC } from './radioDiscipline';
+import { BLOCKED_SQUEAL_SEC, markBlockedRequest, markRequestHeard } from './radioDiscipline';
 
 const QUIET: PilotRealismOverride = {
   digitErrorRate: 0, altitudeErrorRate: 0, frequencyErrorRate: 0, squawkErrorRate: 0, patternMisunderstandRate: 0,
@@ -237,5 +237,23 @@ describe('blocked transmissions', () => {
 
   it('the squeal length matches the engine constant', () => {
     expect(BLOCKED_SQUEAL_SEC).toBeGreaterThan(0.5);
+  });
+});
+
+describe('a blocked request is not a pending request until the retry is heard', () => {
+  const ac = () => ({ pendingRequest: { kind: 'TAXI', text: 'ready to taxi', sinceSec: 0 } }) as unknown as import('./types').Aircraft;
+  it('a blocked request call hides the request, the retry shows it again', () => {
+    const a = ac();
+    markBlockedRequest(a, { answer: false, data: { request: 'TAXI' } });
+    expect(a.pendingRequest?.unheard).toBe(true);
+    markRequestHeard(a, { readback: true }); // not a request call: nothing changes
+    expect(a.pendingRequest?.unheard).toBe(true);
+    markRequestHeard(a, { request: 'TAXI' });
+    expect(a.pendingRequest?.unheard).toBe(false);
+  });
+  it('a blocked readback does not hide a request', () => {
+    const a = ac();
+    markBlockedRequest(a, { answer: true, data: { readback: true } });
+    expect(a.pendingRequest?.unheard).toBeUndefined();
   });
 });
