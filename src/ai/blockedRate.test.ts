@@ -1,70 +1,60 @@
-import { describe, it } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { appendFileSync } from 'node:fs';
-import { loadKacy } from '../airport';
-import { createEngine } from '../sim/engine';
-import { game } from '../game/game';
-import { createAiControllers } from './index';
-import type { SimEvent } from '../sim/types';
+import { measureBlocked, measureRow, PROTOCOL } from './blockedRate';
+import type { BlockedOptions, BlockedRegime } from './blockedRate';
 import type { PilotRealismLevel } from '../sim/pilotBehaviour';
 
 /**
- * Blocked-call measurement (docs/BEHAVIOUR-ACCURACY.md R9): KACY free play, "mixed" start, 24 arrivals + 24 departures per hour, 35 simulated
- * minutes after the first 5 are discarded, share of pilot calls blocked, with and without AI controllers on every position.
- * Slow, so it only runs with BLOCKED_RATE=1 (BLOCKED_SEEDS=1,2,3, BLOCKED_LEVELS=light,moderate,heavy, BLOCKED_AI=0,1, BLOCKED_FILE=path appends the rows).
+ * Blocked-call rate, canonical protocol in `blockedRate.ts` (docs/BEHAVIOUR-ACCURACY.md R9). Slow, so it only runs with BLOCKED_RATE=1.
+ * Knobs: BLOCKED_SEEDS=1,2,3  BLOCKED_LEVELS=light,moderate,heavy  BLOCKED_REGIMES=ai,human-twr,unattended  BLOCKED_PAIRS=1 (list the collisions)
+ * BLOCKED_FILE=path (append the rows). Set-up variations (they leave the canonical protocol, for the reconciliation in R9):
+ * BLOCKED_FLOW=0 (flow control off)  BLOCKED_SPECIAL=1 (special traffic on)  BLOCKED_COUNT=n (starting aircraft)  BLOCKED_MAX=n (maxAircraft)
+ * BLOCKED_IFR=0|1 (IFR flows)  BLOCKED_POS=twr-gnd (session lists only TWR + GND)  BLOCKED_START=quiet|mixed|busy_arrivals|busy_departures  BLOCKED_SPAN=s  BLOCKED_DISCARD=s.
  */
 const enabled = process.env.BLOCKED_RATE === '1';
-const seeds = (process.env.BLOCKED_SEEDS ?? '1,2,3').split(',').map(Number);
-const levels = (process.env.BLOCKED_LEVELS ?? 'light,moderate,heavy').split(',') as PilotRealismLevel[];
-const modes = (process.env.BLOCKED_AI ?? '0,1').split(',').map((x) => x === '1');
-const kacy = loadKacy();
-const DISCARD = 300;
-const SPAN = 2100;
-
-export function measureBlocked(seed: number, level: PilotRealismLevel, withAi: boolean) {
-  const sc = game.buildFreePlay(kacy, {
-    seed, weather: 'clear', aircraftCount: 6, maxAircraft: 30, arrivalsPerHour: 24, departuresPerHour: 24, difficulty: 'normal', pilotRealism: level, startingScenario: 'mixed',
-    airportEvents: false, startUtcMs: Date.UTC(2026, 5, 1, 15),
-  });
-  sc.controllerPositions = ['CLNC', 'GND', 'TWR', 'APP', 'DEP'];
-  sc.playerPositions = [];
-  const engine = createEngine({ airport: kacy, scenario: sc, trafficGenerator: game.createTrafficGenerator(sc, kacy), readbackErrorRate: 0.04, utcStartMs: Date.UTC(2026, 5, 1, 15) });
-  const ai = withAi ? createAiControllers({ engine, airport: kacy, positions: ['CLNC', 'GND', 'TWR', 'APP', 'DEP'], playerPositions: [], seed: 5 }) : undefined;
-  const events: SimEvent[] = [];
-  let last = 0;
-  engine.subscribe((s) => {
-    ai?.update(s);
-    for (const e of s.events) { const n = Number(e.id.replace('ev-', '')); if (n > last) { events.push(e); last = n; } }
-  });
-  for (let t = 1; t <= (DISCARD + SPAN) * 10; t++) engine.step();
-  let pilot = 0, blockedCalls = 0, groups = 0;
-  const pairs: string[] = [];
-  for (const e of events) {
-    if (e.timeSec < DISCARD) continue;
-    if (e.kind === 'TRANSMISSION' && e.speaker === 'PILOT') pilot++;
-    if (e.kind === 'RADIO_BLOCKED') {
-      const d = e.data as { callsigns: string[]; answers: boolean[]; texts: string[]; keyedAtSec: number[] };
-      blockedCalls += d.callsigns.length; groups++;
-      const atc = events.filter((x) => x.kind === 'TRANSMISSION' && x.speaker === 'ATC' && x.timeSec <= e.timeSec && x.timeSec > e.timeSec - 12).map((x) => `ATC@${x.timeSec.toFixed(1)}:${(x.text ?? '').slice(0, 30)}`).join(' | ');
-      pairs.push(atc + ' >> ' + `${Math.round(e.timeSec)} ${d.answers.map((a) => (a ? 'A' : 'P')).join('')} ${d.keyedAtSec.join('/')} ${d.texts.map((t) => `[${t.slice(0, 70)}]`).join(' ')}`);
-    }
-  }
-  return { pilot, blockedCalls, groups, pairs, total: pilot + blockedCalls };
-}
+const env = process.env;
+const seeds = (env.BLOCKED_SEEDS ?? PROTOCOL.seeds.join(',')).split(',').map(Number);
+const levels = (env.BLOCKED_LEVELS ?? PROTOCOL.levels.join(',')).split(',') as PilotRealismLevel[];
+const regimes = (env.BLOCKED_REGIMES ?? 'ai,human-twr').split(',') as BlockedRegime[];
+const vary: Partial<BlockedOptions> = {
+  ...(env.BLOCKED_FLOW === '0' ? { flowControl: false } : {}), ...(env.BLOCKED_SPECIAL === '1' ? { specialTraffic: true } : {}),
+  ...(env.BLOCKED_COUNT ? { aircraftCount: Number(env.BLOCKED_COUNT) } : {}), ...(env.BLOCKED_MAX ? { maxAircraft: Number(env.BLOCKED_MAX) } : {}),
+  ...(env.BLOCKED_START ? { startingScenario: env.BLOCKED_START as BlockedOptions['startingScenario'] } : {}),
+  ...(env.BLOCKED_IFR ? { ifrFlows: env.BLOCKED_IFR === '1' } : {}), ...(env.BLOCKED_POS === 'twr-gnd' ? { positions: 'twr-gnd' as const } : {}),
+  ...(env.BLOCKED_SPAN ? { spanSec: Number(env.BLOCKED_SPAN) } : {}), ...(env.BLOCKED_DISCARD ? { discardSec: Number(env.BLOCKED_DISCARD) } : {}),
+};
 
 describe.skipIf(!enabled)('blocked-call rate', () => {
-  for (const level of levels) for (const withAi of modes) {
-    it(`${level} ${withAi ? 'AI' : 'unattended'}`, () => {
-      let p = 0, b = 0, g = 0;
-      const per: string[] = [];
-      const pairs: string[] = [];
-      for (const seed of seeds) {
-        const r = measureBlocked(seed, level, withAi);
-        p += r.pilot; b += r.blockedCalls; g += r.groups; per.push(`${seed}:${r.blockedCalls}/${r.total}`);
-        if (process.env.BLOCKED_PAIRS) pairs.push(...r.pairs.map((x) => `s${seed} ${x}`));
-      }
-      const line = `${level} ${withAi ? 'AI' : 'unattended'}: blocked ${b} of ${p + b} calls keyed = ${((100 * b) / (p + b)).toFixed(2)} % (groups ${g}; ${per.join(' ')})`;
-      console.log(line + (pairs.length ? '\n' + pairs.join('\n') : ''));
-      if (process.env.BLOCKED_FILE) appendFileSync(process.env.BLOCKED_FILE, line + '\n' + (pairs.length ? pairs.join('\n') + '\n' : ''));
-    }, 1800000);
+  for (const level of levels) for (const regime of regimes) {
+    it(`${level} ${regime}`, () => {
+      const row = measureRow({ level, regime, ...vary }, seeds, `${level} ${regime}`);
+      const out = row.line + (env.BLOCKED_PAIRS ? '\n' + row.pairs.join('\n') : '');
+      console.log(out);
+      if (env.BLOCKED_FILE) appendFileSync(env.BLOCKED_FILE, out + '\n');
+    }, 3600000);
   }
+});
+
+// Always on (a few seconds): the protocol is deterministic and counts what it says it counts.
+describe('blocked-call protocol (short window)', () => {
+  const short = { seed: 1, level: 'heavy' as PilotRealismLevel, discardSec: 120, spanSec: 600 };
+  for (const regime of ['ai', 'human-twr'] as const) {
+    it(`${regime}: same inputs give the same counts, calls are counted`, () => {
+      const a = measureBlocked({ ...short, regime });
+      const b = measureBlocked({ ...short, regime });
+      expect({ ...a, pairs: [] }).toEqual({ ...b, pairs: [] });
+      expect(a.keyed).toBe(a.transmitted + a.blocked);
+      expect(a.transmitted).toBeGreaterThan(30);
+      expect(a.atcCalls).toBeGreaterThan(10);
+      expect(a.blocked).toBeGreaterThanOrEqual(2 * a.groups);
+    }, 120000);
+  }
+  it('unattended: nobody answers, so there are no controller calls and only the first calls of the aircraft', () => {
+    const a = measureBlocked({ ...short, regime: 'unattended' });
+    expect(a.atcCalls).toBe(0);
+    expect(a.keyed).toBeLessThan(120);
+  }, 120000);
+  it('the canonical protocol values', () => {
+    expect([PROTOCOL.discardSec, PROTOCOL.spanSec, PROTOCOL.arrivalsPerHour, PROTOCOL.departuresPerHour, PROTOCOL.maxAircraft, PROTOCOL.aircraftCount]).toEqual([300, 7200, 24, 24, 30, 6]);
+  });
 });

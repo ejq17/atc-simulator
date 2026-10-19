@@ -201,6 +201,16 @@ their callsigns, say "student pilot" and ask for things. How much is the **pilot
 * Timing: seeded response delay (airline quickest, student slowest), a call that is simply missed (call again), "say again" on long
   transmissions, and **blocked transmissions**: two pilots who key up together are both garbled (a heterodyne squeal, "[blocked]" in the log,
   a `RADIO_BLOCKED` event) and retry after different delays.
+  **Measured** (KACY free play, 24 + 24 movements per hour, 30 aircraft at most, three seeds, 2 simulated hours each after the first 5 minutes; share of pilot calls
+  that were blocked, both pilots of a collision counted; protocol in `src/ai/blockedRate.ts`, `BLOCKED_RATE=1 npx vitest run src/ai/blockedRate.test.ts`):
+
+  | Controllers | light | moderate | heavy | pilot calls (light / moderate / heavy) |
+  |---|---|---|---|---|
+  | AI on every position | 0.13 % | 1.03 % | 0.57 % | 1,581 / 1,356 / 1,753 |
+  | Human Tower (answers promptly), AI on the rest | 0 % | 0 % | 0.19 % | 1,221 / 1,344 / 1,036 |
+
+  A row is at most 14 blocked calls, so differences of a percent between cells are noise. Earlier figures in the repository history (2.1-3.9 %, 6.2-8.4 %) came from other
+  builds or set-ups; `docs/BEHAVIOUR-ACCURACY.md` R9 reconciles them.
 * Callsigns (AIM 4-2-4): "November" or the type word on first contact, "student pilot" for students, the abbreviated form (type word and the
   last three characters, "Cessna three echo juliet") once you have used it, never with a similar callsign on the frequency. The parser accepts
   the abbreviation for an aircraft that has called. Airline "with you" / "with Bravo" are marked non-standard.
