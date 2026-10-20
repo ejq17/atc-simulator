@@ -305,6 +305,82 @@ describe('departure release (4-3-4 / LOA)', () => {
   });
 });
 
+describe('departure gap (Tower asks Approach; 3-8-1 / 3-9-5 / 2-1-14, plain words)', () => {
+  const hold22 = (): string => Object.values(kacy.taxiwayGraph.nodes).find((n) => n.kind === 'holding_position' && n.runwayId === '4/22' && n.protectsRunwayEnd === '22')!.id;
+  const make = () => {
+    const e = createEngine({
+      airport: kacy, readbackErrorRate: 0, utcStartMs: DAY,
+      scenario: makeScenario({
+        mode: 'free_play', controllerPositions: ['GND', 'TWR', 'APP'], playerPositions: ['TWR'],
+        activeRunways: { departing: ['22'], landing: ['22'] }, spawns: [{ atSec: 0, callsign: 'N60DX', type: 'C172', flightRules: 'VFR', isDeparture: true, initialFrequencyId: 'TWR', start: { kind: 'holding_short', nodeId: hold22(), runwayEnd: '22' } }],
+      }),
+    }) as ExtendedEngine;
+    run(e, 5);
+    return e;
+  };
+  const ask = (e: ExtendedEngine, departures = 1) => e.coordination!.request({ topic: 'GAP', from: 'TWR', to: 'APP', aircraftId: find(e, 'N60DX').id, runwayId: '4/22', runwayEnd: '22', departures, source: 'player' })!;
+
+  it('the request names the runway end and the number of departures, in plain words', () => {
+    const e = make();
+    const r = ask(e);
+    expect(r.status).toBe('pending');
+    const m = e.getState().coordination!.messages.at(-1)!;
+    expect(m).toMatchObject({ kind: 'GAP_REQUEST', from: 'TWR', to: 'APP', standard: false });
+    expect(m.text).toBe('Approach, Tower, need a gap for a departure runway 22');
+    expect(m.spoken).toBe('Approach, Tower, need a gap for a departure runway two two');
+    expect(describeMessage('GAP_REQUEST', { from: 'TWR', to: 'APP', runwayEnd: '22', departures: 2 }).spoken).toBe('Approach, Tower, need a gap for two departures runway two two');
+  });
+  it('Approach answers "gap after <callsign>" (valid for the design interval), or "unable, <reason>", or "stand by"', () => {
+    const e = make();
+    const after = { afterAircraftId: find(e, 'N60DX').id };
+    const r = ask(e);
+    e.coordination!.respond(r.id, 'approve', { by: 'APP', source: 'ai', ...after });
+    const ok = e.getState().coordination!.requests.find((x) => x.id === r.id)!;
+    expect(ok).toMatchObject({ status: 'approved', afterCallsign: 'N60DX' });
+    expect(ok.expiresSec).toBeCloseTo(e.getState().clock.timeSec + COORDINATION_DESIGN.gapTtlSec, 0);
+    expect(e.getState().coordination!.messages.at(-1)).toMatchObject({ kind: 'GAP_APPROVED', text: 'Tower, Approach, gap after N60DX', standard: false });
+    expect(validApproval(e.getState(), 'GAP', find(e, 'N60DX').id)).toBeDefined();
+
+    const e2 = make();
+    const r2 = ask(e2);
+    e2.coordination!.respond(r2.id, 'deny', { by: 'APP', source: 'ai', reason: 'no arrival I can delay' });
+    expect(e2.getState().coordination!.messages.at(-1)).toMatchObject({ kind: 'GAP_UNABLE', text: 'Tower, Approach, unable, no arrival I can delay' });
+    expect(e2.getState().coordination!.requests.find((x) => x.id === r2.id)!.status).toBe('denied');
+
+    const e3 = make();
+    const r3 = ask(e3);
+    e3.coordination!.respond(r3.id, 'standby', { by: 'APP', source: 'player', reason: 'traffic' });
+    expect(e3.getState().coordination!.messages.at(-1)!.kind).toBe('GAP_STANDBY');
+  });
+  it('an approved gap lapses after its interval, and is completed when the departure is cleared (it left the hold)', () => {
+    const e = make();
+    const r = ask(e);
+    e.coordination!.respond(r.id, 'approve', { by: 'APP', source: 'player' });
+    expect(e.getState().coordination!.messages.at(-1)!.text).toBe('Tower, Approach, gap available now');
+    run(e, COORDINATION_DESIGN.gapTtlSec + 2);
+    expect(e.getState().coordination!.requests.find((x) => x.id === r.id)!.status).toBe('expired');
+
+    const e2 = make();
+    const r2 = ask(e2);
+    e2.coordination!.respond(r2.id, 'approve', { by: 'APP', source: 'player' });
+    expect(e2.applyCommand(cmd('TAKEOFF', 'N60DX', { runwayEnd: '22', runwayId: '4/22' }), { position: 'TWR' }).status).toBe('accepted');
+    run(e2, 2);
+    expect(e2.getState().coordination!.requests.find((x) => x.id === r2.id)!.status).toBe('completed');
+  });
+  it('a repeated request is one request (asked twice); deterministic: the same calls give the same channel', () => {
+    const e = make();
+    const r = ask(e);
+    run(e, 40);
+    const again = ask(e);
+    expect(again.id).toBe(r.id);
+    expect(again.asks).toBe(2);
+    const sigOf = (x: ExtendedEngine) => sig(x.getState());
+    const a = make(); ask(a); run(a, 40); ask(a);
+    const b = make(); ask(b); run(b, 40); ask(b);
+    expect(sigOf(a)).toBe(sigOf(b));
+  });
+});
+
 describe('phraseology (every wording is marked standard or plain)', () => {
   const base = { from: 'DEP' as const, to: 'APP' as const, spokenCallsign: 'Cessna three echo juliet' };
   it('point-out follows the 5-4-3 pattern and its answers are the 5-4-3 terms', () => {

@@ -89,6 +89,33 @@ describe('landline parser: departure release (4-3-4)', () => {
   });
 });
 
+describe('landline parser: departure gap (Tower to Approach; 3-8-1 / 3-9-5 / 2-1-14, plain words)', () => {
+  it('Tower asks: "Approach, Tower, need a gap for a departure runway two two"', () => {
+    const r = p('Approach, Tower, need a gap for a departure runway two two');
+    expect(r).toMatchObject({ kind: 'REQUEST_GAP', to: 'APP', from: 'TWR', runwayEnd: '22', runwayId: '4/22', departures: 1 });
+    expect(r.nonStandard).toBe(true); // no paragraph of the order words the request
+    expect(r.confidence).toBeGreaterThanOrEqual(0.6);
+    expect(looksLikeLandline('Approach, Tower, need a gap for a departure runway two two')).toBe(true);
+  });
+  it('"for two departures" carries the count, and a callsign / the runway may be left out', () => {
+    expect(p('Approach, Tower, need a gap for two departures runway two two')).toMatchObject({ kind: 'REQUEST_GAP', departures: 2, runwayEnd: '22' });
+    expect(p('Approach, Tower, need a gap for Spirit four fifty one runway two two')).toMatchObject({ kind: 'REQUEST_GAP', callsign: 'NKS451' });
+    const bare = p('Approach, Tower, need a gap for a departure');
+    expect(bare.kind).toBe('REQUEST_GAP');
+    expect(bare.confidence).toBeGreaterThanOrEqual(0.6); // the runway is the waiting departure's: the pipeline fills it in
+  });
+  it('a player who works only Tower may leave "Tower" out', () => {
+    const r = parseLandline('Approach, need a gap for a departure runway two two', { ...ctx, playerPositions: ['TWR'] });
+    expect(r).toMatchObject({ kind: 'REQUEST_GAP', to: 'APP', from: 'TWR' });
+  });
+  it('Approach answers: "gap after Cessna ...", "unable, ...", "stand by"', () => {
+    expect(p('Tower, Approach, gap after Cessna seven two three echo juliet')).toMatchObject({ kind: 'GAP_APPROVED', to: 'TWR', from: 'APP', afterCallsign: 'N723EJ' });
+    expect(p('Tower, Approach, gap available now').kind).toBe('GAP_APPROVED');
+    expect(p('Tower, Approach, unable, no arrival I can delay').kind).toBe('UNABLE');
+    expect(p('Tower, Approach, stand by').kind).toBe('STANDBY');
+  });
+});
+
 describe('landline parser: point out (5-4-3)', () => {
   it('"Approach, Departure, point out, two miles west of Cedar Lake, three thousand, Cessna ..."', () => {
     const r = p('Approach, Departure, point out, two miles west of Cedar Lake, three thousand, Cessna seven two three echo juliet');

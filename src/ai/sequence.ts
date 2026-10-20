@@ -113,9 +113,9 @@ export interface SeqWindow {
 const free = (windows: SeqWindow[], start: number, end: number): boolean =>
   windows.every((w) => end + SEQ_MARGIN_SEC <= w.start || start >= w.end + SEQ_MARGIN_SEC);
 
-/** Aircraft the sequencer may delay: light non-military aircraft flying the pattern (fighters and the overhead maneuver have their own handling). */
+/** Aircraft the sequencer may delay: anything flying the pattern, a fighter after its break included (3-8-1 applies to every type: "extend downwind" for the F-16 as for the Cessna, soak seed 13: 15 minutes of go-arounds). Only an overhead maneuver that has not broken yet is its own. */
 export function isSequenceable(ac: Aircraft): boolean {
-  return !ac.onGround && !ac.isDeparture && ac.phase === 'PATTERN' && !getPerformance(ac.type).military && !ac.flags.overhead;
+  return !ac.onGround && !ac.isDeparture && ac.phase === 'PATTERN' && (!ac.flags.overhead || ac.flags.overhead === 'BROKE');
 }
 
 export type SeqAction = 'ok' | 'extend' | 'hold' | 'release';

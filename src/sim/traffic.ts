@@ -31,7 +31,7 @@ import {
   luawIntentionsCall, positionReportCall, requestNumbersCall, trafficAcquiredCall,
 } from '../radio/readback';
 import type { ReadbackEnv } from '../radio/readback';
-import { mustGiveWay } from './headOn';
+import { headOnMarginM, mustGiveWay } from './headOn';
 import { isVehicle, initVehicle, vehiclePilotCalls } from './vehicles';
 import { heliPilotCalls, isRotorcraft } from './rotorcraft';
 import { initSpecial, specialPilotCalls, trainingClearCall } from './special';
@@ -154,6 +154,14 @@ function resolveFrequency(ctx: SimContext, id: string | undefined): { mhz: numbe
 /** A pilot stopped nose to nose waits this long (s) after standing still before calling, and calls again after `HEAD_ON_RECALL_SEC` if nobody answers. DESIGN VALUES. */
 const HEAD_ON_CALL_AFTER_SEC = 4;
 const HEAD_ON_RECALL_SEC = 90;
+/**
+ * Two taxiing aircraft that stand still facing each other (closer than `HEAD_ON_STUCK_MARGINS` head-on margins, headings more than 100 degrees apart) for this long (s) are nose to
+ * nose even when the route test of headOn.ts no longer sees a shared lane (soak seed 12 moderate: a student on progressive taxi and two arrivals on lane L stood 53 minutes
+ * with nobody holding a request: the follow-distance rule had stopped them, the head-on state had been cleared). The one that must give way calls (`mustGiveWay`) and
+ * calls again every `HEAD_ON_RECALL_SEC`. DESIGN VALUES.
+ */
+const HEAD_ON_STUCK_SEC = 30;
+const HEAD_ON_STUCK_MARGINS = 2.5;
 /** An aircraft moved aside after a head-on asks for new instructions only within this many seconds of the conflict ending. DESIGN VALUE. */
 const HEAD_ON_RESUME_WINDOW_SEC = 300;
 
@@ -627,6 +635,22 @@ export function updatePilotRequests(ctx: SimContext): void {
         pilotSay(ctx, ac, nextSegmentCall(ac, env, last.taxiways[0]), { request: 'TAXI' });
         ac.pendingRequest = { kind: 'TAXI', text: 'request next progressive taxi instructions', sinceSec: now, progressive: true };
         continue;
+      }
+    }
+
+    // 1e0. Standing nose to nose with no head-on state (see HEAD_ON_STUCK_SEC): make it one, so that the pilot who must give way holds a live request.
+    if (ac.onGround && ac.groundSpeedKt < 0.1 && rt.stillSince !== undefined && now - rt.stillSince >= HEAD_ON_STUCK_SEC && (ac.phase === 'TAXIING' || ac.phase === 'TAXI_TO_PARKING') && ac.route) {
+      const facing = Object.values(state.aircraft).find((o) => {
+        if (o.id === ac.id || !o.onGround || o.groundSpeedKt >= 0.1 || (o.phase !== 'TAXIING' && o.phase !== 'TAXI_TO_PARKING')) return false;
+        const dx = o.pos.x - ac.pos.x;
+        const dy = o.pos.y - ac.pos.y;
+        const d = Math.hypot(dx, dy);
+        const h = (ac.headingDeg * Math.PI) / 180;
+        return d < HEAD_ON_STUCK_MARGINS * headOnMarginM(ac, o) && Math.abs(((o.headingDeg - ac.headingDeg + 540) % 360) - 180) > 100 && (Math.sin(h) * dx + Math.cos(h) * dy) > 0.5 * d;
+      });
+      if (facing) {
+        if (!rt.headOn) rt.headOn = { otherId: facing.id, taxiway: graph.nodes[ac.route.nodeIds[Math.max(0, ac.route.progressIndex - 1)]]?.taxiways[0] ?? '', sinceSec: now, laneNodeIds: [], synthetic: true };
+        if (rt.headOn.synthetic && rt.headOn.otherId === facing.id) rt.headOn.lastSeenSec = now;
       }
     }
 

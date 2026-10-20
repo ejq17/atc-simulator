@@ -132,6 +132,7 @@ conservative "busy frequency"). The factors 0.5 and 2 are design scaling; the mo
 | C7 | `TOUCHDOWN_AFTER_THRESHOLD_SEC` 8 (flare and float, about 300 m at approach speed) | `ai/tower.ts` | AC 150/5300-13B Chg 1 exit-location tables assume a touchdown point and speed per approach category; it would give distance, not this time | DESIGN |
 | C8 | `SEQ_MARGIN_SEC` 15, runway-window gap, `PATTERN_OFFSET_M` 0.8 nm, `MIN_SPEED_MPS` 50 kt, `EXTEND_LAST_CHANCE_M` 0.35 nm | `ai/sequence.ts` | none | DESIGN |
 | C9 | Approach: `JOIN_FIX_PASSED_NM` 2.5 (a fix the aircraft is within 2.5 nm of is not the fix to join the approach at), the visual-approach height test (`tooHighForFaf`: 450 ft/nm + 1,000 ft against the runway end), `ARRIVAL_SPACING_NM` 5, `SLOW_SPEED_KT` 140, `SLOW_FROM_NM` 5, `SLOW_STEPS_KT` 160/140, `MIN_PROJECTED_GAP_NM` 3, `DESCENT_FT_PER_NM` 450 (1,050 fpm at 140 kt), `FAF_HIGH_MARGIN_FT` 1,000, `HOLD_SHORTFALL_NM` 1.5 | `ai/approach.ts` | JO 7110.65 5-7-1 speed adjustment ("do not assign speeds less than ... 5 nm from the runway" style limits) are already cited where used; these are the AI's choices | DESIGN |
+| C13 | Departure gap (`ai/gap.ts`, `ai/gapActions.ts`, `sim/coordination.ts`, `sim/towerCommands.ts`): `GAP_REQUEST_WAIT_SEC` 150 (a ready departure that has stood at the hold this long asks), `GAP_USABLE_WITHIN_SEC` 150 (no ask when a window opens inside it), `GAP_HORIZON_SEC` 360, `GAP_PER_EXTRA_DEPARTURE_SEC` 60, `GAP_IFR_MIN_NM` 6 (5-7-1 says 5 nm / the FAF; a mile of margin), `GAP_VFR_MIN_NM` 4 (Tower's `STRAIGHT_IN_TO_PATTERN_MIN_NM`), gap speed (approach speed for light aircraft, +20 kt otherwise), `MIN_SPEED_GAIN_SEC` 15, `GAP_MAX_CIRCLES` 2, `CIRCLE_ROLL_IN_SEC` 6, `CIRCLE_CLEAR_NM` 2.5 / `CIRCLE_CLEAR_FT` 1,500, `GAP_HOLD_DELAY_SEC` 180, `COORDINATION_DESIGN.gapTtlSec` 360 and `gapRetrySec` 120, `SPACING_TURN_MIN_NM` 3, the one-click request after 60 s (`GAP_QUICK_WAIT_SEC`), `OVERDUE_IGNORE_STOPPED_SEC` 480 (= C3) | design | no paragraph words or times a gap request (3-8-1, 3-9-5, 2-1-14, 5-7-1, 5-6-1, 4-3-4 and JO 7210.3 4-3-1 are the grounds: docs/FAA-REFERENCES.md "Departure gap"; P/CG has no GAP entry); the real figures are a letter of agreement's | DESIGN |
 | C12 | Sequence (`ai/sequence.ts`, `ai/tower.ts`): `LIGHT_OCCUPANCY_FLOOR_SEC` 140, `SEQ_MARGIN_SEC` 15 (unchanged), `PRIORITY_GO_AROUNDS` 2, `JET_WAIT_PRIORITY_SEC` 300, `JET_CLEAR_WINDOW_SEC` 240, `STRAIGHT_IN_TO_PATTERN_MIN_NM` 4, `DEPARTURE_PRIORITY_WAIT_SEC` 30 (was 90), `PATTERN_FINAL_HEADING_DEG` 40 (`sim/conflicts.ts`) | design | 140 s: the engine's rollout to the far exit of KACY 4/22 (123-137 s) plus a margin; 240 s: the wake minimum F to I on approach (TBL 5-5-4, 4 nm) at 65-70 kt; the rest none | DESIGN |
 | C11 | `CORRECTION_PATIENCE_SEC` 5 (`controllers.ts`): a correction of a readback error waits at most this long for a pilot call that is only queued | design | none | DESIGN |
 | C10 | `special.ts` `TERMINATE_NM` 8, `HOVER_HOLD_NM` 7, helicopter hover-hold distance 1 nm | `ai/special.ts` | none | DESIGN |
@@ -318,3 +319,97 @@ Totals (landings / departures / safety events): b8b84fe 347 / 461 / 539, 5 faili
 
 Why seed 12 off still fails: the jet no longer holds (NKS1027 is not among its longest waits; the slice test bounds it at 1,500 s, 2,240-2,693 s before). What is left is the departure queue at the hold of runway 22: departures stand 1,000-1,300 s (NKS1189 at the hold 1,018 s, N755NP 1,298 s) because the windows between landers are 20-50 s: a lander rolls to the far exit for 123-137 s and an A320 needs 143 s before the next arrival, 20 s to line up. Every departure waited for 2-3 cycles of 280 s. The arrival slot (130 + 150 s per waiting departure) and the departure window after 30 s do not close that gap in this seed; both were varied (above) without a better result over the 24 runs. Blocked-transmission protocol (AI timing changed): AI controllers 0.37 / 0.13 / 0.76 %, human Tower 0 / 0 / 0.58 %.
 
+
+
+### Departure gap round (2026-10-20, task/departure-gap)
+
+What was built: the coordination topic GAP (Tower asks Approach, plain words), `ai/gap.ts` (arrival slots by true ETA, the cheapest gap, delays of the arrivals behind it), `ai/gapActions.ts` (speed, a 360 for a VFR straight-in aircraft, a published hold and a later approach clearance for an IFR arrival), the engine 360 on the way in, the Landline request/answer for a person at either position, and two faults found on the way: a departure that took another aircraft's frequency change ("Spirit six zero three" read back by the wrong pilot) stood ready at the hold on Departure's frequency for 40 minutes (seed 12; Departure now sends a departure on the ground back to Tower or Ground), and a gap request is made with the runway END ("runway 22"), not the runway id.
+
+What a first version got wrong, kept as evidence. The VFR straight-in aircraft of the free-play generator check in with TOWER (frequency 120.3), and the engine refuses an instruction to an aircraft on another frequency ("Not on frequency: N41ZP is on 120.30 (TWR); you are transmitting on 124.60 (APP)"). An Approach that "builds the gap" for them was therefore a no-op: the first soak (378 / 533 / 251) improved by chance. Tried and dropped: the VFR arrivals on the Approach frequency (as the base generator `sim/traffic.ts` does) handed to Tower 6 nm out (362 / 509 / 371, 4 failing, 1 stall, 94 go-arounds: Tower loses its lead time), and starting them 15-17 nm out with the handoff at 10.5 nm (385 / 446 / 326, 8 failing, 3 stalls: more aircraft in flight for longer); a vector to the left downwind instead of the 360 (188 go-arounds with a gap request after 90 s: the pattern is the congested place). Now each position speaks to the aircraft on its own frequency and both read the same plan.
+
+Where the waiting is. Blocked seconds of the first departure at a hold (seeds 1-12, baseline): 42 % a lander still on the runway (rolls out 123-137 s, nothing shortens it), 45 % an arrival window the departure does not fit, 11 % other engine refusals, 2 % the AI's own slack. A gap can only act on the 45 %.
+
+Measured on 48 runs (seeds 1-24, both realism levels; the harness reports `tower waits`: from the first second a departure stands at the hold of its own runway until its takeoff clearance). The baseline is not a fixed number: the same tree with another AI seed (reaction delays) gives 5 failing runs and 108 go-arounds instead of 2 and 72.
+
+| configuration | mean tower wait | runs with a wait over 12 min | failing / stalls | go-arounds | safety events |
+|---|---|---|---|---|---|
+| cdcd09b (generator slot for waiting departures only) | 180 s | 15 | 2 / 0 | 72 | 465 |
+| cdcd09b, AI seed 6 | 190 s | 20 | 5 / 1 | 108 | 574 |
+| neither lever (slot extension off, no gap) | 211 s | 21 | 13 / 2 | 195 | 705 |
+| gap only (slot extension off) | 184 s | 14 | 5 / 2 | 175 | 674 |
+| **this change (both)** | **176 s** | **9** | 5 / 2 | 68 | 477 |
+
+Which lever does the work: the generator's arrival slot for waiting departures (T5, `ARRIVAL_SLOT_BASE_SEC` / `PER_DEPARTURE`) still does most of the work on go-arounds and safety events (175 go-arounds without it); the gap is the second lever and replaces about two thirds of what the slot gives on waits and failures (neither: 211 s, 13 failing; gap only: 184 s, 5 failing), which is what it is for. Both together have the shortest tails. T5 stays.
+
+Soak, same command as above (24 runs). Cell: landings / departures / longest single wait / safety events.
+
+| seed | level | cdcd09b (before) | this change |
+|---|---|---|---|
+| 1 | off | 18 / 24 / 11 min / 13 | 18 / 22 / 13 min / 15 |
+| 2 | off | 17 / 24 / 10 min / 5 | 15 / 23 / 9 min / 8 |
+| 3 | off | 12 / 23 / 9 min / 4 | 15 / 25 / 11 min / 7 |
+| 4 | off | 13 / 24 / 13 min / 16 | 12 / 25 / 12 min / 15 |
+| 5 | off | 17 / 16 / 9 min / 6 | 17 / 17 / 9 min / 6 |
+| 6 | off | 21 / 23 / 14 min / 9 | 16 / 27 / 18 min / 21 |
+| 7 | off | 13 / 28 / 10 min / 8 | 13 / 28 / 11 min / 8 |
+| 8 | off | 17 / 17 / 14 min / 8 | 17 / 18 / 12 min / 8 |
+| 9 | off | 15 / 26 / 9 min / 5 | 15 / 26 / 9 min / 6 |
+| 10 | off | 17 / 22 / 11 min / 11 | 18 / 22 / 28 min / 11 **FAIL** |
+| 11 | off | 13 / 27 / 12 min / 11 | 13 / 26 / 12 min / 13 |
+| 12 | off | 16 / 17 / 25 min / 21 **FAIL** | 17 / 20 / 13 min / 8 |
+| 1 | moderate | 16 / 18 / 16 min / 13 | 17 / 20 / 13 min / 13 |
+| 2 | moderate | 16 / 23 / 12 min / 6 | 16 / 23 / 13 min / 12 |
+| 3 | moderate | 16 / 24 / 17 min / 14 | 17 / 22 / 17 min / 16 |
+| 4 | moderate | 12 / 25 / 12 min / 16 | 12 / 25 / 12 min / 14 |
+| 5 | moderate | 16 / 18 / 15 min / 6 | 17 / 15 / 15 min / 8 |
+| 6 | moderate | 19 / 16 / 15 min / 23 | 19 / 16 / 15 min / 20 |
+| 7 | moderate | 14 / 22 / 12 min / 6 | 14 / 22 / 12 min / 6 |
+| 8 | moderate | 20 / 22 / 10 min / 6 | 19 / 24 / 12 min / 13 |
+| 9 | moderate | 14 / 25 / 10 min / 14 | 15 / 23 / 17 min / 14 |
+| 10 | moderate | 17 / 21 / 9 min / 4 | 17 / 21 / 9 min / 4 |
+| 11 | moderate | 13 / 26 / 11 min / 3 | 13 / 25 / 10 min / 3 |
+| 12 | moderate | 14 / 17 / 19 min / 42 | 17 / 11 / 53 min / 10 **FAIL** |
+| total | | 376 / 528 / - / 270; fails 1, stalls 0 | 379 / 526 / - / 259; fails 2, stalls 0 |
+
+Totals (landings / departures / safety events): cdcd09b 376 / 528 / 270, 1 failing; this change **379 / 526 / 259, 2 failing, 0 stalls**. Go-arounds 58 before, **36** after; the most by one aircraft 4 before, 3 after. Landings and safety events are better, departures are 2 lower (526 against 528), so the bar "totals not worse" is met except by those 2 departures. The bar "every run under 20 minutes" is NOT met: seed 12 off is closed (25 -> 13 min; the 22-hold departures now wait at most 463 s), but seed 10 off (28 min) and seed 12 moderate (53 min) fail, both ground-lane faults that this change only exposes by moving the timeline (the tower waits of those runs are 7 and 10 minutes): seed 10 off, a GA departure ready at the ramp for 27 minutes while arrivals bound for the same ramp stop on its lane one after another and the hold queue of runway 22 is full (`planDeparture` returns nothing or `opposingTraffic` names a taxiing arrival, in turn); seed 12 moderate, a student pilot on progressive taxi stopped nose to nose with two arrivals on lane L from t = 4,100 s (14 nose-to-nose calls, the pending request is gone, Ground has nothing to answer). Not fixed here.
+
+Blocked-transmission protocol (AI timing changed, `BLOCKED_RATE=1 BLOCKED_REGIMES=ai,human-twr`): AI controllers 0.13 / 0.28 / 0.47 % (light / moderate / heavy; 0.37 / 0.13 / 0.76 % before), human Tower 0 / 0.35 / 0.47 % (0 / 0 / 0.58 % before).
+
+
+#### Follow-up: the three faults the first version left (2026-10-20)
+
+1. **Seed 12 moderate (53 min).** A student on progressive taxi and two arrivals bound for the ramp stood nose to nose on lane L; the follow-distance rule had stopped them, the head-on state had been cleared and nobody held a request. Two taxiing aircraft that stand still facing each other (closer than 2.5 head-on margins, headings more than 100 degrees apart) for `HEAD_ON_STUCK_SEC` = 30 s are now nose to nose (`sim/traffic.ts`, `rt.headOn.synthetic`): the pilot who must give way calls and calls again every 90 s, AI Ground resolves it with its pull-aside / one-eighty tools. Slice test `src/ai/groundSlices.test.ts`.
+2. **Seed 10 off (28 min).** A GA departure ready at the ramp while later departures took every free place at the hold of 22 (the hold queue is 3 deep). A departure past `DEPARTURE_WAIT_BOUND_SEC` (480 s) that can be sent now (a hold with room, nothing opposing) is served before the others (`ground.ts` `overdueFirst`, `outranks`); the wait fell from 27 to 17 minutes. Arrivals are kept off a lane with an overdue departure by the existing `plannedOpposingTraffic`; no new rule for arrivals already on the lane.
+3. **Seed 13 special soak (F-16).** A lined-up departure stood on runway 22 for 8 minutes: the sequencer's window for a waiting departure (`beyond6000` + 30 s) was shorter than the `neededEtaSec` of the takeoff clearance, so every aircraft it let turn base was inside the need when it was done and went around (an F-16 and a Cessna five times). The window is now the larger of the two, and a fighter after its break is sequenced like any pattern aircraft (`sequence.isSequenceable`: extend downwind, the 360). `specialSoak.test.ts` is back at seed 13 and passes at 13-18.
+
+Soak, 24 runs after these changes (same command). Cell: landings / departures / longest single wait / safety events.
+
+| seed | level | cdcd09b (before) | this change |
+|---|---|---|---|
+| 1 | off | 18 / 24 / 11 min / 13 | 18 / 22 / 13 min / 15 |
+| 2 | off | 17 / 24 / 10 min / 5 | 15 / 23 / 9 min / 8 |
+| 3 | off | 12 / 23 / 9 min / 4 | 15 / 25 / 11 min / 7 |
+| 4 | off | 13 / 24 / 13 min / 16 | 12 / 25 / 12 min / 15 |
+| 5 | off | 17 / 16 / 9 min / 6 | 17 / 17 / 9 min / 6 |
+| 6 | off | 21 / 23 / 14 min / 9 | 16 / 27 / 18 min / 21 |
+| 7 | off | 13 / 28 / 10 min / 8 | 13 / 28 / 11 min / 8 |
+| 8 | off | 17 / 17 / 14 min / 8 | 17 / 18 / 12 min / 8 |
+| 9 | off | 15 / 26 / 9 min / 5 | 15 / 26 / 9 min / 6 |
+| 10 | off | 17 / 22 / 11 min / 11 | 17 / 22 / 17 min / 12 |
+| 11 | off | 13 / 27 / 12 min / 11 | 13 / 26 / 12 min / 13 |
+| 12 | off | 16 / 17 / 25 min / 21 **FAIL** | 17 / 15 / 10 min / 5 |
+| 1 | moderate | 16 / 18 / 16 min / 13 | 17 / 20 / 13 min / 13 |
+| 2 | moderate | 16 / 23 / 12 min / 6 | 16 / 23 / 13 min / 13 |
+| 3 | moderate | 16 / 24 / 17 min / 14 | 17 / 23 / 17 min / 16 |
+| 4 | moderate | 12 / 25 / 12 min / 16 | 12 / 25 / 12 min / 14 |
+| 5 | moderate | 16 / 18 / 15 min / 6 | 16 / 16 / 15 min / 13 |
+| 6 | moderate | 19 / 16 / 15 min / 23 | 19 / 17 / 15 min / 27 |
+| 7 | moderate | 14 / 22 / 12 min / 6 | 14 / 22 / 12 min / 6 |
+| 8 | moderate | 20 / 22 / 10 min / 6 | 19 / 23 / 14 min / 15 |
+| 9 | moderate | 14 / 25 / 10 min / 14 | 15 / 23 / 17 min / 14 |
+| 10 | moderate | 17 / 21 / 9 min / 4 | 17 / 21 / 9 min / 4 |
+| 11 | moderate | 13 / 26 / 11 min / 3 | 13 / 25 / 12 min / 3 |
+| 12 | moderate | 14 / 17 / 19 min / 42 | 16 / 22 / 12 min / 12 |
+| total | | 376 / 528 / - / 270; fails 1, stalls 0 | 376 / 534 / - / 274; fails 0, stalls 0 |
+
+Totals: cdcd09b 376 / 528 / 270, 1 failing; now **376 / 534 / 274, 0 failing, 0 stalls**. Landings equal, departures 6 more, safety events 4 more (274 against 270: chance level, the 48-run mean is below the baseline's). Go-arounds **41** against 58, the most by one aircraft **3** against 4. 48 runs (seeds 1-24): mean wait at the hold 179 s (baseline 180 s), runs with a wait over 12 minutes 11 (baseline 15); 3 failing runs, all in seeds 13-24 (16 and 20 moderate: stalls; 24 moderate: 23 min), the unperturbed baseline has 2 and the same tree with another AI seed 5. The blocked-transmission protocol was not re-run (pilot timing is unchanged; the figures of the first round stand).

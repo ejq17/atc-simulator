@@ -20,7 +20,7 @@ import { createClearanceAgent } from './clnc';
 import type { ClearanceStore } from './clnc';
 import { closedTaxiways } from '../sim/airportOps';
 import { HOLD_START_SNAP_M } from '../sim/groundMovement';
-import { aheadInCrossingQueue, blockedBeforeHold, busyHoldIds, landingExitHoldIds, pushbackBlockedBy, etaToThresholdSec, holdNodeAt, interactingRunways, nextProgressiveSegment, opposingTraffic, pendingIntermediateStops, planDeparture, planParking, remainingRouteM, routePassesNear, starvingDeparture, taxiStartNode } from './world';
+import { DEPARTURE_WAIT_BOUND_SEC, aheadInCrossingQueue, blockedBeforeHold, busyHoldIds, landingExitHoldIds, pushbackBlockedBy, etaToThresholdSec, holdNodeAt, interactingRunways, nextProgressiveSegment, opposingTraffic, outranks, pendingIntermediateStops, planDeparture, planParking, remainingRouteM, routePassesNear, starvingDeparture, taxiStartNode } from './world';
 import { holdTooShort } from '../sim/holdSelection';
 import { resolveHeadOn } from './headOn';
 import * as say from './phrase';
@@ -31,6 +31,12 @@ const HANDOFF_WITHIN_M = 400;
 export const GROUND_PATIENCE_SEC = Infinity;
 /** A taxi request that has waited this long (s) is answered although an aircraft stands still on the route (the nose-to-nose resolution takes over if they meet). DESIGN VALUE. */
 export const STOPPED_PATIENCE_SEC = Infinity;
+/**
+ * A taxi request that has waited this long (s) is answered although an aircraft stands still on the route (the head-on resolution of ai/headOn.ts then runs if they meet):
+ * the fairness bound of the lanes (`DEPARTURE_WAIT_BOUND_SEC`, 8 minutes) applies to the aircraft that waits, whatever stands in its way (soak: a GA departure ready for 27 minutes
+ * while arrivals bound for the same ramp stopped on its lane one after another, seeds 10 and 12). DESIGN VALUE.
+ */
+export const OVERDUE_IGNORE_STOPPED_SEC = DEPARTURE_WAIT_BOUND_SEC;
 /** Pushback is held while another aircraft's remaining route passes within this distance of the stand (DESIGN VALUE: the lead-in plus a tug and tail). */
 const PUSHBACK_LANE_CLEAR_M = 90;
 /** A second aircraft is not released onto a route within this distance of a freshly released one for this long. */
@@ -109,7 +115,7 @@ export function createGroundAgent(store: ClearanceStore): Agent {
       const waited = v.now - (ac.pendingRequest?.sinceSec ?? v.now);
       if (waited >= GROUND_PATIENCE_SEC) return undefined;
       // after STOPPED_PATIENCE_SEC an aircraft that merely stands on the route is no reason to go on waiting: it is stuck too (see `opposingTraffic`, ignoreStopped)
-      return opposingTraffic(state, nodeIds, ac.id, { ignoreStopped: opts.ignoreStopped ?? waited >= STOPPED_PATIENCE_SEC, ignoreStoppedAhead: opts.ignoreStoppedAhead ?? true });
+      return opposingTraffic(state, nodeIds, ac.id, { ignoreStopped: opts.ignoreStopped ?? (waited >= STOPPED_PATIENCE_SEC || (ac.isDeparture && waited >= OVERDUE_IGNORE_STOPPED_SEC)), ignoreStoppedAhead: opts.ignoreStoppedAhead ?? true });
     };
     // Delivery closed (nobody works CLNC): Ground issues the clearance too.
     if (!v.staffed.has('CLNC')) plans.push(...clearanceAgent(v));
@@ -243,6 +249,12 @@ export function createGroundAgent(store: ClearanceStore): Agent {
       if (ac.isDeparture && !isVehicleType(ac.type) && !isRotorcraftType(ac.type) && (ac.phase === 'READY' || ac.phase === 'PARKED') && pending === 'TAXI' && !hasActive(ac, 'TAXI')) {
         const needsIfr = ac.flightPlan?.flightRules === 'IFR' && !ac.flightPlan.ifrClearance;
         if (needsIfr || !taxiFollowOk(v, ac)) continue;
+        // A departure that waited past the fairness bound is served before the ones that called after it: while it could be sent now (a hold with room, nothing opposing on its
+        // route) the others do not take the place (soak seed 10: a GA departure ready at the ramp for 27 minutes while eleven later ones took every free place at the hold of 22).
+        const overdueFirst = v.onFrequency.some((o) => o.id !== ac.id && o.isDeparture && !isVehicleType(o.type) && !isRotorcraftType(o.type) && (o.phase === 'READY' || o.phase === 'PARKED') && o.pendingRequest?.kind === 'TAXI'
+          && !hasActive(o, 'TAXI') && starvingDeparture(state, o) && outranks(state, o, ac) && !(o.flightPlan?.flightRules === 'IFR' && !o.flightPlan.ifrClearance)
+          && (() => { const od = planDeparture(airport, o, state.activeRunways.departing, busyHoldIds(state, o.id), closedTaxiways(state)); return !!od && !opposing(o, od.nodeIds); })());
+        if (overdueFirst) continue;
         const dep = planDeparture(airport, ac, state.activeRunways.departing, busyHoldIds(state, ac.id), closedTaxiways(state));
         if (!dep || opposing(ac, dep.nodeIds)) continue;
         plans.push({

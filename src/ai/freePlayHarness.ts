@@ -4,6 +4,8 @@ import { createEngine } from '../sim/engine';
 import { game } from '../game/game';
 import { createAiControllers } from './index';
 import type { Aircraft, SimEvent } from '../sim/types';
+import { holdNodeAt } from './world';
+import { findRunwayEnd } from '../sim/runways';
 
 const kacy = loadKacy();
 
@@ -24,6 +26,8 @@ export interface SoakResult {
   noseToNose: number;
   /** Seconds each departure stood at a runway hold line (HOLDING_SHORT) before it was lined up or cleared. */
   holdWaitsSec: number[];
+  /** Seconds each departure waited at the hold line of its own departure runway, from the first second it stood there until its takeoff clearance (a crossing wait at another runway's hold line does not count). */
+  towerWaitsSec: number[];
   goArounds: number;
   /** The most go-arounds one aircraft flew in the run, and who. */
   maxGoArounds: { count: number; callsign: string };
@@ -78,11 +82,12 @@ export function runFreePlaySoak(seed: number, realism: Realism, simHours: number
   const landedIds = new Set<string>();
   const departedIds = new Set<string>();
   const phaseSince = new Map<string, { phase: string; since: number }>();
-  const res: SoakResult = { rows: [], landed: [], departed: [], msPerSimSec: [], maxWaitSec: 0, maxWaitText: '', safety: [], finalCount: 0, events, stubPairs: [], noseToNose: 0, holdWaitsSec: [], goArounds: 0, maxGoArounds: { count: 0, callsign: '' }, spawnedArrivals: 0, spawnedDepartures: 0, longWaits: [], exitHolds: {} };
+  const res: SoakResult = { rows: [], landed: [], departed: [], msPerSimSec: [], maxWaitSec: 0, maxWaitText: '', safety: [], finalCount: 0, events, stubPairs: [], noseToNose: 0, holdWaitsSec: [], towerWaitsSec: [], goArounds: 0, maxGoArounds: { count: 0, callsign: '' }, spawnedArrivals: 0, spawnedDepartures: 0, longWaits: [], exitHolds: {} };
   const pairs = new Map<string, string>();
   const pairSince = new Map<string, number>();
   const waitLog: { sec: number; text: string }[] = [];
   const spawnedIds = new Set<string>();
+  const towerSince = new Map<string, number>();
   const total = Math.round(simHours * 3600);
   let wall0 = performance.now();
   let lastMove = 0;
@@ -117,6 +122,15 @@ export function runFreePlaySoak(seed: number, realism: Realism, simHours: number
       for (const k of [...pairSince.keys()]) if (!nowPairs.has(k)) pairSince.delete(k);
     }
     for (const a of Object.values(s.aircraft)) {
+      if (a.isDeparture && a.onGround) {
+        if (a.phase === 'HOLDING_SHORT' || a.phase === 'LINE_UP_AND_WAIT') {
+          const rid = findRunwayEnd(kacy, a.assignedRunwayEnd)?.runway.id;
+          if (!towerSince.has(a.id) && rid && holdNodeAt(kacy, a)?.runwayId === rid) towerSince.set(a.id, now);
+        } else if ((a.phase === 'CLEARED_FOR_TAKEOFF' || a.phase === 'TAKEOFF_ROLL') && towerSince.has(a.id)) {
+          res.towerWaitsSec.push(now - towerSince.get(a.id)!);
+          towerSince.delete(a.id);
+        }
+      }
       if (!spawnedIds.has(a.id)) { spawnedIds.add(a.id); if (a.isDeparture) res.spawnedDepartures++; else res.spawnedArrivals++; }
       const ps = phaseSince.get(a.id);
       if (!ps || ps.phase !== a.phase) {

@@ -19,9 +19,10 @@ import { distanceToFixNm, findNavFix } from '../sim/navigation';
 import { getPerformance } from '../sim/performance';
 import { findStar, starBeforeIaf } from '../sim/star';
 import { frequencyForPosition } from '../radio/frequencies';
-import { hasActive, mkCmd } from './core';
+import { hasActive, lastClearance, mkCmd } from './core';
+import { GAP_HOLD_DELAY_SEC } from './gap';
 import type { Agent, AgentView, Plan } from './core';
-import { distToThresholdNm, inboundSpeedKt, isInboundArrival, projectedGapNm } from './world';
+import { distToThresholdNm, holdNodeAt, inboundSpeedKt, isInboundArrival, projectedGapNm } from './world';
 import { ARRIVAL_RUNWAY_GAP_SEC } from './tower';
 import * as say from './phrase';
 
@@ -152,6 +153,20 @@ function leaderOf(v: AgentView, ac: Aircraft, g: RunwayEndGeom): { leader: Aircr
   return best;
 }
 
+/**
+ * The published hold-in-lieu the aircraft can still be sent to: a fix it has not reached (more than 2 nm ahead) on the remaining route of the approach it is
+ * working. Used to hold an arrival behind another one (below) and to hold one for a departure gap (`gapActions.ts`).
+ */
+export function publishedHoldFor(v: AgentView, ac: Aircraft): { fix: string; turns?: 'left' | 'right' } | undefined {
+  const choice = chooseApproach(v, ac);
+  if (!choice?.info || !ac.nav) return undefined;
+  const remaining = ac.nav.fixes.slice(ac.nav.index);
+  const hold = choice.info.procedure.holdingPatterns?.find(
+    (h) => h.role === 'hold_in_lieu' && remaining.some((f) => (findNavFix(v.airport, f)?.id ?? f).toUpperCase() === h.fix.toUpperCase()) && (distanceToFixNm(v.airport, ac.pos, h.fix) ?? 0) > 2,
+  );
+  return hold ? { fix: hold.fix, turns: hold.turns } : undefined;
+}
+
 export function createApproachAgent(handleDepartures: (v: AgentView) => boolean): Agent {
   const departures = createDepartureAgent();
   return (v) => {
@@ -248,7 +263,10 @@ export function createApproachAgent(handleDepartures: (v: AgentView) => boolean)
       const fafAlt = fafAltitudeFt(airport, choice.info);
       const dFaf = choice.info?.faf ? distanceToFixNm(airport, ac.pos, choice.info.faf.id) : undefined;
       const tooHigh = fafAlt !== undefined && dFaf !== undefined && tooHighForFaf(ac.altitudeFt - fafAlt, dFaf);
-      if (gapOk && !tooHigh && assessClearanceSafety(v.state, clearance).safe) {
+      // An arrival held for a departure gap (`gapActions.ts`: the hold is the later approach clearance) is cleared when the hold has run its planned time.
+      const gapHeld = phase === 'HOLDING' && mem.notes.has(`gaphold:${ac.id}`) && v.now < (lastClearance(ac, 'HOLD_AT_FIX')?.issuedAtSec ?? v.now) + GAP_HOLD_DELAY_SEC
+        && (v.state.coordination?.requests ?? []).some((r) => r.topic === 'GAP' && r.status === 'approved');
+      if (gapOk && !gapHeld && !tooHigh && assessClearanceSafety(v.state, clearance).safe) {
         plans.push({
           key: `${ac.id}:approach`, aircraftId: ac.id, callsign: ac.callsign, priority: 55, cooldownSec: 20, cmds: [clearance],
           phrase: say.clauses(say.callsign(ac), say.clearedApproach(choice.type, choice.end.end.id)),
@@ -272,10 +290,7 @@ export function createApproachAgent(handleDepartures: (v: AgentView) => boolean)
       const speedsExhausted = fixing === undefined;
       const tryHold = lead.gapNm < ARRIVAL_SPACING_NM - 1.5 || (speedsExhausted && !slowAvailable && proj!.atLeaderThresholdNm < need - HOLD_SHORTFALL_NM);
       if (tryHold && choice.info && ac.nav) {
-        const remaining = ac.nav.fixes.slice(ac.nav.index);
-        const hold = choice.info.procedure.holdingPatterns?.find(
-          (h) => h.role === 'hold_in_lieu' && remaining.some((f) => (findNavFix(airport, f)?.id ?? f).toUpperCase() === h.fix.toUpperCase()) && (distanceToFixNm(airport, ac.pos, h.fix) ?? 0) > 2,
-        );
+        const hold = publishedHoldFor(v, ac);
         if (hold) {
           plans.push({
             key: `${ac.id}:hold:${hold.fix}`, aircraftId: ac.id, callsign: ac.callsign, priority: 45, once: true,
@@ -305,6 +320,20 @@ export function createDepartureAgent(): Agent {
     const plans: Plan[] = [];
     const { airport } = v;
     for (const ac of v.onFrequency) {
+      // A departure still on the ground that took another aircraft's frequency change (a similar callsign read back by the wrong pilot: soak seed 12, NKS603 stood ready
+      // at the hold of 22 on Departure's frequency for 40 minutes, nobody answered it): Departure sends it back, to Tower when it is at a runway, else to Ground.
+      if (ac.isDeparture && ac.onGround && ac.radioState !== 'TRANSMITTING' && v.settled(ac) >= 4) {
+        const at = holdNodeAt(airport, ac, 60) || ac.pendingRequest?.kind === 'DEPARTURE';
+        const back = frequencyForPosition(airport, at && v.staffed.has('TWR') ? 'TWR' : 'GND') ?? frequencyForPosition(airport, 'TWR') ?? frequencyForPosition(airport, 'GND');
+        if (back) {
+          plans.push({
+            key: `${ac.id}:misrouted-from-dep`, aircraftId: ac.id, callsign: ac.callsign, priority: 54, cooldownSec: 60,
+            cmds: [mkCmd('CONTACT_FREQUENCY', ac, { frequencyId: back.id })],
+            phrase: say.contact(ac, airport, back.id, back.mhz), summary: `${ac.callsign} is on the ground, back to ${back.id}`,
+          });
+        }
+        continue;
+      }
       if (!ac.isDeparture || ac.onGround || ac.radioState === 'TRANSMITTING') continue;
       if (ac.phase !== 'INITIAL_CLIMB' && ac.phase !== 'DEPARTURE') continue;
       const ready = ac.pendingRequest !== undefined || v.settled(ac) >= 4;

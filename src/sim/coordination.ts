@@ -18,6 +18,15 @@
  *  - 5-4-3 METHODS / 5-4-7 POINT OUT: "POINT OUT (aircraft position), (aircraft ID), (altitude, restrictions, ...)"; answers "POINT OUT
  *    APPROVED", "TRAFFIC OBSERVED" or "UNABLE (...)". The transferring controller keeps communications and responsibility for the aircraft.
  *
+ *  - GAP (a departure gap, Tower to Approach): no paragraph of the order names such a request. What the order does say is 3-8-1 (the tower
+ *    controller "establish[es] the sequence of arriving and departing aircraft by requiring them to adjust flight or ground operation, as
+ *    necessary, to achieve proper spacing"), 3-9-5 (takeoff clearance need not be withheld until separation exists when there is reasonable
+ *    assurance it will exist when the roll starts), 2-1-14 (before an instruction that changes an aircraft's heading, route, speed or altitude
+ *    the controller must ensure the coordination with every controller whose area is affected: Tower cannot slow Approach's arrival by itself),
+ *    4-3-4 (departure restrictions "to restrict or regulate the departure flow") and 5-7-1 / 5-6-1 (the tools Approach builds the gap with:
+ *    speed adjustments kept to the minimum necessary, vectors). The request and its answer are plain words: a letter of agreement or facility
+ *    directive (JO 7210.3 4-3-1) is where the real facilities fix them. The Pilot/Controller Glossary has no GAP entry (checked 2026-10-19).
+ *
  * Not in the FAA text (plain words, flagged `standard: false`): the Ground-to-Tower request wording, "stand by", "rolling", "going around",
  * "traffic" information between positions, and the "crossing complete" wording (3-1-3 only requires that the advice happen).
  */
@@ -53,6 +62,10 @@ export const COORDINATION_DESIGN = {
   releaseSpacingSec: 45,
   /** A departure that still waits at the hold asks for its release again when the one it holds has this long left (s), so that Departure's answer arrives before the old one lapses (4-3-4 extends no time limit; the release is the LOA's). DESIGN VALUE. */
   releaseRenewBeforeSec: 20,
+  /** An approved departure-gap request stays valid this long (s): the time Approach has to build the gap for the departure that waits at the hold. DESIGN VALUE. */
+  gapTtlSec: 360,
+  /** Tower does not repeat a refused (or lapsed) gap request for the same departure before this long (s). DESIGN VALUE. */
+  gapRetrySec: 120,
 } as const;
 
 /** Where each rule comes from (shown with a coordination error and in the debrief). */
@@ -60,6 +73,7 @@ export const COORDINATION_REFERENCES = {
   crossing: '7110.65 3-1-3 Use of Active Runways',
   release: '7110.65 4-3-4 Departure Release (and the letter of agreement)',
   pointOut: '7110.65 5-4-7 Point Out',
+  gap: '7110.65 3-8-1 Sequence/Spacing Application, 3-9-5 Anticipating Separation, 2-1-14 Coordinate Use of Airspace (a gap request is not phraseology of the order)',
   exit: '7110.65 3-1-4 Coordination Between Local and Ground Controllers (exchange information as necessary for the safe and efficient use of runways and movement areas); 3-10-9 Runway Exiting',
 } as const;
 
@@ -67,7 +81,7 @@ export const COORDINATION_REFERENCES = {
 // Types
 // ---------------------------------------------------------------------------
 
-export type CoordTopic = 'CROSSING' | 'RELEASE' | 'POINT_OUT' | 'EXIT';
+export type CoordTopic = 'CROSSING' | 'RELEASE' | 'POINT_OUT' | 'EXIT' | 'GAP';
 export type CoordStatus = 'pending' | 'standby' | 'approved' | 'denied' | 'rescinded' | 'expired' | 'used' | 'completed';
 export type CoordSource = 'player' | 'ai' | 'system';
 
@@ -76,6 +90,7 @@ export type CoordMessageKind =
   | 'RELEASE_REQUEST' | 'RELEASED' | 'HOLD_FOR_RELEASE' | 'RELEASE_STANDBY'
   | 'POINT_OUT' | 'POINT_OUT_APPROVED' | 'POINT_OUT_UNABLE' | 'TRAFFIC_OBSERVED'
   | 'EXIT_REQUEST' | 'EXIT_APPROVED' | 'EXIT_UNABLE'
+  | 'GAP_REQUEST' | 'GAP_APPROVED' | 'GAP_UNABLE' | 'GAP_STANDBY'
   | 'ROLLING' | 'GOING_AROUND' | 'TRAFFIC' | 'TEXT';
 
 export interface CoordRequest {
@@ -96,6 +111,10 @@ export interface CoordRequest {
   exitSide?: 'left' | 'right';
   /** EXIT: "hold short of runway N after landing": the intersecting runway id ("13/31"). */
   holdShortRunwayId?: string;
+  /** GAP: how many departures wait for the gap (the request is made for the first, `aircraftId`). */
+  departures?: number;
+  /** GAP: the departure runway end ("22"): the request names the end, not the runway ("4/22"). */
+  runwayEnd?: string;
   /** POINT_OUT: position of the target relative to a fix ("two miles west of Cedar Lake") and altitude. */
   positionText?: string;
   altitudeFt?: number;
@@ -108,7 +127,7 @@ export interface CoordRequest {
   approvedSec?: number;
   /** An approval is not valid after this time. */
   expiresSec?: number;
-  /** "After the landing Spirit": the approval is for after this aircraft has landed and cleared the runway (callsign + id). */
+  /** "After the landing Spirit": the approval is for after this aircraft has landed and cleared the runway (callsign + id). GAP: the gap Approach builds follows this arrival. */
   afterCallsign?: string;
   afterAircraftId?: string;
   reason?: string;
@@ -281,7 +300,7 @@ export function describeMessage(
   m: {
     from: ControllerPositionId; to: ControllerPositionId; spokenCallsign?: string; runwayId?: string; point?: string; afterCallsign?: string;
     afterSpoken?: string; reason?: string; positionText?: string; altitudeFt?: number; extra?: string;
-    exitSide?: 'left' | 'right'; holdShortRunwayId?: string;
+    exitSide?: 'left' | 'right'; holdShortRunwayId?: string; departures?: number; runwayEnd?: string;
   },
 ): Said {
   const head = addressee(m.to, m.from);
@@ -319,6 +338,23 @@ export function describeMessage(
     }
     case 'EXIT_UNABLE':
       return say(`unable${m.reason ? `, ${m.reason}` : ''}`, `unable${m.reason ? `, ${m.reason}` : ''}`, false, '3-1-4 (plain words)');
+    case 'GAP_REQUEST': {
+      const n = m.departures ?? 1;
+      const forWhat = n > 1 ? `${n === 2 ? 'two' : n === 3 ? 'three' : String(n)} departures` : 'a departure';
+      const forWhatT = n > 1 ? `${n} departures` : 'a departure';
+      const gapRwyT = m.runwayEnd ? `runway ${m.runwayEnd.replace(/^0/, '')}` : rwyT;
+      const gapRwyS = m.runwayEnd ? `runway ${spokenRunway(m.runwayEnd)}` : rwyS;
+      return say(`need a gap for ${forWhatT} ${gapRwyT}`, `need a gap for ${forWhat} ${gapRwyS}`, false, '3-8-1 / 3-9-5 / 2-1-14 (a gap request is not phraseology of the order)');
+    }
+    case 'GAP_APPROVED': {
+      const after = m.afterCallsign ? `gap after ${m.afterSpoken ?? m.afterCallsign}` : 'gap available now';
+      const afterT = m.afterCallsign ? `gap after ${m.afterCallsign}` : 'gap available now';
+      return say(afterT, after, false, '3-8-1 / 5-7-1 (the answer is plain words)');
+    }
+    case 'GAP_UNABLE':
+      return say(`unable${m.reason ? `, ${m.reason}` : ''}`, `unable${m.reason ? `, ${m.reason}` : ''}`, false, '3-8-1 (plain words)');
+    case 'GAP_STANDBY':
+      return say(`stand by${m.reason ? `, ${m.reason}` : ''}`, `stand by${m.reason ? `, ${m.reason}` : ''}`, false);
     case 'RELEASE_REQUEST':
       return say(`request release ${cs}`, `request release ${cs}`, false, '4-3-4 / LOA (the request wording is not prescribed)');
     case 'RELEASED':
@@ -401,6 +437,9 @@ export interface RequestInput {
   altitudeFt?: number;
   /** POINT_OUT: restrictions / other pertinent information. */
   extra?: string;
+  /** GAP: the number of departures that wait for the gap, and the runway end they depart from. */
+  departures?: number;
+  runwayEnd?: string;
   /** RELEASE: ask again while the current release is about to lapse (a second request; the current release stays valid until it lapses or is used). */
   renew?: boolean;
   source: CoordSource;
@@ -423,7 +462,7 @@ export function coordRequest(ctx: SimContext, input: RequestInput): CoordRequest
     open.asks++;
     open.lastAskSec = now;
     if (input.point) open.point = input.point;
-    post(ctx, kindOfRequest(open.topic), open.from, open.to, input.source, open, describeMessage(kindOfRequest(open.topic), { from: open.from, to: open.to, spokenCallsign: ac.spokenCallsign, runwayId: open.runwayId, point: open.point, positionText: open.positionText, altitudeFt: open.altitudeFt, extra: input.extra, exitSide: open.exitSide, holdShortRunwayId: open.holdShortRunwayId }));
+    post(ctx, kindOfRequest(open.topic), open.from, open.to, input.source, open, describeMessage(kindOfRequest(open.topic), { from: open.from, to: open.to, spokenCallsign: ac.spokenCallsign, runwayId: open.runwayId, point: open.point, positionText: open.positionText, altitudeFt: open.altitudeFt, extra: input.extra, exitSide: open.exitSide, holdShortRunwayId: open.holdShortRunwayId, departures: open.departures, runwayEnd: open.runwayEnd }));
     return open;
   }
   if (ctx.dryRun) return undefined;
@@ -431,16 +470,16 @@ export function coordRequest(ctx: SimContext, input: RequestInput): CoordRequest
     id: `cr-${++c.seq}`, topic: input.topic, from: input.from, to: input.to, aircraftId: ac.id, callsign: ac.callsign, spokenCallsign: ac.spokenCallsign,
     runwayId, point: input.point ?? (runwayId && input.topic === 'CROSSING' ? crossingPointFor(state, ac, runwayId) : undefined),
     exitSide: input.exitSide, holdShortRunwayId: input.holdShortRunwayId ? findRunway(state.airport, input.holdShortRunwayId)?.id ?? input.holdShortRunwayId : undefined,
-    positionText: input.positionText, altitudeFt: input.altitudeFt, createdSec: now, lastAskSec: now, asks: 1, status: 'pending', source: input.source,
+    positionText: input.positionText, altitudeFt: input.altitudeFt, departures: input.topic === 'GAP' ? Math.max(1, Math.round(input.departures ?? 1)) : undefined, runwayEnd: input.topic === 'GAP' ? input.runwayEnd : undefined, createdSec: now, lastAskSec: now, asks: 1, status: 'pending', source: input.source,
     ...(renewing ? { renewalOf: open.id } : {}),
   };
   c.requests.push(req);
   const kind = kindOfRequest(req.topic);
-  post(ctx, kind, req.from, req.to, input.source, req, describeMessage(kind, { from: req.from, to: req.to, spokenCallsign: ac.spokenCallsign, runwayId: req.runwayId, point: req.point, positionText: req.positionText, altitudeFt: req.altitudeFt, extra: input.extra, exitSide: req.exitSide, holdShortRunwayId: req.holdShortRunwayId }));
+  post(ctx, kind, req.from, req.to, input.source, req, describeMessage(kind, { from: req.from, to: req.to, spokenCallsign: ac.spokenCallsign, runwayId: req.runwayId, point: req.point, positionText: req.positionText, altitudeFt: req.altitudeFt, extra: input.extra, exitSide: req.exitSide, holdShortRunwayId: req.holdShortRunwayId, departures: req.departures, runwayEnd: req.runwayEnd }));
   return req;
 }
 
-const kindOfRequest = (t: CoordTopic): CoordMessageKind => (t === 'CROSSING' ? 'CROSS_REQUEST' : t === 'RELEASE' ? 'RELEASE_REQUEST' : t === 'EXIT' ? 'EXIT_REQUEST' : 'POINT_OUT');
+const kindOfRequest = (t: CoordTopic): CoordMessageKind => (t === 'CROSSING' ? 'CROSS_REQUEST' : t === 'RELEASE' ? 'RELEASE_REQUEST' : t === 'EXIT' ? 'EXIT_REQUEST' : t === 'GAP' ? 'GAP_REQUEST' : 'POINT_OUT');
 
 export interface RespondOptions {
   by: ControllerPositionId;
@@ -497,6 +536,16 @@ export function coordRespond(ctx: SimContext, requestId: string, answer: CoordAn
         apply('approved', 'EXIT_APPROVED', { point: o.exitTaxiway ?? req.point, exitSide: o.exitSide ?? req.exitSide });
       } else if (answer === 'deny') apply('denied', 'EXIT_UNABLE');
       else apply('standby', 'TEXT', { extra: 'stand by' });
+      break;
+    case 'GAP':
+      if (answer === 'approve') {
+        req.approvedSec = now;
+        req.expiresSec = now + COORDINATION_DESIGN.gapTtlSec;
+        req.afterAircraftId = after?.id;
+        req.afterCallsign = after?.callsign;
+        apply('approved', 'GAP_APPROVED', { afterCallsign: after?.callsign, afterSpoken: after?.spokenCallsign });
+      } else if (answer === 'deny') apply('denied', 'GAP_UNABLE');
+      else apply('standby', 'GAP_STANDBY');
       break;
     case 'POINT_OUT':
       if (answer === 'approve') {
@@ -571,11 +620,12 @@ export function updateCoordination(ctx: SimContext): void {
     switch (r.status) {
       case 'pending':
       case 'standby':
-        if (!ac || now - r.lastAskSec > COORDINATION_DESIGN.openRequestTimeoutSec) r.status = 'expired';
+        if (!ac || now - r.lastAskSec > COORDINATION_DESIGN.openRequestTimeoutSec || (r.topic === 'GAP' && ac.phase !== 'HOLDING_SHORT' && ac.phase !== 'LINE_UP_AND_WAIT' && ac.phase !== 'READY' && ac.phase !== 'TAXIING')) r.status = 'expired';
         break;
       case 'approved':
         if (!ac) r.status = 'expired';
         else if (r.topic === 'EXIT' && ((ac.onGround && ac.phase !== 'ROLLOUT' && ac.phase !== 'LANDING') || ac.phase === 'GO_AROUND')) r.status = 'completed'; // landed and clear, or sent around: nothing left to arrange
+        else if (r.topic === 'GAP' && ac.phase !== 'HOLDING_SHORT' && ac.phase !== 'LINE_UP_AND_WAIT' && ac.phase !== 'READY' && ac.phase !== 'TAXIING') r.status = 'completed'; // the departure has its takeoff clearance: the gap was used
         else if (r.topic === 'CROSSING' && r.afterAircraftId && !afterAircraftClear(state, r)) {
           r.expiresSec = now + COORDINATION_DESIGN.crossingApprovalTtlSec; // "behind the landing X": the interval starts when X is clear
         } else if (r.expiresSec !== undefined && now >= r.expiresSec) {

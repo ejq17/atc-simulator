@@ -9,7 +9,7 @@
 import type { Aircraft, Airport } from '../sim/types';
 import { AIRBORNE_PROXIMITY_NM, assessClearanceSafety, departureTrailConflict, landedDistanceExceptionApplies, precedingArrivalBlockers, srsMinimumFt } from '../sim/conflicts';
 import { projectArrival, timeToThreshold } from '../sim/runwayTiming';
-import { COORDINATION_DESIGN, findOpenRequest, releaseNeeded, validApproval } from '../sim/coordination';
+import { COORDINATION_DESIGN, findOpenRequest, releaseNeeded, sameController, validApproval } from '../sim/coordination';
 import { findRunwayEnd, isOnFinal } from '../sim/runways';
 import type { RunwayEndGeom } from '../sim/runways';
 import { frequencyForPosition } from '../radio/frequencies';
@@ -20,6 +20,7 @@ import { stoppedExitOptionsFor } from '../sim/runwayStop';
 import { getPerformance } from '../sim/performance';
 import { holdTooShort } from '../sim/holdSelection';
 import { hasActive, landingHoldShort, lastClearance, mkCmd } from './core';
+import { GAP_REQUEST_WAIT_SEC, GAP_USABLE_WITHIN_SEC, usableWindowSec } from './gap';
 import { arrivalWindow, isSequenceable, patternLeg, sequenceDownwind, turnsBaseSoon } from './sequence';
 import type { SeqWindow } from './sequence';
 import type { Agent, AgentView, Plan } from './core';
@@ -335,7 +336,7 @@ export function createTowerAgent(): Agent {
     }
     queue.sort((a, b) => (isLinedUp(a.ac) === isLinedUp(b.ac) ? a.since - b.since : isLinedUp(a.ac) ? -1 : 1));
     const firstPerRunway = new Set<string>();
-    for (const { ac, g } of queue) {
+    for (const { ac, g, since } of queue) {
       if (firstPerRunway.has(g.runway.id)) continue;
       firstPerRunway.add(g.runway.id);
       // A follower that would overtake a slower departure on the same track (5-8-3) is given a departure heading that diverges from it (5-8-2, DIVERGE_TURN_DEG), as a
@@ -346,6 +347,28 @@ export function createTowerAgent(): Agent {
       const ifr = ac.flightPlan?.flightRules === 'IFR';
       const relPos = releaseNeeded(state, 'TWR', ac);
       const takeoffOk = safe(takeoff) && slack >= 0 && !(ifr && !ac.flightPlan?.ifrClearance && state.scenario.mode === 'training');
+      // A departure that has waited at the hold with no usable window in the arrival stream: ask Approach for a gap (see gap.ts: 3-8-1 / 3-9-5 / 2-1-14).
+      if (ac.phase === 'HOLDING_SHORT' && !takeoffOk && v.now - since >= GAP_REQUEST_WAIT_SEC && v.staffed.has('APP') && !sameController(state, 'TWR', 'APP')) {
+        const open = findOpenRequest(state, 'GAP', ac.id);
+        const last = [...(state.coordination?.requests ?? [])].reverse().find((r) => r.topic === 'GAP' && r.aircraftId === ac.id);
+        const retryOk = !last || last.status === 'pending' || last.status === 'standby' || last.status === 'approved' ? true : v.now - last.createdSec >= COORDINATION_DESIGN.gapRetrySec;
+        const askNow = !open ? retryOk : open.status === 'pending' && v.now - open.lastAskSec >= COORDINATION_DESIGN.reaskIntervalSec;
+        if (askNow && usableWindowSec(state, airport, g, ac, false) > GAP_USABLE_WITHIN_SEC) {
+          const waiting = queue.filter((q) => q.g.runway.id === g.runway.id && q.ac.phase === 'HOLDING_SHORT').length;
+          plans.push({
+            key: `${ac.id}:gap-ask:${open?.id ?? 'new'}:${open?.asks ?? 0}`, aircraftId: ac.id, callsign: ac.callsign, priority: 62, cmds: [],
+            phrase: { text: '', spoken: '' }, cooldownSec: 20, summary: `${ac.callsign}: asking Approach for a gap, runway ${g.end.id}`,
+            coord: {
+              to: 'APP',
+              run: (api) => {
+                const req = api.request({ topic: 'GAP', from: 'TWR', to: 'APP', aircraftId: ac.id, runwayId: g.runway.id, runwayEnd: g.end.id, departures: Math.min(3, Math.max(1, waiting)), source: 'ai' });
+                const msgs = state.coordination?.messages ?? [];
+                return req ? [...msgs].reverse().find((m) => m.requestId === req.id) : undefined;
+              },
+            },
+          });
+        }
+      }
       // An aircraft that needs a release is not lined up before it has one: lined up, it blocks the runway for the arrivals behind it (they go around) while
       // Departure holds the release because of those go-arounds - a cycle (free-play soak, docs/PROGRESS.md). The release is asked for at the hold line as soon
       // as the line-up itself would be possible.
@@ -422,8 +445,11 @@ export function createTowerAgent(): Agent {
         if (!o.isDeparture || !o.onGround || (o.phase !== 'HOLDING_SHORT' && o.phase !== 'LINE_UP_AND_WAIT') || !rws.includes(findRunwayEnd(airport, o.assignedRunwayEnd)?.runway.id ?? '')) continue;
         const since = mem.notes.get(`hold:${o.id}`);
         // (a departure that holds its release has the next window at once: Departure released it for this gap, 4-3-4; the pattern traffic that can be delayed gives way, 3-8-1 / 3-9-5)
-        if (!validApproval(state, 'RELEASE', o.id) && (since === undefined || v.now - since < DEPARTURE_PRIORITY_WAIT_SEC)) continue;
-        depWindows.push({ start: 0, end: departureTimes(o, o.phase === 'LINE_UP_AND_WAIT').beyond6000 + RELEASE_MARGIN_SEC });
+        if (!validApproval(state, 'RELEASE', o.id) && !validApproval(state, 'GAP', o.id) && (since === undefined || v.now - since < DEPARTURE_PRIORITY_WAIT_SEC)) continue;
+        // (the window is as long as the takeoff clearance needs behind the slowest arrival: the lined-up departure of soak seed 13 stood on the runway for 8 minutes because the
+        // aircraft the sequencer let turn base were inside `neededEtaSec` when it was done, so every one of them went around - an F-16 and a Cessna five times)
+        const lined = o.phase === 'LINE_UP_AND_WAIT';
+        depWindows.push({ start: 0, end: Math.max(departureTimes(o, lined).beyond6000 + RELEASE_MARGIN_SEC, neededEtaSec(o, lined, 'C172', getPerformance('C172').approachSpeedKt)) });
         break;
       }
       for (const dec of sequenceDownwind(state, g, depWindows)) {

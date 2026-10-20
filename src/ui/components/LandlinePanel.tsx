@@ -21,6 +21,7 @@ export function useLandlineWaiting(): number {
 
 const answerLabels = (r: CoordRequest) =>
   r.topic === 'RELEASE' ? { yes: 'Released', no: 'Hold for release', wait: 'Stand by' }
+    : r.topic === 'GAP' ? { yes: 'Will build the gap', no: 'Unable', wait: 'Stand by' }
     : r.topic === 'POINT_OUT' ? { yes: 'Point out approved', no: 'Unable', wait: 'Stand by' }
       : { yes: 'Approve', no: 'Unable', wait: 'Stand by' };
 
@@ -29,7 +30,7 @@ function IncomingCard({ r }: { r: CoordRequest }) {
   const state = useSimState()!;
   const [after, setAfter] = useState('');
   const labels = answerLabels(r);
-  const cands = r.topic === 'CROSSING' ? afterCandidates(state) : [];
+  const cands = r.topic === 'CROSSING' || r.topic === 'GAP' ? afterCandidates(state) : [];
   return (
     <li data-testid="landline-incoming" data-request={r.id} className="border border-atc-amber/60 bg-atc-bg px-2 py-1.5">
       <div className="flex items-baseline justify-between gap-2">
@@ -43,11 +44,11 @@ function IncomingCard({ r }: { r: CoordRequest }) {
         {r.status !== 'standby' && <Btn size="xs" tone="amber" data-testid="landline-standby" onClick={() => session.answerRequest(r.id, 'standby')}>{labels.wait}</Btn>}
         {cands.length > 0 && (
           <span className="flex items-center gap-1">
-            <select aria-label="Approve behind the landing aircraft" className="h-6 border border-atc-border bg-atc-bg px-1 text-[10px]" value={after} onChange={(e) => setAfter(e.target.value)}>
-              <option value="">behind the landing…</option>
+            <select aria-label={r.topic === 'GAP' ? 'Gap after this arrival' : 'Approve behind the landing aircraft'} className="h-6 border border-atc-border bg-atc-bg px-1 text-[10px]" value={after} onChange={(e) => setAfter(e.target.value)}>
+              <option value="">{r.topic === 'GAP' ? 'gap after…' : 'behind the landing…'}</option>
               {cands.map((a) => <option key={a.id} value={a.id}>{a.callsign}</option>)}
             </select>
-            <Btn size="xs" tone="cyan" disabled={!after} data-testid="landline-approve-after" onClick={() => session.answerRequest(r.id, 'approve', { afterAircraftId: after })}>Approve after</Btn>
+            <Btn size="xs" tone="cyan" disabled={!after} data-testid="landline-approve-after" onClick={() => session.answerRequest(r.id, 'approve', { afterAircraftId: after })}>{r.topic === 'GAP' ? 'Gap after' : 'Approve after'}</Btn>
           </span>
         )}
       </div>
@@ -117,7 +118,7 @@ export function LandlinePanel() {
               {view.outgoing.length === 0 && quick.length === 0 && <li className="text-[11px] text-atc-muted">No open requests.</li>}
               {quick.map((q) => (
                 <li key={`${q.topic}-${q.aircraft.id}`}>
-                  <Btn size="xs" tone="cyan" data-testid="landline-quick" onClick={() => api?.request({ topic: q.topic, from: q.from, to: q.to, aircraftId: q.aircraft.id, runwayId: q.runwayId, source: 'player' })}>{q.label}</Btn>
+                  <Btn size="xs" tone="cyan" data-testid="landline-quick" onClick={() => api?.request({ topic: q.topic, from: q.from, to: q.to, aircraftId: q.aircraft.id, runwayId: q.runwayId, runwayEnd: q.runwayEnd, departures: q.departures, source: 'player' })}>{q.label}</Btn>
                 </li>
               ))}
               {view.outgoing.map((r) => (

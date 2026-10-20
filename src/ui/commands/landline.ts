@@ -14,6 +14,8 @@ import type { SimulationEngine } from '../../sim/api';
 import type { SimulationEngineExtras } from '../../sim/engineExtras';
 import type { Aircraft, ControllerPositionId, SimulationState } from '../../sim/types';
 import { awaitingAnswer, releasePosition, sameController, isStaffed } from '../../sim/coordination';
+import { findRunway } from '../../sim/runways';
+import { departuresAtHold } from '../lib/landline';
 import type { CoordRequest } from '../../sim/coordination';
 import { fixList, taxiwayNames } from './transmit';
 import type { ControllerSetup } from './transmit';
@@ -130,6 +132,23 @@ export function transmitLandline(input: LandlineInput): LandlineResult {
       });
       return req ? done(`Asked ${WORD[to]} to have ${ac!.callsign} ${[cmd.point || cmd.exitSide ? `exit${cmd.exitSide ? ` ${cmd.exitSide}` : ''}${cmd.point ? ` at ${cmd.point}` : ''}` : '', cmd.holdShortAfterLanding ? `hold short of runway ${cmd.runwayEnd ?? cmd.runwayId}` : ''].filter(Boolean).join(', ')}`, cmd, req.id) : fail('rejected', 'The request could not be made.', cmd);
     }
+    case 'REQUEST_GAP': {
+      // "Approach, Tower, need a gap for a departure runway two two": the request is made for the departure that has waited longest at that runway's hold.
+      if (to !== 'APP') return fail('rejected', 'A departure gap is asked of Approach.', cmd);
+      const rw = cmd.runwayId ? findRunway(state.airport, cmd.runwayId) : undefined;
+      const waiting = departuresAtHold(state, rw?.id).filter((a) => !cmd.callsign || a.callsign === cmd.callsign);
+      const dep = ac ?? waiting[0];
+      if (!dep) return fail('rejected', `No departure is waiting at the hold${cmd.runwayEnd ? ` of runway ${cmd.runwayEnd}` : ''}.`, cmd);
+      const end = cmd.runwayEnd ?? dep.assignedRunwayEnd;
+      const req = api.request({ topic: 'GAP', from, to, aircraftId: dep.id, runwayId: rw?.id ?? findRunway(state.airport, dep.assignedRunwayEnd ?? '')?.id, runwayEnd: end, departures: cmd.departures ?? Math.max(1, waiting.length), source: 'player' });
+      return req ? done(`Asked ${WORD[to]} for a gap for ${req.departures ?? 1} departure${(req.departures ?? 1) > 1 ? 's' : ''}${end ? ` runway ${end}` : ''}`, cmd, req.id) : fail('rejected', 'The request could not be made.', cmd);
+    }
+    case 'GAP_APPROVED':
+      return answerWith('GAP', (r) => {
+        const after = cmd.afterCallsign ? aircraftBy(state, cmd.afterCallsign) : undefined;
+        api.respond(r.id, 'approve', { by: from!, source: 'player', afterAircraftId: after?.id });
+        return undefined;
+      });
     case 'APPROVE':
       return answerWith(cmd.runwayId || cmd.point ? 'CROSSING' : undefined, (r) => {
         const after = cmd.afterCallsign ? aircraftBy(state, cmd.afterCallsign) : undefined;

@@ -31,6 +31,8 @@ export const LUAW_TRAFFIC_NM = 6;
 export const LUAW_LIMIT_SEC = 90;
 /** An aircraft cannot turn base closer than this to the threshold (AIM 4-3-3: complete the turn to final at least 1/4 mile out; the base leg needs more room). */
 export const BASE_NOW_MIN_NM = 0.75;
+/** An arrival is not given a 360 for spacing closer than this to the threshold (nm): it is on or about to join the final. DESIGN VALUE. */
+export const SPACING_TURN_MIN_NM = 3;
 
 // ---------------------------------------------------------------------------
 // Runway exit (3-10-9)
@@ -392,6 +394,14 @@ export function planPatternInstruction(env: Env): PlanResult {
       return { plan: { patch, commit: () => { rt.pattern = { ...rt.pattern!, short: true, extend: false }; } } };
     }
     case 'CIRCLE': {
+      // On the way in (Approach's 360 for spacing, 3-8-1 / 5-6-1): before the approach is flown, at least SPACING_TURN_MIN_NM out.
+      if (!inPattern && !ac.onGround && !ac.isDeparture && (ac.phase === 'INBOUND' || ac.phase === 'APPROACH') && g) {
+        const dNm = mToNm(dist(ac.pos, g.end.threshold));
+        if (dNm < SPACING_TURN_MIN_NM) return unable(env, `${ac.callsign} is ${dNm.toFixed(1)} nm from the threshold; a ${cmd.turnDegrees ?? 360}-degree turn for spacing needs at least ${SPACING_TURN_MIN_NM} nm.`, "we're too close in for a three sixty", false);
+        if (ac.clearances.some((c) => (c.kind === 'LAND' || c.kind === 'APPROACH') && c.completedAtSec === undefined)) return unable(env, `${ac.callsign} is cleared (landing or approach); a turn for spacing would leave the clearance.`, "we're cleared, unable the three sixty", false);
+        const dirIn = cmd.turnDirection ?? 'left';
+        return { plan: { patch, commit: () => { rt.spacingTurn = { dir: dirIn, totalDeg: cmd.turnDegrees ?? 360, turnedDeg: 0, lastHeadingDeg: ac.headingDeg }; } } };
+      }
       if (!inPattern || (rt.pattern!.leg !== 'DOWNWIND' && rt.pattern!.leg !== 'BASE')) return unable(env, `${ac.callsign} is not on downwind or base; a ${cmd.turnDegrees ?? 360}-degree turn is flown in the pattern.`, "we're not on downwind or base", false);
       const dir = cmd.turnDirection ?? 'left';
       return { plan: { patch, commit: () => { rt.pattern = { ...rt.pattern!, circle: { dir, totalDeg: cmd.turnDegrees ?? 360, turnedDeg: 0, lastHeadingDeg: ac.headingDeg } }; } } };

@@ -7,6 +7,7 @@
  * `engine.applyCommand(cmd, { position, source: 'ai', aiPosition: position })` so that every validation applies. Several
  * commands of one transmission share a `transmissionId`, which makes the engine log exactly ONE ATC event per transmission.
  */
+import { gapPlans } from './gapActions';
 import type { AiControllerOptions, AiControllers, AiTransmission } from './index';
 import type { SimulationEngineExtras } from '../sim/engineExtras';
 import type { Aircraft, ControllerPositionId, SimulationState } from '../sim/types';
@@ -86,8 +87,9 @@ export function createAiControllers(opts: AiControllerOptions): AiControllers {
     GND: (v) => [...groundAgent(v), ...specialGnd(v)],
     // Approach closed (nobody works APP): Tower sequences missed approaches and inbound IFR traffic itself, as Ground issues
     // IFR clearances when Delivery is closed. Otherwise an IFR go-around would wait forever for a frequency that nobody answers.
-    TWR: (v) => [...towerAgent(v), ...specialTwr(v), ...(v.staffed.has('APP') ? [] : [...approachAgent(v), ...specialApp(v)])],
-    APP: (v) => [...approachAgent(v), ...specialApp(v)],
+    // (an approved departure gap, ai/gapActions.ts: each position speaks to the aircraft on its own frequency)
+    TWR: (v) => [...towerAgent(v), ...gapPlans(v), ...specialTwr(v), ...(v.staffed.has('APP') ? [] : [...approachAgent(v), ...specialApp(v)])],
+    APP: (v) => [...approachAgent(v), ...gapPlans(v), ...specialApp(v)],
     DEP: createDepartureAgent(),
   };
 

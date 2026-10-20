@@ -28,6 +28,7 @@ import { numberWords } from '../radio/spoken';
 import { hasActive, landingHoldShort, mkCmd } from './core';
 import type { Agent, AgentView, Plan } from './core';
 import { CROSSING_ARRIVAL_SEC, runwayInUse } from './ground';
+import { gapPlanFor } from './gapActions';
 import { assignedEnd, distToThresholdNm, etaToThresholdSec, interactingRunways, isInboundArrival } from './world';
 
 
@@ -138,6 +139,20 @@ export const coordinationAgent: Agent = (v) => {
       } else if (r.status === 'pending') {
         plans.push(coordPlan(ac, `co:${r.id}:exit-sb`, 64, r.from, `${ac.callsign}: exit request, stand by`,
           (api) => api.respond(r.id, 'standby', { by: me, source: 'ai', reason: verdict.reason }) && lastMessage(v, r), { once: true }));
+      }
+    } else if (r.topic === 'GAP' && me === 'APP') {
+      // 3-8-1 / 2-1-14: Approach says which arrival the gap follows and then builds it (approach.ts `gapPlans`), or that it cannot.
+      const plan = gapPlanFor(v, ac, r.departures);
+      if (!plan) {
+        plans.push(coordPlan(ac, `co:${r.id}:gap-gone`, 64, r.from, `${ac.callsign}: gap request, departure no longer at the hold`,
+          (api) => api.respond(r.id, 'deny', { by: me, source: 'ai', reason: 'departure is not at the hold' }) && lastMessage(v, r), { once: true }));
+      } else if (plan.feasible) {
+        plans.push(coordPlan(ac, `co:${r.id}:gap-ok`, 66, r.from, `${ac.callsign}: ${plan.after ? `gap after ${plan.after.callsign}` : 'gap available now'}`,
+          (api) => api.respond(r.id, 'approve', { by: me, source: 'ai', afterAircraftId: plan.after?.id }) && lastMessage(v, r), { once: true }));
+      } else {
+        const why = plan.reason ?? 'no gap';
+        plans.push(coordPlan(ac, `co:${r.id}:gap-no`, 64, r.from, `${ac.callsign}: gap request unable, ${why}`,
+          (api) => api.respond(r.id, 'deny', { by: me, source: 'ai', reason: why }) && lastMessage(v, r), { once: true }));
       }
     } else if (r.topic === 'POINT_OUT') {
       plans.push(coordPlan(ac, `co:${r.id}:po-ok`, 62, r.from, `${ac.callsign} point out approved`,

@@ -1433,7 +1433,15 @@ function stepAirborne(ctx: SimContext, ac: Aircraft, dt: number): void {
   }
   trackCrossingsOnFinal(ctx, ac, rt, perf);
   let guid: Guidance | undefined;
-  if (ac.nav && ac.nav.mode !== 'vectors' && NAV_PHASES.includes(ac.phase)) guid = routeGuidance(ctx, ac, rt, gc, perf, wind, agl);
+  const turn = rt.spacingTurn;
+  if (turn) {
+    // A 360 for spacing: a steady turn at the type's turn rate, then the route / approach again (ends early when the aircraft is cleared or has joined a later phase).
+    turn.turnedDeg += Math.abs(headingDiff(turn.lastHeadingDeg, ac.headingDeg));
+    turn.lastHeadingDeg = ac.headingDeg;
+    if (turn.turnedDeg >= turn.totalDeg - 5 || (ac.phase !== 'INBOUND' && ac.phase !== 'APPROACH')) rt.spacingTurn = undefined;
+    else guid = { desiredHeading: normHeading(ac.headingDeg + (turn.dir === 'left' ? -30 : 30)), altTargetFt: ac.target.altitudeFt, speedKt: ac.target.speedKt ?? defaultSpeedKt(ac, perf, agl) };
+  }
+  if (!guid && ac.nav && ac.nav.mode !== 'vectors' && NAV_PHASES.includes(ac.phase)) guid = routeGuidance(ctx, ac, rt, gc, perf, wind, agl);
   if (guid) {
     /* flying the route */
   } else if (g && navPhase && (rt.navMode === 'AUTO' || ac.phase === 'FINAL' || ac.phase === 'LANDING')) {

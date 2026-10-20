@@ -135,6 +135,8 @@ export interface UnreadHoldShort {
 }
 
 export interface AircraftRuntime {
+  /** "Make left/right three-sixty" for spacing on the way in (JO 7110.65 3-8-1; Approach: 5-6-1 vectors): a steady turn before the approach, then the route / approach guidance again. */
+  spacingTurn?: { dir: 'left' | 'right'; totalDeg: number; turnedDeg: number; lastHeadingDeg: number };
   /** Pushback in progress or completed. */
   pushback?: PushbackState;
   /** Nose heading when the push began. */
@@ -161,7 +163,7 @@ export interface AircraftRuntime {
   headOnCalled?: number;
   /** A head-on just ended: wait for the counterpart to move off before driving up to it (groundMovement.ts). */
   headOnLinger?: { otherId: string; untilSec: number };
-  headOn?: { otherId: string; taxiway: string; sinceSec: number; laneNodeIds: string[]; lastSeenSec?: number; lastCallSec?: number; resumeCall?: boolean };
+  headOn?: { otherId: string; taxiway: string; sinceSec: number; laneNodeIds: string[]; lastSeenSec?: number; lastCallSec?: number; resumeCall?: boolean; /** found by `traffic.ts` from two aircraft standing nose to nose (the route test saw no conflict any more) */ synthetic?: boolean };
   /** "Hold short of runway N" given during the landing roll / on final: the intersecting runway the rollout must stop short of. */
   exitHoldShort?: string;
   /** Touch-and-go ground roll in progress (phase ROLLOUT, runway occupied): see `stepTouchAndGo` in flightDynamics.ts. */

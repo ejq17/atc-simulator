@@ -10,6 +10,8 @@
  *   Tower, Ground, have Spirit ten thirty three exit left at Charlie                  asks Tower to give the exit (REQUEST_EXIT, 3-1-4)
  *   Tower, Ground, have Spirit ten thirty three hold short of runway four after landing
  *   Ground, Tower, Spirit ten thirty three will exit left at Charlie | unable, ..., will exit at Bravo     (APPROVE / UNABLE)
+ *   Approach, Tower, need a gap for a departure runway two two [/ for two departures]   asks Approach for a departure gap (REQUEST_GAP; plain words, see sim/coordination.ts GAP)
+ *   Tower, Approach, gap after Cessna three echo juliet | unable, ...                    Approach's answer (GAP_APPROVED / UNABLE)
  *   Approach, Departure, point out, two miles west of Cedar Lake, three thousand, Cessna ...    5-4-3 (POINT_OUT)
  *   Departure, Approach, Cessna ... point out approved | unable | traffic observed
  *
@@ -28,7 +30,7 @@ import type { Token } from './tokens';
 export type LandlineKind =
   | 'REQUEST_CROSS' | 'APPROVE' | 'UNABLE' | 'STANDBY' | 'HOLD_SHORT' | 'CROSS_COMPLETE'
   | 'REQUEST_RELEASE' | 'RELEASED' | 'HOLD_FOR_RELEASE' | 'ROLLING' | 'GOING_AROUND'
-  | 'REQUEST_EXIT'
+  | 'REQUEST_EXIT' | 'REQUEST_GAP' | 'GAP_APPROVED'
   | 'POINT_OUT' | 'POINT_OUT_APPROVED' | 'POINT_OUT_UNABLE' | 'TRAFFIC_OBSERVED' | 'TRAFFIC' | 'TEXT' | 'UNKNOWN';
 
 export interface LandlineCommand {
@@ -45,6 +47,8 @@ export interface LandlineCommand {
   exitSide?: 'left' | 'right';
   /** REQUEST_EXIT: "hold short of runway four after landing" (the runway is `runwayId` / `runwayEnd`). */
   holdShortAfterLanding?: boolean;
+  /** REQUEST_GAP: how many departures wait for the gap ("for two departures"). */
+  departures?: number;
   /** "behind the landing Spirit": the words after it, matched against the active aircraft. */
   afterCallsign?: string;
   /** POINT_OUT: "two miles west of Cedar Lake" as spoken (digits), and the altitude. */
@@ -141,7 +145,7 @@ export function looksLikeLandline(text: string): boolean {
   if (r.to === undefined) return false;
   const body = tokens.slice(r.next);
   const crossesRunway = body.some((t) => t.kind === 'word' && t.text === 'cross') && body.some((t) => t.kind === 'word' && t.text === 'runway');
-  return crossesRunway || hasWord(body, 'pointout', 'release', 'released') || isExitRequestBody(body);
+  return crossesRunway || hasWord(body, 'pointout', 'release', 'released', 'gap') || isExitRequestBody(body);
 }
 
 /** "have <aircraft> exit left at Charlie" / "... hold short of runway four after landing": Ground asking Tower for an exit (3-1-4). */
@@ -243,6 +247,7 @@ export function parseLandline(text: string, ctx: LandlineContext): LandlineComma
     }
   } else if (has('traffic') && has('observed')) kind = 'TRAFFIC_OBSERVED';
   else if (isExitRequestBody(body0)) kind = 'REQUEST_EXIT';
+  else if (has('gap')) kind = has('after', 'available', 'ready') && !has('need', 'request') ? 'GAP_APPROVED' : 'REQUEST_GAP';
   else if (has('hold') && has('release')) kind = 'HOLD_FOR_RELEASE';
   else if (has('released') || (has('release') && has('approved', 'granted'))) kind = 'RELEASED';
   else if (has('release')) kind = 'REQUEST_RELEASE';
@@ -279,13 +284,20 @@ export function parseLandline(text: string, ctx: LandlineContext): LandlineComma
     if (!exitPoint && !exitSide && !holdShortAfterLanding) issues.push('missing exit (say the taxiway or the side, or a hold short)');
     if (holdShortAfterLanding && !ent.runwayId) issues.push('missing runway to hold short of');
   }
+  // REQUEST_GAP: "for a departure" / "for two departures"
+  let departures: number | undefined;
+  if (kind === 'REQUEST_GAP') {
+    // ("departures" is also repaired to the position name "departure", so the plural is read from the normalised text)
+    const m = /(?:^|\s)(\d+)\s+departures\b/.exec(norm.text);
+    departures = m ? Number(m[1]) : /\bdepartures\b/.test(norm.text) ? 2 : 1;
+  }
   // required parts and standardness
   if ((kind === 'REQUEST_CROSS') && !ent.runwayId) issues.push('missing runway');
   if ((kind === 'REQUEST_CROSS') && !callsign) issues.push(cs.callsign ? `low-confidence callsign ${cs.callsign}` : 'missing callsign');
   if ((kind === 'REQUEST_RELEASE' || kind === 'RELEASED' || kind === 'HOLD_FOR_RELEASE' || kind === 'ROLLING' || kind === 'GOING_AROUND' || kind === 'POINT_OUT') && !callsign) issues.push(cs.issues[0] ?? 'missing callsign');
   if (kind === 'REQUEST_CROSS' && !ent.point) { nonStandard = true; issues.push('no point / intersection (3-1-3 asks for it)'); }
   if (kind === 'APPROVE' && ent.runwayEnd !== undefined && !ent.point) { nonStandard = true; issues.push('"cross (runway) at (point)" is the 3-1-3 form'); }
-  if (['REQUEST_CROSS', 'REQUEST_EXIT', 'UNABLE', 'STANDBY', 'HOLD_SHORT', 'CROSS_COMPLETE', 'REQUEST_RELEASE', 'ROLLING', 'GOING_AROUND', 'TRAFFIC', 'TEXT'].includes(kind)) nonStandard = true;
+  if (['REQUEST_CROSS', 'REQUEST_EXIT', 'REQUEST_GAP', 'GAP_APPROVED', 'UNABLE', 'STANDBY', 'HOLD_SHORT', 'CROSS_COMPLETE', 'REQUEST_RELEASE', 'ROLLING', 'GOING_AROUND', 'TRAFFIC', 'TEXT'].includes(kind)) nonStandard = true;
   if (kind === 'APPROVE' && ent.runwayEnd === undefined) nonStandard = true; // bare "approved" / "cross approved"
 
   // The two positions: required, except that a point-out may omit them (the 5-4-3 pattern starts at "point out"; the resolver fills them in).
@@ -309,7 +321,7 @@ export function parseLandline(text: string, ctx: LandlineContext): LandlineComma
   const uniq = [...new Set(issues)];
   if (!known) uniq.push('no recognised coordination call');
   return base({
-    kind, callsign, runwayEnd: ent.runwayEnd, runwayId: ent.runwayId, point: kind === 'REQUEST_EXIT' ? exitPoint : ent.point, exitSide, holdShortAfterLanding: holdShortAfterLanding || undefined, afterCallsign: after,
+    kind, callsign, runwayEnd: ent.runwayEnd, runwayId: ent.runwayId, point: kind === 'REQUEST_EXIT' ? exitPoint : ent.point, exitSide, holdShortAfterLanding: holdShortAfterLanding || undefined, afterCallsign: after, departures,
     positionText, altitudeFt, text: freeText, confidence, nonStandard, issues: uniq,
   });
 }
