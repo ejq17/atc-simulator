@@ -26,6 +26,15 @@ import { coordinationAgent } from './coordination';
 export const DEFAULT_REACTION_DELAY_SEC: [number, number] = [2, 6];
 /** Minimum spacing between two transmissions of the same position. */
 export const MIN_TRANSMISSION_GAP_SEC = 3;
+/**
+ * A controller does not key over a pilot call that is queued (`anyTransmitting`, the pilot has not keyed yet: a request can wait 48 s for its reaction time and the
+ * answer window of the controller's own call). A correction of a readback error has 23 s (the 20 s window starts 3 s after the controller's call) and is not
+ * kept waiting for it longer than this: soak seed 8 moderate, an approach clearance without a readback was never corrected because an unrelated request
+ * queued on the same frequency held Approach silent until the window had closed. DESIGN VALUE; a controller who keys at the same moment as a pilot is blocked
+ * like two pilots (the engine's collision rule).
+ */
+export const CORRECTION_PATIENCE_SEC = 5;
+const CORRECTION_PRIORITY = 95;
 /** After a refused command the same action is not tried again for this long (longer after repeated refusals). */
 export const REJECT_BACKOFF_SEC = 10;
 
@@ -39,6 +48,8 @@ interface Scheduled {
   priority: number;
   at: number;
   summary: string;
+  /** When the plan was first scheduled (a correction stops waiting for queued pilot calls after `CORRECTION_PATIENCE_SEC`). */
+  since?: number;
 }
 
 interface AgentRuntime {
@@ -200,11 +211,11 @@ export function createAiControllers(opts: AiControllerOptions): AiControllers {
         return;
       }
       if (best && best.key !== sch.key && best.priority >= sch.priority + 15) {
-        rt.scheduled = { key: best.key, priority: best.priority, at: Math.max(now + reactionDelay(best), rt.mem.lastTxAt + MIN_TRANSMISSION_GAP_SEC), summary: best.summary };
+        rt.scheduled = { key: best.key, priority: best.priority, since: now, at: Math.max(now + reactionDelay(best), rt.mem.lastTxAt + MIN_TRANSMISSION_GAP_SEC), summary: best.summary };
         return;
       }
       if (now + 1e-9 < sch.at) return;
-      if (anyTransmitting(v)) {
+      if (anyTransmitting(v) && !(sch.priority >= CORRECTION_PRIORITY && now - (sch.since ?? now) >= CORRECTION_PATIENCE_SEC)) {
         sch.at = now + 1;
         return;
       }
@@ -215,7 +226,7 @@ export function createAiControllers(opts: AiControllerOptions): AiControllers {
     const best = pickBest(plans);
     if (!best) return;
     rt.scheduled = {
-      key: best.key, priority: best.priority, summary: best.summary,
+      key: best.key, priority: best.priority, summary: best.summary, since: now,
       at: Math.max(now + reactionDelay(best), rt.mem.lastTxAt + MIN_TRANSMISSION_GAP_SEC),
     };
   }

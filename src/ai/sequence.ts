@@ -78,17 +78,28 @@ export function etaBaseNowSec(ac: Aircraft, g: RunwayEndGeom): number {
   return (toPoint + PATTERN_OFFSET_M + Math.max(behindM, minM)) / speedMps(ac);
 }
 
+/**
+ * A light aircraft holds the runway at least this long (s) in a window: the rollout to the far exit of KACY 4/22 took 123-137 s in the soak (the near exit 44-54 s), and
+ * the exit it takes is not known when the window is made (it depends on touchdown, wind, who stands on the stub). DESIGN VALUE.
+ */
+export const LIGHT_OCCUPANCY_FLOOR_SEC = 140;
+
 const occupancyCache = new WeakMap<object, Map<string, number>>();
 
-/** Seconds an aircraft of this type occupies the runway from the threshold crossing until it is clear. */
+/**
+ * Seconds an aircraft occupies the runway from the threshold crossing until it is clear: the rollout of THIS aircraft (its own exit: `projectArrival` reads the
+ * exit it will fly from its parking position and the stubs), not a type average. A light aircraft that goes on to the far exit at KACY 4/22 holds the runway
+ * about 123 s, one that leaves at the near exit 54 s: a window of the type average let the next aircraft turn base for a gap that the lander ahead then
+ * filled (soak seed 12: "N41ZP ahead lands in 39 s and is not clear of the runway until about 162 s", a go-around for the aircraft behind).
+ */
 export function occupancySec(state: SimulationState, ac: Aircraft, g: RunwayEndGeom): number {
   let m = occupancyCache.get(state.airport);
   if (!m) occupancyCache.set(state.airport, (m = new Map()));
-  const key = `${g.end.id}:${ac.type}`;
+  const key = `${g.end.id}:${ac.id}:${ac.type}`;
   let v = m.get(key);
   if (v === undefined) {
     const pa = projectArrival(state, { ...ac, onGround: false, altitudeFt: g.elevationFt + 600, groundSpeedKt: 70, pos: { x: g.end.threshold.x - g.dir.x * 1500, y: g.end.threshold.y - g.dir.y * 1500 } }, g);
-    v = pa.tClear - pa.tThr;
+    v = Math.max(pa.tClear - pa.tThr, getPerformance(ac.type).category === 'light' ? LIGHT_OCCUPANCY_FLOOR_SEC : 0);
     m.set(key, v);
   }
   return v;
@@ -116,6 +127,21 @@ export interface SeqDecision {
 }
 
 /**
+ * The window of an airborne arrival: from its threshold crossing until it is clear. `projectArrival` measures the distance to the threshold ALONG the runway
+ * axis only, which is right on final and wrong for an aircraft that is still off the extended centreline (an A320 circling at 1,800 ft over the field was
+ * projected to cross the threshold "now" for 15 minutes, a phantom window that kept the pattern aircraft extending downwind, soak seed 12). Off the final the
+ * threshold time is the straight distance at the aircraft's own approach speed (never earlier than the projection), the window is shifted by the difference.
+ */
+export function arrivalWindow(state: SimulationState, o: Aircraft, og: RunwayEndGeom): SeqWindow {
+  const pa = projectArrival(state, o, og);
+  const perf = getPerformance(o.type);
+  const v = Math.max(perf.minSpeedKt, Math.min(Math.max(o.groundSpeedKt, 1), 1.15 * perf.approachSpeedKt)) * 0.514444;
+  const direct = Math.hypot(o.pos.x - og.end.threshold.x, o.pos.y - og.end.threshold.y) / Math.max(v, 1);
+  const shift = Math.max(0, direct - pa.tThr);
+  return { start: pa.tThr + shift, end: pa.tClear + shift };
+}
+
+/**
  * Windows taken by everything on the runways that interact with `g` that cannot be delayed, plus `departureWindows` (seconds from now, from
  * the caller: it knows the takeoff roll model).
  */
@@ -135,8 +161,7 @@ export function committedWindows(state: SimulationState, g: RunwayEndGeom, depar
       const leg = patternLeg(o, og);
       if (leg !== 'BASE' && leg !== 'FINAL') continue; // downwind aircraft are handled one by one; upwind / crosswind ones are far from landing
     }
-    const pa = projectArrival(state, o, og);
-    out.push({ start: pa.tThr, end: pa.tClear });
+    out.push(arrivalWindow(state, o, og));
   }
   return out;
 }

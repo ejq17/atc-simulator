@@ -1,8 +1,8 @@
 import { seeded01 } from './rng';
 
 /**
- * Tuning values for the simulated pilots' behaviour in the Tower vocabulary features. ALL VALUES ARE DESIGN VALUES, not FAA figures
- * (the FAA text says when each situation arises, not how often or how well a pilot sees traffic). Set `Scenario.pilotBehaviour` (partial) to
+ * Tuning values for the simulated pilots' behaviour in the Tower vocabulary features. VALUES ARE DESIGN VALUES, not FAA figures, except the readback error rates of `PilotRealism`
+ * (see there; inventory and sources in docs/DESIGN-VALUES.md) (the FAA text says when each situation arises, not how often or how well a pilot sees traffic). Set `Scenario.pilotBehaviour` (partial) to
  * override them, e.g. to scale difficulty; the defaults are the values the features were built and tested with.
  */
 export interface GroundBehaviour {
@@ -105,14 +105,18 @@ export type PilotRequestCode =
 export type Range = readonly [number, number];
 
 /**
- * ALL VALUES ARE DESIGN VALUES, not FAA figures: the FAA text (JO 7110.65 2-4-3, 2-4-20; AIM 4-2-4, 4-4-7) says what a correct readback
- * and callsign look like, not how often real pilots deviate. Every rate is a probability per eligible event, decided with a seeded
+ * The FAA text (JO 7110.65 2-4-3, 2-4-20; AIM 4-2-4, 4-4-7) says what a correct readback and callsign look like, not how often real pilots
+ * deviate. SOURCED (docs/DESIGN-VALUES.md section 1): the five readback error rates of `moderate` are the measured TRACON rates of FAA
+ * DOT/FAA/AM-06/25 (Prinzo, Hendrix, Hendrix 2006), Table 10 and Table 6: heading 3.93 % (digit), altitude 1.18 %, radio frequency 6.15 %,
+ * transponder 2.50 %, messages not acknowledged 3.8 % (no readback). `light` is half and `heavy` twice the measured rate (design scaling:
+ * the same study finds 10.8-19.2 % for complex messages and about 38 % above complexity 16). Every other value in this file is a DESIGN VALUE.
+ * Every rate is a probability per eligible event, decided with a seeded
  * draw derived from the aircraft seed (or the engine generator), so the same seed replays the same event log.
  */
 export interface PilotRealism {
   level: PilotRealismLevel;
   // --- readback errors (per eligible clearance; one error at most per readback) ---------------------------------------
-  /** Runway or heading digit mistake (the pre-realism error; 0.08 was the single global rate). */
+  /** Runway or heading digit mistake (moderate 4 %: heading readbacks 3.93 % in FAA DOT/FAA/AM-06/25 Table 10; the pre-realism global rate was 0.08). */
   digitErrorRate: number;
   /** ALTITUDE / initial IFR altitude read back wrong by 1000 ft (JO 7110.65 2-4-3 a; AIM 4-4-7 b). */
   altitudeErrorRate: number;
@@ -181,8 +185,8 @@ const OFF: PilotRealism = {
 
 const LIGHT: PilotRealism = {
   ...OFF, level: 'light',
-  digitErrorRate: 0.04, altitudeErrorRate: 0.02, frequencyErrorRate: 0.02, squawkErrorRate: 0.02,
-  patternMisunderstandRate: 0.03, wrongCallsignRate: 0.15, similarCallsignRate: 0.04, noReadbackRate: 0.02,
+  digitErrorRate: 0.02, altitudeErrorRate: 0.006, frequencyErrorRate: 0.03, squawkErrorRate: 0.012,
+  patternMisunderstandRate: 0.03, wrongCallsignRate: 0.15, similarCallsignRate: 0.04, noReadbackRate: 0.019,
   responseDelaySec: { airline: [0.4, 1.2], ga: [0.8, 2.2], student: [1.5, 3.5] },
   delayedResponseRate: 0.015, sayAgainRate: 0.15, sayAgainMinCommands: 3, radioDiscipline: true, blockWindowSec: 0.4,
   novemberInitialRate: 0.3, abbreviateAfterController: true, withYouRate: 0.2, withBravoRate: 0.2, studentShare: 0.1, progressiveTaxiRate: 0.4,
@@ -194,8 +198,8 @@ const LIGHT: PilotRealism = {
 
 const MODERATE: PilotRealism = {
   ...LIGHT, level: 'moderate',
-  digitErrorRate: 0.08, altitudeErrorRate: 0.04, frequencyErrorRate: 0.04, squawkErrorRate: 0.04,
-  patternMisunderstandRate: 0.05, wrongCallsignRate: 0.3, similarCallsignRate: 0.1, noReadbackRate: 0.04,
+  digitErrorRate: 0.04, altitudeErrorRate: 0.012, frequencyErrorRate: 0.06, squawkErrorRate: 0.025,
+  patternMisunderstandRate: 0.05, wrongCallsignRate: 0.3, similarCallsignRate: 0.1, noReadbackRate: 0.038,
   responseDelaySec: { airline: [0.5, 1.8], ga: [1, 3.2], student: [2, 5] },
   delayedResponseRate: 0.03, sayAgainRate: 0.25, sayAgainMinCommands: 3, blockWindowSec: 0.5,
   novemberInitialRate: 0.4, withYouRate: 0.3, withBravoRate: 0.3, studentShare: 0.2, progressiveTaxiRate: 0.5, studentSayAgainFactor: 2, studentPatternFactor: 3,
@@ -206,8 +210,8 @@ const MODERATE: PilotRealism = {
 
 const HEAVY: PilotRealism = {
   ...MODERATE, level: 'heavy',
-  digitErrorRate: 0.12, altitudeErrorRate: 0.07, frequencyErrorRate: 0.07, squawkErrorRate: 0.07,
-  patternMisunderstandRate: 0.08, wrongCallsignRate: 0.5, similarCallsignRate: 0.2, noReadbackRate: 0.07,
+  digitErrorRate: 0.08, altitudeErrorRate: 0.024, frequencyErrorRate: 0.12, squawkErrorRate: 0.05,
+  patternMisunderstandRate: 0.08, wrongCallsignRate: 0.5, similarCallsignRate: 0.2, noReadbackRate: 0.076,
   responseDelaySec: { airline: [0.6, 2.4], ga: [1.2, 4], student: [2.5, 6.5] },
   delayedResponseRate: 0.05, sayAgainRate: 0.35, sayAgainMinCommands: 2, blockWindowSec: 0.6,
   novemberInitialRate: 0.5, withYouRate: 0.4, withBravoRate: 0.4, studentShare: 0.3, progressiveTaxiRate: 0.6, studentSayAgainFactor: 2, studentPatternFactor: 3,

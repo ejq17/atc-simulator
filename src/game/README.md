@@ -119,7 +119,7 @@ unique for the whole session and never ending in the same three characters as an
 
 ### Flow control (`traffic.ts`)
 
-Design values (nothing in the FAA order fixes them); the hourly rates are never lowered, spawns wait instead: a due arrival is retried every 10 s, a departure likewise.
+Design values (nothing in the FAA order fixes them); while departures have stood ready at the hold line for 120 s the arrival slot is 130 s + 150 s per waiting departure (at most three) instead of 200 s (`arrivalSlotSec`: the runway occupancy of a light aircraft that rolls to the far exit plus the 143 s a jet needs, `docs/DESIGN-VALUES.md` section 9); the hourly rates are never lowered, spawns wait instead: a due arrival is retried every 10 s, a departure likewise.
 
 * `ARRIVAL_SLOT_SEC` = 200 (was 160; measured on the 2 h soak, 8 runs, docs/PROGRESS.md "Throughput": at 160 s three of the eight runs had a longest wait of 22, 36 and 50 minutes (departures wait for a gap that arrivals 160 s apart do not leave), at 180 s four runs were over 30 and one had 46 go-arounds, at 200 s every run is under 20 minutes; landings per run are within the spread of the Poisson clock): a new arrival is not generated while it would reach the threshold of its runway end within 200 s of another arrival (nominal 520 s for a light aircraft, 330 s for an airliner; other aircraft by distance / expected speed 70 / 145 kt; an aircraft in the pattern or on a missed approach counts as 150 s). One runway shared with departures, crossings and taxiing arrivals takes about one landing per 200 s at the closest spacing (the generated flow is 10 per hour, 360 s).
 * `MAX_ARRIVALS_IN_FLIGHT` = 6 airborne arrivals not yet landed.

@@ -51,6 +51,8 @@ export const COORDINATION_DESIGN = {
   pointOutNm: 4,
   /** Departure releases to one departure sector are at least this far apart (s) before the AI Departure says "hold for release". DESIGN VALUE. */
   releaseSpacingSec: 45,
+  /** A departure that still waits at the hold asks for its release again when the one it holds has this long left (s), so that Departure's answer arrives before the old one lapses (4-3-4 extends no time limit; the release is the LOA's). DESIGN VALUE. */
+  releaseRenewBeforeSec: 20,
 } as const;
 
 /** Where each rule comes from (shown with a coordination error and in the debrief). */
@@ -111,6 +113,8 @@ export interface CoordRequest {
   afterAircraftId?: string;
   reason?: string;
   usedSec?: number;
+  /** RELEASE: this request renews the (still valid) release with this id: it does not count as a new release for the spacing between departures. */
+  renewalOf?: string;
   /** CROSSING: the aircraft has been seen on the runway since the approval was used. */
   onRunway?: boolean;
   source: CoordSource;
@@ -218,8 +222,11 @@ export function findOpenRequest(state: SimulationState, topic: CoordTopic, aircr
 /** A current approval (crossing) or release for this aircraft: approved, not expired, not yet used. */
 export function validApproval(state: SimulationState, topic: CoordTopic, aircraftId: string, runwayId?: string): CoordRequest | undefined {
   const now = state.clock.timeSec;
-  const r = findOpenRequest(state, topic, aircraftId, runwayId);
-  return r && r.status === 'approved' && (r.expiresSec === undefined || now < r.expiresSec) ? r : undefined;
+  for (let i = coord(state).requests.length - 1; i >= 0; i--) {
+    const r = coord(state).requests[i];
+    if (r.topic === topic && r.aircraftId === aircraftId && (runwayId === undefined || r.runwayId === runwayId) && r.status === 'approved' && (r.expiresSec === undefined || now < r.expiresSec)) return r;
+  }
+  return undefined;
 }
 
 /** Requests the position still has to answer (pending or on stand-by), oldest first. */
@@ -394,6 +401,8 @@ export interface RequestInput {
   altitudeFt?: number;
   /** POINT_OUT: restrictions / other pertinent information. */
   extra?: string;
+  /** RELEASE: ask again while the current release is about to lapse (a second request; the current release stays valid until it lapses or is used). */
+  renew?: boolean;
   source: CoordSource;
 }
 
@@ -407,7 +416,8 @@ export function coordRequest(ctx: SimContext, input: RequestInput): CoordRequest
   let runwayId = input.runwayId;
   if (runwayId) runwayId = findRunway(state.airport, runwayId)?.id ?? runwayId;
   const open = findOpenRequest(state, input.topic, ac.id, runwayId);
-  if (open && open.to === input.to) {
+  const renewing = !!open && open.status === 'approved' && input.renew === true && open.topic === 'RELEASE' && open.expiresSec !== undefined && open.expiresSec - now <= COORDINATION_DESIGN.releaseRenewBeforeSec;
+  if (open && open.to === input.to && !renewing) {
     if (open.status === 'approved') return open; // already approved: nothing to ask
     if (now - open.lastAskSec < COORDINATION_DESIGN.duplicateWindowSec) return open;
     open.asks++;
@@ -422,6 +432,7 @@ export function coordRequest(ctx: SimContext, input: RequestInput): CoordRequest
     runwayId, point: input.point ?? (runwayId && input.topic === 'CROSSING' ? crossingPointFor(state, ac, runwayId) : undefined),
     exitSide: input.exitSide, holdShortRunwayId: input.holdShortRunwayId ? findRunway(state.airport, input.holdShortRunwayId)?.id ?? input.holdShortRunwayId : undefined,
     positionText: input.positionText, altitudeFt: input.altitudeFt, createdSec: now, lastAskSec: now, asks: 1, status: 'pending', source: input.source,
+    ...(renewing ? { renewalOf: open.id } : {}),
   };
   c.requests.push(req);
   const kind = kindOfRequest(req.topic);
@@ -532,6 +543,12 @@ export function coordConsume(ctx: SimContext, req: CoordRequest): void {
   if (ctx.dryRun) return;
   req.status = 'used';
   req.usedSec = ctx.state.clock.timeSec;
+  // A release that was renewed while the departure waited: the renewal (or the release it renewed) is of no use any more.
+  if (req.topic === 'RELEASE') {
+    for (const o of ctx.state.coordination?.requests ?? []) {
+      if (o !== req && o.topic === 'RELEASE' && o.aircraftId === req.aircraftId && (o.status === 'pending' || o.status === 'standby' || o.status === 'approved')) o.status = 'completed';
+    }
+  }
 }
 
 /** A coordination rule was broken (free play / career): logged as an event; the score counts it (scoring.ts). */

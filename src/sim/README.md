@@ -690,7 +690,7 @@ A typed message channel between controller positions, replayable and determinist
 * **Rules** (`crossingGate`, `releaseGate`, called by `planCross` and `planTakeoff`):
   * CROSS_RUNWAY issued as GND on a runway of the active configuration (`runwayIsActive`) needs Tower's current approval for that aircraft and runway (JO 7110.65 3-1-3). Training refuses (no pilot readback, not a communication error) with the reason and the paragraph; free play and career accept and emit a `COORDINATION` event with `data.error` (+1 coordination error, -3 points). An approval with `afterAircraftId` ("behind the landing X") is not usable until X is on the ground, clear of the runway and not rolling out (`afterAircraftClear`).
   * TAKEOFF issued as TWR to an IFR departure needs a current release from Departure (Approach when no Departure is staffed) unless the same person works both, or `Scenario.coordination.releasesRequired === false` (LOA concept, 4-3-4). Same consequences.
-  * Lifetimes (`COORDINATION_DESIGN`, design values, not FAA numbers): crossing approval 60 s (restarts while a "behind the landing X" approval waits for X), release 120 s, open request 240 s, AI re-ask 30 s, duplicate window 5 s, crossing closed anyway 180 s after use, point-out geometry 4 nm, release spacing 45 s.
+  * Lifetimes (`COORDINATION_DESIGN`, design values, not FAA numbers): crossing approval 60 s (restarts while a "behind the landing X" approval waits for X), release 120 s (renewed by a second request when 20 s are left, `releaseRenewBeforeSec`, while the departure still waits), open request 240 s, AI re-ask 30 s, duplicate window 5 s, crossing closed anyway 180 s after use, point-out geometry 4 nm, release spacing 45 s.
   * `updateCoordination` (once per tick): expires stale approvals / requests and aircraft that left, and when the crossed aircraft has left the runway marks the request `completed` and posts `CROSS_COMPLETE` as `system` (3-1-3: the ground controller advises Tower, verbally or by visual aid; the engine is the visual aid).
 * Not modelled: vehicles, runway changes and intersection departures announced to Tower (3-1-4), radar handoffs between sectors, delegated airspace for point outs (information only).
 Tests: `coordination.test.ts` (22).
@@ -728,8 +728,9 @@ Tests: `coordination.test.ts` (22).
 
 `Scenario.pilotRealism` (`off` / `light` / `moderate` / `heavy`; absent = the earlier behaviour) selects a preset of `PilotRealism`, part of
 `PilotBehaviour.realism`; `Scenario.pilotBehaviour.realism` overrides single values (ignored at level `off`). The level also sets the ground task's
-rates (`ground.holdShortOmitFraction`, `taxiwayErrorShare`, `unfamiliarFraction`, `GROUND_RATES_BY_LEVEL`). Per-level table: README "Pilot realism". ALL
-RATES ARE DESIGN VALUES. Every draw is `seeded01(ac.seed, label)` (or the per-clearance label), never the shared generator, so switching realism on does not
+rates (`ground.holdShortOmitFraction`, `taxiwayErrorShare`, `unfamiliarFraction`, `GROUND_RATES_BY_LEVEL`). Per-level table: README "Pilot realism". The readback error
+rates (digit, altitude, frequency, squawk, no readback) of `moderate` are the measured TRACON rates of FAA DOT/FAA/AM-06/25 (docs/DESIGN-VALUES.md section 1;
+`light` half, `heavy` twice); ALL OTHER RATES ARE DESIGN VALUES. Every draw is `seeded01(ac.seed, label)` (or the per-clearance label), never the shared generator, so switching realism on does not
 shift the rest of the simulation and the same seed replays the same log.
 
 * **Readback errors** (`radio/readback.ts`): runway / heading digit (the old error), altitude (+-1000 ft, also in an IFR clearance), frequency, squawk,
@@ -747,7 +748,7 @@ shift the rest of the simulation and the same seed replays the same log.
   What keeps a busy frequency from blocking itself: a call a pilot starts himself is keyed after a seeded reaction time (`KEYUP_SPREAD_SEC` 12 s, 40 % the aircraft's own habit,
   60 % per call; x4 for requests), is staggered `blockWindowSec` + 0.3 s from any call already queued (`staggered`; design values), waits for the end of a controller call's expected answer (`answerWindow`,
   applied to every queued call before any is emitted: `deferForAnswerWindows`), and waits behind calls on the air. Answers to the controller are NOT staggered: two pilots who
-  answer calls given together still collide (that is the realistic remainder). The AI controllers need no hold-off of their own: a controller never keys over a queued pilot call (`anyTransmitting`).
+  answer calls given together still collide (that is the realistic remainder). The AI controllers need no hold-off of their own: a controller never keys over a queued pilot call (`anyTransmitting`), except that a correction of a readback error stops waiting for one after `CORRECTION_PATIENCE_SEC` = 5 s (the window to correct is 23 s).
   `RADIO_BLOCKED.data` lists `answers`, `texts` and `keyedAtSec` per call. Measurement: `src/ai/blockedRate.ts` protocol, run by `src/ai/blockedRate.test.ts` (`BLOCKED_RATE=1`); table in BEHAVIOUR-ACCURACY R9.
 * **One readback per transmission** (`radioDiscipline.ts addReadbackFragment` / `flushReadbackGroup`): the instructions of one transmission (every clearance kind except `PUSHBACK`: ground, vectors, altitude, speed, direct, approach, landing, takeoff, line up, IFR clearance, frequency change; `ParsedCommand.groupSize` > 1 and a `transmissionId`) are executed one by one, each with its readback text and any readback error, and the texts are joined into one call with the callsign once at the end. Spoken after the last command of the transmission, else on the next tick. `data.clearanceIds` lists the clearances it answers.
 * **Missed calls and "say again"** (`pilotRealism.ts`, `commandExecutor.ts`): `delayedResponseRate` - the pilot did not hear: nothing is said or done, the

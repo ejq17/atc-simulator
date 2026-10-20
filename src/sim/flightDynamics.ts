@@ -820,6 +820,7 @@ export function initiateGoAround(ctx: SimContext, ac: Aircraft, o: { reason: str
   const elev = g?.elevationFt ?? ctx.state.airport.elevationFt;
   setPhase(ctx, ac, 'GO_AROUND', o.reason);
   ac.lastGoAroundSec = ctx.state.clock.timeSec;
+  ac.goAroundCount = (ac.goAroundCount ?? 0) + 1;
   completeClearances(ctx, ac, ['LAND']);
   if (g) {
     const idx = ac.runwayAuthorizations.indexOf(g.runway.id);

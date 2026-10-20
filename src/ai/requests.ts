@@ -21,6 +21,7 @@ import { getPerformance } from '../sim/performance';
 import { mkCmd } from './core';
 import type { Agent, Plan } from './core';
 import { planDeparture } from './world';
+import { tooHighForFaf } from './approach';
 import * as say from './phrase';
 
 /** Seconds a request is left alone before it is answered (the controller was busy, the AI reaction delay comes on top). */
@@ -96,7 +97,10 @@ export const requestAgent: Agent = (v) => {
         const mine = Math.hypot(ac.pos.x - g.end.threshold.x, ac.pos.y - g.end.threshold.y);
         const crowded = Object.values(state.aircraft).some((o) => o.id !== ac.id && !o.onGround && !o.isDeparture && o.assignedRunwayEnd === g.end.id
           && Math.hypot(o.pos.x - g.end.threshold.x, o.pos.y - g.end.threshold.y) < mine && mine - Math.hypot(o.pos.x - g.end.threshold.x, o.pos.y - g.end.threshold.y) < 6 * 1852);
-        plans.push(!crowded && safe(mkCmd('APPROACH', ac, f)) ? plan('APPROACH', f, say.clauses(say.callsign(ac), say.clearedApproach('VISUAL', g.end.id)), `${ac.callsign} cleared visual approach runway ${g.end.id}`) : unable('expect vectors for the approach'));
+        // nor from too high: the engine flies the descent at the airliner's 1,060 fpm, a visual approach cleared at 5,000 ft 5.7 nm out crossed the threshold at 2,350 ft and
+        // touched down 7.6 km along the runway (soak seed 12). The same height test as the final approach fix (`tooHighForFaf`: 450 ft per nm and 1,000 ft), against the runway end.
+        const tooHigh = tooHighForFaf(ac.altitudeFt - airport.elevationFt, mine / 1852);
+        plans.push(!crowded && !tooHigh && safe(mkCmd('APPROACH', ac, f)) ? plan('APPROACH', f, say.clauses(say.callsign(ac), say.clearedApproach('VISUAL', g.end.id)), `${ac.callsign} cleared visual approach runway ${g.end.id}`) : unable('expect vectors for the approach'));
         break;
       }
       case 'TAXI_BACK': {

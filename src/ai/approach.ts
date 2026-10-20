@@ -117,19 +117,26 @@ function descentAltitude(v: AgentView, ac: Aircraft, info: ProcedureInfo | undef
 }
 
 /** The fix the AI sends an aircraft to when it is not on a route that joins the procedure: the nearest IAF/IF ahead of the FAF. */
+/**
+ * The fix the aircraft is sent direct to in order to join the approach: the nearest fix of the procedure (not the FAF itself), or, when the aircraft is already
+ * within `JOIN_FIX_PASSED_NM` of it, the next one along the procedure. A "direct" to a fix the aircraft is at completes the route at once and leaves the aircraft
+ * on a heading that does not join the approach: soak seeds 8 and 12 ("proceed direct FLDER" every 30-100 s for 30-56 minutes).
+ */
+const JOIN_FIX_PASSED_NM = 2.5;
 function joinFix(v: AgentView, ac: Aircraft, info: ProcedureInfo): string | undefined {
   const ids = [...info.feeders, ...info.onCourse.map((f) => f.id)];
   const usable = ids.length > 1 ? ids.slice(0, -1) : ids; // not the FAF itself
-  let best: string | undefined;
+  let best = -1;
   let bestD = Infinity;
-  for (const id of usable) {
+  usable.forEach((id, i) => {
     const d = distanceToFixNm(v.airport, ac.pos, id);
     if (d !== undefined && d < bestD) {
-      best = id;
+      best = i;
       bestD = d;
     }
-  }
-  return best;
+  });
+  if (best < 0) return undefined;
+  return bestD < JOIN_FIX_PASSED_NM && best + 1 < usable.length ? usable[best + 1] : usable[best];
 }
 
 /** The nearest arrival ahead of `ac` for the same runway (closer to the threshold), if any. */

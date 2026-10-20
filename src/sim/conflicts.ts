@@ -587,6 +587,9 @@ function arrivalsOverRunway(state: SimulationState, rw: Runway, excludeId: strin
  * preceding aircraft's threshold crossing, touchdown and rollout / exit time against the follower's projected threshold crossing,
  * with a 3 s margin.
  */
+/** A pattern aircraft whose heading is within this many degrees of the runway heading is on its final (DESIGN VALUE; base is 90 degrees off, downwind 180). */
+const PATTERN_FINAL_HEADING_DEG = 40;
+
 export function precedingArrivalBlockers(state: SimulationState, ac: Aircraft, g: RunwayEndGeom): { other: Aircraft; tMine: number; tTd: number; tClear: number }[] {
   const out: { other: Aircraft; tMine: number; tTd: number; tClear: number }[] = [];
   if (ac.onGround) return out;
@@ -596,6 +599,10 @@ export function precedingArrivalBlockers(state: SimulationState, ac: Aircraft, g
     if (o.id === ac.id || o.onGround || o.assignedRunwayEnd !== g.end.id || !isArriving(o)) continue;
     const { along, cross } = alongCross(g, o.pos);
     if (along <= myAlong || Math.abs(cross) > FINAL_LATERAL_M) continue; // behind the subject: it is the follower
+    // A pattern aircraft that is not on its final (on the upwind / crosswind / downwind leg abeam the runway, heading some other way) is not "ahead on the same final": it lands
+    // only after the turn to base and final, and the sequencer (ai/sequence.ts) places it there. Counting it as landing now sent the aircraft behind it around (soak seed 6:
+    // "N9001T ahead on the same final lands in 172 s" with N9001T on a 0.9 nm downwind).
+    if (o.phase === 'PATTERN' && Math.abs(headingDiff(o.headingDeg, g.headingDeg)) > PATTERN_FINAL_HEADING_DEG) continue;
     const proj = projectArrival(state, o, g);
     if (tMine >= proj.tClear + ARRIVAL_CLEAR_MARGIN_SEC) continue; // landed and clear when the follower crosses the threshold
     if (tMine >= proj.tTd && landedExceptionHolds(state, ac, o, proj.alongAt(tMine) - g.displacedM - perfOf(o).lengthM / 2)) continue; // by day, 3,000 / 4,500 ft down the runway

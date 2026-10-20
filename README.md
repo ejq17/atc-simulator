@@ -190,7 +190,7 @@ their callsigns, say "student pilot" and ask for things. How much is the **pilot
   6-9 moderate, 10-12 heavy. Free play: a "Pilot realism" selector on the setup screen, default moderate. Anything else with a `Difficulty`: easy = light,
   normal = moderate, hard = heavy. A scenario without any level keeps the earlier behaviour (only the seeded runway / heading digit error, 8 %).
 * Everything is seeded from the aircraft seed (or the engine generator): the same seed gives the same mistakes, the same blocked calls, the
-  same event log. All rates are **design values** (the FAA text says what is correct, not how often pilots deviate) and live in one object,
+  same event log. The five readback error rates of `moderate` are **measured FAA figures** (DOT/FAA/AM-06/25, TRACON recordings; `docs/DESIGN-VALUES.md`); every other rate is a **design value** (the FAA text says what is correct, not how often pilots deviate). They live in one object,
   `src/sim/pilotBehaviour.ts`; `Scenario.pilotBehaviour.realism` overrides single values.
 * Readback errors beyond the digit slip (JO 7110.65 2-4-3, 3-7-2, AIM 4-4-7 b): wrong altitude, frequency, squawk, hold-short left out, wrong
   taxiway, pattern instruction misunderstood, no readback at all, and an aircraft with a similar callsign answering a clearance meant for
@@ -206,9 +206,10 @@ their callsigns, say "student pilot" and ask for things. How much is the **pilot
 
   | Controllers | light | moderate | heavy | pilot calls (light / moderate / heavy) |
   |---|---|---|---|---|
-  | AI on every position | 0.13 % | 1.03 % | 0.57 % | 1,581 / 1,356 / 1,753 |
-  | Human Tower (answers promptly), AI on the rest | 0 % | 0 % | 0.19 % | 1,221 / 1,344 / 1,036 |
+  | AI on every position | 0.37 % | 0.13 % | 0.76 % | 1,633 / 1,546 / 1,577 |
+  | Human Tower (answers promptly), AI on the rest | 0 % | 0 % | 0.58 % | 1,091 / 1,181 / 1,034 |
 
+  (Re-measured 2026-10-19 after the readback error rates were set to the FAA-measured figures and the AI corrections / approach / arrival-slot fixes; before those changes the same protocol gave 0.13 / 1.03 / 0.57 % and 0 / 0 / 0.19 %. Fewer pilot mistakes mean fewer re-issued calls; the rows differ by noise.)
   A row is at most 14 blocked calls, so differences of a percent between cells are noise. Earlier figures in the repository history (2.1-3.9 %, 6.2-8.4 %) came from other
   builds or set-ups; `docs/BEHAVIOUR-ACCURACY.md` R9 reconciles them.
 * Callsigns (AIM 4-2-4): "November" or the type word on first contact, "student pilot" for students, the abbreviated form (type word and the
@@ -217,18 +218,20 @@ their callsigns, say "student pilot" and ask for things. How much is the **pilot
 * Requests (answer with an ordinary command, or say "unable"): runway change, short approach, the option, straight-in, stay in the pattern,
   "we need a minute" at the hold, a 360 for spacing, higher / lower, direct a fix, "field in sight, request visual", taxi back.
 
-Levels (design values):
+Levels (readback errors: `moderate` = FAA AM-06/25 Tables 6 and 10, `light` half, `heavy` twice; everything else a design value):
 
 | Design value (`PilotRealism`, `src/sim/pilotBehaviour.ts`) | off | light | moderate | heavy |
 |---|---|---|---|---|
-| Runway / heading digit error (`digitErrorRate`) | 0 | 4 % | 8 % | 12 % |
-| Altitude (`altitudeErrorRate`), frequency, squawk | 0 | 2 % | 4 % | 7 % |
+| Runway / heading digit error (`digitErrorRate`; heading readbacks 3.93 % in AM-06/25) | 0 | 2 % | 4 % | 8 % |
+| Altitude (`altitudeErrorRate`; 1.18 % measured) | 0 | 0.6 % | 1.2 % | 2.4 % |
+| Frequency (`frequencyErrorRate`; 6.15 % measured) | 0 | 3 % | 6 % | 12 % |
+| Squawk (`squawkErrorRate`; 2.50 % measured, n = 40) | 0 | 1.2 % | 2.5 % | 5 % |
 | Hold-short omitted (`ground.holdShortOmitFraction`, ground task) | 0 | 4 % | 8 % | 12 % |
 | Wrong taxiway (`ground.taxiwayErrorShare` x digit rate, ground task) | 0 | 0.5 x | 0.5 x | 0.5 x |
 | Unfamiliar pilots, progressive taxi (`ground.unfamiliarFraction`) | 0 | 5 % | 10 % | 15 % |
 | Pattern instruction misunderstood (`patternMisunderstandRate`; x3 for students at moderate, heavy) | 0 | 3 % | 5 % | 8 % |
 | Similar-callsign aircraft answers (`wrongCallsignRate`, needs a similar callsign on the frequency) | 0 | 15 % | 30 % | 50 % |
-| No readback at all (`noReadbackRate`) | 0 | 2 % | 4 % | 7 % |
+| No readback at all (`noReadbackRate`; 3.8 % of messages unacknowledged in AM-06/25) | 0 | 1.9 % | 3.8 % | 7.6 % |
 | Response delay s, airline / GA / student (`responseDelaySec`) | 0 | 0.4-1.2 / 0.8-2.2 / 1.5-3.5 | 0.5-1.8 / 1-3.2 / 2-5 | 0.6-2.4 / 1.2-4 / 2.5-6.5 |
 | Call missed, needs a second call (`delayedResponseRate`) | 0 | 1.5 % | 3 % | 5 % |
 | "Say again" on a transmission of more than N instructions (`sayAgainRate`, `sayAgainMinCommands`; students x1.5 / 2 / 2) | 0 | 15 %, N=3 | 25 %, N=3 | 35 %, N=2 |

@@ -6,6 +6,7 @@ import type { Aircraft, Clearance } from '../sim/types';
 import { mkCmd } from './core';
 import type { Agent, AgentView, Plan } from './core';
 import * as say from './phrase';
+import { findStar } from '../sim/star';
 
 const RETRY_COOLDOWN_SEC = 8;
 
@@ -66,6 +67,24 @@ function planFor(v: AgentView, ac: Aircraft, clr: Clearance, parking: (id: strin
       return clr.speedKt !== undefined ? { cmds: [mkCmd('SPEED', ac, { speedKt: clr.speedKt })], phrase: say.negative(say.clauses(say.callsign(ac), say.reduceSpeed(clr.speedKt))) } : undefined;
     case 'DIRECT_FIX':
       return clr.fix ? { cmds: [mkCmd('DIRECT_FIX', ac, { fix: clr.fix })], phrase: say.negative(say.clauses(say.callsign(ac), say.direct(v.airport, clr.fix))) } : undefined;
+    // Approach / Departure / Tower / Ground instructions that had no case here were never repeated when the pilot gave no readback (soak seed 8: "hold at CARYL
+    // as published"; the pilot did not receive it, the 20 s window dropped it and nothing was said for 190 s).
+    case 'HOLD_AT_FIX':
+      return clr.hold?.fix && clr.hold.asPublished
+        ? { cmds: [mkCmd('HOLD_AT_FIX', ac, { hold: clr.hold })], phrase: say.negative(say.clauses(say.callsign(ac), say.holdAsPublished(v.airport, clr.hold.fix))) }
+        : undefined;
+    case 'STAR':
+      return clr.starName
+        ? { cmds: [mkCmd('STAR', ac, { starName: clr.starName, descendVia: clr.descendVia })], phrase: say.negative(say.clauses(say.callsign(ac), say.descendViaArrival(findStar(v.airport, clr.starName)?.star.spokenName ?? clr.starName))) }
+        : undefined;
+    case 'PUSHBACK':
+      return { cmds: [mkCmd('PUSHBACK', ac, clr.pushTailDeg !== undefined ? { pushTailDeg: clr.pushTailDeg } : {})], phrase: say.negative(say.pushbackApproved(ac)) };
+    case 'ENTER_PATTERN':
+      return clr.runwayEnd && clr.patternLeg
+        ? { cmds: [mkCmd('ENTER_PATTERN', ac, { runwayEnd: clr.runwayEnd, patternLeg: clr.patternLeg })], phrase: say.negative(say.enterPattern(ac, clr.runwayEnd, clr.patternLeg.replace('_', ' '))) }
+        : undefined;
+    case 'SQUAWK':
+      return clr.squawk ? { cmds: [mkCmd('SQUAWK', ac, { squawk: clr.squawk })], phrase: say.negative(say.squawkCode(ac, clr.squawk)) } : undefined;
     case 'IFR_CLEARANCE':
       return clr.ifr
         ? { cmds: [mkCmd('IFR_CLEARANCE', ac, { ifr: clr.ifr })], phrase: say.negative(say.ifrClearance(ac, v.facility(ac), clr.ifr, v.airport)) }

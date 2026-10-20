@@ -234,7 +234,7 @@ function releaseVerdict(v: AgentView, r: CoordRequest): Verdict {
   const missed = Object.values(state.aircraft).some((a) => !a.isDeparture && !a.onGround && a.phase === 'GO_AROUND' && a.flightPlan?.flightRules === 'IFR');
   if (missed) return { answer: 'deny', reason: 'missed approach in progress' };
   const recent = (state.coordination?.requests ?? []).some(
-    (o) => o.topic === 'RELEASE' && o.id !== r.id && o.aircraftId !== r.aircraftId && o.approvedSec !== undefined
+    (o) => o.topic === 'RELEASE' && o.id !== r.id && o.aircraftId !== r.aircraftId && !o.renewalOf && o.approvedSec !== undefined
       && now - o.approvedSec < COORDINATION_DESIGN.releaseSpacingSec && (o.status === 'approved' || o.status === 'used' || o.status === 'completed'),
   );
   return recent ? { answer: 'standby' } : { answer: 'approve' };

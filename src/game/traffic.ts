@@ -40,7 +40,7 @@ import { pickArrivalStart, pickParking } from './placement';
 import type { AirbornePoint } from './placement';
 import type { Difficulty, GameScenario } from './types';
 import { arrivalJoinNm, arrivalProcedure, ifrArrivalSpawn, ifrDepartureSpawn, isTurbojet, resolveIfrFlows, starArrival, starArrivalSpawn } from './ifr';
-import { alongCross, findRunwayEnd } from '../sim/runways';
+import { alongCross, crossingRunways, findRunwayEnd } from '../sim/runways';
 import { getPerformance } from '../sim/performance';
 import { mToNm } from '../sim/geo';
 import { findNavFix } from '../sim/navigation';
@@ -57,6 +57,20 @@ export const MIN_SPAWN_SPACING_SEC = 45;
  * Tower can only send them around or hold them on an extended downwind.
  */
 export const ARRIVAL_SLOT_SEC = 200;
+/**
+ * ... and, while departures stand at a hold line of the runway waiting for it, `ARRIVAL_SLOT_BASE_SEC + n * ARRIVAL_SLOT_PER_DEPARTURE_SEC` for n waiting departures
+ * (n capped at 3, never below `ARRIVAL_SLOT_SEC`): the runway then needs a gap for each of them as well, which Approach leaves when it spaces arrivals (JO 7110.65
+ * 3-9-5 anticipating separation, 3-8-1 sequencing). The figures are the engine's own: a light aircraft that rolls out to the far exit holds the runway about 130 s
+ * (KACY 4/22, exit A at 1,860 m), and a jet departure behind a light arrival needs `neededEtaSec` = 143 s (ai/tower.ts), rounded up to 150 s, before the next arrival
+ * crosses the threshold: one departure 130 + 150 = 280 s. DESIGN VALUES (nothing in the order fixes a slot). The soak showed departures waiting 1,490 s at a 200 s slot
+ * (docs/DESIGN-VALUES.md section 9).
+ */
+export const ARRIVAL_SLOT_BASE_SEC = 130;
+export const ARRIVAL_SLOT_PER_DEPARTURE_SEC = 150;
+/** The arrival slot (s) while `departuresWaiting` departures have stood ready at the hold line for `DEPARTURE_WAIT_FOR_SLOT_SEC`. */
+export const arrivalSlotSec = (departuresWaiting: number): number => Math.max(ARRIVAL_SLOT_SEC, ARRIVAL_SLOT_BASE_SEC + Math.min(3, departuresWaiting) * ARRIVAL_SLOT_PER_DEPARTURE_SEC);
+/** A departure counts as waiting for a gap after standing ready at the hold line this long (s). DESIGN VALUE. */
+export const DEPARTURE_WAIT_FOR_SLOT_SEC = 120;
 export const MAX_ARRIVALS_IN_FLIGHT = 6;
 /**
  * Departure flow control (design value): no new departure appears at a gate while this many departures are on the ground and not yet airborne
@@ -204,6 +218,10 @@ export function createTrafficGenerator(scenario: Scenario, airport: Airport, opt
     if (!g) return true;
     const light = getPerformance(type).category === 'light';
     const mine = light ? NOMINAL_ETA_LIGHT_SEC : NOMINAL_ETA_JET_SEC;
+    const rws = [g.runway.id, ...crossingRunways(airport, g.runway.id).map((r) => r.id)];
+    const waitingDepartures = Object.values(state.aircraft).filter((a) => a.isDeparture && a.onGround && a.phase === 'HOLDING_SHORT' && a.assignedRunwayEnd !== undefined && state.clock.timeSec - (a.pendingRequest?.sinceSec ?? state.clock.timeSec) >= DEPARTURE_WAIT_FOR_SLOT_SEC
+      && rws.includes(findRunwayEnd(airport, a.assignedRunwayEnd)?.runway.id ?? ''));
+    const slot = arrivalSlotSec(waitingDepartures.length);
     let inFlight = 0;
     for (const a of Object.values(state.aircraft)) {
       if (a.onGround || a.isDeparture || a.assignedRunwayEnd === undefined || a.flags.transit || a.type === 'H65') continue;
@@ -213,7 +231,7 @@ export function createTrafficGenerator(scenario: Scenario, airport: Airport, opt
       const near = a.phase === 'PATTERN' || a.phase === 'GO_AROUND' || a.phase === 'HOLDING';
       const kt = getPerformance(a.type).category === 'light' ? EXPECTED_SPEED_LIGHT_KT : EXPECTED_SPEED_JET_KT;
       const eta = near ? NEAR_FIELD_ETA_SEC : (mToNm(Math.hypot(a.pos.x - g.end.threshold.x, a.pos.y - g.end.threshold.y)) / kt) * 3600;
-      if (Math.abs(eta - mine) < ARRIVAL_SLOT_SEC) return false;
+      if (Math.abs(eta - mine) < slot) return false;
     }
     return inFlight < MAX_ARRIVALS_IN_FLIGHT;
   };

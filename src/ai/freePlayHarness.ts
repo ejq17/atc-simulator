@@ -25,6 +25,8 @@ export interface SoakResult {
   /** Seconds each departure stood at a runway hold line (HOLDING_SHORT) before it was lined up or cleared. */
   holdWaitsSec: number[];
   goArounds: number;
+  /** The most go-arounds one aircraft flew in the run, and who. */
+  maxGoArounds: { count: number; callsign: string };
   /** Aircraft the generator put into the sim: arrivals and departures (the offered traffic; the generator is state dependent through its flow control). */
   spawnedArrivals: number;
   spawnedDepartures: number;
@@ -76,7 +78,7 @@ export function runFreePlaySoak(seed: number, realism: Realism, simHours: number
   const landedIds = new Set<string>();
   const departedIds = new Set<string>();
   const phaseSince = new Map<string, { phase: string; since: number }>();
-  const res: SoakResult = { rows: [], landed: [], departed: [], msPerSimSec: [], maxWaitSec: 0, maxWaitText: '', safety: [], finalCount: 0, events, stubPairs: [], noseToNose: 0, holdWaitsSec: [], goArounds: 0, spawnedArrivals: 0, spawnedDepartures: 0, longWaits: [], exitHolds: {} };
+  const res: SoakResult = { rows: [], landed: [], departed: [], msPerSimSec: [], maxWaitSec: 0, maxWaitText: '', safety: [], finalCount: 0, events, stubPairs: [], noseToNose: 0, holdWaitsSec: [], goArounds: 0, maxGoArounds: { count: 0, callsign: '' }, spawnedArrivals: 0, spawnedDepartures: 0, longWaits: [], exitHolds: {} };
   const pairs = new Map<string, string>();
   const pairSince = new Map<string, number>();
   const waitLog: { sec: number; text: string }[] = [];
@@ -159,6 +161,9 @@ export function runFreePlaySoak(seed: number, realism: Realism, simHours: number
   res.longWaits = waitLog.sort((x, y) => y.sec - x.sec).map((w) => w.text);
   res.stubPairs = [...pairs.values()];
   res.goArounds = events.filter((e) => e.kind === 'GO_AROUND').length;
+  const perAircraft = new Map<string, number>();
+  for (const e of events) if (e.kind === 'GO_AROUND') perAircraft.set(e.callsign ?? '?', (perAircraft.get(e.callsign ?? '?') ?? 0) + 1);
+  for (const [callsign, count] of perAircraft) if (count > res.maxGoArounds.count) res.maxGoArounds = { count, callsign };
   res.noseToNose = events.filter((e) => /nose to nose/i.test(e.text)).length;
   res.finalCount = Object.keys(engine.getState().aircraft).length;
   res.safety = events.filter((e) => e.kind === 'RUNWAY_INCURSION' || e.kind === 'SEPARATION_VIOLATION').map((e) => `${Math.round(e.timeSec)} ${e.kind} ${e.text}`);

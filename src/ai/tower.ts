@@ -20,7 +20,7 @@ import { stoppedExitOptionsFor } from '../sim/runwayStop';
 import { getPerformance } from '../sim/performance';
 import { holdTooShort } from '../sim/holdSelection';
 import { hasActive, landingHoldShort, lastClearance, mkCmd } from './core';
-import { isSequenceable, patternLeg, sequenceDownwind, turnsBaseSoon } from './sequence';
+import { arrivalWindow, isSequenceable, patternLeg, sequenceDownwind, turnsBaseSoon } from './sequence';
 import type { SeqWindow } from './sequence';
 import type { Agent, AgentView, Plan } from './core';
 import {
@@ -55,7 +55,7 @@ export function landingInfo(v: AgentView, g: RunwayEndGeom): say.Phrase[] {
 const LINE_UP_DELAY_SEC = 20;
 const RELEASE_MARGIN_SEC = 30;
 /** A departure waiting longer than this at the hold for a gap makes the pattern traffic that can be delayed leave one. DESIGN VALUE. */
-const DEPARTURE_PRIORITY_WAIT_SEC = 90;
+const DEPARTURE_PRIORITY_WAIT_SEC = 30;
 /** A crossing request that has waited this long (s) makes the delayable pattern traffic leave a gap of CROSSING_WINDOW_SEC. DESIGN VALUES. */
 const CROSSING_PRIORITY_WAIT_SEC = 30;
 const CROSSING_WINDOW_SEC = 75;
@@ -177,7 +177,35 @@ export const ARRIVAL_RUNWAY_GAP_SEC = 80;
  * An arrival ahead of `ac` on the same runway (or an intersecting one) that has not left the runway yet, or will not have by the
  * time `ac` arrives. The engine only judges a landing clearance against aircraft that are already on the ground.
  */
+/** An aircraft that has already gone around this many times gets the next window: it is never sent around for spacing again (DESIGN VALUE). */
+export const PRIORITY_GO_AROUNDS = 2;
+/** A jet that has been in the approach phase this long (s) without an approach clearance is number one: the light straight-in aircraft in its way join the pattern. DESIGN VALUE. */
+export const JET_WAIT_PRIORITY_SEC = 300;
+/** ... those whose threshold time is within this many seconds of the jet's (wake turbulence: 4 nm behind an A320 at 65-70 kt is about 210-250 s, 5-5-4 TBL on approach F to I). */
+export const JET_CLEAR_WINDOW_SEC = 240;
+/** A straight-in light aircraft closer than this to the threshold (nm) is not moved to the pattern for a jet. DESIGN VALUE. */
+const STRAIGHT_IN_TO_PATTERN_MIN_NM = 4;
+
+/** The jet (IFR, not light) waiting for its approach clearance that this light straight-in aircraft stands in the way of (within `JET_CLEAR_WINDOW_SEC` of its threshold time). */
+export function jetWaitingBehind(v: AgentView, ac: Aircraft, g: RunwayEndGeom): Aircraft | undefined {
+  const mine = arrivalWindow(v.state, ac, g).start;
+  for (const j of Object.values(v.state.aircraft)) {
+    if (j.id === ac.id || j.onGround || j.isDeparture || j.flightRules !== 'IFR' || getPerformance(j.type).category === 'light') continue;
+    if (j.phase !== 'APPROACH' && j.phase !== 'INBOUND') continue;
+    if (j.assignedRunwayEnd !== g.end.id || j.clearances.some((c) => c.kind === 'APPROACH' && c.completedAtSec === undefined)) continue;
+    if (v.now - Math.max(j.spawnedAtSec, j.lastGoAroundSec ?? 0) < JET_WAIT_PRIORITY_SEC) continue;
+    if (Math.abs(arrivalWindow(v.state, j, g).start - mine) < JET_CLEAR_WINDOW_SEC) return j;
+  }
+  return undefined;
+}
+export const priorityArrival = (ac: Aircraft): boolean => (ac.goAroundCount ?? 0) >= PRIORITY_GO_AROUNDS;
+
+/** 360s for spacing the Tower has given this aircraft since its last go-around. */
+const spacingCircles = (ac: Aircraft): number =>
+  ac.clearances.filter((c) => c.kind === 'PATTERN_INSTRUCTION' && c.destination === 'CIRCLE' && c.issuedAtSec > (ac.lastGoAroundSec ?? -1)).length;
+
 export function blockedByLeader(v: AgentView, ac: Aircraft, g: RunwayEndGeom): Aircraft | undefined {
+  if (priorityArrival(ac)) return undefined;
   const rws = interactingRunways(v.airport, g.runway.id);
   const myEta = etaToThresholdSec(ac, g);
   for (const o of Object.values(v.state.aircraft)) {
@@ -222,6 +250,7 @@ export function awaitingResequence(v: AgentView, ac: Aircraft): boolean {
  */
 export function earlyGoAroundReason(v: AgentView, ac: Aircraft, g: RunwayEndGeom): string | undefined {
   if (ac.phase !== 'FINAL' || distToThresholdNm(ac, g) > EARLY_GO_AROUND_NM) return undefined;
+  if (priorityArrival(ac)) return undefined; // spacing is never a reason to send it around a third time
   const blockers = precedingArrivalBlockers(v.state, ac, g);
   if (blockers.length) return `${blockers[0].other.callsign} will not be clear of the runway`;
   const mine = distToThresholdNm(ac, g);
@@ -320,19 +349,26 @@ export function createTowerAgent(): Agent {
       // An aircraft that needs a release is not lined up before it has one: lined up, it blocks the runway for the arrivals behind it (they go around) while
       // Departure holds the release because of those go-arounds - a cycle (free-play soak, docs/PROGRESS.md). The release is asked for at the hold line as soon
       // as the line-up itself would be possible.
-      const wantRelease = relPos && !validApproval(state, 'RELEASE', ac.id) && (takeoffOk || (ac.phase === 'HOLDING_SHORT' && slack >= LINEUP_EXTRA_SEC && safe(takeoff)));
-      if (wantRelease) {
+      // The release is asked for as soon as the departure is first at the hold line, not when a gap happens to be open (soak seed 3, moderate: the release
+      // was asked for when the gap opened, lapsed 120 s later because the lander ahead was still rolling out, and the next request came 740 s later, when a gap
+      // happened to open at the same moment as an empty runway). It is renewed when it has `releaseRenewBeforeSec` left and the departure still waits, so that
+      // the takeoff clearance is not held up for lack of it when the gap comes. JO 7110.65 4-3-4 / the LOA: the release is Departure's, it does not depend on the
+      // runway being free; 3-9-5 and 3-9-6 are applied when the takeoff clearance is given (`takeoffOk`).
+      const held = validApproval(state, 'RELEASE', ac.id);
+      const renewDue = !!held && ac.phase === 'HOLDING_SHORT' && !takeoffOk && held.expiresSec !== undefined && held.expiresSec - v.now <= COORDINATION_DESIGN.releaseRenewBeforeSec;
+      const wantRelease = !!relPos && ((!held && (takeoffOk || ac.phase === 'HOLDING_SHORT')) || renewDue);
+      if (wantRelease && relPos) {
         // The takeoff would be possible, but Departure/Approach has not released the aircraft (LOA concept, 7110.65 4-3-4): ask, and keep
         // asking every reask interval until it is answered. The aircraft simply stays at the hold line meanwhile.
         const open = findOpenRequest(state, 'RELEASE', ac.id);
-        if (!open || (open.status === 'pending' && v.now - open.lastAskSec >= COORDINATION_DESIGN.reaskIntervalSec)) {
+        if (!open || (open.status === 'pending' && v.now - open.lastAskSec >= COORDINATION_DESIGN.reaskIntervalSec) || (renewDue && open.status === 'approved')) {
           plans.push({
             key: `${ac.id}:rel-ask:${open?.id ?? 'new'}:${open?.asks ?? 0}`, aircraftId: ac.id, callsign: ac.callsign, priority: 79, cmds: [],
             phrase: { text: '', spoken: '' }, cooldownSec: 20, summary: `${ac.callsign}: asking ${relPos} for the release`,
             coord: {
               to: relPos,
               run: (api) => {
-                const req = api.request({ topic: 'RELEASE', from: 'TWR', to: relPos, aircraftId: ac.id, runwayId: g.runway.id, source: 'ai' });
+                const req = api.request({ topic: 'RELEASE', from: 'TWR', to: relPos, aircraftId: ac.id, runwayId: g.runway.id, source: 'ai', renew: renewDue });
                 const msgs = state.coordination?.messages ?? [];
                 return req ? [...msgs].reverse().find((m) => m.requestId === req.id) : undefined;
               },
@@ -385,7 +421,8 @@ export function createTowerAgent(): Agent {
       for (const o of v.onFrequency) {
         if (!o.isDeparture || !o.onGround || (o.phase !== 'HOLDING_SHORT' && o.phase !== 'LINE_UP_AND_WAIT') || !rws.includes(findRunwayEnd(airport, o.assignedRunwayEnd)?.runway.id ?? '')) continue;
         const since = mem.notes.get(`hold:${o.id}`);
-        if (since === undefined || v.now - since < DEPARTURE_PRIORITY_WAIT_SEC) continue;
+        // (a departure that holds its release has the next window at once: Departure released it for this gap, 4-3-4; the pattern traffic that can be delayed gives way, 3-8-1 / 3-9-5)
+        if (!validApproval(state, 'RELEASE', o.id) && (since === undefined || v.now - since < DEPARTURE_PRIORITY_WAIT_SEC)) continue;
         depWindows.push({ start: 0, end: departureTimes(o, o.phase === 'LINE_UP_AND_WAIT').beyond6000 + RELEASE_MARGIN_SEC });
         break;
       }
@@ -607,6 +644,31 @@ export function createTowerAgent(): Agent {
       const goAroundNm = Math.max(GO_AROUND_NM, (Math.max(ac.groundSpeedKt, 60) * GO_AROUND_SEC) / 3600);
       const inRange = (ac.phase === 'FINAL' ? d <= goAroundNm : isOnFinal(g, ac.pos, ac.headingDeg, goAroundNm)) && ['FINAL', 'APPROACH', 'PATTERN', 'INBOUND'].includes(ac.phase);
       const early = earlyGoAroundReason(v, ac, g);
+      // A light VFR aircraft that stands in the way of a jet which has waited for its approach clearance joins the pattern (the jet is number one: it cannot slow
+      // below 120-140 kt behind a 55 kt aircraft, and a final full of light aircraft 5 nm apart never has a hole for it, soak seed 12: 36 minutes at 1,800 ft).
+      // Pattern aircraft are the ones the sequence can delay; 3-8-1, 3-10-6.
+      if (!cleared && (ac.phase === 'APPROACH' || ac.phase === 'INBOUND') && ac.flightRules !== 'IFR' && getPerformance(ac.type).category === 'light' && !priorityArrival(ac)
+        && d >= STRAIGHT_IN_TO_PATTERN_MIN_NM && !ac.flags.training && !mem.done.has(`${ac.id}:to-pattern`)) {
+        const jet = jetWaitingBehind(v, ac, g);
+        if (jet) {
+          plans.push({
+            key: `${ac.id}:to-pattern`, aircraftId: ac.id, callsign: ac.callsign, priority: 88, once: true,
+            cmds: [mkCmd('ENTER_PATTERN', ac, { runwayEnd: g.end.id, patternLeg: 'left_downwind' })], phrase: say.enterPattern(ac, g.end.id, 'left downwind'),
+            summary: `${ac.callsign} left downwind runway ${g.end.id} (${jet.callsign} is number one)`,
+          });
+          continue;
+        }
+      }
+      // Spacing is made before the final: an aircraft on base that would meet the traffic ahead is given a 360 for spacing (JO 7110.65 3-8-1; the pilot makes it on the
+      // base leg), not a go-around, which stays the safety action of the last 30 s. Twice at most; then it is next in the sequence (`PRIORITY_GO_AROUNDS`).
+      if (!landSafe && !cleared && !inRange && !early && isSequenceable(ac) && patternLeg(ac, g) === 'BASE' && spacingCircles(ac) < PRIORITY_GO_AROUNDS && !mem.done.has(`${ac.id}:circle:${spacingCircles(ac)}`)) {
+        plans.push({
+          key: `${ac.id}:circle:${spacingCircles(ac)}`, aircraftId: ac.id, callsign: ac.callsign, priority: 90, once: true,
+          cmds: [mkCmd('PATTERN_INSTRUCTION', ac, { destination: 'CIRCLE', turnDirection: 'left', turnDegrees: 360 })], phrase: say.clauses(say.callsign(ac), 'make left three sixty for spacing'),
+          summary: `${ac.callsign} make a left 360 for spacing (${why})`,
+        });
+        continue;
+      }
       if ((inRange && !landSafe) || early) {
         plans.push({
           key: `${ac.id}:go-around`, aircraftId: ac.id, callsign: ac.callsign, priority: 100,

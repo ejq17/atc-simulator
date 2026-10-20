@@ -34,7 +34,7 @@ describe('level resolution', () => {
       expect(v, k).toEqual([...v].sort((a, b) => a - b));
     }
     expect(PILOT_REALISM_PRESETS.off.digitErrorRate).toBe(0);
-    expect(PILOT_REALISM_PRESETS.moderate.digitErrorRate).toBe(0.08); // the pre-realism global rate
+    expect(PILOT_REALISM_PRESETS.moderate.digitErrorRate).toBe(0.04); // measured heading readback error rate (DOT/FAA/AM-06/25 Table 10)
   });
   it('maps Difficulty: easy light, normal moderate, hard heavy', () => {
     expect(realismForDifficulty('easy')).toBe('light');
