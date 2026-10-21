@@ -2,7 +2,10 @@
   "name": "atc-simulator",
   "private": true,
   "homepage": "https://ejq17.github.io/atc-simulator/",
-  "repository": { "type": "git", "url": "git+https://github.com/ejq17/atc-simulator.git" },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ejq17/atc-simulator.git"
+  },
   "license": "MIT",
   "version": "0.0.0",
   "type": "module",
@@ -21,6 +24,7 @@
     "test:e2e": "playwright test"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^1.0.0",
     "@huggingface/transformers": "^4.3.1",
     "kokoro-js": "^1.2.1",
     "onnxruntime-web": "1.31.0-dev.20260914-8d85527a0",

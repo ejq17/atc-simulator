@@ -394,6 +394,8 @@ export interface Clearance {
   byPosition: ControllerPositionId;
   runwayEnd?: string;            // "13"
   runwayId?: string;             // "13/31" for crossing / hold short
+  /** CROSS_RUNWAY: conditional crossing, the aircraft that must pass the crossing point first (ParsedCommand.behindCallsign). */
+  behindCallsign?: string;
   route?: string[];              // taxiway identifiers in order
   holdShort?: string[];          // runway ids to hold short of
   destination?: string;          // parking id or "RWY13"
@@ -560,6 +562,13 @@ export interface ParsedCommand {
   route?: string[];
   holdShort?: string[];
   crossRunwayId?: string;
+  /**
+   * CROSS_RUNWAY: conditional crossing "cross runway 13 behind the landing Cessna" (callsign of the aircraft to let pass first).
+   * ICAO Doc 4444 conditional clearance, not JO 7110.65 phraseology: always flagged non-standard.
+   */
+  behindCallsign?: string;
+  /** Set when the command came from the cloud phrase interpreter (src/commands/llm) rather than the rule grammar. */
+  interpretedBy?: 'grammar' | 'llm';
   destination?: string;
   headingDeg?: number;             // magnetic
   /** TAKEOFF: heading to fly after liftoff, magnetic (JO 7110.65 5-8-2 departure instruction given with the takeoff clearance); `turnDirection` is the turn to it. */
