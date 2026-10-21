@@ -18,11 +18,17 @@ const deepgram = vi.fn((_req: unknown, res: import('node:http').ServerResponse) 
   res.end('{"configured":false}');
 });
 
+const llm = vi.fn((req: import('node:http').IncomingMessage, res: import('node:http').ServerResponse) => {
+  res.statusCode = 200;
+  res.setHeader('Content-Type', 'application/json');
+  res.end(JSON.stringify({ routed: req.method }));
+});
+
 let server: Server;
 let port: number;
 
 beforeAll(async () => {
-  server = createAppServer({ awc: createAwcClient({ fetch: upstream }), deepgram });
+  server = createAppServer({ awc: createAwcClient({ fetch: upstream }), deepgram, llm });
   await new Promise<void>((r) => server.listen(0, '127.0.0.1', r));
   port = (server.address() as AddressInfo).port;
 });
@@ -50,6 +56,22 @@ describe('server routes', () => {
     expect(r.status).toBe(200);
     expect(r.json()).toMatchObject({ ok: true, service: 'kacy-atc-sim-backend' });
     expect(r.headers['content-type']).toContain('application/json');
+  });
+
+  it('GET /api/health reports the phrase interpreter state without any key', async () => {
+    const r = (await call('GET', '/api/health')).json();
+    expect(typeof r.llmConfigured).toBe('boolean');
+    expect(typeof r.llmModel).toBe('string');
+    expect(JSON.stringify(r)).not.toMatch(/sk-ant/);
+  });
+
+  it('routes /api/llm/parse to the injected llm handler (any method) and allows POST in preflight', async () => {
+    const a = await call('POST', '/api/llm/parse');
+    expect(a.status).toBe(200);
+    expect(a.json()).toEqual({ routed: 'POST' });
+    const o = await call('OPTIONS', '/api/llm/parse', { Origin: VITE_DEV_ORIGIN });
+    expect(o.status).toBe(204);
+    expect(o.headers['access-control-allow-methods']).toContain('POST');
   });
 
   it('GET /api/weather/metar returns the AWC array, caches, and sets X-Cache', async () => {

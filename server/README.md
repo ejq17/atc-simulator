@@ -19,15 +19,19 @@ Configuration comes from `.env` in the project root (see `.env.example`; loaded 
 | `PORT` | `8787` | listen port |
 | `HOST` | `127.0.0.1` | bind address (loopback only by default) |
 | `DEEPGRAM_API_KEY` | unset | used by `server/voice/deepgramToken.ts` |
+| `ANTHROPIC_API_KEY` | unset | enables the phrase interpreter (`server/llm/`); without it the route answers `503 LLM_NOT_CONFIGURED` |
+| `ATC_LLM_MODEL` | `claude-opus-5-5` | model of the phrase interpreter (`claude-haiku-5-5` is faster and cheaper) |
+| `ATC_LLM_EFFORT` | `low` | `output_config.effort` of the interpreter (`low`, `medium`, `high`, `xhigh`, `max`) |
 
 ## Routes
 
 | Route | Description |
 |---|---|
-| `GET /api/health` | `{ ok, service, uptimeSec, deepgramConfigured, upstreamRequests }` |
+| `GET /api/health` | `{ ok, service, uptimeSec, deepgramConfigured, llmConfigured, llmModel, upstreamRequests }` |
 | `GET /api/weather/metar?ids=KACY` | AWC METAR JSON array, cached 5 min |
 | `GET /api/weather/taf?ids=KACY` | AWC TAF JSON array, cached 30 min |
 | `GET\|POST /api/voice/deepgram-token` | delegated to `handleDeepgramToken` in `./voice/deepgramToken` |
+| `POST /api/llm/parse` | phrase interpreter, `server/llm/parseRoute.ts`; contract in `src/commands/llm/contract.ts` |
 | anything else | `404` JSON |
 
 Errors are always JSON: `{ "error": { "code": "...", "message": "..." } }`.
@@ -36,6 +40,24 @@ Codes: `INVALID_IDS` 400, `METHOD_NOT_ALLOWED` 405, `NOT_FOUND` 404, `FORBIDDEN_
 `UPSTREAM_UNREACHABLE` 502, `INTERNAL_ERROR` 500.
 Weather responses carry `X-Cache: HIT|MISS|COALESCED|STALE` and `X-Cache-Age` (seconds).
 `ids` must match `^[A-Z0-9,]{4,40}$` (upper case, max 10 stations).
+
+## Phrase interpreter (`server/llm/`)
+
+`POST /api/llm/parse` takes `{ text, context, grammar? }` (`LlmParseRequest`) and answers `{ commands, note?, model, latencyMs, usage? }`.
+It asks Claude (`client.messages.parse` with a JSON-schema `output_config.format`) to map a transmission the rule grammar could not
+read onto the same `kind`s and fields as `src/commands`. Errors: `INVALID_BODY` 400, `METHOD_NOT_ALLOWED` 405, `LLM_NOT_CONFIGURED` 503,
+`UPSTREAM_RATE_LIMITED` 429 (with `Retry-After`), `UPSTREAM_TIMEOUT` 504, `UPSTREAM_ERROR` / `LLM_REFUSED` 502.
+
+* What is sent to the Anthropic API: the transmission text (at most 400 characters), the aircraft list (callsign, spoken callsign, type),
+  the runway ends, taxiways, frequencies, fixes and STAR arrivals of the airport, and the rule parser's guess (kinds, callsigns, issues).
+  Nothing else: no player data, no audio, no session state. Transmissions are not stored or logged by the backend; one console line per
+  call records model, latency and token counts only. The API key never leaves the backend.
+* The system prompt (the instruction catalogue) is a constant sent with `cache_control: ephemeral`, so repeated calls read it from the
+  prompt cache. `server/llm/prompt.ts` holds it and the response schema; `prompt.test.ts` keeps the `kind` list in sync with `CommandKind`
+  and the table in `src/commands/README.md`.
+* The response schema is flat with sentinels ("" / -1 / false / []) rather than nullable fields, because structured outputs allow at most
+  16 union-typed and 24 optional parameters; the route strips the sentinels and regroups `traffic`, `info`, `ifr` and `hold`.
+* The browser still resolves the callsign and validates identifiers before anything executes.
 
 ## Behaviour of the AWC client (`server/weather/awc.ts`)
 

@@ -6,6 +6,7 @@
  *   GET /api/weather/taf?ids=KACY        -> AWC JSON array (cached 30 min)
  *   GET|POST /api/voice/deepgram-token   -> ./voice/deepgramToken
  *   GET /api/charts/pdf?url=<aeronav>     -> ./charts/chartProxy
+ *   POST /api/llm/parse                   -> ./llm/parseRoute (phrase interpreter, needs ANTHROPIC_API_KEY)
  *
  * Run with `npm run server` (tsx watch). Configuration: `.env` in the project
  * root (see `.env.example`), PORT (default 8787), HOST (default 127.0.0.1).
@@ -19,6 +20,8 @@ import { loadEnvFile } from './env';
 import { AwcError, createAwcClient, parseIds, type AwcClient } from './weather/awc';
 import { handleDeepgramToken } from './voice/deepgramToken';
 import { handleChartProxy } from './charts/chartProxy';
+import { createLlmParseHandler, isLlmConfigured, llmModelName } from './llm/parseRoute';
+import { LLM_PARSE_PATH } from '../src/commands/llm/contract';
 
 export const DEFAULT_PORT = 8787;
 export const VITE_DEV_ORIGIN = 'http://localhost:5173';
@@ -28,6 +31,8 @@ type Handler = (req: IncomingMessage, res: ServerResponse) => void | Promise<voi
 export interface AppOptions {
   awc?: AwcClient;
   deepgram?: Handler;
+  /** Phrase interpreter handler (default: `createLlmParseHandler()` using ANTHROPIC_API_KEY). */
+  llm?: Handler;
   corsOrigin?: string;
   /** Hostnames accepted in the Host header (DNS-rebinding guard). */
   allowedHosts?: string[];
@@ -50,6 +55,7 @@ function sendError(res: ServerResponse, status: number, code: string, message: s
 export function createAppServer(options: AppOptions = {}): Server {
   const awc = options.awc ?? createAwcClient();
   const deepgram: Handler = options.deepgram ?? ((req, res) => handleDeepgramToken(req, res));
+  const llm: Handler = options.llm ?? createLlmParseHandler();
   const corsOrigin = options.corsOrigin ?? VITE_DEV_ORIGIN;
   const allowedHosts = new Set(options.allowedHosts ?? ['localhost', '127.0.0.1', '[::1]']);
 
@@ -82,6 +88,11 @@ export function createAppServer(options: AppOptions = {}): Server {
       return;
     }
 
+    if (path === LLM_PARSE_PATH) {
+      await llm(req, res);
+      return;
+    }
+
     if (path === '/api/charts/pdf') {
       await handleChartProxy(req, res);
       return;
@@ -94,6 +105,8 @@ export function createAppServer(options: AppOptions = {}): Server {
         service: 'kacy-atc-sim-backend',
         uptimeSec: Math.round((Date.now() - STARTED_AT) / 1000),
         deepgramConfigured: Boolean(process.env.DEEPGRAM_API_KEY?.trim()),
+        llmConfigured: isLlmConfigured(),
+        llmModel: llmModelName(),
         upstreamRequests: awc.stats().upstreamRequests,
       });
       return;
@@ -157,6 +170,7 @@ if (isMainModule()) {
     console.log(`[server] KACY ATC backend listening on http://${host}:${port}`);
     console.log(`[server] CORS allows ${VITE_DEV_ORIGIN}; .env keys loaded: ${loaded.length ? loaded.join(', ') : '(none)'}`);
     console.log(`[server] Deepgram key ${process.env.DEEPGRAM_API_KEY?.trim() ? 'configured' : 'NOT configured (voice cloud STT disabled)'}`);
+    console.log(`[server] Phrase interpreter ${isLlmConfigured() ? `configured (model ${llmModelName()})` : 'NOT configured (set ANTHROPIC_API_KEY to enable the LLM fallback)'}`);
   });
   const shutdown = () => server.close(() => process.exit(0));
   process.on('SIGINT', shutdown);
