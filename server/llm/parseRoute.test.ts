@@ -26,10 +26,7 @@ function mkRes() {
   return { res: res as unknown as ServerResponse & { body: string }, headers, json: () => JSON.parse(res.body) };
 }
 
-const wire = (over: Record<string, unknown>) => ({
-  kind: 'UNKNOWN', callsign: null, runwayEnd: '', runwayId: '', crossRunwayId: '', behindCallsign: '', route: [], holdShort: [],
-  destination: '', headingDeg: -1, altitudeFt: -1, turnDirection: '', ifAble: false, trafficDesc: '', trafficPosition: '', ...over,
-});
+const wire = (kind: string, callsign: string, ...fields: [string, string][]) => ({ kind, callsign, fields: fields.map(([name, value]) => ({ name, value })) });
 const okMessage = (commands: unknown[], note: string | null = null, extra: Record<string, unknown> = {}) => ({
   parsed_output: { commands, note }, stop_reason: 'end_turn',
   usage: { input_tokens: 120, output_tokens: 40, cache_read_input_tokens: 900, cache_creation_input_tokens: 0 }, ...extra,
@@ -89,7 +86,7 @@ describe('createLlmParseHandler', () => {
     const p = parse.mock.calls[0] as unknown as [any];
     const params = p[0];
     expect(params.model).toBe('claude-haiku-5-5');
-    expect(params.max_tokens).toBe(1024);
+    expect(params.max_tokens).toBe(4096);
     expect(params.thinking).toBeUndefined();
     expect(params.system).toEqual([{ type: 'text', text: SYSTEM_PROMPT, cache_control: { type: 'ephemeral' } }]);
     expect(params.output_config.effort).toBe('medium');
@@ -118,21 +115,32 @@ describe('createLlmParseHandler', () => {
     const times = [1000, 1234];
     const lines: string[] = [];
     const h = withClient(() => okMessage([
-      wire({ kind: 'CROSS_RUNWAY', callsign: 'N6004T', crossRunwayId: '13/31', runwayEnd: '13', behindCallsign: 'NKS451' }),
-      wire({ kind: 'HEADING', callsign: 'NKS451', headingDeg: 270, turnDirection: 'left', trafficPosition: 'final', trafficDesc: 'cessna' }),
-      wire({ kind: 'HOLD_AT_FIX', callsign: 'NKS451', holdFix: 'CARYL', holdTurns: '', holdAsPublished: true }),
+      wire('CROSS_RUNWAY', 'N6004T', ['crossRunwayId', '13/31'], ['runwayEnd', '13'], ['behindCallsign', 'NKS451'], ['route', '']),
+      wire('HEADING', 'NKS451', ['headingDeg', '270'], ['turnDirection', 'left'], ['traffic.position', 'final'], ['traffic.distanceNm', '2'], ['bogus', 'x']),
+      wire('HOLD_AT_FIX', '', ['hold.fix', 'CARYL'], ['hold.asPublished', 'true'], ['holdShort', 'A, C']),
     ], 'one line'), { now: () => times.shift() ?? 0, log: (l: string) => lines.push(l) });
     const r = await run(h, 'POST', goodBody);
     expect(r.status).toBe(200);
     const body = r.json();
     expect(body.commands[0]).toEqual({ kind: 'CROSS_RUNWAY', callsign: 'N6004T', crossRunwayId: '13/31', runwayEnd: '13', behindCallsign: 'NKS451' });
-    expect(body.commands[1]).toEqual({ kind: 'HEADING', callsign: 'NKS451', headingDeg: 270, turnDirection: 'left', traffic: { desc: 'cessna', position: 'final' } });
-    expect(body.commands[2]).toEqual({ kind: 'HOLD_AT_FIX', callsign: 'NKS451', hold: { fix: 'CARYL', turns: 'right', asPublished: true } });
-    expect(JSON.stringify(body.commands)).not.toContain('null');
+    expect(body.commands[1]).toEqual({ kind: 'HEADING', callsign: 'NKS451', headingDeg: 270, turnDirection: 'left', traffic: { desc: '', position: 'final', distanceNm: 2 } });
+    expect(body.commands[2]).toEqual({ kind: 'HOLD_AT_FIX', callsign: null, holdShort: ['A', 'C'], hold: { fix: 'CARYL', turns: 'right', asPublished: true } });
+    expect(JSON.stringify(body.commands).replace('"callsign":null', '')).not.toContain('null'); // only callsign may be null
     expect(body).toMatchObject({ note: 'one line', model: 'claude-opus-5-5', latencyMs: 234 });
     expect(body.usage).toEqual({ inputTokens: 120, outputTokens: 40, cacheReadInputTokens: 900, cacheCreationInputTokens: 0 });
     expect(lines).toHaveLength(1);
     expect(lines[0]).toMatch(/model=claude-opus-5-5 latencyMs=234 in=120 out=40 cacheRead=900 commands=3/);
+  });
+
+  it('sends thinking disabled only for Haiku models with ATC_LLM_THINKING=off', async () => {
+    const send = async (model: string, thinking?: string) => {
+      const parse = vi.fn(() => okMessage([]));
+      await run(withClient(parse, { model, thinking }), 'POST', goodBody);
+      return (parse.mock.calls[0] as unknown as [any])[0];
+    };
+    expect((await send('claude-haiku-5-5', 'off')).thinking).toEqual({ type: 'disabled' });
+    expect((await send('claude-opus-5-5', 'off')).thinking).toBeUndefined();
+    expect((await send('claude-haiku-5-5')).thinking).toBeUndefined();
   });
 
   it('returns an empty command list with a note and omits an absent note', async () => {

@@ -29,6 +29,8 @@ export interface LlmParseDeps {
   client?: LlmClient;
   model?: string;
   effort?: string;
+  /** 'off' turns thinking off for Haiku models only (Opus 5.5 rejects disabled thinking with a 400). Default: ATC_LLM_THINKING. */
+  thinking?: string;
   /** Millisecond clock (latency). */
   now?: () => number;
   env?: Env;
@@ -150,13 +152,15 @@ export function createLlmParseHandler(deps: LlmParseDeps = {}): (req: IncomingMe
     const model = deps.model ?? llmModelName(env);
     const requestedEffort = deps.effort ?? env.ATC_LLM_EFFORT?.trim() ?? DEFAULT_LLM_EFFORT;
     const effort = (EFFORTS.includes(requestedEffort) ? requestedEffort : DEFAULT_LLM_EFFORT) as Effort;
+    const thinkingOff = (deps.thinking ?? env.ATC_LLM_THINKING)?.trim().toLowerCase() === 'off' && /haiku/i.test(model);
     const started = now();
 
     let message: any;
     try {
       message = await client.messages.parse({
         model,
-        max_tokens: 1024,
+        ...(thinkingOff ? { thinking: { type: 'disabled' } } : {}),
+        max_tokens: 4096, // thinking tokens count against it; the compact answer is ~150 tokens
         system: [{ type: 'text', text: SYSTEM_PROMPT, cache_control: { type: 'ephemeral' } }],
         messages: [{ role: 'user', content: buildUserMessage(parsedReq) }],
         output_config: {
@@ -188,7 +192,7 @@ export function createLlmParseHandler(deps: LlmParseDeps = {}): (req: IncomingMe
     if (typeof u.cache_creation_input_tokens === 'number') usage.cacheCreationInputTokens = u.cache_creation_input_tokens;
 
     const body: LlmParseResponse = {
-      commands: parsed.commands.map(toLlmCommand),
+      commands: parsed.commands.map((c) => toLlmCommand(c)),
       ...(parsed.note ? { note: parsed.note } : {}),
       model,
       latencyMs,

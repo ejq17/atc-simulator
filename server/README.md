@@ -22,6 +22,7 @@ Configuration comes from `.env` in the project root (see `.env.example`; loaded 
 | `ANTHROPIC_API_KEY` | unset | enables the phrase interpreter (`server/llm/`); without it the route answers `503 LLM_NOT_CONFIGURED` |
 | `ATC_LLM_MODEL` | `claude-opus-5-5` | model of the phrase interpreter (`claude-haiku-5-5` is faster and cheaper) |
 | `ATC_LLM_EFFORT` | `low` | `output_config.effort` of the interpreter (`low`, `medium`, `high`, `xhigh`, `max`) |
+| `ATC_LLM_THINKING` | unset | `off` sends `thinking: { type: 'disabled' }`, but only for Haiku models (Opus 5.5 rejects it) |
 
 ## Routes
 
@@ -55,8 +56,13 @@ read onto the same `kind`s and fields as `src/commands`. Errors: `INVALID_BODY` 
 * The system prompt (the instruction catalogue) is a constant sent with `cache_control: ephemeral`, so repeated calls read it from the
   prompt cache. `server/llm/prompt.ts` holds it and the response schema; `prompt.test.ts` keeps the `kind` list in sync with `CommandKind`
   and the table in `src/commands/README.md`.
-* The response schema is flat with sentinels ("" / -1 / false / []) rather than nullable fields, because structured outputs allow at most
-  16 union-typed and 24 optional parameters; the route strips the sentinels and regroups `traffic`, `info`, `ifr` and `hold`.
+* The wire format is compact: `{ commands: [{ kind, callsign, fields: [{ name, value }] }], note }`, e.g.
+  `{"kind":"CROSS_RUNWAY","callsign":"N12345","fields":[{"name":"crossRunwayId","value":"13/31"},{"name":"behindCallsign","value":"N67890"}]}`.
+  Only the fields that apply are written, every value is a string (lists comma-separated, booleans `true`/`false`, nested fields
+  dotted: `traffic.desc`, `hold.fix`), `callsign` is `""` when no aircraft is addressed. A schema with every field required cost about
+  650 output tokens per command. `FIELD_TABLE` in `server/llm/prompt.ts` is the typed coercion table (string, number, boolean, list,
+  enum); `toLlmCommand` coerces by it, regroups the dotted names into `traffic`, `info`, `ifr` and `hold`, and drops unknown names or
+  invalid values with a console warning. `max_tokens` is 4096 because thinking tokens count against it.
 * The browser still resolves the callsign and validates identifiers before anything executes.
 
 ## Behaviour of the AWC client (`server/weather/awc.ts`)
