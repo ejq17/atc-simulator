@@ -18,7 +18,7 @@ src/voice/
   audio/unlock.ts   unlockAudio() (call from a click) + the page-wide AudioContext
   transmissionQueue.ts, pilotVoice.ts   one speaker at a time, several audible frequencies, stepped-on handling, stuck-key watchdog
   tts/ttsDebug.ts   window.__kacyTts (what the app asked Chrome to say and what Chrome did)
-  settings.ts (localStorage `kacy.voice.settings`, VOICE_PRIVACY_NOTES), transcriptLog.ts
+  settings.ts (localStorage `kacy.voice.settings`, VOICE_PRIVACY_NOTES; includes `interpreterEnabled`, the phrase interpreter fallback of src/commands/llm), transcriptLog.ts
 server/voice/deepgramToken.ts   short-lived Deepgram token endpoint
 ```
 

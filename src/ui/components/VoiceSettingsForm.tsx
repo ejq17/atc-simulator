@@ -4,6 +4,8 @@ import { STT_PROVIDER_NOTES, VOICE_PRIVACY_NOTES, TRANSCRIPT_STORAGE_KEY, NEURAL
 import type { NeuralDeviceChoice, NeuralProgress, NeuralTts, SttProviderId, TtsEngineId, WhisperDeviceChoice, WhisperModelChoice, WhisperProgress } from '../../voice';
 import { voiceSettings, useVoiceSettings } from '../store/voiceSettings';
 import { isStaticHosting } from '../../hosting';
+import { checkLlmAvailability } from '../../commands/llm/client';
+import type { LlmAvailability } from '../../commands/llm/client';
 import { keyLabel } from '../lib/voiceStatus';
 import { Btn, Field, Kbd, SELECT, Toggle } from './ui';
 
@@ -36,6 +38,32 @@ function useProviderAvailability(id: SttProviderId): { checking: boolean; availa
     return () => { cancelled = true; };
   }, [id]);
   return state;
+}
+
+function useLlmAvailability(): { checking: boolean } & Partial<LlmAvailability> {
+  const [state, setState] = useState<{ checking: boolean } & Partial<LlmAvailability>>({ checking: true });
+  useEffect(() => {
+    let cancelled = false;
+    void checkLlmAvailability().then((a) => { if (!cancelled) setState({ checking: false, ...a }); });
+    return () => { cancelled = true; };
+  }, []);
+  return state;
+}
+
+/** Settings block for the phrase interpreter fallback (src/commands/llm). */
+function PhraseInterpreterSettings() {
+  const s = useVoiceSettings();
+  const avail = useLlmAvailability();
+  return (
+    <section className="flex flex-col gap-1.5" data-testid="phrase-interpreter">
+      <h3 className="mb-1 font-sans text-[11px] font-semibold uppercase tracking-[0.18em] text-atc-cyan">Phrase interpreter</h3>
+      <Toggle checked={s.interpreterEnabled} onChange={(v) => voiceSettings.update({ interpreterEnabled: v })} label="Phrase interpreter" hint="When the rule grammar is unsure about a radio call, ask a language model to read it. Clear instructions are never sent." />
+      <div className={`border px-2 py-1.5 leading-snug ${avail.available === false ? 'border-atc-amber/60 text-atc-amber' : 'border-atc-border text-atc-muted'}`} data-testid="phrase-interpreter-status" role="status">
+        {avail.checking ? 'Checking availability…' : avail.available ? `Available: model ${avail.model ?? 'configured on the local backend'}.` : avail.detail}
+      </div>
+      <p className="leading-snug text-atc-muted" data-testid="phrase-interpreter-privacy">{VOICE_PRIVACY_NOTES.interpreter}</p>
+    </section>
+  );
 }
 
 /** One shared speech provider for the "Play test call" button (the session has its own). */
@@ -274,6 +302,8 @@ export function VoiceSettingsForm({ compact = false }: { compact?: boolean }) {
         </div>
         <Toggle checked={s.radioEffectsEnabled} onChange={(v) => voiceSettings.update({ radioEffectsEnabled: v })} label="Radio effects" hint="Key-up and key-down clicks. With the local neural voice the pilot voices also go through the radio filter, with per-aircraft quality and distance fading; browser voices cannot be filtered." />
       </section>
+
+      <PhraseInterpreterSettings />
 
       {!compact && (
         <section className="flex flex-col gap-1">

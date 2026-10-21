@@ -40,6 +40,11 @@ export interface VoiceSettings {
   ttsRate: number;
   /** When false (default) nothing is persisted beyond the in-memory session log. */
   storeTranscripts: boolean;
+  /**
+   * Phrase interpreter: when the rule grammar is unsure about a radio transmission, ask the local backend (a language model) for the
+   * commands. Needs the local backend with an API key; harmless without one. Default on.
+   */
+  interpreterEnabled: boolean;
 }
 
 export const DEFAULT_VOICE_SETTINGS: Readonly<VoiceSettings> = Object.freeze({
@@ -58,6 +63,7 @@ export const DEFAULT_VOICE_SETTINGS: Readonly<VoiceSettings> = Object.freeze({
   ttsVolume: 1,
   ttsRate: 1,
   storeTranscripts: false,
+  interpreterEnabled: true,
 });
 
 function clamp(n: unknown, lo: number, hi: number, fallback: number): number {
@@ -86,6 +92,7 @@ export function sanitizeVoiceSettings(raw: unknown): VoiceSettings {
     ttsVolume: clamp(r.ttsVolume, 0, 1, d.ttsVolume),
     ttsRate: clamp(r.ttsRate, 0.5, 2, d.ttsRate),
     storeTranscripts: typeof r.storeTranscripts === 'boolean' ? r.storeTranscripts : d.storeTranscripts,
+    interpreterEnabled: typeof r.interpreterEnabled === 'boolean' ? r.interpreterEnabled : d.interpreterEnabled,
   };
 }
 
@@ -165,5 +172,7 @@ export const VOICE_PRIVACY_NOTES = {
   },
   transcripts:
     'Transcript text is kept in memory for the current session so you can review it in the debrief. It is only saved to this browser (localStorage) if you turn on "Store transcripts", and you can clear it at any time.',
+  interpreter:
+    'Phrase interpreter: when the rule grammar is unsure about a transmission, the text of that transmission (not audio) plus the callsigns, aircraft types, runway ends, taxiways, frequencies and fixes of the current airport are sent through the local backend to the model provider\'s API (Anthropic) to be read as commands. Clear instructions never leave the browser. Turn it off to keep everything local.',
   analytics: 'There is no analytics or third-party tracking in the voice system.',
 } as const;

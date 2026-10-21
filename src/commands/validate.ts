@@ -40,5 +40,9 @@ export function validateFields(f: Partial<ParsedCommand>, ctx: ParseContext): Va
       unknown(`no known ${f.frequencyId} frequency`);
     }
   }
+  if (ctx.fixes) {
+    const known = new Set(ctx.fixes.map((x) => x.id.toUpperCase()));
+    for (const id of new Set([f.fix, f.hold?.fix].filter((x): x is string => !!x))) if (!known.has(id.toUpperCase())) unknown(`unknown fix ${id}`);
+  }
   return v;
 }

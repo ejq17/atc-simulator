@@ -20,9 +20,9 @@
  * - Processing stops at the first `clarify` (the controller must repeat), but not at a `rejected` command.
  */
 import { looksLikeLandline, parseTransmission } from '../../commands';
-import type { AircraftRef, FixInfo } from '../../commands';
+import type { AircraftRef, FixInfo, ParseContext } from '../../commands';
 import type { SimulationEngine } from '../../sim/api';
-import type { Aircraft, CommandOutcome, ControllerPositionId, ParsedCommand, SimulationState } from '../../sim/types';
+import type { Aircraft, CommandOutcome, ControllerPositionId, ParsedCommand, ParseResult, SimulationState } from '../../sim/types';
 import { frequencyForPosition, positionWord, sameFrequency } from '../../radio/frequencies';
 
 /** The positions the controller is currently working. The first is primary. */
@@ -184,6 +184,36 @@ export interface TransmitInput {
   source: 'voice' | 'typed';
   controller: ControllerSetup;
   transmissionId?: string;
+  /**
+   * A parse the caller already made (`parseForTransmit`, possibly replaced by the phrase interpreter's reading). When absent the
+   * transmission is parsed here, exactly as before. Everything after the parse (landline guard, AI refusal, execution) is unchanged.
+   */
+  parsed?: ParseResult;
+  /** Short origin note ("phrase interpreter, 1.2 s") appended to the result message when an executed command has `interpretedBy: 'llm'`. */
+  interpreterNote?: string;
+}
+
+/**
+ * The local (rule grammar) parse of a transmission, with the ambiguous-callsign retry among the aircraft on the controller's
+ * frequencies. Split out of `transmit` so the session can decide on the phrase interpreter fallback before executing anything.
+ */
+export function parseForTransmit(engine: SimulationEngine, text: string, controller: ControllerSetup): { parsed: ParseResult; ctx: ParseContext } {
+  const state = engine.getState();
+  const all = Object.values(state.aircraft);
+  let ctx = buildParseContext(state, all);
+  let parsed = parseTransmission(text, ctx);
+  // Ambiguous callsign: retry among aircraft on the controller's frequencies only.
+  const ambiguous = parsed.commands.some((c) => !c.callsign && (c.callsignCandidates?.length ?? 0) > 1);
+  if (ambiguous) {
+    const freqs = controllerFrequencies(state, controller);
+    const onFreq = all.filter((a) => freqs.some((m) => sameFrequency(m, a.frequencyMhz)));
+    if (onFreq.length > 0 && onFreq.length < all.length) {
+      const retryCtx = buildParseContext(state, onFreq);
+      const retry = parseTransmission(text, retryCtx);
+      if (retry.commands.length > 0 && retry.commands.every((c) => c.callsign)) { parsed = retry; ctx = retryCtx; }
+    }
+  }
+  return { parsed, ctx };
 }
 
 export function transmit(input: TransmitInput): TransmitResult {
@@ -201,20 +231,7 @@ export function transmit(input: TransmitInput): TransmitResult {
     return { ...empty(message), summary: 'clarify', clarification: message };
   }
 
-  const state = engine.getState();
-  const all = Object.values(state.aircraft);
-  let parsed = parseTransmission(text, buildParseContext(state, all));
-
-  // Ambiguous callsign: retry among aircraft on the controller's frequencies only.
-  const ambiguous = parsed.commands.some((c) => !c.callsign && (c.callsignCandidates?.length ?? 0) > 1);
-  if (ambiguous) {
-    const freqs = controllerFrequencies(state, controller);
-    const onFreq = all.filter((a) => freqs.some((m) => sameFrequency(m, a.frequencyMhz)));
-    if (onFreq.length > 0 && onFreq.length < all.length) {
-      const retry = parseTransmission(text, buildParseContext(state, onFreq));
-      if (retry.commands.length > 0 && retry.commands.every((c) => c.callsign)) parsed = retry;
-    }
-  }
+  let parsed = input.parsed ?? parseForTransmit(engine, text, controller).parsed;
 
   if (parsed.commands.length === 0) {
     const heard = `No instruction recognised in that transmission (heard "${text}").`;
@@ -264,7 +281,7 @@ export function transmit(input: TransmitInput): TransmitResult {
   } else {
     summary = 'accepted';
     message = accepted.length
-      ? `Issued: ${accepted.map((r) => describe(r.command)).join(', ')}`
+      ? `Issued: ${accepted.map((r) => describe(r.command)).join(', ')}${input.interpreterNote && accepted.some((r) => r.command.interpretedBy === 'llm') ? ` (${input.interpreterNote})` : ''}`
       : `Pilot answered${results[0]?.command.callsign ? ` (${results[0].command.callsign})` : ''}.`;
   }
   const offFrequency = !aiBlocked && rejected.some((r) => (r.outcome as Extract<CommandOutcome, { status: 'rejected' }>).reason.startsWith('Not on frequency'));

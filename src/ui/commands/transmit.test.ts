@@ -3,7 +3,8 @@ import { createEngine } from '../../sim/engine';
 import type { SimulationEngine } from '../../sim/api';
 import type { Scenario, ScenarioAircraftSpawn } from '../../sim/types';
 import { loadKacy, runwayEntryNodes } from '../../airport';
-import { buildParseContext, controllerFrequencies, positionFor, taxiwayNames, transmit } from './transmit';
+import { buildParseContext, controllerFrequencies, parseForTransmit, positionFor, taxiwayNames, transmit } from './transmit';
+import type { ParseResult } from '../../sim/types';
 import type { ControllerSetup } from './transmit';
 import { getPresetWeather } from '../../weather/presets';
 
@@ -182,5 +183,44 @@ describe('parse context helpers', () => {
     const { engine } = scripted();
     expect(controllerFrequencies(engine.getState(), BOTH)).toEqual([120.3, 121.9]);
     expect(controllerFrequencies(engine.getState(), { positions: ['CLNC'] })).toEqual([127.85]);
+  });
+});
+
+describe('parsed override and parseForTransmit', () => {
+  const SAY = 'Cessna seven two three echo juliet, runway one three, cleared for takeoff';
+
+  it('parseForTransmit returns the local parse and the context it was made with', () => {
+    const { engine } = scripted();
+    const { parsed, ctx } = parseForTransmit(engine, SAY, TWR);
+    expect(parsed.commands[0]).toMatchObject({ kind: 'TAKEOFF', callsign: 'N723EJ' });
+    expect(ctx.aircraft.map((a) => a.callsign)).toContain('N723EJ');
+    expect(ctx.runwayEnds).toContain('13');
+  });
+
+  it('transmit executes a supplied parse instead of parsing the text, and says where it came from', () => {
+    const { engine } = scripted();
+    runSec(engine, 8);
+    const supplied: ParseResult = {
+      commands: [{ kind: 'TAKEOFF', callsign: 'N723EJ', runwayEnd: '13', runwayId: '13/31', confidence: 0.9, rawText: 'blah', normalizedText: 'blah', issues: [], interpretedBy: 'llm' }],
+      callsign: 'N723EJ', rawText: 'blah', normalizedText: 'blah',
+    };
+    const r = transmit({ engine, text: 'blah blah unintelligible', source: 'typed', controller: TWR, parsed: supplied, interpreterNote: 'phrase interpreter, 1.2 s' });
+    expect(r.summary).toBe('accepted');
+    expect(r.commands[0].interpretedBy).toBe('llm');
+    expect(r.message).toBe('Issued: takeoff N723EJ (phrase interpreter, 1.2 s)');
+  });
+
+  it('the grammar path is unchanged: no note, no interpretedBy', () => {
+    const { engine } = scripted();
+    runSec(engine, 8);
+    const r = transmit({ engine, text: SAY, source: 'typed', controller: TWR, interpreterNote: 'phrase interpreter, 1.2 s' });
+    expect(r.message).toBe('Issued: takeoff N723EJ');
+    expect(r.commands[0].interpretedBy).toBeUndefined();
+  });
+
+  it('an empty supplied parse still ends in the "no instruction" clarification', () => {
+    const { engine } = scripted();
+    const r = transmit({ engine, text: 'mumble', source: 'typed', controller: TWR, parsed: { commands: [], callsign: null, rawText: 'mumble', normalizedText: 'mumble' } });
+    expect(r.summary).toBe('clarify');
   });
 });

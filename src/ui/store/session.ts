@@ -29,7 +29,11 @@ import type { AiControllers, AiTransmission } from '../../ai';
 import type { SpeechSynthesisProvider, TranscriptLog, TransmissionQueue, VoiceController, VoiceStatusEvent } from '../../voice';
 import { createRenderBuffer } from '../display/renderBuffer';
 import type { RenderBuffer } from '../display/renderBuffer';
-import { controllerFrequencies, transmit } from '../commands/transmit';
+import { controllerFrequencies, nextTransmissionId, parseForTransmit, transmit } from '../commands/transmit';
+import { isStaticHosting } from '../../hosting';
+import { createLlmParser, LlmParseError } from '../../commands/llm/client';
+import type { LlmParser } from '../../commands/llm/client';
+import { adoptLlmCommands, mergeResults, needsInterpreter } from '../../commands/llm/fallback';
 import { looksLikeLandline, transmitLandline } from '../commands/landline';
 import type { LandlineResult } from '../commands/landline';
 import type { CoordAnswer } from '../../sim/coordination';
@@ -96,6 +100,12 @@ export interface SessionParams {
   /** Test seam: replaces the browser speech synthesis provider. */
   tts?: SpeechSynthesisProvider & { isSupported?(): boolean };
   seed?: number;
+  /**
+   * Phrase interpreter fallback (src/commands/llm): asked only when the rule grammar is unsure about a radio call and the
+   * "Phrase interpreter" setting is on. Default: the HTTP client for the local backend in a browser (null when statically hosted
+   * or outside a browser, so tests never touch the network). Pass `null` to disable, or a fake in tests.
+   */
+  interpreter?: LlmParser | null;
   /** Provide the pilot-transmission sink; the engine must have been created with `pilotSink`. */
   pilotSink: PilotSink;
 }
@@ -131,6 +141,10 @@ export interface Session {
   /** Pilot audio facts for the Radio panel. */
   audioInfo(): { supported: boolean; voices: number };
   setController(setup: ControllerSetup): void;
+  /**
+   * Radio transmission. Returns the real result synchronously, except when the phrase interpreter is consulted: then it returns a
+   * provisional `{ summary: 'empty', message: 'Interpreting…' }` and the real result follows through `hooks.onTransmitResult`.
+   */
   submit(text: string, source: 'voice' | 'typed'): TransmitResult;
   /** A landline call to another position ("Tower, Ground, cross runway ..."): parsed as coordination phraseology. */
   submitLandline(text: string, source: 'voice' | 'typed'): LandlineResult;
@@ -349,6 +363,9 @@ export function startSession(p: SessionParams): Session {
   strips.update(engine.getState());
 
   let landlineMode = false;
+  const interpreter: LlmParser | null = p.interpreter !== undefined ? p.interpreter : (typeof window !== 'undefined' && !isStaticHosting() ? createLlmParser() : null);
+  /** Set when the backend answers LLM_NOT_CONFIGURED: no further attempts this session. */
+  let interpreterOff = false;
   const submitLandline = (text: string, source: 'voice' | 'typed', confidence?: number): LandlineResult => {
     transcript.add({ text: `landline: ${text}`, source: source === 'voice' ? 'speech' : 'typed', confidence });
     const r = transmitLandline({ engine, text, source, controller });
@@ -364,7 +381,48 @@ export function startSession(p: SessionParams): Session {
       return { transmissionId: `ll-${Date.now().toString(36)}`, text, source, commands: [], results: [], summary: lr.summary === 'done' ? 'accepted' : lr.summary === 'clarify' ? 'clarify' : lr.summary === 'empty' ? 'empty' : 'rejected', message: `Landline: ${lr.message}`, clarification: lr.summary === 'clarify' ? lr.message : undefined };
     }
     transcript.add({ text, source: source === 'voice' ? 'speech' : 'typed', confidence });
-    const r = transmit({ engine, text, source, controller });
+    const { parsed, ctx } = parseForTransmit(engine, text.trim(), controller);
+    if (!(interpreter && !interpreterOff && text.trim() && voiceSettings.get().interpreterEnabled && needsInterpreter(parsed))) {
+      return finishRadio(transmit({ engine, text, source, controller, parsed }));
+    }
+
+    // The interpreter is a network call (up to LLM_PARSE_TIMEOUT_MS), so `submit` cannot make the caller wait for it: the voice controller
+    // ignores the return value and the typed box only shows `hooks.onTransmitResult`. Rather than turn every caller async, a call that needs
+    // the interpreter returns a provisional 'empty' result at once and delivers the real one through the same hook later. Clear
+    // instructions (the normal case) still return the real result synchronously. Exactly one `transmit` runs per submission, in the
+    // `.then` below, so the command is executed once and the pilot answers once whatever the interpreter does.
+    const transmissionId = nextTransmissionId();
+    engine.logEvent({ kind: 'INFO', text: 'Checking that phrasing with the phrase interpreter…', severity: 'info', speaker: 'SYSTEM' });
+    const t0 = performance.now();
+    const grammarFallback = (reason: string) => {
+      engine.logEvent({ kind: 'INFO', text: `Phrase interpreter unavailable (${reason}); using the standard parse.`, severity: 'info', speaker: 'SYSTEM' });
+      return parsed;
+    };
+    void interpreter.parse({
+      text: text.trim(),
+      context: ctx,
+      grammar: parsed.commands.length > 0 ? { commands: parsed.commands.map((c) => ({ kind: c.kind, callsign: c.callsign, confidence: c.confidence, issues: c.issues })) } : undefined,
+    }).then((resp) => {
+      const adopted = adoptLlmCommands(resp, text.trim(), ctx);
+      if (!adopted) engine.logEvent({ kind: 'INFO', text: `Phrase interpreter found no usable instruction${resp.note ? ` (${resp.note})` : ''}; using the standard parse.`, severity: 'info', speaker: 'SYSTEM' });
+      return { merged: mergeResults(parsed, adopted), ms: performance.now() - t0 };
+    }, (err: unknown) => {
+      let reason = err instanceof Error ? err.message : String(err);
+      if (err instanceof LlmParseError) {
+        if (err.code === 'LLM_NOT_CONFIGURED') { interpreterOff = true; reason = 'phrase interpreter not configured on the local backend'; }
+        else if (err.code === 'TIMEOUT') reason = 'it took too long';
+        else if (err.code === 'NETWORK') reason = 'local backend not reachable';
+      }
+      return { merged: grammarFallback(reason), ms: performance.now() - t0 };
+    }).then(({ merged, ms }) => {
+      if (disposed) return;
+      finishRadio(transmit({ engine, text, source, controller, parsed: merged, transmissionId, interpreterNote: `phrase interpreter, ${(ms / 1000).toFixed(1)} s` }));
+    }).catch((err: unknown) => hooks.onNotice('error', `Transmission failed after the phrase interpreter: ${err instanceof Error ? err.message : String(err)}`));
+    const provisional: TransmitResult = { transmissionId, text: text.trim(), source, commands: [], results: [], summary: 'empty', message: 'Interpreting…' };
+    hooks.onTransmitResult(provisional);
+    return provisional;
+  };
+  const finishRadio = (r: TransmitResult): TransmitResult => {
     for (const res of r.results) {
       training?.onCommand({
         kind: res.command.kind,

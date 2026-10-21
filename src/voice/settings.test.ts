@@ -20,6 +20,18 @@ describe('voice settings', () => {
     expect(loadVoiceSettings()).toEqual(DEFAULT_VOICE_SETTINGS);
   });
 
+  it('phrase interpreter setting: on by default, survives old stored settings without it, rejects non-booleans', () => {
+    expect(DEFAULT_VOICE_SETTINGS.interpreterEnabled).toBe(true);
+    localStorage.setItem(VOICE_SETTINGS_KEY, JSON.stringify({ providerId: 'deepgram', pttKey: 'KeyT' }));
+    expect(loadVoiceSettings()).toMatchObject({ providerId: 'deepgram', pttKey: 'KeyT', interpreterEnabled: true });
+    expect(sanitizeVoiceSettings({ interpreterEnabled: false }).interpreterEnabled).toBe(false);
+    expect(sanitizeVoiceSettings({ interpreterEnabled: 'no' }).interpreterEnabled).toBe(true);
+    const store = createVoiceSettingsStore();
+    store.update({ interpreterEnabled: false });
+    expect(loadVoiceSettings().interpreterEnabled).toBe(false);
+    expect(VOICE_PRIVACY_NOTES.interpreter).toMatch(/sent through the local backend/);
+  });
+
   it('accepts the local Whisper provider id and still rejects unknown ones', () => {
     expect(sanitizeVoiceSettings({ providerId: 'whisper-local' }).providerId).toBe('whisper-local');
     expect(sanitizeVoiceSettings({ providerId: 'whisper-cloud' }).providerId).toBe(DEFAULT_VOICE_SETTINGS.providerId);
