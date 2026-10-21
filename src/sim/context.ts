@@ -16,6 +16,7 @@ import type { GustState } from './wind';
 import type { HeliRuntime } from './rotorcraft';
 import type { VehicleRuntime } from './vehicles';
 import type { SpecialRuntime } from './special';
+import type { ConditionalCross } from './conditionalCrossing';
 
 export const EVENT_CAP = 2000;
 
@@ -240,6 +241,10 @@ export interface AircraftRuntime {
   hold?: HoldState;
   /** Accepted land-and-hold-short clearance: the aircraft must stop (or exit) before `holdShortAlongM` along its landing runway. */
   lahso?: { holdShortRunwayId: string; holdShortAlongM: number; stopAlongM: number };
+  /** Conditional crossing in force ("cross runway 13 behind the landing Cessna"): the aircraft keeps holding until `conditionalCrossing.ts` releases it. */
+  conditionalCross?: ConditionalCross;
+  /** A released conditional crossing: this aircraft crosses `runwayId` behind `behindId`, which was past the crossing point at the release (conflicts.ts does not count that pair as sharing the surface while it stays past it). */
+  crossedBehind?: { behindId: string; runwayId: string; crossNodeId: string };
   /** A missed approach / go-around was flown and the aircraft has not yet been cleared for another approach. */
   missedFlown?: boolean;
   /** Nav mode to return to on RESUME_OWN_NAVIGATION after vectors. */

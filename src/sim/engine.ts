@@ -18,6 +18,7 @@ import type { SimContext } from './context';
 import { executeCommand, validateCommand } from './commandExecutor';
 import type { SimulationEngineExtras } from './engineExtras';
 import { updateGroundMovement } from './groundMovement';
+import { updateConditionalCrossings } from './conditionalCrossing';
 import { updateFlightDynamics } from './flightDynamics';
 import { updateRotorcraft } from './rotorcraft';
 import { updateVehicles } from './vehicles';
@@ -143,6 +144,7 @@ export function createEngine(opts: EngineOptionsExt): SimulationEngine & Simulat
     flushScheduledSpeech(ctx);
     updatePilotRequests(ctx);
     enforceClosuresOnRoutes(ctx);
+    updateConditionalCrossings(ctx);
     updateGroundMovement(ctx, dt);
     updateRotorcraft(ctx, dt);
     updateFlightDynamics(ctx, dt);

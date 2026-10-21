@@ -396,6 +396,8 @@ export interface Clearance {
   runwayId?: string;             // "13/31" for crossing / hold short
   /** CROSS_RUNWAY: conditional crossing, the aircraft that must pass the crossing point first (ParsedCommand.behindCallsign). */
   behindCallsign?: string;
+  /** CROSS_RUNWAY conditional: how the pilot names that aircraft in the readback ("Cessna", "Spirit four fifty one"). */
+  behindSpoken?: string;
   route?: string[];              // taxiway identifiers in order
   holdShort?: string[];          // runway ids to hold short of
   destination?: string;          // parking id or "RWY13"

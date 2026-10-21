@@ -15,6 +15,8 @@ export interface Draft {
   unknownIds: number;
   /** taxi: a "hold short" clause was spoken but its point (runway or taxiway) could not be read */
   holdShortUnparsed?: boolean;
+  /** CROSS_RUNWAY: "behind <aircraft>" was spoken but no single active aircraft matches it (never executed as a plain crossing) */
+  behindUnresolved?: boolean;
   /** IFR clearance: token range of the route phrase, resolved to raw text by parse.ts */
   routeSpan?: [number, number];
 }

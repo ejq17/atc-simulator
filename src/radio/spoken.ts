@@ -186,3 +186,9 @@ export function titleCase(s: string): string {
 export function capitalize(s: string): string {
   return s.length ? s[0].toUpperCase() + s.slice(1) : s;
 }
+
+/** How a pilot names another aircraft in a readback: "Cessna" for a GA registration with a type word, else the whole spoken callsign ("Spirit four fifty one"). */
+export function spokenTrafficLabel(a: { callsign: string; spokenCallsign: string }): string {
+  const first = a.spokenCallsign.split(' ')[0] ?? '';
+  return /^N\d/i.test(a.callsign) && first.toLowerCase() !== 'november' && a.spokenCallsign.split(' ').length > 1 ? first : a.spokenCallsign;
+}

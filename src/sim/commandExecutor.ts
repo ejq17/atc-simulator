@@ -24,7 +24,7 @@ import { findTaxiRoute, nearestNode, routeStartNode, neighborIds, runwayCrossing
 import type { TaxiRoute } from './pathfinding';
 import { stoppedOnRunway, runwayChainPosition } from './runwayStop';
 import { pickRunwayHold, runwayHoldCandidates, runwayRemainingM, takeoffRunM } from './holdSelection';
-import { spokenTaxiway } from '../radio/spoken';
+import { spokenTaxiway, spokenTrafficLabel } from '../radio/spoken';
 import { computeStopNodes } from './groundMovement';
 import { pushbackGeometry, pushbackStand, PUSH_DIRECTION_TOLERANCE_DEG } from './pushback';
 import { pilotUnfamiliar } from './pilotBehaviour';
@@ -33,6 +33,7 @@ import { hashString, mulberry32, seeded01 } from './rng';
 import { freeParkingCandidates, parkingOccupant, resolveParkingQuery } from './parkingResolver';
 import { assessClearanceSafety, recordUnsafeClearance } from './conflicts';
 import { crossingGate, releaseGate } from './coordination';
+import { landingOnRunway } from './conditionalCrossing';
 import { frequencyById, frequencyByMhz, frequencyForPosition, hearsFrequency, formatMhz } from '../radio/frequencies';
 import { buildReadback, buildSayAgain, buildUnable, holdShortReadbackText, sayRouteCall } from '../radio/readback';
 import { asksSayAgain, givesNoReadback, missesCall, readbackRealism, wrongCallsignAnswerer } from './pilotRealism';
@@ -518,7 +519,7 @@ function missingEntities(cmd: ParsedCommand, g?: RunwayEndGeom): string[] {
 function commandKey(ac: Aircraft, c: ParsedCommand): string {
   return [
     ac.id, c.kind, c.runwayEnd ?? '', c.runwayId ?? '', (c.route ?? []).join('>'), (c.holdShort ?? []).join(','), c.crossRunwayId ?? '',
-    c.destination ?? '', c.headingDeg ?? '', c.turnDirection ?? '', c.altitudeFt ?? '', c.speedKt ?? '', c.frequencyMhz ?? '', c.frequencyId ?? '', c.patternLeg ?? '',
+    c.behindCallsign ?? '', c.destination ?? '', c.headingDeg ?? '', c.turnDirection ?? '', c.altitudeFt ?? '', c.speedKt ?? '', c.frequencyMhz ?? '', c.frequencyId ?? '', c.patternLeg ?? '',
     c.approachType ?? '', c.fix ?? '', c.ifr ? JSON.stringify(c.ifr) : '', c.hold ? JSON.stringify(c.hold) : '',
     c.starName ?? '', c.starTransition ?? '', c.descendVia ?? '', c.advisory ?? '', c.brakingTerm ?? '', c.lightsDirection ?? '', c.lightStep ?? '',
     c.exitTaxiway ?? '', c.ifAble ?? '', c.traffic ? JSON.stringify(c.traffic) : '', c.sequenceNumber ?? '', c.distanceNm ?? '', c.turnDegrees ?? '', c.squawk ?? '', c.info ? JSON.stringify(c.info) : '',
@@ -538,7 +539,7 @@ function sameParams(clr: Clearance, cmd: ParsedCommand, g?: RunwayEndGeom): bool
     case 'CROSS_RUNWAY': {
       const a = normalizeRunwayEndId(clr.runwayId ?? '');
       const b = normalizeRunwayEndId(cmd.crossRunwayId ?? cmd.runwayId ?? cmd.runwayEnd ?? '');
-      return a === b || a.split('/').includes(b) || b.split('/').includes(a);
+      return (a === b || a.split('/').includes(b) || b.split('/').includes(a)) && (clr.behindCallsign ?? '') === (cmd.behindCallsign ?? '');
     }
     case 'TAXI':
     case 'TAXI_TO_PARKING':
@@ -572,7 +573,7 @@ function planMisread(ctx: SimContext, ac: Aircraft, rt: AircraftRuntime, clr: Cl
   const airport = ctx.state.airport;
   const base: ParsedCommand = {
     kind: clr.kind, callsign: ac.callsign, confidence: 1, rawText: '', normalizedText: '', issues: [],
-    runwayEnd: clr.runwayEnd, runwayId: clr.runwayId, route: clr.route, holdShort: clr.holdShort, destination: clr.destination, headingDeg: clr.headingDeg, ...(clr.kind === 'TAKEOFF' && clr.headingDeg !== undefined ? { departureHeading: clr.headingDeg } : {}),
+    runwayEnd: clr.runwayEnd, runwayId: clr.runwayId, behindCallsign: clr.behindCallsign, route: clr.route, holdShort: clr.holdShort, destination: clr.destination, headingDeg: clr.headingDeg, ...(clr.kind === 'TAKEOFF' && clr.headingDeg !== undefined ? { departureHeading: clr.headingDeg } : {}),
     turnDirection: clr.turnDirection, altitudeFt: clr.altitudeFt, speedKt: clr.speedKt, frequencyMhz: clr.frequencyMhz, frequencyId: clr.frequencyId,
     patternLeg: clr.patternLeg, squawk: clr.squawk, fix: clr.fix, approachType: clr.approachType, exitTaxiway: clr.exitTaxiway, turnDegrees: clr.turnDegrees,
   };
@@ -1125,6 +1126,7 @@ function planHoldShort(env: Env): PlanResult {
       patch: { holdShort: refs },
       commit: () => {
         for (const rw of rws) {
+          if (rt.conditionalCross?.runwayId === rw.id) rt.conditionalCross = undefined; // a hold short replaces a conditional crossing of that runway
           const i = ac.runwayAuthorizations.indexOf(rw.id);
           if (i >= 0) ac.runwayAuthorizations.splice(i, 1);
           if (ac.route) {
@@ -1187,14 +1189,46 @@ function planCross(env: Env): PlanResult {
   if (!atIntersection && !runwayCrossingsAlong(graph, route.nodeIds.slice(holdIdx)).includes(rw.id)) {
     return unable(env, `The current route of ${ac.callsign} does not continue across runway ${rw.id}; issue a new taxi instruction.`, `our route doesn't cross runway ${rw.id}`);
   }
+  // Conditional crossing (ICAO Doc 4444 conditional clearance): the named aircraft must be arriving to or rolling out on this runway.
+  let behind: Aircraft | undefined;
+  if (cmd.behindCallsign) {
+    behind = Object.values(env.ctx.state.aircraft).find((a) => a.callsign === cmd.behindCallsign && a.id !== ac.id);
+    if (!behind || !landingOnRunway(env.ctx, behind, rw)) {
+      const why = !behind ? `${cmd.behindCallsign} is not an active aircraft.` : `${behind.callsign} is not landing on or rolling out on runway ${rw.id} (${behind.onGround ? 'on the ground' : 'airborne'}, ${behind.phase}).`;
+      return unable(env, `Conditional crossing of runway ${rw.id} behind ${cmd.behindCallsign} refused: ${why}`, "we don't see the traffic");
+    }
+  }
   // JO 7110.65 3-1-3: Ground needs local control's approval for an active runway (coordination.ts).
   const gate = crossingGate(env.ctx, ac, env.position, rw);
   if (gate.refuse) return { reject: { reason: gate.refuse, commError: false } };
+  if (behind) {
+    const holdNode = graph.nodes[route.nodeIds[holdIdx]];
+    const next = graph.nodes[route.nodeIds[holdIdx + 1]];
+    const crossNode = atIntersection || !next || next.kind !== 'runway' || !(next.runwayId === rw.id || next.runwayIds?.includes(rw.id)) ? holdNode : next;
+    const traffic = behind;
+    return {
+      plan: {
+        patch: { runwayId: raw, behindCallsign: traffic.callsign, behindSpoken: spokenTrafficLabel(traffic) },
+        commit: (clr) => {
+          gate.commit();
+          // Not released: no authorisation, the hold node stays a stop, the pilot keeps holding short (conditionalCrossing.ts releases it).
+          const addedStop = !route.stopAtNodeIds.includes(holdNode.id);
+          if (addedStop) route.stopAtNodeIds.push(holdNode.id);
+          ac.flags.holdingPosition = false;
+          rt.conditionalCross = {
+            clearanceId: clr.id, behindId: traffic.id, behindCallsign: traffic.callsign, runwayId: rw.id, runwayLabel: cmd.runwayEnd ?? raw,
+            holdNodeId: holdNode.id, crossNodeId: crossNode.id, addedStop, sawOnRunway: traffic.onGround && traffic.occupyingRunways.includes(rw.id),
+          };
+        },
+      },
+    };
+  }
   return {
     plan: {
       patch: { runwayId: raw },
       commit: () => {
         gate.commit();
+        rt.conditionalCross = undefined;
         if (!ac.runwayAuthorizations.includes(rw.id)) ac.runwayAuthorizations.push(rw.id);
         route.stopAtNodeIds = route.stopAtNodeIds.filter((id) => graph.nodes[id].runwayId !== rw.id);
         ac.flags.holdingPosition = false;

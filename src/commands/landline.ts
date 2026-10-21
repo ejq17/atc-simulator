@@ -20,6 +20,7 @@
  * `nonStandard`: a plain-words call keeps a lower confidence (0.9 per non-standard element, like the radio grammar's non-standard factor).
  */
 import type { ControllerPositionId } from '../sim/types';
+import { matchAircraftPhrase } from './behind';
 import { resolveCallsign, CALLSIGN_ACCEPT } from './callsign';
 import type { AircraftRef } from './callsign';
 import { parseOneTaxiway, parseRunway } from './entities';
@@ -182,19 +183,9 @@ function entities(body: Token[], ctx: LandlineContext): { runwayEnd?: string; ru
 
 /** "behind the landing Spirit [four fifty one]": the aircraft the active list matches best (callsign, or the telephony / type word). */
 function afterAircraft(body: Token[], ctx: LandlineContext): string | undefined {
-  let i = body.findIndex((t) => t.kind === 'word' && (t.text === 'behind' || t.text === 'after'));
+  const i = body.findIndex((t) => t.kind === 'word' && (t.text === 'behind' || t.text === 'after'));
   if (i < 0) return undefined;
-  i++;
-  while (body[i] && ['the', 'landing', 'arrival', 'traffic', 'departing', 'aircraft'].includes(body[i].text)) i++;
-  const slice = body.slice(i, i + 8);
-  if (!slice.length) return undefined;
-  const res = resolveCallsign(slice, ctx.aircraft);
-  if (res.callsign && res.score >= CALLSIGN_ACCEPT) return res.callsign;
-  // "the landing Spirit" / "the Cessna": first word of the spoken callsign, only when exactly one aircraft has it
-  const word = slice[0].text.toLowerCase();
-  const hits = ctx.aircraft.filter((a) =>
-    a.spokenCallsign.toLowerCase().split(' ')[0] === word || (slice[0].kind === 'airline' && a.callsign.toUpperCase().startsWith(slice[0].text.toUpperCase()) && /^[A-Z]{3}\d/.test(a.callsign)));
-  return hits.length === 1 ? hits[0].callsign : undefined;
+  return matchAircraftPhrase(body, i + 1, ctx.aircraft).callsign;
 }
 
 export function parseLandline(text: string, ctx: LandlineContext): LandlineCommand {

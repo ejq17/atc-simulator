@@ -45,7 +45,7 @@ const r = parseTransmission('Spirit four fifty one, runway one three, cleared fo
 | taxi [to] runway N / ramp / parking / general aviation / FBO / gate N [via A B] [hold short of X] | `TAXI` (`destination: RWY<end>`, `route`, `holdShort`) or `TAXI_TO_PARKING` (`destination`: RAMP, PARKING, GA, FBO, TERMINAL, CARGO, HANGAR, APRON, GATE<n>) |
 | hold position / hold your position / stop | `HOLD_POSITION` (bare "hold" accepted, flagged non-standard) |
 | hold short [of] runway N / N / taxiway X [on\|at taxiway Y] | `HOLD_SHORT` (`holdShort: ['RWY13']` or `['A']`, plus `runwayEnd`/`runwayId`). Inside a hold-short object the word "runway" may be left out: a bare 1-2 digit number (optional left\|right\|center or L\|R\|C) that is in `ctx.runwayEnds` is the runway ("hold short of 31 on Bravo"); without `runwayEnds` a bare number is never a runway. A trailing "on\|at <taxiway>" after a runway names where to hold; it is consumed (no field stores it, no unrecognised-words penalty) |
-| cross runway N [at/via taxiway X] | `CROSS_RUNWAY` (`crossRunwayId: '13/31'`, `runwayEnd`, crossing taxiway in `route`) |
+| cross runway N [at/via taxiway X] [behind/after the [landing] <aircraft>] | `CROSS_RUNWAY` (`crossRunwayId: '13/31'`, `runwayEnd`, crossing taxiway in `route`; with "behind": `behindCallsign`, always non-standard, see below) |
 | line up and wait / position and hold / taxi into position | `LINE_UP_AND_WAIT` ("line up" alone is accepted but flagged) |
 | cleared for takeoff (STT: take off, clear for) | `TAKEOFF`; "fly heading/runway heading" and "turn left heading" are separate `HEADING` commands |
 | cleared to land / option / touch and go / stop and go / low approach | `LAND` (`destination: option, touch_and_go, stop_and_go, low_approach`) |
@@ -241,6 +241,10 @@ realised -> released, and everything the shared normaliser already fixes (NATO l
 
 * Landline `REQUEST_EXIT`: "Tower, Ground, have Spirit ten thirty three exit left at Charlie" / "... hold short of runway four after landing" (`exitSide`, `point`, `holdShortAfterLanding` + `runwayId`). 7110.65 3-1-4 asks for the exchange but prescribes no wording: `nonStandard`, confidence x0.9. `looksLikeLandline` is true for one position name followed by "have ... exit ..." or "hold short ... after landing". Tests: `exitRequest.test.ts`.
 * Radio `TURN_AROUND` (`ruleTurnAround`, rules-ground.ts): "make a one eighty", "do a 180", "turn around", "turn back", "reverse course". No 7110.65 phrase exists for an aircraft on a taxiway (3-7-2 gives step-by-step directions and directional turns): non-standard, confidence x0.9, the issue text says so. Executed by `sim/turnAround.ts`.
+
+## Conditional crossing ("behind the landing Cessna")
+
+`Spirit four fifty one, cross runway one three at Bravo behind the landing Cessna` -> `CROSS_RUNWAY` with `behindCallsign` = the one active aircraft the words name. This is an ICAO Doc 4444 conditional clearance, not JO 7110.65 phraseology, so the parser always adds the non-standard issue (confidence x0.9, `Fn = 0.90 ^ nonstandard`). The aircraft words go through `behind.ts` (`matchAircraftPhrase`, shared with the landline parser): a callsign, a telephony word ("Spirit"), an N-number fragment or a type word ("Cessna", "Skyhawk"), optionally after "the" / "landing" / "arriving" / "departing"; telephony and type words must fit exactly one active aircraft and are never taken when digits were spoken that fit nobody. When nothing (or several aircraft) match, `behindCallsign` stays unset, the issue `conditional crossing: no aircraft matches '...'` is added and `requirements.ts` counts a missing entity, so the engine asks for a say-again and never executes it as a plain crossing. The aircraft to wait for is masked out of the callsign resolution (`behindClauseSpan`), so it is never taken for the addressed aircraft. The engine side is `src/sim/conditionalCrossing.ts`.
 
 ## Phrase interpreter (fallback) (`llm/`)
 

@@ -709,7 +709,7 @@ export function updatePilotRequests(ctx: SimContext): void {
             : { kind: 'FREQUENCY_CHANGE', text: `holding short runway ${g!.end.id}`, sinceSec: now };
         continue;
       }
-      if (!routeDone && node.kind === 'holding_position' && node.runwayId && !rt.calls.has(`holdX:${node.id}`) && ac.route.stopAtNodeIds.includes(node.id)) {
+      if (!routeDone && node.kind === 'holding_position' && node.runwayId && !rt.calls.has(`holdX:${node.id}`) && !rt.conditionalCross && ac.route.stopAtNodeIds.includes(node.id)) {
         rt.calls.add(`holdX:${node.id}`);
         const taxiway = node.taxiways[0];
         pilotSay(ctx, ac, holdingShortCrossingCall(ac, env, node.runwayId, taxiway), { request: 'CROSSING' });

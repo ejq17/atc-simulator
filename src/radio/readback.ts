@@ -255,7 +255,7 @@ export function buildReadback(aircraft: Aircraft, c: Clearance, env: ReadbackEnv
         return /^(RWY|RUNWAY)?\s*\d/i.test(ref) ? `Hold short of runway ${runwayRef(ref)}` : `Hold short of ${spokenTaxiway(ref.replace(/^TWY\s*/i, ''))}`;
       }
       case 'CROSS_RUNWAY':
-        return `Cross runway ${runwaySpoken(c.runwayId ?? c.runwayEnd ?? '')}`;
+        return `Cross runway ${runwaySpoken(c.runwayId ?? c.runwayEnd ?? '')}${c.behindCallsign ? ` behind the landing ${c.behindSpoken ?? c.behindCallsign}` : ''}`;
       case 'GO_AROUND':
         return 'Going around';
       case 'CONTINUE_APPROACH':

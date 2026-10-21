@@ -3,7 +3,7 @@ import type { ParseContext } from './context';
 import { makeFixMatcher } from './fixes';
 import type { Toks } from './match';
 import {
-  makeClearedToParkingRule, makeContinueTaxiRule, makeHoldShortRule, makeTaxiRule, ruleCancel, ruleContinueSegment, ruleCross, ruleHoldPosition, ruleLineUp, ruleReadBackHold, ruleTaxiIntoPosition, ruleTurnAround,
+  makeClearedToParkingRule, makeContinueTaxiRule, makeHoldShortRule, makeTaxiRule, ruleCancel, ruleContinueSegment, makeCrossRule, ruleHoldPosition, ruleLineUp, ruleReadBackHold, ruleTaxiIntoPosition, ruleTurnAround,
 } from './rules-ground';
 import { ruleHoldAtFix, ruleMissedApproach } from './rules-hold';
 import { makeAltitudeRule, ruleHeading, rulePattern, ruleSpeed } from './rules-flight';
@@ -40,7 +40,7 @@ import {
  *    "cleared ROZZE two arrival" must not reach the IFR clearance / unsupported rules, "runway lights" must not reach the runway reference
  * Fix-aware rules (direct, until, position text) need `ctx.fixes`, so the list is built per parse.
  */
-export function buildRules(ctx: Pick<ParseContext, 'fixes' | 'taxiways' | 'runwayEnds' | 'arrivals'> = {}): readonly Rule[] {
+export function buildRules(ctx: Partial<Pick<ParseContext, 'fixes' | 'taxiways' | 'runwayEnds' | 'arrivals' | 'aircraft'>> = {}): readonly Rule[] {
   const fixes = makeFixMatcher(ctx.fixes);
   const taxiRule = makeTaxiRule(ctx.taxiways, ctx.runwayEnds);
   return [
@@ -48,7 +48,7 @@ export function buildRules(ctx: Pick<ParseContext, 'fixes' | 'taxiways' | 'runwa
     ruleAirportInfo, ruleWind, ruleDidYouCopy, ruleSayAgain, ruleUnable, ruleBirdAdvisory, ruleBrakingAdvisory, ruleRvr, ruleRunwayLights, ruleStar(ctx.arrivals ?? [], fixes), ruleTaxiIntoPosition, withLuawTraffic(ruleLineUp), ruleCancelTakeoff, ruleRadarServiceTerminated, ruleFrequencyApproved, ruleSquawk,
     ruleTurnAround, ruleExitRunway, rulePatternInstruction, ruleReportPosition, ruleFollowTraffic, ruleTrafficAdvisory, ruleTakeoff, ruleLand, ruleHoldAtFix(fixes),
     ruleMissedApproach, ruleGoAround, rulePushback, ruleReadBackHold, ruleContinueSegment, ruleRadarContact(fixes), ruleResumeNav, makeClearedToParkingRule(ctx.taxiways, ctx.runwayEnds), ruleApproach, ruleDirectFix(fixes),
-    ruleIfrClearance, ruleContact, makeHoldShortRule(ctx.runwayEnds), ruleHoldPosition, ruleCancel, ruleCross, makeContinueTaxiRule(ctx.taxiways, ctx.runwayEnds), makeTaxiRule(ctx.taxiways, ctx.runwayEnds),
+    ruleIfrClearance, ruleContact, makeHoldShortRule(ctx.runwayEnds), ruleHoldPosition, ruleCancel, makeCrossRule(ctx.aircraft), makeContinueTaxiRule(ctx.taxiways, ctx.runwayEnds), makeTaxiRule(ctx.taxiways, ctx.runwayEnds),
     ruleHeading, ruleSpeed, makeAltitudeRule(fixes), rulePattern, ruleContinue, ruleUnsupported,
     ruleRunwayRef, ruleRoute, rulePosition(fixes), ruleFiller,
   ];

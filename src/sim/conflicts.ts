@@ -10,6 +10,7 @@
  */
 import type { Aircraft, ConflictAlert, ParsedCommand, SimulationState } from './types';
 import { dist, headingDiff, ktToMps, magneticToTrue, mToFt, mToNm, nmToM, pointInPolygon } from './geo';
+import { crossesBehind } from './conditionalCrossing';
 import { projectArrival, surfaceWindow, timeToThreshold } from './runwayTiming';
 import { highestMvaAhead, MVA_LOOKAHEAD_NM, mvaExempt } from './mva';
 import { alongCross, crossingRunways, findRunway, findRunwayEnd, isOnFinal, runwayIntersection } from './runways';
@@ -508,11 +509,15 @@ export function assessClearanceSafety(state: SimulationState, cmd: ParsedCommand
       if (all.length) push(`Vehicle ${ac.callsign} sent onto runway ${runwayId} with ${cs(state, all.map((x) => x.id))} landing / in the pattern for runway ${rid}`, REF_TAXI, all.map((x) => x.id));
     }
   } else if (cmd.kind === 'CROSS_RUNWAY') {
+    // A conditional crossing ("behind the landing Cessna") is not released until that aircraft has passed the crossing point
+    // (conditionalCrossing.ts), so the named aircraft is the one traffic the clearance is allowed to have on the runway.
+    const named = cmd.behindCallsign ? Object.values(state.aircraft).find((a) => a.callsign === cmd.behindCallsign)?.id : undefined;
+    const others = (ids: string[]) => ids.filter((i) => i !== ac.id && i !== named);
     const occ = others(act.occupants);
     if (occ.length) push(`Crossing clearance for ${ac.callsign} over runway ${runwayId} while it is occupied by ${cs(state, occ)}`, REF_TAXI, occ);
     const dep = others([...act.departing, ...act.lineUp]).filter((i) => !occ.includes(i));
     if (dep.length) push(`Crossing clearance for ${ac.callsign} over runway ${runwayId} while ${cs(state, dep)} is departing / in position`, REF_TAXI, dep);
-    const landing = arrivalsOnFinal(state, runwayId, FINAL_CROSSING_NM, ac.id).filter((a) => !occ.includes(a.id));
+    const landing = arrivalsOnFinal(state, runwayId, FINAL_CROSSING_NM, ac.id).filter((a) => !occ.includes(a.id) && a.id !== named);
     const rolling = others(act.landing).filter((i) => state.aircraft[i]?.onGround && !occ.includes(i));
     if (landing.length || rolling.length) {
       const ids = [...landing.map((a) => a.id), ...rolling];
@@ -925,6 +930,10 @@ export function detectConflicts(ctx: SimContext): void {
       return a && (a.groundSpeedKt > 25 || a.phase === 'TAKEOFF_ROLL' || a.phase === 'ROLLOUT');
     });
     if (!moving.length) continue;
+    // A crossing released behind a lander that is past the crossing point (conditionalCrossing.ts) is not the surface conflict: leave the pair out.
+    const shared = act.occupants.some((x) => act.occupants.some((y) => x !== y && (moving.includes(x) || moving.includes(y))
+      && !(state.aircraft[x] && state.aircraft[y] && (crossesBehind(ctx, state.aircraft[x], state.aircraft[y]) || crossesBehind(ctx, state.aircraft[y], state.aircraft[x])))));
+    if (!shared) continue;
     const ids = [...act.occupants].sort();
     candidates.push({
       key: `RWC:${rid}:${ids.join('+')}`,

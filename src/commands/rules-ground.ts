@@ -1,3 +1,5 @@
+import { matchAircraftPhrase } from './behind';
+import type { AircraftRef } from './callsign';
 import { applyRunway, cmdHit, makeDraft, type Draft, type Rule } from './draft';
 import { makeRunwayRef, parseOneTaxiway, parseParking, parseRunway, parseTaxiways, runwayAfter, type RunwayParse } from './entities';
 import { intAt, isOneOf, seq, skipWords, txt, type Toks } from './match';
@@ -118,8 +120,28 @@ export const ruleHoldPosition: Rule = (t, i) => {
   return null;
 };
 
-/** "cross runway N [at|via taxiway X]" */
-export const ruleCross: Rule = (t, i) => {
+const CONDITIONAL_NONSTANDARD = 'non-standard phraseology: conditional "behind" crossing is an ICAO Doc 4444 clearance, not 7110.65';
+
+/** "behind|after [the] [landing] <aircraft>" at `b` (the word after "behind"): sets `behindCallsign`, or leaves the crossing unresolved. Returns the end index. */
+function parseBehind(d: Draft, t: Toks, b: number, aircraft: readonly AircraftRef[]): number {
+  const m = matchAircraftPhrase(t, b, aircraft);
+  if (m.callsign) d.fields.behindCallsign = m.callsign;
+  else {
+    d.behindUnresolved = true;
+    d.issues.push(!m.spoken ? 'conditional crossing: no aircraft named after "behind"'
+      : m.ambiguous.length > 1 ? `conditional crossing: '${m.spoken}' fits ${m.ambiguous.join(', ')}; name the aircraft by callsign`
+        : `conditional crossing: no aircraft matches '${m.spoken}'`);
+  }
+  d.nonstandard++;
+  d.issues.push(CONDITIONAL_NONSTANDARD);
+  return m.next;
+}
+
+/**
+ * "cross runway N [at|via taxiway X] [behind|after the [landing] <aircraft>]". The conditional form is an ICAO Doc 4444 conditional clearance, not
+ * JO 7110.65 phraseology, so it is always non-standard; `aircraft` (the active list) resolves the aircraft to let pass first.
+ */
+export const makeCrossRule = (aircraft: readonly AircraftRef[] = []): Rule => (t, i) => {
   if (txt(t, i) !== 'cross') return null;
   const d = makeDraft('CROSS_RUNWAY');
   let j = i + 1;
@@ -128,13 +150,21 @@ export const ruleCross: Rule = (t, i) => {
     if (r.ok) applyRunway(d, r.ref); else { d.issues.push(r.reason); d.unknownIds++; }
     j = r.next;
   }
-  const k = seq(t, j, 'at|via|using|on taxiway?');
-  if (k >= 0) {
+  const taxiway = () => {
+    const k = seq(t, j, 'at|via|using|on taxiway?');
+    if (k < 0) return;
     const tw = parseTaxiways(t, k);
     if (tw.ids.length) { d.fields.route = tw.ids; j = tw.next; }
+  };
+  taxiway();
+  const b = seq(t, j, 'behind|after');
+  if (b >= 0) {
+    j = parseBehind(d, t, b, aircraft);
+    if (!d.fields.route) taxiway();
   }
   return cmdHit(j, d);
 };
+export const ruleCross: Rule = makeCrossRule();
 
 /**
  * The body of a taxi instruction after its verb (at `i`): "[to] runway N | ramp | parking | <taxiway> ... [via A B] [hold short of ...]".

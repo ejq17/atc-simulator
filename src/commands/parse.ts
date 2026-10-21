@@ -1,4 +1,5 @@
 import type { ParseResult, ParsedCommand } from '../sim/types';
+import { behindClauseSpan } from './behind';
 import { assemble, type PlacedDraft } from './assemble';
 import { resolveCallsign, type AircraftRef, type CallsignResolution } from './callsign';
 import { commandConfidence } from './confidence';
@@ -62,7 +63,10 @@ function maskCallsign(tokens: readonly Token[], cs: CallsignResolution): { toks:
 
 export function parse(text: string, ctx: ParseContext): ParseResult {
   const norm: NormalizedText = normalize(text, { extraAirlines: deriveAirlines(ctx.aircraft), protectedWords: protectedWords(ctx), taxiways: ctx.taxiways, runwayEnds: ctx.runwayEnds });
-  const cs = resolveCallsign(norm.tokens, ctx.aircraft);
+  // "cross runway 13 behind the landing N67890": the aircraft to let pass is not the addressed one
+  const behind = behindClauseSpan(norm.tokens, ctx.aircraft);
+  const csTokens = behind ? norm.tokens.map((t, k): Token => (k >= behind.start && k < behind.end ? { ...t, text: '\u0000', kind: 'barrier' } : t)) : norm.tokens;
+  const cs = resolveCallsign(csTokens, ctx.aircraft);
   const { toks, masked } = maskCallsign(norm.tokens, cs);
   const { drafts, consumed } = assemble(scan(toks, buildRules(ctx)), toks.length, masked);
   const coverage = toks.length === 0 ? 0 : consumed.filter(Boolean).length / toks.length;

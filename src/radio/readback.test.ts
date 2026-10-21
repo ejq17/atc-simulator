@@ -81,6 +81,8 @@ describe('clearance readbacks (callsign last)', () => {
     expect(t({ kind: 'LAND', runwayEnd: '31' })).toBe('Runway three one, cleared to land, Cessna seven two three echo juliet');
     expect(t({ kind: 'LINE_UP_AND_WAIT', runwayEnd: '4' })).toBe('Runway four, line up and wait, Cessna seven two three echo juliet');
     expect(t({ kind: 'CROSS_RUNWAY', runwayId: '13/31' })).toBe('Cross runway one three, Cessna seven two three echo juliet');
+    expect(t({ kind: 'CROSS_RUNWAY', runwayId: '13/31', behindCallsign: 'NKS451', behindSpoken: 'Spirit four fifty one' })).toBe('Cross runway one three behind the landing Spirit four fifty one, Cessna seven two three echo juliet');
+    expect(t({ kind: 'CROSS_RUNWAY', runwayId: '13/31', behindCallsign: 'N45PX', behindSpoken: 'Piper' })).toBe('Cross runway one three behind the landing Piper, Cessna seven two three echo juliet');
     expect(t({ kind: 'HOLD_SHORT', holdShort: ['4/22'] })).toBe('Hold short of runway four, Cessna seven two three echo juliet');
     expect(t({ kind: 'HOLD_POSITION' })).toBe('Holding position, Cessna seven two three echo juliet');
     expect(t({ kind: 'GO_AROUND' }, spirit)).toBe('Going around, Spirit four fifty one');
