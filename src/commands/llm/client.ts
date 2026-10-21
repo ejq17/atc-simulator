@@ -67,7 +67,7 @@ export function createLlmParser(options: LlmParserOptions = {}): LlmParser {
         let body: unknown;
         try {
           body = await res.json();
-        } catch (err) {
+        } catch {
           if (timedOut) throw new LlmParseError('TIMEOUT', `The phrase interpreter did not answer within ${Math.round(timeoutMs / 1000)} s.`);
           if (res.ok) throw new LlmParseError('BAD_RESPONSE', 'The phrase interpreter returned something that is not JSON.', res.status);
           body = undefined;
