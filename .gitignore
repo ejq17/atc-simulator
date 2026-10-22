@@ -25,7 +25,7 @@ dist-ssr
 .env
 .env.*
 !.env.example
-data/sources/raw/
+data/sources/raw
 test-results/
 playwright-report/
 .cache/
