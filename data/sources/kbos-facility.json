@@ -1,0 +1,1180 @@
+{
+ "_provenance": {
+  "source": "FAA NASR 28-day subscription, cycle effective 2026-10-01 (next 2026-10-29), CSV per-file zips from https://nfdc.faa.gov/webContent/28DaySub/extra/01_Oct_2026_<NAME>_CSV.zip; page https://www.faa.gov/air_traffic/flight_info/aeronav/aero_data/NASR_Subscription/2026-10-01/",
+  "files": [
+   "APT_BASE.csv",
+   "APT_RWY.csv",
+   "APT_RWY_END.csv",
+   "APT_RMK.csv",
+   "APT_CON.csv",
+   "APT_ARS.csv",
+   "ATC_BASE.csv",
+   "ATC_ATIS.csv",
+   "ATC_SVC.csv",
+   "ATC_RMK.csv",
+   "CLS_ARSP.csv",
+   "ILS_BASE.csv",
+   "ILS_GS.csv",
+   "ILS_DME.csv",
+   "ILS_MKR.csv",
+   "ILS_RMK.csv"
+  ],
+  "retrieved": "2026-10-21",
+  "faa_cycle_effective": "2026-10-01",
+  "faa_cycle_next": "2026-10-29",
+  "arpt_id": "BOS",
+  "icao": "KBOS",
+  "site_no": "08778.",
+  "method": "Extracted by scripts/extract-nasr-airport.ts BOS KBOS: rows with ARPT_ID/FACILITY_ID == BOS copied verbatim, only numeric conversion applied. Blank NASR fields are reported as null/none-recorded, never filled in. Charted magnetic runway headings are read from the airport diagram (see airport_diagram.charted_runway_headings_mag in kbos-procedures.json).",
+  "raw_dir": "raw/nasr_2026-10-01/"
+ },
+ "airport": {
+  "name": "GENERAL EDWARD LAWRENCE LOGAN INTL",
+  "icao": "KBOS",
+  "faa_id": "BOS",
+  "city": "BOSTON",
+  "state": "MA",
+  "county": "SUFFOLK",
+  "faa_region": "ANE",
+  "ownership": {
+   "type_code": "PU",
+   "type_meaning": "PU = publicly owned (NASR code)",
+   "owner": "MASS PORT AUTHORITY",
+   "contacts": [
+    {
+     "title": "MANAGER",
+     "name": "SHARON WILLIAMS",
+     "address": "LOGAN INTERNATIONAL AIRPORT, EAST BOSTON, MA, 02128",
+     "phone": "617-567-5400"
+    },
+    {
+     "title": "OWNER",
+     "name": "MASS PORT AUTHORITY",
+     "address": "ONE HARBORSIDE DR STE 200S, BOSTON, MA, 02128",
+     "phone": "617-428-2800"
+    }
+   ]
+  },
+  "facility_use": "PU",
+  "status": "O",
+  "activation_date": "1940/04",
+  "far139_type": "I E",
+  "far139_carrier_service": "S",
+  "arp": {
+   "lat": 42.36294444,
+   "lon": -71.00638888,
+   "lat_dms": "42-21-46.6N",
+   "lon_dms": "71-0-23W",
+   "source": "3RD PARTY SURVEY",
+   "source_date": "2008/11/15"
+  },
+  "field_elevation_ft": 19.1,
+  "elevation_source": "3RD PARTY SURVEY",
+  "elevation_source_date": "2008/11/05",
+  "magnetic_variation": {
+   "deg": 15,
+   "hemisphere": "W",
+   "epoch_year": "2020",
+   "note": "NASR airport variation is 15W, epoch 2020. The airport diagram prints \"VAR 15° W, JANUARY 2020, annual rate of change 0.1 deg E\". Charted magnetic runway headings = true + 15. Current WMM declination for 2026 is NOT verified here."
+  },
+  "artcc": {
+   "id": "ZBW",
+   "name": "BOSTON"
+  },
+  "fss": {
+   "id": "BDR",
+   "name": "BRIDGEPORT"
+  },
+  "tower_type": "ATCT",
+  "beacon": {
+   "schedule": "SS-SR",
+   "lens": "WG"
+  },
+  "wind_indicator": "Y-L",
+  "fuel": "100LL,A",
+  "customs": null,
+  "landing_fee": "Y",
+  "military_landing_rights": "Y",
+  "acreage": 2384,
+  "chart_name": "NEW YORK",
+  "distance_city_to_airport_nm": 1,
+  "direction_city_to_airport": "E",
+  "last_inspection": "2023/09/29",
+  "traffic_pattern_altitude_ft": null,
+  "traffic_pattern_altitude_note": "TPA blank in NASR for BOS - UNVERIFIED",
+  "time_zone": "America/New_York",
+  "time_zone_source": "Boston, Massachusetts (Eastern Time; IANA tz database zone America/New_York). A fixed property of the location, not in NASR."
+ },
+ "tower": {
+  "facility_type": "ATCT",
+  "operator_code": "F",
+  "operator_meaning": "F = FAA (NASR code)",
+  "tower_call": "BOSTON",
+  "tower_hours": "24",
+  "tower_hours_note": "NASR TWR_HRS = 24 (hours/day).",
+  "approach_radio_call": "BOSTON",
+  "departure_radio_call": "BOSTON",
+  "approach_provider": "A90",
+  "services": [
+   "CLASS B",
+   "CONFLICT ALERT",
+   "CPDLC (LOGON KUSA)",
+   "MSAW",
+   "PDC",
+   "TDWR"
+  ],
+  "atis": [
+   {
+    "atis_no": "1",
+    "hours": "24",
+    "phone": "617-455-3003"
+   }
+  ],
+  "note": "ATC_BASE: ATCT, tower radio call \"BOSTON\", primary approach/departure provider A90 (\"BOSTON\"). ATC remarks: \"ASDE-X IN USE. OPERATE TRANSPONDERS WITH ALTITUDE REPORTING MODE AND ADS-B (IF EQUIPPED) ENABLED ON ALL AIRPORT SURFACES.\""
+ },
+ "airspace": {
+  "class_c": false,
+  "class_b": true,
+  "class_d": false,
+  "class_e_surface": false,
+  "hours": null,
+  "note": "NASR CLS_ARSP: BOS CLASS_C_AIRSPACE = . Vertical/lateral limits are NOT in the CSV rows; class_airspace_shape_files.zip was not downloaded - shelf dimensions UNVERIFIED.",
+  "class": "B"
+ },
+ "runways": [
+  {
+   "id": "04L/22R",
+   "length_ft": 7864,
+   "width_ft": 150,
+   "surface": "ASPH",
+   "condition": "GOOD",
+   "treatment": "GRVD",
+   "pavement_classification": "PCR",
+   "pcr_number": "800",
+   "pavement_code": "F/C/X/T",
+   "edge_lights": "HIGH",
+   "weight_bearing_klbs": {
+    "single": 120,
+    "dual": 250,
+    "dual_tandem": 550,
+    "double_dual_tandem": null
+   },
+   "length_source": "3RD PARTY SURVEY",
+   "length_source_date": "2013/12/16",
+   "ends": [
+    {
+     "id": "04L",
+     "true_alignment_deg": 20,
+     "charted_magnetic_heading_deg": 35,
+     "charted_magnetic_heading_source": "airport diagram 00058AD.PDF (runway end heading printed on the chart)",
+     "threshold": {
+      "lat": 42.35798825,
+      "lon": -71.01433852,
+      "lat_dms": "42-21-28.7577N",
+      "lon_dms": "71-0-51.6187W",
+      "elev_ft": 13.9,
+      "position_source": "3RD PARTY SURVEY",
+      "position_date": "2013/12/16",
+      "note": "NASR RWY_END_LAT/LONG = the physical runway end (pavement end). The simulator uses it as the runway-end node; a displaced landing threshold, where one exists, is listed in displaced_threshold."
+     },
+     "displaced_threshold": {
+      "present": false,
+      "length_ft": null,
+      "note": "NASR DISPLACED_THR_* fields are blank for this runway end (none recorded)."
+     },
+     "tdz_elev_ft": 13.9,
+     "threshold_crossing_height_ft": 51,
+     "visual_glide_path_angle_deg": 3.1,
+     "vgsi": "P4L",
+     "approach_lighting": "NONE recorded in NASR",
+     "tdz_lights": null,
+     "centerline_lights": "Y",
+     "reil": "REIL",
+     "ils_type_nasr": "NONE recorded in NASR",
+     "marking": {
+      "type": "PIR",
+      "condition": "GOOD"
+     },
+     "declared_distances_ft": {
+      "tora": 7864,
+      "toda": 7864,
+      "asda": 7864,
+      "lda": 7864
+     },
+     "lahso": {
+      "available_landing_distance_ft": 5250,
+      "hold_short_of": "15L/33R",
+      "hold_short_point": {
+       "lat": 42.37154791,
+       "lon": -71.00777913
+      }
+     },
+     "right_hand_traffic": "N",
+     "controlling_obstruction": {
+      "type": "BOAT",
+      "height_ft": 161,
+      "slope": "18",
+      "dist_from_thr_ft": 3250,
+      "offset_ft": null,
+      "offset_side": null
+     }
+    },
+    {
+     "id": "22R",
+     "true_alignment_deg": 200,
+     "charted_magnetic_heading_deg": 215,
+     "charted_magnetic_heading_source": "airport diagram 00058AD.PDF (runway end heading printed on the chart)",
+     "threshold": {
+      "lat": 42.37829886,
+      "lon": -71.00451386,
+      "lat_dms": "42-22-41.8759N",
+      "lon_dms": "71-0-16.2499W",
+      "elev_ft": 14.9,
+      "position_source": "3RD PARTY SURVEY",
+      "position_date": "2013/12/16",
+      "note": "NASR RWY_END_LAT/LONG = the physical runway end (pavement end). The simulator uses it as the runway-end node; a displaced landing threshold, where one exists, is listed in displaced_threshold."
+     },
+     "displaced_threshold": {
+      "present": true,
+      "length_ft": 819,
+      "lat": 42.37618461,
+      "lon": -71.00553588,
+      "elev_ft": 15.2,
+      "note": "NASR DISPLACED_THR_LEN: landing threshold displaced from the pavement end (the displaced area is usable for takeoff, taxi and landing rollout). Not modelled by the simulator beyond this record."
+     },
+     "tdz_elev_ft": 15.2,
+     "threshold_crossing_height_ft": 50,
+     "visual_glide_path_angle_deg": 3,
+     "vgsi": "P4L",
+     "approach_lighting": "NONE recorded in NASR",
+     "tdz_lights": null,
+     "centerline_lights": "Y",
+     "reil": null,
+     "ils_type_nasr": "NONE recorded in NASR",
+     "marking": {
+      "type": "PIR",
+      "condition": "GOOD"
+     },
+     "declared_distances_ft": {
+      "tora": 7864,
+      "toda": 7864,
+      "asda": 7864,
+      "lda": 7046
+     },
+     "lahso": null,
+     "right_hand_traffic": "N",
+     "controlling_obstruction": {
+      "type": "BOAT",
+      "height_ft": 44,
+      "slope": "10",
+      "dist_from_thr_ft": 670,
+      "offset_ft": null,
+      "offset_side": null
+     }
+    }
+   ],
+   "type": "RUNWAY"
+  },
+  {
+   "id": "04R/22L",
+   "length_ft": 10006,
+   "width_ft": 150,
+   "surface": "ASPH",
+   "condition": "GOOD",
+   "treatment": "GRVD",
+   "pavement_classification": "PCR",
+   "pcr_number": "830",
+   "pavement_code": "F/C/X/T",
+   "edge_lights": "HIGH",
+   "weight_bearing_klbs": {
+    "single": 120,
+    "dual": 250,
+    "dual_tandem": 550,
+    "double_dual_tandem": null
+   },
+   "length_source": "3RD PARTY SURVEY",
+   "length_source_date": "2013/12/16",
+   "ends": [
+    {
+     "id": "04R",
+     "true_alignment_deg": 20,
+     "charted_magnetic_heading_deg": 35,
+     "charted_magnetic_heading_source": "airport diagram 00058AD.PDF (runway end heading printed on the chart)",
+     "threshold": {
+      "lat": 42.35105816,
+      "lon": -71.01179388,
+      "lat_dms": "42-21-3.8094N",
+      "lon_dms": "71-0-42.458W",
+      "elev_ft": 18.8,
+      "position_source": "3RD PARTY SURVEY",
+      "position_date": "2013/12/16",
+      "note": "NASR RWY_END_LAT/LONG = the physical runway end (pavement end). The simulator uses it as the runway-end node; a displaced landing threshold, where one exists, is listed in displaced_threshold."
+     },
+     "displaced_threshold": {
+      "present": true,
+      "length_ft": 1155,
+      "lat": 42.35404027,
+      "lon": -71.01035252,
+      "elev_ft": 17.6,
+      "note": "NASR DISPLACED_THR_LEN: landing threshold displaced from the pavement end (the displaced area is usable for takeoff, taxi and landing rollout). Not modelled by the simulator beyond this record."
+     },
+     "tdz_elev_ft": 17.6,
+     "threshold_crossing_height_ft": 67,
+     "visual_glide_path_angle_deg": 3,
+     "vgsi": "P4L",
+     "approach_lighting": "ALSF2",
+     "tdz_lights": "Y",
+     "centerline_lights": "Y",
+     "reil": null,
+     "ils_type_nasr": "ILS/DME",
+     "marking": {
+      "type": "PIR",
+      "condition": "GOOD"
+     },
+     "declared_distances_ft": {
+      "tora": 10006,
+      "toda": 10006,
+      "asda": 10006,
+      "lda": 8851
+     },
+     "lahso": null,
+     "right_hand_traffic": "N",
+     "controlling_obstruction": {
+      "type": "BOAT",
+      "height_ft": 157,
+      "slope": "8",
+      "dist_from_thr_ft": 1550,
+      "offset_ft": null,
+      "offset_side": null
+     }
+    },
+    {
+     "id": "22L",
+     "true_alignment_deg": 200,
+     "charted_magnetic_heading_deg": 215,
+     "charted_magnetic_heading_source": "airport diagram 00058AD.PDF (runway end heading printed on the chart)",
+     "threshold": {
+      "lat": 42.37689997,
+      "lon": -70.99929091,
+      "lat_dms": "42-22-36.8399N",
+      "lon_dms": "70-59-57.4473W",
+      "elev_ft": 14.5,
+      "position_source": "3RD PARTY SURVEY",
+      "position_date": "2013/12/16",
+      "note": "NASR RWY_END_LAT/LONG = the physical runway end (pavement end). The simulator uses it as the runway-end node; a displaced landing threshold, where one exists, is listed in displaced_threshold."
+     },
+     "displaced_threshold": {
+      "present": true,
+      "length_ft": 1199,
+      "lat": 42.37380411,
+      "lon": -71.00079041,
+      "elev_ft": 15.6,
+      "note": "NASR DISPLACED_THR_LEN: landing threshold displaced from the pavement end (the displaced area is usable for takeoff, taxi and landing rollout). Not modelled by the simulator beyond this record."
+     },
+     "tdz_elev_ft": 15.6,
+     "threshold_crossing_height_ft": 71,
+     "visual_glide_path_angle_deg": 3,
+     "vgsi": "P4R",
+     "approach_lighting": "MALSF",
+     "tdz_lights": null,
+     "centerline_lights": "Y",
+     "reil": null,
+     "ils_type_nasr": "ILS/DME",
+     "marking": {
+      "type": "PIR",
+      "condition": "GOOD"
+     },
+     "declared_distances_ft": {
+      "tora": 10006,
+      "toda": 10006,
+      "asda": 10006,
+      "lda": 8806
+     },
+     "lahso": {
+      "available_landing_distance_ft": 6400,
+      "hold_short_of": "09/27",
+      "hold_short_point": {
+       "lat": 42.3572743,
+       "lon": -71.00878927
+      }
+     },
+     "right_hand_traffic": "N",
+     "controlling_obstruction": {
+      "type": "BOAT",
+      "height_ft": 45,
+      "slope": "7",
+      "dist_from_thr_ft": 525,
+      "offset_ft": null,
+      "offset_side": null
+     }
+    }
+   ],
+   "type": "RUNWAY"
+  },
+  {
+   "id": "09/27",
+   "length_ft": 7001,
+   "width_ft": 150,
+   "surface": "ASPH",
+   "condition": "GOOD",
+   "treatment": "GRVD",
+   "pavement_classification": "PCR",
+   "pcr_number": "810",
+   "pavement_code": "F/C/X/T",
+   "edge_lights": "HIGH",
+   "weight_bearing_klbs": {
+    "single": 120,
+    "dual": 250,
+    "dual_tandem": 550,
+    "double_dual_tandem": null
+   },
+   "length_source": "3RD PARTY SURVEY",
+   "length_source_date": "2013/12/16",
+   "ends": [
+    {
+     "id": "09",
+     "true_alignment_deg": 77,
+     "charted_magnetic_heading_deg": 92,
+     "charted_magnetic_heading_source": "airport diagram 00058AD.PDF (runway end heading printed on the chart)",
+     "threshold": {
+      "lat": 42.35575416,
+      "lon": -71.01289408,
+      "lat_dms": "42-21-20.715N",
+      "lon_dms": "71-0-46.4187W",
+      "elev_ft": 16.7,
+      "position_source": "3RD PARTY SURVEY",
+      "position_date": "2013/12/16",
+      "note": "NASR RWY_END_LAT/LONG = the physical runway end (pavement end). The simulator uses it as the runway-end node; a displaced landing threshold, where one exists, is listed in displaced_threshold."
+     },
+     "displaced_threshold": {
+      "present": false,
+      "length_ft": null,
+      "note": "NASR DISPLACED_THR_* fields are blank for this runway end (none recorded)."
+     },
+     "tdz_elev_ft": 16.8,
+     "threshold_crossing_height_ft": null,
+     "visual_glide_path_angle_deg": null,
+     "vgsi": null,
+     "approach_lighting": "NONE recorded in NASR",
+     "tdz_lights": null,
+     "centerline_lights": "Y",
+     "reil": null,
+     "ils_type_nasr": "NONE recorded in NASR",
+     "marking": {
+      "type": "BSC",
+      "condition": "GOOD"
+     },
+     "declared_distances_ft": {
+      "tora": 7001,
+      "toda": 7001,
+      "asda": 7001,
+      "lda": 7001
+     },
+     "lahso": null,
+     "right_hand_traffic": "N",
+     "controlling_obstruction": {
+      "type": "BOAT",
+      "height_ft": 158,
+      "slope": "11",
+      "dist_from_thr_ft": 2050,
+      "offset_ft": null,
+      "offset_side": null
+     }
+    },
+    {
+     "id": "27",
+     "true_alignment_deg": 257,
+     "charted_magnetic_heading_deg": 272,
+     "charted_magnetic_heading_source": "airport diagram 00058AD.PDF (runway end heading printed on the chart)",
+     "threshold": {
+      "lat": 42.36021575,
+      "lon": -70.98770211,
+      "lat_dms": "42-21-36.7767N",
+      "lon_dms": "70-59-15.7276W",
+      "elev_ft": 14.8,
+      "position_source": "3RD PARTY SURVEY",
+      "position_date": "2013/12/16",
+      "note": "NASR RWY_END_LAT/LONG = the physical runway end (pavement end). The simulator uses it as the runway-end node; a displaced landing threshold, where one exists, is listed in displaced_threshold."
+     },
+     "displaced_threshold": {
+      "present": false,
+      "length_ft": null,
+      "note": "NASR DISPLACED_THR_* fields are blank for this runway end (none recorded)."
+     },
+     "tdz_elev_ft": 17.2,
+     "threshold_crossing_height_ft": 71,
+     "visual_glide_path_angle_deg": 3,
+     "vgsi": "P4L",
+     "approach_lighting": "NONE recorded in NASR",
+     "tdz_lights": null,
+     "centerline_lights": "Y",
+     "reil": "REIL",
+     "ils_type_nasr": "ILS/DME",
+     "marking": {
+      "type": "PIR",
+      "condition": "GOOD"
+     },
+     "declared_distances_ft": {
+      "tora": 7001,
+      "toda": 7001,
+      "asda": 7001,
+      "lda": 7001
+     },
+     "lahso": {
+      "available_landing_distance_ft": 5650,
+      "hold_short_of": "04R/22L",
+      "hold_short_point": {
+       "lat": 42.35661536,
+       "lon": -71.00803533
+      }
+     },
+     "right_hand_traffic": "N",
+     "controlling_obstruction": {
+      "type": "BOAT",
+      "height_ft": 45,
+      "slope": "6",
+      "dist_from_thr_ft": 500,
+      "offset_ft": null,
+      "offset_side": null
+     }
+    }
+   ],
+   "type": "RUNWAY"
+  },
+  {
+   "id": "14/32",
+   "length_ft": 5000,
+   "width_ft": 100,
+   "surface": "ASPH",
+   "condition": "GOOD",
+   "treatment": "GRVD",
+   "pavement_classification": "PCR",
+   "pcr_number": "780",
+   "pavement_code": "F/C/X/T",
+   "edge_lights": "HIGH",
+   "weight_bearing_klbs": {
+    "single": 120,
+    "dual": 250,
+    "dual_tandem": 490,
+    "double_dual_tandem": null
+   },
+   "length_source": "3RD PARTY SURVEY",
+   "length_source_date": "2013/12/16",
+   "ends": [
+    {
+     "id": "14",
+     "true_alignment_deg": 125,
+     "charted_magnetic_heading_deg": 140,
+     "charted_magnetic_heading_source": "airport diagram 00058AD.PDF (runway end heading printed on the chart)",
+     "threshold": {
+      "lat": 42.3565978,
+      "lon": -71.02327461,
+      "lat_dms": "42-21-23.7521N",
+      "lon_dms": "71-1-23.7886W",
+      "elev_ft": 16,
+      "position_source": "3RD PARTY SURVEY",
+      "position_date": "2013/12/16",
+      "note": "NASR RWY_END_LAT/LONG = the physical runway end (pavement end). The simulator uses it as the runway-end node; a displaced landing threshold, where one exists, is listed in displaced_threshold."
+     },
+     "displaced_threshold": {
+      "present": false,
+      "length_ft": null,
+      "note": "NASR DISPLACED_THR_* fields are blank for this runway end (none recorded)."
+     },
+     "tdz_elev_ft": 19.1,
+     "threshold_crossing_height_ft": null,
+     "visual_glide_path_angle_deg": null,
+     "vgsi": null,
+     "approach_lighting": "NONE recorded in NASR",
+     "tdz_lights": null,
+     "centerline_lights": null,
+     "reil": null,
+     "ils_type_nasr": "NONE recorded in NASR",
+     "marking": {
+      "type": "BSC",
+      "condition": "GOOD"
+     },
+     "declared_distances_ft": {
+      "tora": 5000,
+      "toda": 5000,
+      "asda": 5000,
+      "lda": null
+     },
+     "lahso": null,
+     "right_hand_traffic": null,
+     "controlling_obstruction": {
+      "type": "BLDG",
+      "height_ft": 174,
+      "slope": null,
+      "dist_from_thr_ft": 1364,
+      "offset_ft": 70,
+      "offset_side": "L"
+     }
+    },
+    {
+     "id": "32",
+     "true_alignment_deg": 305,
+     "charted_magnetic_heading_deg": 320,
+     "charted_magnetic_heading_source": "airport diagram 00058AD.PDF (runway end heading printed on the chart)",
+     "threshold": {
+      "lat": 42.34859902,
+      "lon": -71.00824558,
+      "lat_dms": "42-20-54.9565N",
+      "lon_dms": "71-0-29.6841W",
+      "elev_ft": 19.1,
+      "position_source": "3RD PARTY SURVEY",
+      "position_date": "2013/12/16",
+      "note": "NASR RWY_END_LAT/LONG = the physical runway end (pavement end). The simulator uses it as the runway-end node; a displaced landing threshold, where one exists, is listed in displaced_threshold."
+     },
+     "displaced_threshold": {
+      "present": false,
+      "length_ft": null,
+      "note": "NASR DISPLACED_THR_* fields are blank for this runway end (none recorded)."
+     },
+     "tdz_elev_ft": 19.1,
+     "threshold_crossing_height_ft": 45,
+     "visual_glide_path_angle_deg": 3,
+     "vgsi": "P4L",
+     "approach_lighting": "NONE recorded in NASR",
+     "tdz_lights": null,
+     "centerline_lights": null,
+     "reil": "REIL",
+     "ils_type_nasr": "NONE recorded in NASR",
+     "marking": {
+      "type": "PIR",
+      "condition": "GOOD"
+     },
+     "declared_distances_ft": {
+      "tora": null,
+      "toda": null,
+      "asda": null,
+      "lda": 5000
+     },
+     "lahso": null,
+     "right_hand_traffic": null,
+     "controlling_obstruction": null
+    }
+   ],
+   "type": "RUNWAY"
+  },
+  {
+   "id": "15L/33R",
+   "length_ft": 2557,
+   "width_ft": 100,
+   "surface": "ASPH",
+   "condition": "GOOD",
+   "treatment": "NONE",
+   "pavement_classification": "PCR",
+   "pcr_number": "850",
+   "pavement_code": "F/C/X/T",
+   "edge_lights": "MED",
+   "weight_bearing_klbs": {
+    "single": 120,
+    "dual": 250,
+    "dual_tandem": 550,
+    "double_dual_tandem": null
+   },
+   "length_source": "3RD PARTY SURVEY",
+   "length_source_date": "2013/12/16",
+   "ends": [
+    {
+     "id": "15L",
+     "true_alignment_deg": 135,
+     "charted_magnetic_heading_deg": 150,
+     "charted_magnetic_heading_source": "airport diagram 00058AD.PDF (runway end heading printed on the chart)",
+     "threshold": {
+      "lat": 42.37319466,
+      "lon": -71.00861241,
+      "lat_dms": "42-22-23.5008N",
+      "lon_dms": "71-0-31.0047W",
+      "elev_ft": 14.8,
+      "position_source": "3RD PARTY SURVEY",
+      "position_date": "2013/12/16",
+      "note": "NASR RWY_END_LAT/LONG = the physical runway end (pavement end). The simulator uses it as the runway-end node; a displaced landing threshold, where one exists, is listed in displaced_threshold."
+     },
+     "displaced_threshold": {
+      "present": false,
+      "length_ft": null,
+      "note": "NASR DISPLACED_THR_* fields are blank for this runway end (none recorded)."
+     },
+     "tdz_elev_ft": 15.8,
+     "threshold_crossing_height_ft": null,
+     "visual_glide_path_angle_deg": null,
+     "vgsi": null,
+     "approach_lighting": "NONE recorded in NASR",
+     "tdz_lights": null,
+     "centerline_lights": null,
+     "reil": null,
+     "ils_type_nasr": "NONE recorded in NASR",
+     "marking": {
+      "type": "BSC",
+      "condition": "GOOD"
+     },
+     "declared_distances_ft": {
+      "tora": 2557,
+      "toda": 2557,
+      "asda": 2557,
+      "lda": 2557
+     },
+     "lahso": null,
+     "right_hand_traffic": "N",
+     "controlling_obstruction": null
+    },
+    {
+     "id": "33R",
+     "true_alignment_deg": 315,
+     "charted_magnetic_heading_deg": 330,
+     "charted_magnetic_heading_source": "airport diagram 00058AD.PDF (runway end heading printed on the chart)",
+     "threshold": {
+      "lat": 42.36821641,
+      "lon": -71.00194466,
+      "lat_dms": "42-22-5.5791N",
+      "lon_dms": "71-0-7.0008W",
+      "elev_ft": 14,
+      "position_source": "3RD PARTY SURVEY",
+      "position_date": "2013/12/16",
+      "note": "NASR RWY_END_LAT/LONG = the physical runway end (pavement end). The simulator uses it as the runway-end node; a displaced landing threshold, where one exists, is listed in displaced_threshold."
+     },
+     "displaced_threshold": {
+      "present": false,
+      "length_ft": null,
+      "note": "NASR DISPLACED_THR_* fields are blank for this runway end (none recorded)."
+     },
+     "tdz_elev_ft": 15.8,
+     "threshold_crossing_height_ft": 40,
+     "visual_glide_path_angle_deg": 3,
+     "vgsi": "P4R",
+     "approach_lighting": "NONE recorded in NASR",
+     "tdz_lights": null,
+     "centerline_lights": null,
+     "reil": null,
+     "ils_type_nasr": "NONE recorded in NASR",
+     "marking": {
+      "type": "BSC",
+      "condition": "GOOD"
+     },
+     "declared_distances_ft": {
+      "tora": 2557,
+      "toda": 2557,
+      "asda": 2557,
+      "lda": 2557
+     },
+     "lahso": null,
+     "right_hand_traffic": "N",
+     "controlling_obstruction": null
+    }
+   ],
+   "type": "RUNWAY"
+  },
+  {
+   "id": "15R/33L",
+   "length_ft": 10083,
+   "width_ft": 150,
+   "surface": "ASPH",
+   "condition": "EXCELLENT",
+   "treatment": "GRVD",
+   "pavement_classification": "PCR",
+   "pcr_number": "800",
+   "pavement_code": "F/C/X/T",
+   "edge_lights": "HIGH",
+   "weight_bearing_klbs": {
+    "single": 120,
+    "dual": 250,
+    "dual_tandem": 550,
+    "double_dual_tandem": null
+   },
+   "length_source": "NGS",
+   "length_source_date": "2013/12/16",
+   "ends": [
+    {
+     "id": "15R",
+     "true_alignment_deg": 135,
+     "charted_magnetic_heading_deg": 150,
+     "charted_magnetic_heading_source": "airport diagram 00058AD.PDF (runway end heading printed on the chart)",
+     "threshold": {
+      "lat": 42.3742708,
+      "lon": -71.01789213,
+      "lat_dms": "42-22-27.3749N",
+      "lon_dms": "71-1-4.4117W",
+      "elev_ft": 18.9,
+      "position_source": "3RD PARTY SURVEY",
+      "position_date": "2013/12/16",
+      "note": "NASR RWY_END_LAT/LONG = the physical runway end (pavement end). The simulator uses it as the runway-end node; a displaced landing threshold, where one exists, is listed in displaced_threshold."
+     },
+     "displaced_threshold": {
+      "present": true,
+      "length_ft": 882,
+      "lat": 42.37255533,
+      "lon": -71.01559136,
+      "elev_ft": 17,
+      "note": "NASR DISPLACED_THR_LEN: landing threshold displaced from the pavement end (the displaced area is usable for takeoff, taxi and landing rollout). Not modelled by the simulator beyond this record."
+     },
+     "tdz_elev_ft": 17,
+     "threshold_crossing_height_ft": 71,
+     "visual_glide_path_angle_deg": 3,
+     "vgsi": "P4L",
+     "approach_lighting": "MALSR",
+     "tdz_lights": "Y",
+     "centerline_lights": "Y",
+     "reil": null,
+     "ils_type_nasr": "ILS/DME",
+     "marking": {
+      "type": "PIR",
+      "condition": "GOOD"
+     },
+     "declared_distances_ft": {
+      "tora": 10083,
+      "toda": 10083,
+      "asda": 10083,
+      "lda": 9202
+     },
+     "lahso": {
+      "available_landing_distance_ft": 6800,
+      "hold_short_of": "09/27",
+      "hold_short_point": {
+       "lat": 42.35932513,
+       "lon": -70.99784916
+      }
+     },
+     "right_hand_traffic": "N",
+     "controlling_obstruction": {
+      "type": "TREES",
+      "height_ft": 62,
+      "slope": "45",
+      "dist_from_thr_ft": 3040,
+      "offset_ft": 140,
+      "offset_side": "L"
+     }
+    },
+    {
+     "id": "33L",
+     "true_alignment_deg": 315,
+     "charted_magnetic_heading_deg": 330,
+     "charted_magnetic_heading_source": "airport diagram 00058AD.PDF (runway end heading printed on the chart)",
+     "threshold": {
+      "lat": 42.35465077,
+      "lon": -70.99158605,
+      "lat_dms": "42-21-16.7428N",
+      "lon_dms": "70-59-29.7098W",
+      "elev_ft": 15.7,
+      "position_source": "3RD PARTY SURVEY",
+      "position_date": "2013/12/16",
+      "note": "NASR RWY_END_LAT/LONG = the physical runway end (pavement end). The simulator uses it as the runway-end node; a displaced landing threshold, where one exists, is listed in displaced_threshold."
+     },
+     "displaced_threshold": {
+      "present": false,
+      "length_ft": null,
+      "note": "NASR DISPLACED_THR_* fields are blank for this runway end (none recorded)."
+     },
+     "tdz_elev_ft": 16.2,
+     "threshold_crossing_height_ft": 68,
+     "visual_glide_path_angle_deg": 3,
+     "vgsi": "P4R",
+     "approach_lighting": "ALSF2",
+     "tdz_lights": "Y",
+     "centerline_lights": "Y",
+     "reil": null,
+     "ils_type_nasr": "ILS/DME",
+     "marking": {
+      "type": "PIR",
+      "condition": "GOOD"
+     },
+     "declared_distances_ft": {
+      "tora": 10083,
+      "toda": 10083,
+      "asda": 10083,
+      "lda": 10083
+     },
+     "lahso": null,
+     "right_hand_traffic": "N",
+     "controlling_obstruction": {
+      "type": "BOAT",
+      "height_ft": 160,
+      "slope": "30",
+      "dist_from_thr_ft": 5075,
+      "offset_ft": null,
+      "offset_side": null
+     }
+    }
+   ],
+   "type": "RUNWAY"
+  }
+ ],
+ "lights_and_aids": {
+  "arresting_gear": [
+   {
+    "rwy_end": "04L/22R end 04L",
+    "device": "EMAS"
+   },
+   {
+    "rwy_end": "15R/33L end 15R",
+    "device": "EMAS"
+   }
+  ]
+ },
+ "ils_by_runway_end": {
+  "27": {
+   "loc_ident": "DGU",
+   "category": "I",
+   "loc_freq_mhz": 111.3,
+   "approach_bearing_mag": 271.58,
+   "glideslope_angle": 3,
+   "gs_freq_mhz": 332.3
+  },
+  "4R": {
+   "loc_ident": "BOS",
+   "category": "III",
+   "loc_freq_mhz": 110.3,
+   "approach_bearing_mag": 34.74,
+   "glideslope_angle": 3,
+   "gs_freq_mhz": 335
+  },
+  "15R": {
+   "loc_ident": "MDC",
+   "category": "I",
+   "loc_freq_mhz": 110.7,
+   "approach_bearing_mag": 148.56,
+   "glideslope_angle": 3,
+   "gs_freq_mhz": 330.2
+  },
+  "22L": {
+   "loc_ident": "LQN",
+   "category": "I",
+   "loc_freq_mhz": 110.3,
+   "approach_bearing_mag": 214.74,
+   "glideslope_angle": 3,
+   "gs_freq_mhz": 335
+  },
+  "33L": {
+   "loc_ident": "LIP",
+   "category": "III",
+   "loc_freq_mhz": 110.7,
+   "approach_bearing_mag": 331,
+   "glideslope_angle": 3,
+   "gs_freq_mhz": 330.2
+  }
+ },
+ "remarks": [
+  {
+   "legacy_element": "E111",
+   "applies_to": "ASP_ANLYS_DTRM_CODE",
+   "seq": "1",
+   "text": "PRVDD THE DESIGNATION OF A MOVEMENT AREA ASSOCIATED WITH THE RELCTN IS COORDINATED WITH & DESIGNATED BY BOSTON ATCT; APPROPRIATE HOLD LINES ESTABLISHED & MARKED FOR SERVICE VEHICLE MOVEMENT & TAXILANES; RELCTN MARKED IN ACCORDANCE WITH FAA ADVISORY CIRCULAR/5930-2."
+  },
+  {
+   "legacy_element": "A110-1",
+   "applies_to": "GENERAL_REMARK",
+   "seq": "1",
+   "text": "BIRDS ON & INVOF ARPT."
+  },
+  {
+   "legacy_element": "A110-7",
+   "applies_to": "GENERAL_REMARK",
+   "seq": "7",
+   "text": "NO RON PARKING FOR NON-TENANT CHARTER AIRCRAFT WITHOUT PRIOR MASSPORT PERMISSION."
+  },
+  {
+   "legacy_element": "A110-8",
+   "applies_to": "GENERAL_REMARK",
+   "seq": "8",
+   "text": "TERMINAL E; NORTH & SOUTH CARGO ARRIVALS CTC MASSPORT GATE CONTROL ON FREQ 131.1 BEFORE ENTERING/DEPARTING RAMP AREA."
+  },
+  {
+   "legacy_element": "A110-10",
+   "applies_to": "GENERAL_REMARK",
+   "seq": "10",
+   "text": "NMRS CRANES ON AND INVOF ARPT."
+  },
+  {
+   "legacy_element": "A110-11",
+   "applies_to": "GENERAL_REMARK",
+   "seq": "11",
+   "text": "RWY 14/32 UNIDIRECTIONAL; NO LDGS RWY 14; NO TKOFS RWY 32."
+  },
+  {
+   "legacy_element": "A110-13",
+   "applies_to": "GENERAL_REMARK",
+   "seq": "13",
+   "text": "PILOTS SHOULD COMPLETE ALL CALCULATIONS PRIOR TO PUSHBACK FROM GATE."
+  },
+  {
+   "legacy_element": "A110-14",
+   "applies_to": "GENERAL_REMARK",
+   "seq": "14",
+   "text": "RWY STATUS LGTS IN OPN."
+  },
+  {
+   "legacy_element": "A110-16",
+   "applies_to": "GENERAL_REMARK",
+   "seq": "16",
+   "text": "FOR NOISE ABATEMENT, RWY 15R IS PREFERRED FOR TKOF, RWY 33L IS PREFERRED FOR LDG. FOR MORE INFO ON NOISE ABATEMENT PROCS CALL 617-561-3333."
+  },
+  {
+   "legacy_element": "A110-17",
+   "applies_to": "GENERAL_REMARK",
+   "seq": "17",
+   "text": "THE USE OF THE RNAV SIDS AT BOSTON LOGAN ARE CRITICAL TO RDCG NOISE AND ACHIEVING OUR FLY QUIET GOALS. MASSPORT AND THE FAA ENCOURAGE PILOTS TO USE PUBLD RNAV FLIGHT PROCS AT BOSTON LOGAN ARPT WHENEVER POSS. ALL ACFT THAT HAVE REQD ALTS ABV 10,000 FT SHOULD BE FILING RNAV SIDS WITH FAA ATC. CTC MASSPORT'S NOISE ABATEMENT OFC AT 617-561-3333 WITH ANY QNS."
+  },
+  {
+   "legacy_element": "E60-04L_EMAS",
+   "applies_to": "ARREST_DEVICE_CODE",
+   "seq": "1",
+   "text": "ENGINEERING MATERIALS ARRESTING SYSTEM (EMAS) 190 FT IN LENGTH BY 170 FT IN WIDTH LCTD AT DER 04L."
+  },
+  {
+   "legacy_element": "E60-15R_EMAS",
+   "applies_to": "ARREST_DEVICE_CODE",
+   "seq": "1",
+   "text": "ENGINEERED MATERIALS ARRESTING SYSTEM (EMAS) 158 FT IN LENGTH BY 170 FT IN WIDTH LCTD AT DER 15R."
+  },
+  {
+   "legacy_element": "A42-14_MARK",
+   "applies_to": "RWY_MARKING_TYPE_CODE",
+   "seq": "1",
+   "text": "AVBL FOR DEPARTURE ONLY."
+  },
+  {
+   "legacy_element": "A43-22L",
+   "applies_to": "VGSI_CODE",
+   "seq": "1",
+   "text": "UNUSBL BYD 7 DEGS LEFT OF CNTRLN."
+  },
+  {
+   "legacy_element": "A57-04R",
+   "applies_to": "OBSTN_CLNC_SLOPE",
+   "seq": "1",
+   "text": "APCH RATIO 17:1 FROM DSPLCD THR; 43:1 WHEN CHANNEL IS CLEAR."
+  },
+  {
+   "legacy_element": "A57-14",
+   "applies_to": "OBSTN_CLNC_SLOPE",
+   "seq": "1",
+   "text": "APPROACHES TO RWY 14 NOT AUTHORIZED."
+  },
+  {
+   "legacy_element": "A57-15R",
+   "applies_to": "OBSTN_CLNC_SLOPE",
+   "seq": "1",
+   "text": "APCH RATIO 50:1 FROM DSPLCD THR."
+  },
+  {
+   "legacy_element": "A57-22L",
+   "applies_to": "OBSTN_CLNC_SLOPE",
+   "seq": "1",
+   "text": "APCH RATIO 38:1 FROM DSPLCD THR."
+  },
+  {
+   "legacy_element": "A57-22R",
+   "applies_to": "OBSTN_CLNC_SLOPE",
+   "seq": "1",
+   "text": "APCH RATIO 33:1 FROM DSPLCD THR; 50:1 TO THR WHEN CHANNEL IS CLEAR."
+  }
+ ],
+ "unverified": [
+  "Traffic pattern altitude (TPA blank in NASR)",
+  "Current (2026) magnetic declination; NASR/diagram epoch is stale",
+  "Class C airspace vertical/lateral dimensions (shape files not downloaded)",
+  "Operating hours of airport-owned customer services other than as given in remarks"
+ ],
+ "runway_configurations": [
+  {
+   "id": "NE-4R4L-9",
+   "name": "Northeast flow",
+   "landing": [
+    "4R",
+    "4L"
+   ],
+   "departing": [
+    "4R",
+    "9",
+    "4L"
+   ],
+   "share_percent": 34,
+   "notes": "Arrivals to 4L and 4R; departures from 9, 4L and 4R (MCAC Logan 101 slides 14-15: R4R arr and dep, R4L arr and non-jet dep, R9 dep). CY2016: 114,013 jet flights, 34%. In instrument conditions the FAA App. A configuration 2 lands on 4R only. 4L has no ILS (RNAV GPS only), so the simulator's ILS arrivals use 4R.",
+   "source": "Massport, Boston Logan Operational Overview (Logan 101), MCAC 2017-06-08, slides 8, 14-15; FAA Runway 33L RNAV SID EA, Appendix A, Table A.3 (configurations 1 and 2)",
+   "url": "https://massportcac.org/wp-content/uploads/2017/06/Final-BOS-Update-MCAC-Logan-101-060817.pdf",
+   "retrieved": "2026-10-21"
+  },
+  {
+   "id": "SW-22L27",
+   "name": "Southwest flow",
+   "landing": [
+    "22L",
+    "27"
+   ],
+   "departing": [
+    "22L",
+    "22R"
+   ],
+   "share_percent": 31,
+   "notes": "Arrivals to 22L and 27 (22R takes non-jet arrivals only); departures from 22L and 22R (slides 10-11). CY2016: 104,129 jet flights, 31%. In instrument conditions the FAA App. A configuration 4 lands on 22L only.",
+   "source": "Massport, Boston Logan Operational Overview (Logan 101), MCAC 2017-06-08, slides 8, 10-11; FAA Runway 33L RNAV SID EA, Appendix A, Table A.3 (configurations 4 and 6)",
+   "url": "https://massportcac.org/wp-content/uploads/2017/06/Final-BOS-Update-MCAC-Logan-101-060817.pdf",
+   "retrieved": "2026-10-21"
+  },
+  {
+   "id": "NW-33L27",
+   "name": "Northwest flow",
+   "landing": [
+    "33L",
+    "27"
+   ],
+   "departing": [
+    "33L",
+    "27"
+   ],
+   "share_percent": 31,
+   "notes": "Arrivals to 33L, 27, 33R (limited) and 32 (wind restricted); departures from 33L and 27 (slides 16-17). CY2016: 102,804 jet flights, 31%. 33R and 32 are omitted from the arrival list (a 2,557 ft and a 5,000 ft runway); 14/32 is documented as unidirectional and wind restricted for noise abatement.",
+   "source": "Massport, Boston Logan Operational Overview (Logan 101), MCAC 2017-06-08, slides 8, 16-17, 39-40; FAA Runway 33L RNAV SID EA, Appendix A, Table A.3 (configurations 5 and 7)",
+   "url": "https://massportcac.org/wp-content/uploads/2017/06/Final-BOS-Update-MCAC-Logan-101-060817.pdf",
+   "retrieved": "2026-10-21"
+  },
+  {
+   "id": "SE-15R-9",
+   "name": "Southeast flow",
+   "landing": [
+    "15R"
+   ],
+   "departing": [
+    "15R",
+    "9"
+   ],
+   "share_percent": 4,
+   "notes": "Arrivals to 15R (15L very limited); departures from 15R, 9 and 14 (very limited) (slides 12-13). CY2016: 12,849 jet flights, 4%. Slide 12: limited throughput, two intersecting jet runways, intersection at the departure ends, narrow weather window.",
+   "source": "Massport, Boston Logan Operational Overview (Logan 101), MCAC 2017-06-08, slides 8, 12-13",
+   "url": "https://massportcac.org/wp-content/uploads/2017/06/Final-BOS-Update-MCAC-Logan-101-060817.pdf",
+   "retrieved": "2026-10-21"
+  }
+ ],
+ "runway_configurations_provenance": {
+  "retrieved": "2026-10-21",
+  "note": "Configurations are the ones Massport documents. NO wind sector or tailwind limit is published in any document found, so wind_from_deg / wind_to_deg / max_tailwind_kt are ABSENT (UNVERIFIED, never invented): the selector falls back to aligning the arrival runways with the wind (the sources state only that the FAA lands and departs into the wind and that wind and weather are the primary driver). The list order is the preference order for calm wind and follows the documented CY2016 share of jet flights.",
+  "sources": [
+   {
+    "id": "MCAC-LOGAN101",
+    "title": "Boston Logan International Airport Operational Overview (Logan 101), Massport, presented to the Massport Community Advisory Committee 2017-06-08, slides 8-18",
+    "url": "https://massportcac.org/wp-content/uploads/2017/06/Final-BOS-Update-MCAC-Logan-101-060817.pdf",
+    "retrieved": "2026-10-21",
+    "local_file": "raw/kbos_runway_use_docs/mcac_logan101.pdf (text: mcac_logan101.txt)",
+    "data": "Annual jet use by configuration in CY2016 (Massport Noise Abatement Office): NE flow 114,013 jet flights (34%), SW flow 104,129 (31%), NW flow 102,804 (31%), SE flow 12,849 (4%); runway lists per flow (slides 8, 10, 12, 14, 16, 18); late-night opposite-direction configuration arrivals R33L, departures R15R (calendar year 2016, jets)."
+   },
+   {
+    "id": "FAA-NA-APPENDIX-A",
+    "title": "Boston Logan International Airport Runway 33L RNAV SID Final Environmental Assessment, Appendix A Noise Modeling Technical Report (FAA, 2013), Table A.3 and A.4",
+    "url": "https://www.faa.gov/sites/faa.gov/files/air_traffic/environmental_issues/ared_documentation/Appendix_A_Noise_Modeling_06032013.pdf",
+    "retrieved": "2026-10-21",
+    "local_file": "raw/kbos_runway_use_docs/faa_appendixA.pdf (text: faa_appendixA.txt)",
+    "data": "Definition of Runway Operating Configurations (Massport 2009 runway operating configuration log): 1 Visual arr 4L,4R dep 4L,4R,9,15R; 2 Instrument arr 4R dep 4L,4R,9,15R; 3 Visual arr 22L,22R dep 22L,22R,15R; 4 Instrument arr 22L dep 22L,22R,15R; 5 Visual arr 33L,32,33R dep 33L,27; 6 Visual arr 27,22L dep 22L,22R; 7 Visual arr 27,32,33L dep 33L,27 (33L arrivals infrequent). Instrument conditions = visibility under 3 SM or ceiling under 1,000 ft AGL. 2009 annual-average-day shares (6am-midnight): 4/9 38.9% (visual 28.8 + instrument 10.2), 22/22 11.5%, 33-32/27 8.8%, 27/22 26.1%, 27-32/33 14.7%; 2015 forecast 29.5 + 10.4, 8.0, 6.5, 29.0, 16.7."
+   },
+   {
+    "id": "MCAC-2016-BRIEFING",
+    "title": "Massport briefing to the Massport CAC annual meeting 2016-12-08",
+    "url": "https://massportcac.org/wp-content/uploads/2017/03/Massport-Briefing-to-MassportCAC-Annual-Mtg-12-08-2016.pdf",
+    "retrieved": "2026-10-21",
+    "local_file": "raw/kbos_runway_use_docs/mcac_brief2016.pdf",
+    "data": "'Based on wind/weather, the FAA uses Logan runways in combinations'; 'aircraft land and depart into the wind'; the flows NE (R4R/L and 9) and SW (R22R/L and 27)."
+   }
+  ],
+  "not_found": "The Massport monthly Runway Use reports (massport.com noise abatement 'runway use' page, linked PDF/Excel files), the FAA Preferential Runway Advisory System / Runway Use Program text and the current Environmental Data Report tables were not retrieved in this session (the page text lists links only), so no 2024-2026 percentages are recorded."
+ }
+}

@@ -1,0 +1,537 @@
+{
+ "_provenance": {
+  "source": "FAA NASR 28-day subscription, cycle effective 2026-10-01; https://nfdc.faa.gov/webContent/28DaySub/extra/01_Oct_2026_FRQ_CSV.zip (FRQ.csv)",
+  "also_used": [
+   "ATC_BASE.csv",
+   "ATC_ATIS.csv (ATIS phone)",
+   "ATC_RMK.csv",
+   "FAA d-TPP KBOS airport diagram 00058AD.PDF cycle 2610 (cross-check of the printed frequencies)",
+   "FAA d-TPP departure procedure charts (departure facility name)"
+  ],
+  "retrieved": "2026-10-21",
+  "faa_cycle_effective": "2026-10-01",
+  "faa_cycle_next": "2026-10-29",
+  "method": "All rows in FRQ.csv where FACILITY==BOS or SERVICED_FACILITY==BOS, copied verbatim (scripts/extract-nasr-airport.ts). No values from memory.",
+  "raw": "raw/nasr_2026-10-01/x_FRQ_CSV/FRQ.csv"
+ },
+ "facility": {
+  "id": "BOS",
+  "name": "GENERAL EDWARD LAWRENCE LOGAN INTL",
+  "type": "ATCT",
+  "tower_hours": "24",
+  "radio_call": "BOSTON",
+  "approach_radio_call": "BOSTON",
+  "departure_radio_call": "BOSTON",
+  "approach_provider": "A90",
+  "approach_provider_name": "BOSTON CONSOLIDATED TRACON",
+  "controlling_artcc": "ZBW (BOSTON)"
+ },
+ "summary_by_function": {
+  "ATIS": {
+   "vhf": "135.0",
+   "uhf": null,
+   "hours": "24",
+   "phone": "617-455-3003",
+   "note": "FRQ use code D-ATIS (ARR 135.0, DEP 135.0); no plain ATIS row; ATC_ATIS.csv phone 617-455-3003. The ASOS row on the same frequency is the automated weather source."
+  },
+  "clearance_delivery": {
+   "vhf": "121.65",
+   "uhf": "257.8",
+   "note": "FRQ CD PRE TAXI CLNC (no VHF CD/P row; the VHF clearance row is the pre-taxi clearance frequency); the airport diagram prints CLNC DEL 121.65 257.8 (CPDLC, PDC)"
+  },
+  "ground": {
+   "vhf": "121.75",
+   "uhf": null,
+   "note": "FRQ GND/P (2 VHF rows: 121.75, 121.9; NASR gives no sectorization); the airport diagram prints GND CON 121.75 121.9"
+  },
+  "ground_all": [
+   {
+    "freq_mhz": "121.75",
+    "sectorization": null
+   },
+   {
+    "freq_mhz": "121.9",
+    "sectorization": null
+   }
+  ],
+  "tower": {
+   "vhf": "128.8",
+   "uhf": "257.8",
+   "note": "FRQ LCL/P; the airport diagram prints BOSTON TOWER 128.8 (WEST) 132.225 (EAST) 257.8; Helicopters 124.725"
+  },
+  "tower_all": [
+   {
+    "freq_mhz": "124.725",
+    "sectorization": "HELICOPTERS",
+    "remark": null
+   },
+   {
+    "freq_mhz": "128.8",
+    "sectorization": "WEST",
+    "remark": null
+   },
+   {
+    "freq_mhz": "132.225",
+    "sectorization": "EAST",
+    "remark": null
+   }
+  ],
+  "ramp_control": [
+   {
+    "freq_mhz": "134.05",
+    "note": "FRQ RAMP CTL"
+   }
+  ],
+  "tracon_vhf_rows": [
+   {
+    "freq_mhz": "118.25",
+    "use_code": "APCH/P",
+    "sectorization": "NORTH",
+    "facility": "A90",
+    "facility_name": "BOSTON CONSOLIDATED TRACON"
+   },
+   {
+    "freq_mhz": "120.6",
+    "use_code": "APCH/P IC",
+    "sectorization": "WEST",
+    "facility": "A90",
+    "facility_name": "BOSTON CONSOLIDATED TRACON"
+   },
+   {
+    "freq_mhz": "120.6",
+    "use_code": "WOONS STAR",
+    "sectorization": null,
+    "facility": "A90",
+    "facility_name": "BOSTON CONSOLIDATED TRACON"
+   },
+   {
+    "freq_mhz": "124.1",
+    "use_code": "CLASS B",
+    "sectorization": "091-269",
+    "facility": "A90",
+    "facility_name": "BOSTON CONSOLIDATED TRACON"
+   },
+   {
+    "freq_mhz": "124.4",
+    "use_code": "CLASS B",
+    "sectorization": "270-090",
+    "facility": "A90",
+    "facility_name": "BOSTON CONSOLIDATED TRACON"
+   },
+   {
+    "freq_mhz": "127.2",
+    "use_code": "APCH/P",
+    "sectorization": "SOUTH",
+    "facility": "A90",
+    "facility_name": "BOSTON CONSOLIDATED TRACON"
+   },
+   {
+    "freq_mhz": "133.0",
+    "use_code": "DEP/P",
+    "sectorization": null,
+    "facility": "A90",
+    "facility_name": "BOSTON CONSOLIDATED TRACON"
+   }
+  ],
+  "class_b_frequencies": [
+   {
+    "freq_mhz": "124.1",
+    "sectorization": "091-269"
+   },
+   {
+    "freq_mhz": "124.4",
+    "sectorization": "270-090"
+   }
+  ],
+  "approach_departure": {
+   "vhf": null,
+   "uhf": null,
+   "sectorization": null,
+   "chart_name": "BOSTON APP CON 120.6 263.1 (as printed on the approach plates); BOSTON DEP CON 133.0 on the departure charts",
+   "facility": "A90",
+   "facility_name": "BOSTON CONSOLIDATED TRACON",
+   "radio_call": "BOSTON",
+   "note": "No combined APCH/P DEP/P row: BOSTON CONSOLIDATED TRACON publishes sector rows (see tracon_vhf_rows: APCH/P NORTH / SOUTH, APCH/P IC WEST, DEP/P, CLASS B by bearing, STAR frequency)."
+  },
+  "class_c_sector_frequencies": [],
+  "emergency": {
+   "vhf": "121.5",
+   "uhf": "243.0"
+  },
+  "unicom": {
+   "vhf": "122.95",
+   "note": "FRQ use code UNICOM"
+  }
+ },
+ "all_frequencies_serving_airport": [
+  {
+   "freq_mhz": "118.25",
+   "use_code": "APCH/P",
+   "sectorization": "NORTH",
+   "remark": null,
+   "facility": "A90",
+   "facility_name": "BOSTON CONSOLIDATED TRACON",
+   "facility_type": "TRACON",
+   "serviced_facility": "BOS",
+   "serviced_site_type": "AIRPORT",
+   "radio_call": "BOSTON",
+   "approach_radio_call": "BOSTON",
+   "band": "VHF"
+  },
+  {
+   "freq_mhz": "120.6",
+   "use_code": "APCH/P IC",
+   "sectorization": "WEST",
+   "remark": null,
+   "facility": "A90",
+   "facility_name": "BOSTON CONSOLIDATED TRACON",
+   "facility_type": "TRACON",
+   "serviced_facility": "BOS",
+   "serviced_site_type": "AIRPORT",
+   "radio_call": "BOSTON",
+   "approach_radio_call": "BOSTON",
+   "band": "VHF"
+  },
+  {
+   "freq_mhz": "120.6",
+   "use_code": "WOONS STAR",
+   "sectorization": null,
+   "remark": null,
+   "facility": "A90",
+   "facility_name": "BOSTON CONSOLIDATED TRACON",
+   "facility_type": "TRACON",
+   "serviced_facility": "BOS",
+   "serviced_site_type": "AIRPORT",
+   "radio_call": "BOSTON",
+   "approach_radio_call": "BOSTON",
+   "band": "VHF"
+  },
+  {
+   "freq_mhz": "124.1",
+   "use_code": "CLASS B",
+   "sectorization": "091-269",
+   "remark": null,
+   "facility": "A90",
+   "facility_name": "BOSTON CONSOLIDATED TRACON",
+   "facility_type": "TRACON",
+   "serviced_facility": "BOS",
+   "serviced_site_type": "AIRPORT",
+   "radio_call": "BOSTON",
+   "approach_radio_call": "BOSTON",
+   "band": "VHF"
+  },
+  {
+   "freq_mhz": "124.4",
+   "use_code": "CLASS B",
+   "sectorization": "270-090",
+   "remark": null,
+   "facility": "A90",
+   "facility_name": "BOSTON CONSOLIDATED TRACON",
+   "facility_type": "TRACON",
+   "serviced_facility": "BOS",
+   "serviced_site_type": "AIRPORT",
+   "radio_call": "BOSTON",
+   "approach_radio_call": "BOSTON",
+   "band": "VHF"
+  },
+  {
+   "freq_mhz": "127.2",
+   "use_code": "APCH/P",
+   "sectorization": "SOUTH",
+   "remark": null,
+   "facility": "A90",
+   "facility_name": "BOSTON CONSOLIDATED TRACON",
+   "facility_type": "TRACON",
+   "serviced_facility": "BOS",
+   "serviced_site_type": "AIRPORT",
+   "radio_call": "BOSTON",
+   "approach_radio_call": "BOSTON",
+   "band": "VHF"
+  },
+  {
+   "freq_mhz": "133.0",
+   "use_code": "DEP/P",
+   "sectorization": null,
+   "remark": null,
+   "facility": "A90",
+   "facility_name": "BOSTON CONSOLIDATED TRACON",
+   "facility_type": "TRACON",
+   "serviced_facility": "BOS",
+   "serviced_site_type": "AIRPORT",
+   "radio_call": "BOSTON",
+   "approach_radio_call": "BOSTON",
+   "band": "VHF"
+  },
+  {
+   "freq_mhz": "263.1",
+   "use_code": "APCH/P IC",
+   "sectorization": null,
+   "remark": null,
+   "facility": "A90",
+   "facility_name": "BOSTON CONSOLIDATED TRACON",
+   "facility_type": "TRACON",
+   "serviced_facility": "BOS",
+   "serviced_site_type": "AIRPORT",
+   "radio_call": "BOSTON",
+   "approach_radio_call": "BOSTON",
+   "band": "UHF"
+  },
+  {
+   "freq_mhz": "263.1",
+   "use_code": "WOONS STAR",
+   "sectorization": null,
+   "remark": null,
+   "facility": "A90",
+   "facility_name": "BOSTON CONSOLIDATED TRACON",
+   "facility_type": "TRACON",
+   "serviced_facility": "BOS",
+   "serviced_site_type": "AIRPORT",
+   "radio_call": "BOSTON",
+   "approach_radio_call": "BOSTON",
+   "band": "UHF"
+  },
+  {
+   "freq_mhz": "121.5",
+   "use_code": "EMERG",
+   "sectorization": null,
+   "remark": null,
+   "facility": "BOS",
+   "facility_name": "GENERAL EDWARD LAWRENCE LOGAN INTL",
+   "facility_type": "ATCT",
+   "serviced_facility": "BOS",
+   "serviced_site_type": "AIRPORT",
+   "radio_call": "BOSTON",
+   "approach_radio_call": "BOSTON",
+   "band": "VHF"
+  },
+  {
+   "freq_mhz": "121.65",
+   "use_code": "CD PRE TAXI CLNC",
+   "sectorization": null,
+   "remark": null,
+   "facility": "BOS",
+   "facility_name": "GENERAL EDWARD LAWRENCE LOGAN INTL",
+   "facility_type": "ATCT",
+   "serviced_facility": "BOS",
+   "serviced_site_type": "AIRPORT",
+   "radio_call": "BOSTON",
+   "approach_radio_call": "BOSTON",
+   "band": "VHF"
+  },
+  {
+   "freq_mhz": "121.75",
+   "use_code": "GND/P",
+   "sectorization": null,
+   "remark": null,
+   "facility": "BOS",
+   "facility_name": "GENERAL EDWARD LAWRENCE LOGAN INTL",
+   "facility_type": "ATCT",
+   "serviced_facility": "BOS",
+   "serviced_site_type": "AIRPORT",
+   "radio_call": "BOSTON",
+   "approach_radio_call": "BOSTON",
+   "band": "VHF"
+  },
+  {
+   "freq_mhz": "121.9",
+   "use_code": "GND/P",
+   "sectorization": null,
+   "remark": null,
+   "facility": "BOS",
+   "facility_name": "GENERAL EDWARD LAWRENCE LOGAN INTL",
+   "facility_type": "ATCT",
+   "serviced_facility": "BOS",
+   "serviced_site_type": "AIRPORT",
+   "radio_call": "BOSTON",
+   "approach_radio_call": "BOSTON",
+   "band": "VHF"
+  },
+  {
+   "freq_mhz": "122.95",
+   "use_code": "UNICOM",
+   "sectorization": null,
+   "remark": null,
+   "facility": "BOS",
+   "facility_name": "GENERAL EDWARD LAWRENCE LOGAN INTL",
+   "facility_type": "ATCT",
+   "serviced_facility": "BOS",
+   "serviced_site_type": "AIRPORT",
+   "radio_call": null,
+   "approach_radio_call": null,
+   "band": "VHF"
+  },
+  {
+   "freq_mhz": "124.725",
+   "use_code": "LCL/P",
+   "sectorization": "HELICOPTERS",
+   "remark": null,
+   "facility": "BOS",
+   "facility_name": "GENERAL EDWARD LAWRENCE LOGAN INTL",
+   "facility_type": "ATCT",
+   "serviced_facility": "BOS",
+   "serviced_site_type": "AIRPORT",
+   "radio_call": "BOSTON",
+   "approach_radio_call": "BOSTON",
+   "band": "VHF"
+  },
+  {
+   "freq_mhz": "128.8",
+   "use_code": "LCL/P",
+   "sectorization": "WEST",
+   "remark": null,
+   "facility": "BOS",
+   "facility_name": "GENERAL EDWARD LAWRENCE LOGAN INTL",
+   "facility_type": "ATCT",
+   "serviced_facility": "BOS",
+   "serviced_site_type": "AIRPORT",
+   "radio_call": "BOSTON",
+   "approach_radio_call": "BOSTON",
+   "band": "VHF"
+  },
+  {
+   "freq_mhz": "132.225",
+   "use_code": "LCL/P",
+   "sectorization": "EAST",
+   "remark": null,
+   "facility": "BOS",
+   "facility_name": "GENERAL EDWARD LAWRENCE LOGAN INTL",
+   "facility_type": "ATCT",
+   "serviced_facility": "BOS",
+   "serviced_site_type": "AIRPORT",
+   "radio_call": "BOSTON",
+   "approach_radio_call": "BOSTON",
+   "band": "VHF"
+  },
+  {
+   "freq_mhz": "134.05",
+   "use_code": "RAMP CTL",
+   "sectorization": null,
+   "remark": null,
+   "facility": "BOS",
+   "facility_name": "GENERAL EDWARD LAWRENCE LOGAN INTL",
+   "facility_type": "ATCT",
+   "serviced_facility": "BOS",
+   "serviced_site_type": "AIRPORT",
+   "radio_call": "BOSTON",
+   "approach_radio_call": "BOSTON",
+   "band": "VHF"
+  },
+  {
+   "freq_mhz": "135.0",
+   "use_code": "D-ATIS",
+   "sectorization": "ARR",
+   "remark": null,
+   "facility": "BOS",
+   "facility_name": "GENERAL EDWARD LAWRENCE LOGAN INTL",
+   "facility_type": "ATCT",
+   "serviced_facility": "BOS",
+   "serviced_site_type": "AIRPORT",
+   "radio_call": "BOSTON",
+   "approach_radio_call": "BOSTON",
+   "band": "VHF"
+  },
+  {
+   "freq_mhz": "135.0",
+   "use_code": "D-ATIS",
+   "sectorization": "DEP",
+   "remark": null,
+   "facility": "BOS",
+   "facility_name": "GENERAL EDWARD LAWRENCE LOGAN INTL",
+   "facility_type": "ATCT",
+   "serviced_facility": "BOS",
+   "serviced_site_type": "AIRPORT",
+   "radio_call": "BOSTON",
+   "approach_radio_call": "BOSTON",
+   "band": "VHF"
+  },
+  {
+   "freq_mhz": "243.0",
+   "use_code": "EMERG",
+   "sectorization": null,
+   "remark": null,
+   "facility": "BOS",
+   "facility_name": "GENERAL EDWARD LAWRENCE LOGAN INTL",
+   "facility_type": "ATCT",
+   "serviced_facility": "BOS",
+   "serviced_site_type": "AIRPORT",
+   "radio_call": "BOSTON",
+   "approach_radio_call": "BOSTON",
+   "band": "UHF"
+  },
+  {
+   "freq_mhz": "257.8",
+   "use_code": "CD/P",
+   "sectorization": null,
+   "remark": null,
+   "facility": "BOS",
+   "facility_name": "GENERAL EDWARD LAWRENCE LOGAN INTL",
+   "facility_type": "ATCT",
+   "serviced_facility": "BOS",
+   "serviced_site_type": "AIRPORT",
+   "radio_call": "BOSTON",
+   "approach_radio_call": "BOSTON",
+   "band": "UHF"
+  },
+  {
+   "freq_mhz": "257.8",
+   "use_code": "LCL/P",
+   "sectorization": null,
+   "remark": null,
+   "facility": "BOS",
+   "facility_name": "GENERAL EDWARD LAWRENCE LOGAN INTL",
+   "facility_type": "ATCT",
+   "serviced_facility": "BOS",
+   "serviced_site_type": "AIRPORT",
+   "radio_call": "BOSTON",
+   "approach_radio_call": "BOSTON",
+   "band": "UHF"
+  },
+  {
+   "freq_mhz": "135.0",
+   "use_code": "BOS ASOS",
+   "sectorization": null,
+   "remark": null,
+   "facility": "BOS",
+   "facility_name": null,
+   "facility_type": "ASOS_AWOS",
+   "serviced_facility": "BOS",
+   "serviced_site_type": "ASOS",
+   "radio_call": null,
+   "approach_radio_call": null,
+   "band": "VHF"
+  },
+  {
+   "freq_mhz": "112.7/74X",
+   "use_code": "BOS VOR/DME",
+   "sectorization": null,
+   "remark": null,
+   "facility": "BOS",
+   "facility_name": "BOSTON",
+   "facility_type": "NAVAID",
+   "serviced_facility": "BOS",
+   "serviced_site_type": "VOR/DME",
+   "radio_call": null,
+   "approach_radio_call": null,
+   "band": "VHF"
+  },
+  {
+   "freq_mhz": "111.0",
+   "use_code": "BOS VOT",
+   "sectorization": null,
+   "remark": null,
+   "facility": "BOS",
+   "facility_name": "BOSTON",
+   "facility_type": "NAVAID",
+   "serviced_facility": "BOS",
+   "serviced_site_type": "VOT",
+   "radio_call": null,
+   "approach_radio_call": null,
+   "band": "VHF"
+  }
+ ],
+ "notes": [
+  ">=225 MHz are UHF (military) frequencies; the sim ignores UHF.",
+  "NASR ATC remark 1: ASDE-X IN USE. OPERATE TRANSPONDERS WITH ALTITUDE REPORTING MODE AND ADS-B (IF EQUIPPED) ENABLED ON ALL AIRPORT SURFACES.",
+  "The approach/departure facility (A90 BOSTON CONSOLIDATED TRACON) is a separate TRACON; its radio call is \"BOSTON\" while the tower call is \"BOSTON\"."
+ ]
+}

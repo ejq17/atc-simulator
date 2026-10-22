@@ -106,6 +106,7 @@ const AIRLINES: Record<string, string> = {
   ASA: 'Alaska', AAY: 'Allegiant', SKW: 'SkyWest', ENY: 'Envoy', RPA: 'Brickyard', FDX: 'FedEx', UPS: 'U P S',
   EJA: 'Executive Jet', LXJ: 'Flexjet', EDV: 'Endeavor', JIA: 'Blue Streak', BAW: 'Speedbird', ACA: 'Air Canada',
   MXY: 'Moxy', PDT: 'Piedmont', GJS: 'Lindbergh', WIG: 'Wiggins', SCX: 'Sun Country',
+  KAP: 'Cair', DLH: 'Lufthansa', AFR: 'Airfrans', EIN: 'Shamrock',
 };
 
 const GA_PREFIX: Record<string, string> = {
@@ -189,6 +190,7 @@ const AIRPORT_CITIES: Record<string, string> = {
   KASH: 'Nashua', KCON: 'Concord', KLCI: 'Laconia', KPSM: 'Portsmouth', KLWM: 'Lawrence', KBVY: 'Beverly', KEEN: 'Keene', KBED: 'Bedford',
   KPWM: 'Portland', KFIT: 'Fitchburg', KBNA: 'Nashville', KMDW: 'Chicago Midway', KRSW: 'Fort Myers', KCHS: 'Charleston', KSDF: 'Louisville',
   KMEM: 'Memphis', KMYR: 'Myrtle Beach', KPGD: 'Punta Gorda', KFMY: 'Page Field', KVNC: 'Venice', KSRQ: 'Sarasota', KAPF: 'Naples', KIMM: 'Immokalee', KLAL: 'Lakeland', KALB: 'Albany', KAVL: 'Asheville', KCVG: 'Cincinnati', KPVD: 'Providence', KMSP: 'Minneapolis', KLEX: 'Lexington', KMCI: 'Kansas City', KROC: 'Rochester', KSYR: 'Syracuse', KGRR: 'Grand Rapids', KCAK: 'Akron Canton', KTYS: 'Knoxville', KMDT: 'Harrisburg',
+  KOWD: 'Norwood', KPYM: 'Plymouth', KORH: 'Worcester', KHYA: 'Hyannis', KPVC: 'Provincetown', EGLL: 'London Heathrow', EDDF: 'Frankfurt', LFPG: 'Paris', EIDW: 'Dublin',
 };
 
 /** Spoken name of an airport for clearances: "KPHL" -> "Philadelphia"; unknown ids are spelled in phonetics. */

@@ -246,6 +246,12 @@ export class Planar {
         if (!this.alive[n] || this.pinned.has(n) || !this.isWayEnd(n)) continue;
         const pr = projectOnSegment(this.pos[n], r.a, r.b);
         if (pr.d <= snap) {
+          // a taxiway that ends within 1.5 m of a runway threshold joins the threshold node (otherwise the runway gets a second node < 0.5 m away)
+          const na = [...set].find((q) => this.alive[q] && (dist(this.pos[q], r.a) < 1e-6 || dist(this.pos[q], r.b) < 1e-6) && dist(this.pos[q], pr.q) < 1.5);
+          if (na !== undefined) {
+            this.mergeNodes(na, n);
+            continue;
+          }
           this.pos[n] = pr.q;
           this.pinned.add(n);
           set.add(n);

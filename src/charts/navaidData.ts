@@ -2,10 +2,11 @@
  * Typed accessors over data/sources/<icao>-navaids.json (NASR 2026-10-01 +
  * d-TPP 2610 plate readings). Display-only; nothing is derived except the
  * great-circle distance/bearing from the airport's own navaid (ACY VORTAC,
- * MHT DME), which is labelled as computed in the UI.
+ * MHT DME, BOS VOR/DME), which is labelled as computed in the UI.
  */
 import rawNavaids from '../../data/sources/kacy-navaids.json';
 import rawKmhtNavaids from '../../data/sources/kmht-navaids.json';
+import rawKbosNavaids from '../../data/sources/kbos-navaids.json';
 import rawKpgdNavaids from '../../data/sources/kpgd-navaids.json';
 
 export interface Vortac {
@@ -130,6 +131,7 @@ export const PRIMARY_NEARBY_IDS = ['VCN', 'SIE', 'CYN'] as const;
 const AIRPORTS: Record<string, { raw: RawNav; faaId: string; noIlsNote: string; keyFixIds?: readonly string[]; primaryNearby: readonly string[] }> = {
   KACY: { raw: rawNavaids as unknown as RawNav, faaId: 'ACY', noIlsNote: 'RNAV (GPS) and VOR approaches only.', keyFixIds: KEY_FIX_IDS, primaryNearby: PRIMARY_NEARBY_IDS },
   KMHT: { raw: rawKmhtNavaids as unknown as RawNav, faaId: 'MHT', noIlsNote: 'RNAV (GPS) approaches only (see the approach charts).', primaryNearby: ['CON', 'GDM'] },
+  KBOS: { raw: rawKbosNavaids as unknown as RawNav, faaId: 'BOS', noIlsNote: 'Runways 4L and 32 have RNAV (GPS) approaches only; 9, 14, 15L, 22R and 33R have no instrument approach.', primaryNearby: ['GDM', 'LFV', 'PVD'] },
   KPGD: { raw: rawKpgdNavaids as unknown as RawNav, faaId: 'PGD', noIlsNote: 'ILS runway 4 only; RNAV (GPS) approaches to runways 4, 15, 22 and 33.', primaryNearby: ['RSW'] },
 };
 

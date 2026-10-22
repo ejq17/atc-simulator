@@ -136,6 +136,14 @@ export interface AirportProfile {
   extraApproximate?: string[];
   /** Spoken airport name from the NASR name; default: INTL -> International, RGNL -> Regional, title-cased. */
   spokenName?(nasrName: string): string;
+  /** Treat OSM `aeroway=taxilane` ways (apron lanes between stands) as untagged taxiway ways in the graph (KBOS: terminal aprons are mapped as taxilanes only). */
+  includeTaxilanes?: boolean;
+  /** OSM ways left out of the graph, each with the reason (reported as "dropped as abandoned"; e.g. a connector whose hold line would lie inside another runway). */
+  excludeOsmWays?: readonly { id: number; reason: string }[];
+  /** A junction at least this far (m) from the runway centreline is a real taxiway junction, not a mapped fillet: the hold is placed on the stub (60 %) instead of beyond the junction on the through taxiway (default: walk on past any junction before 250 ft). */
+  shortStubJunctionM?: number;
+  /** Drop OSM ways that form islands touching no runway (isolated mapped lanes), listed in the report. */
+  dropIsolatedLanes?: boolean;
   /** Remove degree-2 OSM vertices between a runway node and its hold line (densely digitised entrances), so the hold is adjacent. */
   simplifyEntryChains?: boolean;
   /** One-line notes for the airport.provenance entries (source file summaries with counts). */

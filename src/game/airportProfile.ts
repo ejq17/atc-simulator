@@ -181,6 +181,67 @@ const KMHT: AirportTrafficProfile = {
 };
 
 // ---------------------------------------------------------------------------
+// KBOS: General Edward Lawrence Logan International
+// ---------------------------------------------------------------------------
+
+/**
+ * Sources: carrier shares of 2024 passengers (JetBlue ~27 %, Delta 22 %, American 14 %, United 11 %, Spirit 6 %, Southwest 4 %) from the
+ * Road Genius aggregator page https://roadgenius.com/statistics/airports/usa/logan-bos-airport/ (secondary source, retrieved 2026-10-21; the
+ * Boston Globe of 2025-03-20 calls JetBlue and Delta neck and neck); JetBlue focus city and Delta hub as stated in the task. Massport's
+ * own airline page lists no airlines in its text and its page "nonstop international destinations" (retrieved 2026-10-21) lists 57
+ * destinations without carriers; the international legs below are taken from that list (London, Frankfurt, Paris, Dublin, Amsterdam). Telephony
+ * words: FAA JO 7340.2 chapter 3 section 1 (retrieved 2026-10-21). NOT SOURCED: the aircraft type each carrier uses at BOS (ESTIMATE from
+ * the performance table's types), the regional carriers operating for Delta / American / United, the cargo carriers and the cruise altitudes
+ * (DESIGN VALUE). Weights are a gameplay mix, not traffic statistics.
+ */
+const KBOS: AirportTrafficProfile = {
+  icao: 'KBOS',
+  airlines: [
+    { icao3: 'JBU', telephony: 'JetBlue', types: ['A320', 'A321', 'E190', 'BCS3'], weight: 27, flightNumbers: [100, 2999],
+      destinations: [dest('KJFK', 14000, 16000), dest('KDCA', 22000, 24000), dest('KMCO', 32000, 34000, 36000), dest('KFLL', 32000, 34000, 36000), dest('KTPA', 32000, 34000, 36000), dest('KRDU', 26000, 28000, 30000)] },
+    { icao3: 'DAL', telephony: 'Delta', types: ['A321', 'B738', 'A319'], weight: 16, flightNumbers: [100, 2999],
+      destinations: [dest('KATL', 32000, 34000, 36000), dest('KDTW', 28000, 30000, 32000), dest('KLGA', 12000, 14000), dest('KMCO', 32000, 34000, 36000), dest('KMIA', 32000, 34000, 36000)] },
+    { icao3: 'DAL', telephony: 'Delta', types: ['B763', 'A333'], weight: 2, flightNumbers: [100, 499], destinations: [dest('EGLL', 34000, 36000, 38000), dest('EDDF', 34000, 36000, 38000)] },
+    { icao3: 'SKW', telephony: 'SkyWest', types: ['E175', 'CRJ7', 'CRJ9'], weight: 4, flightNumbers: [3000, 6999], destinations: [dest('KDTW', 28000, 30000, 32000), dest('KLGA', 12000, 14000), dest('KPIT', 24000, 26000)] },
+    { icao3: 'AAL', telephony: 'American', types: ['A321', 'A319', 'B738'], weight: 10, flightNumbers: [100, 2999],
+      destinations: [dest('KCLT', 30000, 32000, 34000), dest('KORD', 30000, 32000, 34000), dest('KMIA', 32000, 34000, 36000), dest('KPHL', 20000, 22000, 24000), dest('KDCA', 22000, 24000, 26000)] },
+    { icao3: 'RPA', telephony: 'Brickyard', types: ['E175'], weight: 4, flightNumbers: [4300, 6499], destinations: [dest('KPHL', 20000, 22000, 24000), dest('KDCA', 22000, 24000, 26000), dest('KCLT', 30000, 32000, 34000)] },
+    { icao3: 'UAL', telephony: 'United', types: ['B738', 'A320', 'B739'], weight: 8, flightNumbers: [100, 2999],
+      destinations: [dest('KEWR', 14000, 16000), dest('KORD', 30000, 32000, 34000), dest('KIAD', 22000, 24000, 26000)] },
+    { icao3: 'NKS', telephony: 'Spirit', types: ['A320', 'A21N'], weight: 5, flightNumbers: [100, 1499], destinations: [dest('KFLL', 32000, 34000, 36000), dest('KMCO', 32000, 34000, 36000), dest('KDTW', 28000, 30000, 32000)] },
+    { icao3: 'SWA', telephony: 'Southwest', types: ['B738', 'B38M'], weight: 4, flightNumbers: [100, 2999], destinations: [dest('KBWI', 16000, 18000), dest('KMDW', 28000, 30000, 32000), dest('KBNA', 30000, 32000, 34000)] },
+    { icao3: 'KAP', telephony: 'Cair', types: ['C402'], weight: 2, flightNumbers: [100, 999], hours: 'day', destinations: [dest('KHYA', 4000, 6000), dest('KPVC', 4000, 6000)] },
+    { icao3: 'BAW', telephony: 'Speedbird', types: ['B772', 'B789', 'A35K'], weight: 2, flightNumbers: [200, 299], destinations: [dest('EGLL', 34000, 36000, 38000)] },
+    { icao3: 'DLH', telephony: 'Lufthansa', types: ['A333', 'A359'], weight: 1, flightNumbers: [400, 499], destinations: [dest('EDDF', 34000, 36000, 38000)] },
+    { icao3: 'AFR', telephony: 'Airfrans', types: ['A359', 'B77W'], weight: 1, flightNumbers: [300, 399], destinations: [dest('LFPG', 34000, 36000, 38000)] },
+    { icao3: 'EIN', telephony: 'Shamrock', types: ['A332', 'A321'], weight: 1, flightNumbers: [100, 199], destinations: [dest('EIDW', 34000, 36000, 38000)] },
+    { icao3: 'FDX', telephony: 'FedEx', types: ['B763', 'MD11'], weight: 2, flightNumbers: [100, 999], hours: 'night', destinations: [dest('KMEM', 30000, 32000, 34000)] },
+    { icao3: 'UPS', telephony: 'UPS', types: ['B763', 'B752'], weight: 2, flightNumbers: [100, 999], hours: 'night', destinations: [dest('KSDF', 28000, 30000, 32000)] },
+  ],
+  neighbours: {
+    KBED: { name: 'Hanscom', lat: 42.46994444, lon: -71.289, spoken: 'Bedford' },
+    KOWD: { name: 'Norwood', lat: 42.19052027, lon: -71.17293083, spoken: 'Norwood' },
+    KBVY: { name: 'Beverly', lat: 42.58414138, lon: -70.91614444, spoken: 'Beverly' },
+    KLWM: { name: 'Lawrence', lat: 42.71704222, lon: -71.12353333, spoken: 'Lawrence' },
+    KPYM: { name: 'Plymouth', lat: 41.90878833, lon: -70.72762805, spoken: 'Plymouth' },
+    KORH: { name: 'Worcester', lat: 42.26713888, lon: -71.87561111, spoken: 'Worcester' },
+    KFIT: { name: 'Fitchburg', lat: 42.55384722, lon: -71.75917388, spoken: 'Fitchburg' },
+    KPSM: { name: 'Portsmouth', lat: 43.07794444, lon: -70.82327777, spoken: 'Portsmouth' },
+    KHYA: { name: 'Hyannis', lat: 41.66933722, lon: -70.28035916, spoken: 'Hyannis' },
+    KPVC: { name: 'Provincetown', lat: 42.07227777, lon: -70.22072222, spoken: 'Provincetown' },
+  },
+  gaRemote: ['KBED', 'KOWD', 'KBVY', 'KLWM', 'KPYM', 'KORH', 'KFIT', 'KPSM'],
+  gaTypes: [['C172', 0.75], ['PA28', 0.25]],
+  referenceJet: 'A320',
+  // Boston is Class B (NASR CLS_ARSP): VFR transitions need an ATC clearance and are rare, so a low design rate; airport vehicles exist at every
+  // towered airport. No USCG or ANG unit was sourced (data/sources/README.md "Traffic variety").
+  special: {
+    transition: { perHour: 1 },
+    vehicles: { perHour: 3 },
+  },
+};
+
+// ---------------------------------------------------------------------------
 // KPGD: Punta Gorda Airport (Allegiant base)
 // ---------------------------------------------------------------------------
 
@@ -220,7 +281,7 @@ const KPGD: AirportTrafficProfile = {
   },
 };
 
-const PROFILES: Readonly<Record<string, AirportTrafficProfile>> = { KACY, KMHT, KPGD };
+const PROFILES: Readonly<Record<string, AirportTrafficProfile>> = { KACY, KMHT, KBOS, KPGD };
 
 /** The traffic profile of an airport (unknown ICAO: KACY's). */
 export function profileFor(icao: string | undefined): AirportTrafficProfile {
@@ -324,7 +385,7 @@ export function profileDestinations(profile: AirportTrafficProfile): RouteDestin
 }
 
 /** Types that park at the cargo apron when the airport has one. */
-export const CARGO_TYPES: ReadonlySet<string> = new Set(['B752', 'B763', 'A306']);
+export const CARGO_TYPES: ReadonlySet<string> = new Set(['B752', 'B763', 'A306', 'MD11']);
 /** Telephony designators that are cargo operators (their arrivals taxi to the cargo apron). */
 export const CARGO_PREFIXES: ReadonlySet<string> = new Set(['UPS', 'FDX']);
 

@@ -5,10 +5,13 @@
 import type { Airport } from '../sim/types';
 import { loadKacy } from './kacy';
 import { loadKmht } from './kmht';
-import { loadKpgd } from './kpgd';
+import { loadKbos } from './kbos';
 
 export { loadKacy } from './kacy';
 export { loadKmht } from './kmht';
+export { loadKbos } from './kbos';
+import { loadKpgd } from './kpgd';
+
 export { loadKpgd } from './kpgd';
 export { createProjection, trueToMagnetic, magneticToTrue, normalizeDeg, bearingDeg, angleDiffDeg } from './projection';
 export type { Projection } from './projection';
@@ -46,6 +49,7 @@ export const OSM_ATTRIBUTION = '© OpenStreetMap contributors, ODbL 1.0';
 const AIRPORTS: Record<string, () => Airport> = {
   KACY: loadKacy,
   KMHT: loadKmht,
+  KBOS: loadKbos,
   KPGD: loadKpgd,
 };
 

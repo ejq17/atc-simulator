@@ -32,6 +32,7 @@ import type { Decision, DiagramLabel } from './lib/inference.ts';
 import { renderDebugSvg } from './lib/svg.ts';
 import { kacyProfile } from './airports/kacy.ts';
 import { kmhtProfile } from './airports/kmht.ts';
+import { kbosProfile } from './airports/kbos.ts';
 import { kpgdProfile } from './airports/kpgd.ts';
 import type { AirportProfile, ApronRec, BuildingRec, ParkingCtx, ParkRec } from './airports/types.ts';
 import type {
@@ -50,7 +51,7 @@ const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(HERE, '..');
 const SRC = path.join(ROOT, 'data/sources');
 
-const PROFILES: Record<string, AirportProfile> = { KACY: kacyProfile, KMHT: kmhtProfile, KPGD: kpgdProfile };
+const PROFILES: Record<string, AirportProfile> = { KACY: kacyProfile, KMHT: kmhtProfile, KBOS: kbosProfile, KPGD: kpgdProfile };
 const requested = (process.argv[2] ?? '').toUpperCase();
 const profile = PROFILES[requested] ?? PROFILES[`K${requested}`];
 if (!profile) {
@@ -264,8 +265,12 @@ const toLocalPts = (coords: [number, number][]): P[] => coords.map(([lon, lat]) 
 
 const excludedOsmRefs: string[] = [];
 const abandonedWays: number[] = [];
-const wayIns = featsOf('taxiway')
+const wayIns = [...featsOf('taxiway'), ...(profile.includeTaxilanes ? featsOf('taxilane') : [])]
   .filter((f: J) => {
+    if (profile.excludeOsmWays?.some((x) => x.id === f.properties.osm_id)) {
+      abandonedWays.push(f.properties.osm_id as number);
+      return false;
+    }
     const t = f.properties.tags ?? {};
     if (t.abandoned === 'yes' || t.disused === 'yes' || t.access === 'no') {
       abandonedWays.push(f.properties.osm_id as number);
@@ -296,7 +301,24 @@ pl.attachRunways(
 const nTiny2 = pl.contractTiny(CONFIG.tinyEdgeM);
 const droppedFillets = pl.collapseFillets(CONFIG.filletMaxM, CONFIG.filletReachM);
 const nTiny3 = droppedFillets.length ? pl.contractTiny(CONFIG.tinyEdgeM) : 0;
-report.push(`planar: ${wayIns.length} OSM taxiway ways -> ${pl.ways.filter((w) => w.kind === 'taxiway').length} ways, ${nTJ} T-junction splits, ${nX} crossings, ${nTiny1 + nTiny2 + nTiny3} tiny edges contracted${droppedFillets.length ? `, ${droppedFillets.length} mapped turn-on fillets collapsed (${droppedFillets.map((w) => w.key).join(', ')})` : ''}`);
+// --- isolated lane islands: components of the planar network that touch no runway (e.g. a mapped apron lane with no connection to the taxiways)
+const droppedIslands: string[] = [];
+if (profile.dropIsolatedLanes) {
+  const parent = new Map<number, number>();
+  const find = (x: number): number => {
+    let r = x;
+    while ((parent.get(r) ?? r) !== r) r = parent.get(r)!;
+    parent.set(x, r);
+    return r;
+  };
+  for (const w of pl.ways) for (let k = 0; k < w.nodes.length - 1; k++) parent.set(find(w.nodes[k]), find(w.nodes[k + 1]));
+  const rwComps = new Set<number>();
+  for (const w of pl.ways) if (w.kind === 'runway') for (const n of w.nodes) rwComps.add(find(n));
+  const keep = pl.ways.filter((w) => w.kind === 'runway' || w.nodes.some((n) => rwComps.has(find(n))));
+  for (const w of pl.ways) if (!keep.includes(w)) droppedIslands.push(w.key);
+  pl.ways = keep;
+}
+report.push(`planar: ${wayIns.length} OSM taxiway ways -> ${pl.ways.filter((w) => w.kind === 'taxiway').length} ways, ${nTJ} T-junction splits, ${nX} crossings, ${nTiny1 + nTiny2 + nTiny3} tiny edges contracted${droppedFillets.length ? `, ${droppedFillets.length} mapped turn-on fillets collapsed (${droppedFillets.map((w) => w.key).join(', ')})` : ''}${droppedIslands.length ? `; ${droppedIslands.length} ways dropped because they form islands with no connection to a runway or the taxiway network (${droppedIslands.join(', ')})` : ''}`);
 
 // --- FAA diagram labels
 const labelFile = profile.diagramLabels?.() ?? { labels: [], from: '', note: '' };
@@ -380,7 +402,7 @@ for (const rb of runwayBuilds) {
         }
         const nbrs = (adj.get(cur) ?? []).filter((x) => x.other !== prev);
         const isJunction = (adj.get(cur) ?? []).length >= 3 || pl.pinned.has(cur);
-        if (isJunction && !pl.pinned.has(cur) && nbrs.length > 0) {
+        if (isJunction && !pl.pinned.has(cur) && nbrs.length > 0 && !(profile.shortStubJunctionM !== undefined && distToRunwayLine(rb, pl.pos[cur]) >= profile.shortStubJunctionM)) {
           // a junction before 250 ft (e.g. a mapped fillet that joins the through taxiway): keep walking along the branch that leads
           // away from the runway, so the hold line ends up on the through taxiway instead of inside the fillet
           const curD = distToRunwayLine(rb, pl.pos[cur]);
@@ -598,6 +620,19 @@ function connectParking(rec: ParkRec, maxM: number): void {
   const seq = [laneNode, ...chain, stopNode];
   if (rec.leadIn.length === 1) {
     // synthetic: straight connector from the foot point
+  }
+  // a stand that coincides with the lane vertex it attaches to (OSM lead-in ending on the lane) would give a zero-length connector:
+  // the parking node is moved 0.6 m away from the previous node (along the lead-in direction) so the graph has no degenerate edge
+  for (let i = 1; i < seq.length; i++) {
+    const a = pl.pos[seq[i - 1]];
+    const b = pl.pos[seq[i]];
+    if (dist(a, b) < 0.5 && !pl.pinned.has(seq[i]) && !holdNodeSet.has(seq[i]) && (parkNodeSet.has(seq[i]) || (apronNodeSet.has(seq[i]) && i < seq.length - 1 && seq[i] !== laneNode))) {
+      const ref = rec.leadIn.length > 1 ? rec.leadIn[rec.leadIn.length - 2] : { x: a.x - 1, y: a.y };
+      const dx = b.x - ref.x || 1;
+      const dy = b.y - ref.y;
+      const l = Math.hypot(dx, dy) || 1;
+      pl.pos[seq[i]] = { x: a.x + (dx / l) * 0.6, y: a.y + (dy / l) * 0.6 };
+    }
   }
   let total = 0;
   for (let i = 0; i + 1 < seq.length; i++) {
@@ -1081,6 +1116,7 @@ const starOf = (t: J): NonNullable<InstrumentProcedure['star']> => ({
     ...(r.speed_kt !== undefined ? { speedKt: r.speed_kt } : {}),
   })),
   legs: (t.legs as J[]).map((l) => ({ from: l.from, to: l.to, ...(l.track_mag_deg !== undefined ? { trackMagDeg: l.track_mag_deg } : {}), distanceNm: l.distance_nm, ...(l.mea_ft !== undefined ? { meaFt: l.mea_ft } : {}) })),
+  ...(t.sim_entry_fixes?.length ? { simEntryFixes: [...t.sim_entry_fixes] } : {}),
   notes: [...t.notes],
 });
 for (const st of (procSrc.stars ?? []) as J[]) {
@@ -1250,6 +1286,7 @@ const holdIds = Object.values(nodes).filter((n) => n.kind === 'holding_position'
 const parkNodeIds = parking.map((p) => p.nodeId).filter(Boolean);
 const strandedAll = Object.values(nodes).filter((n) => compAll.get(n.id) !== mainAllComp);
 const strandedTaxi = Object.values(nodes).filter((n) => compTaxi.get(n.id) !== mainTaxiComp && n.kind !== 'runway');
+if (process.env.KBUILD_DEBUG) for (const n of strandedAll) console.log('STRANDED', n.id, n.kind, JSON.stringify(n.latLon ?? n.pos), (n as { taxiway?: string }).taxiway ?? '');
 check('graph connected (all edges)', strandedAll.length === 0, `${strandedAll.length} node(s) outside the main component: ${strandedAll.slice(0, 10).map((n) => n.id).join(', ')}`);
 check('graph connected without runway edges (crossings count as connections)', strandedTaxi.length === 0, `${strandedTaxi.length} non-runway node(s) can only be reached via runway edges or are isolated: ${strandedTaxi.slice(0, 10).map((n) => n.id).join(', ')}`, false);
 check('every holding position is in the main taxi component', holdIds.every((h) => compTaxi.get(h) === mainTaxiComp), `holds outside main component: ${holdIds.filter((h) => compTaxi.get(h) !== mainTaxiComp).join(', ')}`);
@@ -1322,7 +1359,9 @@ for (const rb of runwayBuilds) {
     regionCounts.push({ runway: rb.runway.id, end: end.id, count: ids.length, ids });
   });
 }
-for (const rc of regionCounts) check(`runway ${rc.runway} end ${rc.end} half has >= 2 entry/exit nodes`, rc.count >= 2, `${rc.count}: ${rc.ids.join(', ')}`);
+// short runways (under 6,000 ft: general aviation or crosswind runways such as BOS 14/32 and 15L/33R) are mapped with few taxiway links; their
+// half-runway exit count is reported as a warning only
+for (const rc of regionCounts) check(`runway ${rc.runway} end ${rc.end} half has >= 2 entry/exit nodes`, rc.count >= 2, `${rc.count}: ${rc.ids.join(', ')}`, (runwayById(rc.runway).runway.lengthFt as number) >= 6000);
 
 // holding positions
 for (const rb of runwayBuilds) {

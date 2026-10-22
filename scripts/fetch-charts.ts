@@ -20,7 +20,7 @@ import { listCharts } from '../src/charts/chartIndex.ts';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const outRoot = path.join(root, 'public', 'charts');
-const AIRPORTS = ['KACY', 'KMHT', 'KPGD'];
+const AIRPORTS = ['KACY', 'KMHT', 'KBOS', 'KPGD'];
 const RETRIES = 4;
 const CONCURRENCY = 4;
 

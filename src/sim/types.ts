@@ -196,6 +196,8 @@ export interface StarProcedure {
   restrictions: { fix: string; atOrAboveFt?: number; atOrBelowFt?: number; atFt?: number; speedKt?: number }[];
   /** Leg data for integrity checks (magnetic track, distance, MEA as printed). */
   legs?: { from: string; to: string; trackMagDeg?: number; distanceNm: number; meaFt?: number }[];
+  /** Where the simulator starts a STAR arrival (fixes of the STAR a flight is handed over at; see game/ifr.ts). Absent: the first two fixes after the common fix of the runway leg. */
+  simEntryFixes?: string[];
   notes: string[];
 }
 

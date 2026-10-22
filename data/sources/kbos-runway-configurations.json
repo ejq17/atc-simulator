@@ -1,0 +1,123 @@
+{
+ "_provenance": {
+  "retrieved": "2026-10-21",
+  "note": "Configurations are the ones Massport documents. NO wind sector or tailwind limit is published in any document found, so wind_from_deg / wind_to_deg / max_tailwind_kt are ABSENT (UNVERIFIED, never invented): the selector falls back to aligning the arrival runways with the wind (the sources state only that the FAA lands and departs into the wind and that wind and weather are the primary driver). The list order is the preference order for calm wind and follows the documented CY2016 share of jet flights.",
+  "sources": [
+   {
+    "id": "MCAC-LOGAN101",
+    "title": "Boston Logan International Airport Operational Overview (Logan 101), Massport, presented to the Massport Community Advisory Committee 2017-06-08, slides 8-18",
+    "url": "https://massportcac.org/wp-content/uploads/2017/06/Final-BOS-Update-MCAC-Logan-101-060817.pdf",
+    "retrieved": "2026-10-21",
+    "local_file": "raw/kbos_runway_use_docs/mcac_logan101.pdf (text: mcac_logan101.txt)",
+    "data": "Annual jet use by configuration in CY2016 (Massport Noise Abatement Office): NE flow 114,013 jet flights (34%), SW flow 104,129 (31%), NW flow 102,804 (31%), SE flow 12,849 (4%); runway lists per flow (slides 8, 10, 12, 14, 16, 18); late-night opposite-direction configuration arrivals R33L, departures R15R (calendar year 2016, jets)."
+   },
+   {
+    "id": "FAA-NA-APPENDIX-A",
+    "title": "Boston Logan International Airport Runway 33L RNAV SID Final Environmental Assessment, Appendix A Noise Modeling Technical Report (FAA, 2013), Table A.3 and A.4",
+    "url": "https://www.faa.gov/sites/faa.gov/files/air_traffic/environmental_issues/ared_documentation/Appendix_A_Noise_Modeling_06032013.pdf",
+    "retrieved": "2026-10-21",
+    "local_file": "raw/kbos_runway_use_docs/faa_appendixA.pdf (text: faa_appendixA.txt)",
+    "data": "Definition of Runway Operating Configurations (Massport 2009 runway operating configuration log): 1 Visual arr 4L,4R dep 4L,4R,9,15R; 2 Instrument arr 4R dep 4L,4R,9,15R; 3 Visual arr 22L,22R dep 22L,22R,15R; 4 Instrument arr 22L dep 22L,22R,15R; 5 Visual arr 33L,32,33R dep 33L,27; 6 Visual arr 27,22L dep 22L,22R; 7 Visual arr 27,32,33L dep 33L,27 (33L arrivals infrequent). Instrument conditions = visibility under 3 SM or ceiling under 1,000 ft AGL. 2009 annual-average-day shares (6am-midnight): 4/9 38.9% (visual 28.8 + instrument 10.2), 22/22 11.5%, 33-32/27 8.8%, 27/22 26.1%, 27-32/33 14.7%; 2015 forecast 29.5 + 10.4, 8.0, 6.5, 29.0, 16.7."
+   },
+   {
+    "id": "MCAC-2016-BRIEFING",
+    "title": "Massport briefing to the Massport CAC annual meeting 2016-12-08",
+    "url": "https://massportcac.org/wp-content/uploads/2017/03/Massport-Briefing-to-MassportCAC-Annual-Mtg-12-08-2016.pdf",
+    "retrieved": "2026-10-21",
+    "local_file": "raw/kbos_runway_use_docs/mcac_brief2016.pdf",
+    "data": "'Based on wind/weather, the FAA uses Logan runways in combinations'; 'aircraft land and depart into the wind'; the flows NE (R4R/L and 9) and SW (R22R/L and 27)."
+   }
+  ],
+  "not_found": "The Massport monthly Runway Use reports (massport.com noise abatement 'runway use' page, linked PDF/Excel files), the FAA Preferential Runway Advisory System / Runway Use Program text and the current Environmental Data Report tables were not retrieved in this session (the page text lists links only), so no 2024-2026 percentages are recorded."
+ },
+ "configurations": [
+  {
+   "id": "NE-4R4L-9",
+   "name": "Northeast flow",
+   "landing": [
+    "4R",
+    "4L"
+   ],
+   "departing": [
+    "4R",
+    "9",
+    "4L"
+   ],
+   "share_percent": 34,
+   "notes": "Arrivals to 4L and 4R; departures from 9, 4L and 4R (MCAC Logan 101 slides 14-15: R4R arr and dep, R4L arr and non-jet dep, R9 dep). CY2016: 114,013 jet flights, 34%. In instrument conditions the FAA App. A configuration 2 lands on 4R only. 4L has no ILS (RNAV GPS only), so the simulator's ILS arrivals use 4R.",
+   "source": "Massport, Boston Logan Operational Overview (Logan 101), MCAC 2017-06-08, slides 8, 14-15; FAA Runway 33L RNAV SID EA, Appendix A, Table A.3 (configurations 1 and 2)",
+   "url": "https://massportcac.org/wp-content/uploads/2017/06/Final-BOS-Update-MCAC-Logan-101-060817.pdf",
+   "retrieved": "2026-10-21"
+  },
+  {
+   "id": "SW-22L27",
+   "name": "Southwest flow",
+   "landing": [
+    "22L",
+    "27"
+   ],
+   "departing": [
+    "22L",
+    "22R"
+   ],
+   "share_percent": 31,
+   "notes": "Arrivals to 22L and 27 (22R takes non-jet arrivals only); departures from 22L and 22R (slides 10-11). CY2016: 104,129 jet flights, 31%. In instrument conditions the FAA App. A configuration 4 lands on 22L only.",
+   "source": "Massport, Boston Logan Operational Overview (Logan 101), MCAC 2017-06-08, slides 8, 10-11; FAA Runway 33L RNAV SID EA, Appendix A, Table A.3 (configurations 4 and 6)",
+   "url": "https://massportcac.org/wp-content/uploads/2017/06/Final-BOS-Update-MCAC-Logan-101-060817.pdf",
+   "retrieved": "2026-10-21"
+  },
+  {
+   "id": "NW-33L27",
+   "name": "Northwest flow",
+   "landing": [
+    "33L",
+    "27"
+   ],
+   "departing": [
+    "33L",
+    "27"
+   ],
+   "share_percent": 31,
+   "notes": "Arrivals to 33L, 27, 33R (limited) and 32 (wind restricted); departures from 33L and 27 (slides 16-17). CY2016: 102,804 jet flights, 31%. 33R and 32 are omitted from the arrival list (a 2,557 ft and a 5,000 ft runway); 14/32 is documented as unidirectional and wind restricted for noise abatement.",
+   "source": "Massport, Boston Logan Operational Overview (Logan 101), MCAC 2017-06-08, slides 8, 16-17, 39-40; FAA Runway 33L RNAV SID EA, Appendix A, Table A.3 (configurations 5 and 7)",
+   "url": "https://massportcac.org/wp-content/uploads/2017/06/Final-BOS-Update-MCAC-Logan-101-060817.pdf",
+   "retrieved": "2026-10-21"
+  },
+  {
+   "id": "SE-15R-9",
+   "name": "Southeast flow",
+   "landing": [
+    "15R"
+   ],
+   "departing": [
+    "15R",
+    "9"
+   ],
+   "share_percent": 4,
+   "notes": "Arrivals to 15R (15L very limited); departures from 15R, 9 and 14 (very limited) (slides 12-13). CY2016: 12,849 jet flights, 4%. Slide 12: limited throughput, two intersecting jet runways, intersection at the departure ends, narrow weather window.",
+   "source": "Massport, Boston Logan Operational Overview (Logan 101), MCAC 2017-06-08, slides 8, 12-13",
+   "url": "https://massportcac.org/wp-content/uploads/2017/06/Final-BOS-Update-MCAC-Logan-101-060817.pdf",
+   "retrieved": "2026-10-21"
+  }
+ ],
+ "time_zone": "America/New_York",
+ "time_zone_source": "Boston, Massachusetts (Eastern Time; IANA tz database zone America/New_York). A fixed property of the location, not in NASR.",
+ "documented_not_used": [
+  {
+   "id": "LATE-NIGHT-33L-15R",
+   "name": "Late night opposite direction (midnight to 6 am)",
+   "landing": [
+    "33L"
+   ],
+   "departing": [
+    "15R"
+   ],
+   "notes": "Late-night opposite-direction operations: arrivals 33L, departures 15R (slides 18-19, jets, calendar year 2016); FAA App. A: late-night operations use different configurations than daytime and 'there is no correlation between a given daytime and late night configuration'. No share is published for it. Listed last; use only between midnight and 6 am local when the wind allows.",
+   "source": "Massport, Boston Logan Operational Overview (Logan 101), MCAC 2017-06-08, slides 18-19; FAA Runway 33L RNAV SID EA, Appendix A, Table A.3 note 1",
+   "url": "https://massportcac.org/wp-content/uploads/2017/06/Final-BOS-Update-MCAC-Logan-101-060817.pdf",
+   "retrieved": "2026-10-21",
+   "approximate": true,
+   "not_used_reason": "The simulator selects a configuration by wind alone (src/weather/runwayConfigurations.ts); this one is a time-of-day (midnight to 6 am) configuration whose arrival runway 33L would win every northwest-wind selection against the daytime northwest flow. Documented here, not offered."
+  }
+ ]
+}

@@ -21,6 +21,9 @@ const NAMES: readonly (readonly [string, string])[] = [
   ['tampa', 'KTPA'], ['fort myers', 'KRSW'], ['charleston', 'KCHS'], ['raleigh durham', 'KRDU'], ['raleigh', 'KRDU'],
   ['louisville', 'KSDF'], ['memphis', 'KMEM'],
   ['nashua', 'KASH'], ['concord', 'KCON'], ['portsmouth', 'KPSM'], ['portland', 'KPWM'], ['keene', 'KEEN'], ['laconia', 'KLCI'],
+  ['detroit', 'KDTW'], ['miami', 'KMIA'],
+  ['norwood', 'KOWD'], ['plymouth', 'KPYM'], ['worcester', 'KORH'], ['hyannis', 'KHYA'], ['provincetown', 'KPVC'],
+  ['london heathrow', 'EGLL'], ['heathrow', 'EGLL'], ['frankfurt', 'EDDF'], ['paris', 'LFPG'], ['dublin', 'EIDW'],
   ['bedford', 'KBED'], ['hanscom', 'KBED'], ['lawrence', 'KLWM'], ['beverly', 'KBVY'], ['fitchburg', 'KFIT'],
 ];
 

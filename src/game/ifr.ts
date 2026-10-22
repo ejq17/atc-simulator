@@ -13,7 +13,7 @@ import { analyzeProcedure, matchingProcedures } from '../sim/approach';
 import { findNavFix } from '../sim/navigation';
 import { findRunwayEnd } from '../sim/runways';
 import { mToNm } from '../sim/geo';
-import { findStar, starRouteFrom, starRunwayLeg } from '../sim/star';
+import { airportStars, starRouteFrom, starRunwayLeg } from '../sim/star';
 import type { StarRef } from '../sim/star';
 import { getPerformance } from '../sim/performance';
 import type { GameScenario } from './types';
@@ -149,12 +149,22 @@ export function ifrArrivalSpeedKt(type: string): number {
 // ---------------------------------------------------------------------------
 
 /**
- * Where STAR arrivals appear. The published transitions start far outside the simulated area (SMYTH is about 100 nm out, QUINZ 71 nm, CRIBB
- * 47 nm, MUCOW 72 nm from KMHT), so the simulator starts a flight where Boston Center would hand it to Boston Approach on the arrival: over
- * CRIBB (the entry fix of the CRIBB transition, "ATC assigned") or FLYZZ (on the QUINZ / PONCT / SMYTH transitions). Everything from there on
- * is the published route (JO 7110.65 4-7-1) to the end of the runway leg and the approach join fixes. Documented simplification.
+ * Where STAR arrivals appear. Per STAR the entry fixes come from `StarProcedure.simEntryFixes` (data), else from this table, else the first two
+ * fixes after the common fix of the runway leg (so a new airport's STARs generate arrivals without a code change; a STAR with no leg for a
+ * runway end has no arrival there and its traffic is vectored). Table, per STAR ident: The published transitions start far outside the simulated area (KMHT: SMYTH is about 100 nm out,
+ * QUINZ 71 nm, CRIBB 47 nm, MUCOW 72 nm from the airport), so the simulator starts a flight where Boston Center would hand it to the Approach
+ * controller on the arrival: KMHT ROZZE TWO over CRIBB (the entry fix of the CRIBB transition, "ATC assigned") or FLYZZ (on the QUINZ / PONCT /
+ * SMYTH transitions); KBOS ROBUC THREE over PROVI or JOODY (on the common body, before the runway legs split at JOODY) and KBOS JFUND TWO over
+ * AUTUM or JFUND (the first fixes of its runway bodies). Everything from there on is the published route (JO 7110.65 4-7-1) to the end of the
+ * runway leg and the approach join fixes. Documented simplification; the fixes are fixes of the published STAR (data/sources/*-procedures.json).
  */
-export const STAR_SIM_ENTRY_FIXES: readonly string[] = ['CRIBB', 'FLYZZ'];
+export const STAR_SIM_ENTRY_FIXES_BY_STAR: Readonly<Record<string, readonly string[]>> = {
+  ROZZE2: ['CRIBB', 'FLYZZ'],
+  ROBUC3: ['PROVI', 'JOODY'],
+  JFUND2: ['JFUND', 'AUTUM'],
+};
+/** KMHT's entry fixes (kept for the existing tests and docs). */
+export const STAR_SIM_ENTRY_FIXES: readonly string[] = STAR_SIM_ENTRY_FIXES_BY_STAR.ROZZE2;
 /** Speed of a STAR arrival at its entry fix (kt): the engine's own en-route default (250 kt). */
 export const STAR_ENTRY_SPEED_KT = 250;
 
@@ -166,36 +176,47 @@ export interface StarEntry {
   /** Published altitude window at the entry fix (ft); the spawn altitude lies within it. */
   minAltitudeFt: number;
   maxAltitudeFt: number;
+  /** The STAR this entry belongs to (airports with several STARs). */
+  ref?: StarRef;
 }
 
 export interface StarArrival {
+  /** The first STAR serving the runway end. */
   ref: StarRef;
   runwayEnd: string;
+  /** Entries of every STAR that has a leg for the runway end (one STAR at KMHT). */
   entries: StarEntry[];
 }
 
 const starCache = new WeakMap<Airport, Map<string, StarArrival | null>>();
 
-/** The STAR serving a landing runway end (turbojets only, per the chart note), or undefined (KACY: no STARs). */
+/** The STARs serving a landing runway end (turbojets only, per the chart note), or undefined (KACY: no STARs). */
 export function starArrival(airport: Airport, runwayEnd: string): StarArrival | undefined {
   let per = starCache.get(airport);
   if (!per) starCache.set(airport, (per = new Map()));
   if (per.has(runwayEnd)) return per.get(runwayEnd) ?? undefined;
   let found: StarArrival | undefined;
   const g = findRunwayEnd(airport, runwayEnd);
-  const ref = findStar(airport);
-  if (g && ref && starRunwayLeg(ref.star, g.end.id)) {
+  if (g) {
     const entries: StarEntry[] = [];
-    for (const fix of STAR_SIM_ENTRY_FIXES) {
-      const r = starRouteFrom(airport, ref, fix, g.end.id);
-      const nav = findNavFix(airport, fix);
-      if (!r || !nav) continue;
-      const restr = ref.star.restrictions.find((x) => x.fix.toUpperCase() === nav.id.toUpperCase());
-      const min = restr?.atFt ?? restr?.atOrAboveFt ?? 10000;
-      const max = restr?.atFt ?? restr?.atOrBelowFt ?? min + 2000;
-      entries.push({ fix: nav.id, transition: r.transition, route: r.fixes, minAltitudeFt: min, maxAltitudeFt: max });
+    let first: StarRef | undefined;
+    for (const ref of airportStars(airport)) {
+      if (!starRunwayLeg(ref.star, g.end.id)) continue;
+      first ??= ref;
+      // entry fixes: the STAR's own list (data), else the table above, else the first two fixes after the common fix of this runway leg
+      const leg = starRunwayLeg(ref.star, g.end.id)!;
+      const entryFixes = ref.star.simEntryFixes ?? STAR_SIM_ENTRY_FIXES_BY_STAR[ref.star.ident] ?? leg.fixes.slice(1, 3);
+      for (const fix of entryFixes) {
+        const r = starRouteFrom(airport, ref, fix, g.end.id);
+        const nav = findNavFix(airport, fix);
+        if (!r || !nav) continue;
+        const restr = ref.star.restrictions.find((x) => x.fix.toUpperCase() === nav.id.toUpperCase());
+        const min = restr?.atFt ?? restr?.atOrAboveFt ?? 10000;
+        const max = restr?.atFt ?? restr?.atOrBelowFt ?? min + 2000;
+        entries.push({ fix: nav.id, transition: r.transition, route: r.fixes, minAltitudeFt: min, maxAltitudeFt: max, ...(airportStars(airport).length > 1 ? { ref } : {}) });
+      }
     }
-    if (entries.length) found = { ref, runwayEnd: g.end.id, entries };
+    if (first && entries.length) found = { ref: first, runwayEnd: g.end.id, entries };
   }
   per.set(runwayEnd, found ?? null);
   return found;
@@ -225,7 +246,7 @@ export function starArrivalSpawn(
   const e = (o.entry ? sa.entries.find((x) => x.fix === o.entry) : undefined) ?? sa.entries[Math.min(sa.entries.length - 1, Math.floor(rng() * sa.entries.length))];
   return {
     atSec: o.atSec, callsign: o.callsign, type: o.type, flightRules: 'IFR',
-    start: { kind: 'at_fix', fix: e.fix, altitudeFt: pickStarEntryAltitudeFt(rng, e), speedKt: STAR_ENTRY_SPEED_KT, route: e.route, runwayEnd: sa.runwayEnd, star: { procedureId: sa.ref.procedure.id, transition: e.transition || undefined } },
+    start: { kind: 'at_fix', fix: e.fix, altitudeFt: pickStarEntryAltitudeFt(rng, e), speedKt: STAR_ENTRY_SPEED_KT, route: e.route, runwayEnd: sa.runwayEnd, star: { procedureId: (e.ref ?? sa.ref).procedure.id, transition: e.transition || undefined } },
     isDeparture: false, initialFrequencyId: 'APP', initialRequest: 'APPROACH',
   };
 }

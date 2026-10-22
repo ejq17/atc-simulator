@@ -68,7 +68,7 @@ the build from `data/sources/<icao>-*.json` and `<icao>-taxiways.geojson`. Addin
 * KPGD (third airport) is the first with an excluded NASR runway (`AirportProfile.excludeRunways`: 09/27) and a **shared Clearance Delivery / Ground frequency**
   (119.55): the engine resolves a frequency to the first position that owns it (`frequencyByMhz`), so the profile lists GND before CLNC; pilots on the IFR-clearance flow
   still call "Clearance Delivery" through their frequency id. Tower hours (0600-2100) are data only; the simulator does not enforce them. STAR arrivals are generated
-  only for KMHT (`STAR_SIM_ENTRY_FIXES` in `src/game/ifr.ts` names the ROZZE TWO entry fixes): the KPGD LUBBR FOUR / PIKKR SEVEN charts are transcribed and can be assigned by command.
+  for any airport whose STARs are transcribed with a runway leg: the entry fixes come from `StarProcedure.simEntryFixes` (data), else `STAR_SIM_ENTRY_FIXES_BY_STAR` in `src/game/ifr.ts` (ROZZE2, ROBUC3, JFUND2), else the first two fixes after the common fix of the runway leg (KPGD: ZEBON, RUNNE, GUSEC); with several STARs on a runway end `starArrival` returns the entries of all of them.
 
 ## Key contracts
 
@@ -116,3 +116,4 @@ variation comes from NASR per airport (KACY 10 W, KMHT 15 W). Altitudes in feet 
 * No connection to real radio, ADS-B, or live traffic. Live weather is an input only.
 * This is entertainment/learning software, not ATC training.
 - Traffic variety (src/sim/{rotorcraft,vehicles,special}.ts, src/game/specialGenerator.ts, src/ai/special.ts): see src/sim/README.md and src/game/README.md.
+* KBOS (fourth airport, six runways): see `docs/ADDING-AN-AIRPORT.md`. Profile options added for it: `includeTaxilanes` (OSM `taxilane` ways = apron lanes), `dropIsolatedLanes`, `excludeOsmWays` (with reasons), `shortStubJunctionM` (hold at 60 % of a stub whose junction is a real taxiway junction), plus: a taxiway that ends within 1.5 m of a runway threshold joins the threshold node; the half-runway exit check is a warning for runways under 6,000 ft.

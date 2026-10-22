@@ -83,6 +83,8 @@ const endRows = table('APT', 'APT_RWY_END.csv').filter((r) => r.ARPT_ID === FAA_
 const cls = table('CLS_ARSP', 'CLS_ARSP.csv').filter((r) => r.ARPT_ID === FAA_ID);
 
 const charted: Record<string, number> = proc.airport_diagram.charted_runway_headings_mag;
+/** Runway end key used in the *-procedures.json files: leading zeros stripped, the L/R/C letter kept ("04" -> "4", "04R" -> "4R"). */
+const endKey = (id: string): string => id.replace(/^0+(?=\d)/, '');
 const ilsBase = table('ILS', 'ILS_BASE.csv').filter((r) => r.ARPT_ID === FAA_ID);
 const ilsGs = table('ILS', 'ILS_GS.csv').filter((r) => r.ARPT_ID === FAA_ID);
 const ilsDme = table('ILS', 'ILS_DME.csv').filter((r) => r.ARPT_ID === FAA_ID);
@@ -101,7 +103,7 @@ const runways = rwyRows.map((r) => {
     return {
       id: e.RWY_END_ID,
       true_alignment_deg: num(e.TRUE_ALIGNMENT),
-      charted_magnetic_heading_deg: charted[String(parseInt(e.RWY_END_ID, 10))] ?? null,
+      charted_magnetic_heading_deg: charted[endKey(e.RWY_END_ID)] ?? null,
       charted_magnetic_heading_source: `airport diagram ${proc.airport_diagram.pdf_name} (runway end heading printed on the chart)`,
       threshold: {
         lat: num(e.LAT_DECIMAL),
@@ -163,7 +165,7 @@ const runways = rwyRows.map((r) => {
 const ilsByEnd: Record<string, J> = {};
 for (const b of ilsBase) {
   const gs = ilsGs.find((g) => g.RWY_END_ID === b.RWY_END_ID);
-  ilsByEnd[String(parseInt(b.RWY_END_ID, 10))] = {
+  ilsByEnd[endKey(b.RWY_END_ID)] = {
     loc_ident: b.ILS_LOC_ID,
     category: b.CATEGORY,
     loc_freq_mhz: num(b.LOC_FREQ),
@@ -268,6 +270,19 @@ const facility = {
     'Operating hours of airport-owned customer services other than as given in remarks',
   ],
 };
+// optional hand-sourced runway configurations (data/sources/<slug>-runway-configurations.json): embedded as facility.runway_configurations
+const cfgPath = path.join(SRC, `${icaoLower}-runway-configurations.json`);
+if (fs.existsSync(cfgPath)) {
+  const cfg: J = JSON.parse(fs.readFileSync(cfgPath, 'utf8'));
+  (facility as J).runway_configurations = cfg.configurations;
+  (facility as J).runway_configurations_provenance = cfg._provenance;
+  if (cfg.time_zone) {
+    (facility as J).airport.time_zone = cfg.time_zone;
+    (facility as J).airport.time_zone_source = cfg.time_zone_source;
+  }
+}
+// airspace class from the NASR CLS_ARSP flags (B takes precedence over C over D)
+(facility as J).airspace.class = facility.airspace.class_b ? 'B' : facility.airspace.class_c ? 'C' : facility.airspace.class_d ? 'D' : undefined;
 fs.writeFileSync(path.join(SRC, `${icaoLower}-facility.json`), JSON.stringify(facility, null, 1) + '\n');
 
 // ---------------------------------------------------------------------------------------------------------------------
@@ -290,19 +305,28 @@ const frqRow = (r: Row): J => ({
 });
 const vhfUse = (use: string, facilityType?: string): J[] => frq.filter((r) => r.FREQ_USE === use && (!facilityType || r.FACILITY_TYPE === facilityType) && Number(r.FREQ) < 225);
 const uhfUse = (use: string, facilityType?: string): string | undefined => frq.find((r) => r.FREQ_USE === use && (!facilityType || r.FACILITY_TYPE === facilityType) && Number(r.FREQ) >= 225)?.FREQ;
-const one = (use: string, facilityType?: string, ownFacilityOnly = false): J => {
-  const v = vhfUse(use, facilityType).filter((r) => !ownFacilityOnly || r.FACILITY === FAA_ID);
-  if (v.length !== 1) throw new Error(`expected exactly one VHF ${use} row, found ${v.length}`);
-  return v[0];
-};
-const atis = one('ATIS', 'ATCT');
-const cd = one('CD/P', undefined, true);
-const gnd = one('GND/P', undefined, true);
-const lcl = one('LCL/P', undefined, true);
+// Airports with several rows of one use (BOS: two GND/P, three LCL/P by sector, D-ATIS arrival/departure, no CD/P VHF) take the
+// multi-row path; single-row airports (KACY, KMHT) keep exactly the old fields.
+const atisRows = vhfUse('ATIS', 'ATCT');
+const datisRows = frq.filter((r) => r.FREQ_USE === 'D-ATIS' && Number(r.FREQ) < 225);
+const atis = atisRows.length === 1 ? atisRows[0] : datisRows[0];
+if (!atis) throw new Error('no ATIS or D-ATIS VHF row');
+const cdRows = vhfUse('CD/P').filter((r) => r.FACILITY === FAA_ID);
+const cdPre = frq.filter((r) => r.FREQ_USE === 'CD PRE TAXI CLNC' && Number(r.FREQ) < 225);
+const cd = cdRows.length === 1 ? cdRows[0] : cdPre[0];
+if (!cd) throw new Error('no VHF clearance delivery row (CD/P or CD PRE TAXI CLNC)');
+const gndRows = vhfUse('GND/P').filter((r) => r.FACILITY === FAA_ID);
+if (!gndRows.length) throw new Error('no VHF GND/P row');
+const gnd = gndRows[0];
+const lclRows = vhfUse('LCL/P').filter((r) => r.FACILITY === FAA_ID && (r.FACILITY_TYPE === 'ATCT' || r.FACILITY_TYPE === ''));
+if (!lclRows.length) throw new Error('no VHF LCL/P row');
+const lcl = lclRows.find((r) => !str(r.SECTORIZATION)) ?? lclRows.find((r) => r.SECTORIZATION !== 'HELICOPTERS') ?? lclRows[0];
 const appRows = frq.filter((r) => r.FREQ_USE.startsWith('APCH/P DEP/P')); // 'APCH/P DEP/P' and 'APCH/P DEP/P IC' (PGD lists its UHF row with the IC suffix)
-const appVhf = appRows.find((r) => Number(r.FREQ) < 225)!;
+const appVhf = appRows.find((r) => Number(r.FREQ) < 225) ?? frq.find((r) => r.FREQ_USE.startsWith('APCH/P') && r.FACILITY_TYPE === 'TRACON' && Number(r.FREQ) < 225)!;
 const appUhf = appRows.find((r) => Number(r.FREQ) >= 225);
+const tracon = frq.filter((r) => r.FACILITY_TYPE === 'TRACON' && Number(r.FREQ) < 225);
 const classC = frq.filter((r) => r.FREQ_USE === 'CLASS C');
+const classB = frq.filter((r) => r.FREQ_USE === 'CLASS B');
 const emerg = frq.find((r) => r.FREQ_USE === 'EMERG' && Number(r.FREQ) < 225);
 const emergU = frq.find((r) => r.FREQ_USE === 'EMERG' && Number(r.FREQ) >= 225);
 const unicom = frq.find((r) => r.FREQ_USE === 'UNICOM');
@@ -328,19 +352,24 @@ const frequencies = {
     controlling_artcc: `${apt.RESP_ARTCC_ID} (${apt.ARTCC_NAME})`,
   },
   summary_by_function: {
-    ATIS: { vhf: atis.FREQ, uhf: uhfUse('ATIS', 'ATCT') ?? null, hours: atcAtis[0]?.ATIS_HRS || atis.TOWER_HRS, phone: atcAtis[0]?.ATIS_PHONE_NO || null, note: 'FRQ use code ATIS (facility type ATCT); phone from ATC_ATIS.csv. The ASOS row on the same frequency is the automated weather source.' },
-    clearance_delivery: { vhf: cd.FREQ, uhf: uhfUse('CD/P') ?? null, note: `FRQ CD/P; the airport diagram prints CLNC DEL ${proc.airport_diagram.printed_frequencies?.CLNC_DEL}` },
-    ground: { vhf: gnd.FREQ, uhf: uhfUse('GND/P') ?? null, note: `FRQ GND/P; the airport diagram prints GND CON ${proc.airport_diagram.printed_frequencies?.GND_CON}` },
+    ATIS: { vhf: atis.FREQ, uhf: uhfUse('ATIS', 'ATCT') ?? null, hours: atcAtis[0]?.ATIS_HRS || atis.TOWER_HRS, phone: atcAtis[0]?.ATIS_PHONE_NO || null, note: atisRows.length === 1 ? 'FRQ use code ATIS (facility type ATCT); phone from ATC_ATIS.csv. The ASOS row on the same frequency is the automated weather source.' : `FRQ use code D-ATIS (${datisRows.map((r) => `${r.SECTORIZATION} ${r.FREQ}`).join(', ')}); no plain ATIS row; ATC_ATIS.csv phone ${atcAtis[0]?.ATIS_PHONE_NO ?? 'none recorded'}. The ASOS row on the same frequency is the automated weather source.` },
+    clearance_delivery: { vhf: cd.FREQ, uhf: uhfUse('CD/P') ?? null, note: `FRQ ${cd.FREQ_USE}${cdRows.length === 1 ? '' : ' (no VHF CD/P row; the VHF clearance row is the pre-taxi clearance frequency)'}; the airport diagram prints CLNC DEL ${proc.airport_diagram.printed_frequencies?.CLNC_DEL}` },
+    ground: { vhf: gnd.FREQ, uhf: uhfUse('GND/P') ?? null, note: `FRQ GND/P${gndRows.length > 1 ? ` (${gndRows.length} VHF rows: ${gndRows.map((r) => r.FREQ).join(', ')}; NASR gives no sectorization)` : ''}; the airport diagram prints GND CON ${proc.airport_diagram.printed_frequencies?.GND_CON}` },
+    ...(gndRows.length > 1 ? { ground_all: gndRows.map((r) => ({ freq_mhz: r.FREQ, sectorization: str(r.SECTORIZATION) })) } : {}),
     tower: { vhf: lcl.FREQ, uhf: uhfUse('LCL/P', 'ATCT') ?? null, note: `FRQ LCL/P; the airport diagram prints ${proc.airport_diagram.printed_frequencies?.TOWER}` },
+    ...(lclRows.length > 1 ? { tower_all: lclRows.map((r) => ({ freq_mhz: r.FREQ, sectorization: str(r.SECTORIZATION), remark: str(r.REMARK) })) } : {}),
+    ramp_control: frq.filter((r) => r.FREQ_USE === 'RAMP CTL' && Number(r.FREQ) < 225).map((r) => ({ freq_mhz: r.FREQ, note: 'FRQ RAMP CTL' })),
+    tracon_vhf_rows: tracon.map((r) => ({ freq_mhz: r.FREQ, use_code: r.FREQ_USE, sectorization: str(r.SECTORIZATION), facility: r.FACILITY, facility_name: r.FAC_NAME })),
+    class_b_frequencies: classB.map((r) => ({ freq_mhz: r.FREQ, sectorization: str(r.SECTORIZATION) })),
     approach_departure: {
-      vhf: appVhf.FREQ,
+      vhf: appRows.length ? appVhf.FREQ : null,
       uhf: appUhf?.FREQ ?? null,
       sectorization: null,
       chart_name: proc.airport_diagram.printed_frequencies?.APPROACH,
       facility: appVhf.FACILITY,
       facility_name: appVhf.FAC_NAME,
       radio_call: appVhf.PRIMARY_APPROACH_RADIO_CALL,
-      note: `FRQ APCH/P DEP/P (${appVhf.FAC_NAME}, serving ${FAA_ID}); no sectorization bearings are published for this row. Approach and departure share this frequency.`,
+      note: appRows.length ? `FRQ APCH/P DEP/P (${appVhf.FAC_NAME}, serving ${FAA_ID}); no sectorization bearings are published for this row. Approach and departure share this frequency.` : `No combined APCH/P DEP/P row: ${appVhf.FAC_NAME} publishes sector rows (see tracon_vhf_rows: APCH/P NORTH / SOUTH, APCH/P IC WEST, DEP/P, CLASS B by bearing, STAR frequency).`,
     },
     class_c_sector_frequencies: classC.map((r) => ({ freq_mhz: r.FREQ, sectorization: str(r.SECTORIZATION), note: 'FRQ use code CLASS C row (secondary Class C service frequency, named by area, not by bearings)' })),
     emergency: { vhf: emerg?.FREQ ?? null, uhf: emergU?.FREQ ?? null },
@@ -396,7 +425,7 @@ const ilsPlate: Record<string, J> = proc.ils_plate_data;
 const systems = ilsBase.map((b) => {
   const gs = ilsGs.find((g) => g.RWY_END_ID === b.RWY_END_ID);
   const dme = ilsDme.find((d) => d.RWY_END_ID === b.RWY_END_ID) ?? ilsDme.find((d) => d.ILS_LOC_ID === b.ILS_LOC_ID);
-  const endId = String(parseInt(b.RWY_END_ID, 10));
+  const endId = endKey(b.RWY_END_ID);
   const plate = ilsPlate[endId];
   const rwEnd = endRows.find((e) => e.RWY_END_ID === b.RWY_END_ID);
   return {
@@ -478,8 +507,8 @@ const navaids = {
   },
   primary_navaid: { ...navObj(primaryRow), tacan_dme_channel: primaryRow.CHAN, location_note: proc.primary_navaid_note },
   ils_localizers: {
-    runways_with_ils: ilsBase.map((b) => String(parseInt(b.RWY_END_ID, 10))),
-    runways_without_ils_or_loc: runways.flatMap((r) => r.ends.map((e) => String(parseInt(e.id, 10)))).filter((id) => !ilsByEnd[id]),
+    runways_with_ils: ilsBase.map((b) => endKey(b.RWY_END_ID)),
+    runways_without_ils_or_loc: runways.flatMap((r) => r.ends.map((e) => endKey(e.id))).filter((id) => !ilsByEnd[id]),
     note: proc.ils_note,
     systems,
   },

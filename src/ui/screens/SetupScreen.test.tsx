@@ -17,11 +17,11 @@ afterEach(() => {
 });
 
 describe('<SetupScreen /> airport selector', () => {
-  it('defaults to KACY and offers KMHT and KPGD', () => {
+  it('defaults to KACY and offers KMHT, KBOS and KPGD', () => {
     render(<SetupScreen />);
     const select = screen.getByTestId('airport-select') as HTMLSelectElement;
     expect(select.value).toBe('KACY');
-    expect([...select.options].map((o) => o.value)).toEqual(['KACY', 'KMHT', 'KPGD']);
+    expect([...select.options].map((o) => o.value)).toEqual(['KACY', 'KMHT', 'KBOS', 'KPGD']);
     expect(screen.getByText('KACY ATC Simulator')).toBeInTheDocument();
     expect(fetchLiveMetar).toHaveBeenCalledWith('KACY');
   });

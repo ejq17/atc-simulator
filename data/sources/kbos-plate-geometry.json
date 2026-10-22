@@ -1,0 +1,280 @@
+{
+ "_provenance": {
+  "source": "FAA d-TPP cycle 2610 instrument approach plates for KBOS (the PDFs listed in kbos-procedures.json)",
+  "retrieved": "2026-10-21",
+  "method": "Glidepath angle / TCH and the missed approach climb altitudes were read from each plate render (profile view \"GS 3.00 / TCH 51\", MISSED APPROACH box) and cross-checked against the pdfjs-dist text layer (\"GS 3.00 TCH 51\" strings). The SA CAT I and CAT II-III plates repeat the glideslope and missed approach of the standard ILS. RNAV (GPS) RWY 32 has no vertical guidance: its 2.91 deg / TCH 45 is a visual descent angle (VDA). HUMAN TRANSCRIPTION - verify against the PDFs before any real use.",
+  "terms": "TCH = threshold crossing height above the runway threshold of the plate's glidepath (GS = ILS glideslope, GP = RNAV glidepath, VDA = visual descent angle of a non-precision approach). It is NOT the VGSI TCH printed in the \"(VGSI Angle x/TCH y)\" note (KBOS: 67, 71, 71, 71, 68 for 4R, 15R, 22L, 27, 33L), which belongs to the visual glide slope indicator (NASR threshold_crossing_height_ft in the facility file)."
+ },
+ "procedures": [
+  {
+   "chart_name": "ILS OR LOC RWY 04R",
+   "pdf_name": "00058IL4R.PDF",
+   "glidepath": {
+    "kind": "GS",
+    "angle_deg": 3,
+    "tch_ft": 51
+   },
+   "missed_approach": {
+    "initial_climb_altitude_ft": null,
+    "final_altitude_ft": 3000,
+    "plate_text": "MISSED APPROACH: Climb to 3000 on BOS VOR/DME R-030 to WAXEN/BOS 14 DME and hold."
+   },
+   "read_by": "plate render read visually; text layer (pdfjs-dist) cross-checked"
+  },
+  {
+   "chart_name": "ILS OR LOC RWY 15R",
+   "pdf_name": "00058IL15R.PDF",
+   "glidepath": {
+    "kind": "GS",
+    "angle_deg": 3,
+    "tch_ft": 60
+   },
+   "missed_approach": {
+    "initial_climb_altitude_ft": null,
+    "final_altitude_ft": 3000,
+    "plate_text": "MISSED APPROACH: Climb to 3000 on BOS VOR/DME R-154 to CELTS INT/BOS 11.7 DME and hold."
+   },
+   "read_by": "plate render read visually; text layer (pdfjs-dist) cross-checked"
+  },
+  {
+   "chart_name": "ILS OR LOC RWY 22L",
+   "pdf_name": "00058IL22L.PDF",
+   "glidepath": {
+    "kind": "GS",
+    "angle_deg": 3,
+    "tch_ft": 55
+   },
+   "missed_approach": {
+    "initial_climb_altitude_ft": null,
+    "final_altitude_ft": 3000,
+    "plate_text": "MISSED APPROACH: Climb to 3000 on BOS VOR/DME R-219 to WINNI/BOS 15.6 DME/RADAR and hold."
+   },
+   "read_by": "plate render read visually; text layer (pdfjs-dist) cross-checked"
+  },
+  {
+   "chart_name": "ILS OR LOC RWY 27",
+   "pdf_name": "00058IL27.PDF",
+   "glidepath": {
+    "kind": "GS",
+    "angle_deg": 3,
+    "tch_ft": 57
+   },
+   "missed_approach": {
+    "initial_climb_altitude_ft": null,
+    "final_altitude_ft": 3000,
+    "plate_text": "MISSED APPROACH: Climb to 3000 on BOS VOR/DME R-268 to BOSOX INT/BOS 29.9 DME and hold."
+   },
+   "read_by": "plate render read visually; text layer (pdfjs-dist) cross-checked"
+  },
+  {
+   "chart_name": "ILS OR LOC RWY 33L",
+   "pdf_name": "00058IL33L.PDF",
+   "glidepath": {
+    "kind": "GS",
+    "angle_deg": 3,
+    "tch_ft": 57
+   },
+   "missed_approach": {
+    "initial_climb_altitude_ft": 1500,
+    "final_altitude_ft": 3000,
+    "plate_text": "MISSED APPROACH: Climb to 1500 then climbing right turn to 3000 on BOS VOR/DME R-030 to WAXEN/BOS 14 DME and hold."
+   },
+   "read_by": "plate render read visually; text layer (pdfjs-dist) cross-checked"
+  },
+  {
+   "chart_name": "ILS RWY 04R (SA CAT I)",
+   "pdf_name": "00058I4RSAC1.PDF",
+   "glidepath": {
+    "kind": "GS",
+    "angle_deg": 3,
+    "tch_ft": 51
+   },
+   "missed_approach": {
+    "initial_climb_altitude_ft": null,
+    "final_altitude_ft": 3000,
+    "plate_text": "MISSED APPROACH: Climb to 3000 on BOS VOR/DME R-030 to WAXEN/BOS 14 DME and hold."
+   },
+   "read_by": "plate render read visually; text layer (pdfjs-dist) cross-checked"
+  },
+  {
+   "chart_name": "ILS RWY 04R (CAT II - III)",
+   "pdf_name": "00058I4RC2_3.PDF",
+   "glidepath": {
+    "kind": "GS",
+    "angle_deg": 3,
+    "tch_ft": 51
+   },
+   "missed_approach": {
+    "initial_climb_altitude_ft": null,
+    "final_altitude_ft": 3000,
+    "plate_text": "MISSED APPROACH: Climb to 3000 on BOS VOR/DME R-030 to WAXEN/BOS 14 DME and hold."
+   },
+   "read_by": "plate render read visually; text layer (pdfjs-dist) cross-checked"
+  },
+  {
+   "chart_name": "ILS RWY 33L (SA CAT I)",
+   "pdf_name": "00058I33LSAC1.PDF",
+   "glidepath": {
+    "kind": "GS",
+    "angle_deg": 3,
+    "tch_ft": 57
+   },
+   "missed_approach": {
+    "initial_climb_altitude_ft": 1500,
+    "final_altitude_ft": 3000,
+    "plate_text": "MISSED APPROACH: Climb to 1500 then climbing right turn to 3000 on BOS VOR/DME R-030 to WAXEN/BOS 14 DME and hold."
+   },
+   "read_by": "plate render read visually; text layer (pdfjs-dist) cross-checked"
+  },
+  {
+   "chart_name": "ILS RWY 33L (CAT II - III)",
+   "pdf_name": "00058I33LC2_3.PDF",
+   "glidepath": {
+    "kind": "GS",
+    "angle_deg": 3,
+    "tch_ft": 57
+   },
+   "missed_approach": {
+    "initial_climb_altitude_ft": 1500,
+    "final_altitude_ft": 3000,
+    "plate_text": "MISSED APPROACH: Climb to 1500 then climbing right turn to 3000 on BOS VOR/DME R-030 to WAXEN/BOS 14 DME and hold."
+   },
+   "read_by": "plate render read visually; text layer (pdfjs-dist) cross-checked"
+  },
+  {
+   "chart_name": "RNAV (RNP) X RWY 33L",
+   "pdf_name": "00058RRX33L.PDF",
+   "glidepath": {
+    "kind": "GP",
+    "angle_deg": 3,
+    "tch_ft": 52
+   },
+   "missed_approach": {
+    "initial_climb_altitude_ft": 600,
+    "final_altitude_ft": 3000,
+    "plate_text": "MISSED APPROACH: Climb to 600 then climbing right turn to 3000 direct WAXEN and hold."
+   },
+   "read_by": "plate render read visually; text layer (pdfjs-dist) cross-checked"
+  },
+  {
+   "chart_name": "RNAV (GPS) RWY 04L",
+   "pdf_name": "00058R4L.PDF",
+   "glidepath": {
+    "kind": "GP",
+    "angle_deg": 3.1,
+    "tch_ft": 50
+   },
+   "missed_approach": {
+    "initial_climb_altitude_ft": 700,
+    "final_altitude_ft": 3000,
+    "plate_text": "MISSED APPROACH: Climb to 700 then climbing left turn to 3000 direct UJEGE and hold, continue climb-in-hold to 3000. * Missed approach requires minimum climb of 425 feet per NM to 900."
+   },
+   "read_by": "plate render read visually; text layer (pdfjs-dist) cross-checked"
+  },
+  {
+   "chart_name": "RNAV (GPS) RWY 04R",
+   "pdf_name": "00058R4R.PDF",
+   "glidepath": {
+    "kind": "GP",
+    "angle_deg": 3,
+    "tch_ft": 51
+   },
+   "missed_approach": {
+    "initial_climb_altitude_ft": null,
+    "final_altitude_ft": 3000,
+    "plate_text": "MISSED APPROACH: Climb to 3000 direct OMVOZ and on track 032 deg to WAXEN and hold."
+   },
+   "read_by": "plate render read visually; text layer (pdfjs-dist) cross-checked"
+  },
+  {
+   "chart_name": "RNAV (GPS) RWY 15R",
+   "pdf_name": "00058R15R.PDF",
+   "glidepath": {
+    "kind": "GP",
+    "angle_deg": 3,
+    "tch_ft": 60
+   },
+   "missed_approach": {
+    "initial_climb_altitude_ft": null,
+    "final_altitude_ft": 3000,
+    "plate_text": "MISSED APPROACH: Climb to 3000 direct HUBIR and on track 152 deg to CELTS and hold."
+   },
+   "read_by": "plate render read visually; text layer (pdfjs-dist) cross-checked"
+  },
+  {
+   "chart_name": "RNAV (GPS) RWY 27",
+   "pdf_name": "00058R27.PDF",
+   "glidepath": {
+    "kind": "GP",
+    "angle_deg": 3,
+    "tch_ft": 57
+   },
+   "missed_approach": {
+    "initial_climb_altitude_ft": null,
+    "final_altitude_ft": 3000,
+    "plate_text": "MISSED APPROACH: Climb to 3000 direct WANTU and on track 266 deg to BOSOX and hold."
+   },
+   "read_by": "plate render read visually; text layer (pdfjs-dist) cross-checked"
+  },
+  {
+   "chart_name": "RNAV (GPS) RWY 32",
+   "pdf_name": "00058R32.PDF",
+   "glidepath": {
+    "kind": "VDA",
+    "angle_deg": 2.91,
+    "tch_ft": 45
+   },
+   "missed_approach": {
+    "initial_climb_altitude_ft": null,
+    "final_altitude_ft": 3000,
+    "plate_text": "MISSED APPROACH: Climb to 3000 direct WINDZ and on track 284 deg to TELLE and hold."
+   },
+   "read_by": "plate render read visually; text layer (pdfjs-dist) cross-checked"
+  },
+  {
+   "chart_name": "RNAV (GPS) X RWY 22L",
+   "pdf_name": "00058RX22L.PDF",
+   "glidepath": {
+    "kind": "GP",
+    "angle_deg": 3,
+    "tch_ft": 55
+   },
+   "missed_approach": {
+    "initial_climb_altitude_ft": null,
+    "final_altitude_ft": 3000,
+    "plate_text": "MISSED APPROACH: Climb to 3000 direct WINNI and hold."
+   },
+   "read_by": "plate render read visually; text layer (pdfjs-dist) cross-checked"
+  },
+  {
+   "chart_name": "RNAV (GPS) Y RWY 22L",
+   "pdf_name": "00058RY22L.PDF",
+   "glidepath": {
+    "kind": "GP",
+    "angle_deg": 3,
+    "tch_ft": 55
+   },
+   "missed_approach": {
+    "initial_climb_altitude_ft": null,
+    "final_altitude_ft": 3000,
+    "plate_text": "MISSED APPROACH: Climb to 3000 direct WINNI and hold."
+   },
+   "read_by": "plate render read visually; text layer (pdfjs-dist) cross-checked"
+  },
+  {
+   "chart_name": "RNAV (GPS) Z RWY 33L",
+   "pdf_name": "00058RZ33L.PDF",
+   "glidepath": {
+    "kind": "GP",
+    "angle_deg": 3,
+    "tch_ft": 57
+   },
+   "missed_approach": {
+    "initial_climb_altitude_ft": 600,
+    "final_altitude_ft": 3000,
+    "plate_text": "MISSED APPROACH: Climb to 600 then climbing right turn to 3000 direct WAXEN and hold."
+   },
+   "read_by": "plate render read visually; text layer (pdfjs-dist) cross-checked"
+  }
+ ]
+}
