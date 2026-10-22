@@ -399,7 +399,7 @@ export function buildReadback(aircraft: Aircraft, c: Clearance, env: ReadbackEnv
       case 'OVERHEAD':
         return overheadReadback({ runwayEnd: c.runwayEnd ?? c.runwayId ?? '', altitudeFt: c.altitudeFt, turnDirection: c.turnDirection, reports: c.destination === 'BREAK' ? ['initial', 'break'] : ['initial'] });
       case 'AIRPORT_INFO':
-        return c.info?.altimeterInHg !== undefined ? `Altimeter ${digitsSpoken(String(Math.round(c.info.altimeterInHg * 100)))}` : 'Roger';
+        return c.info?.altimeterInHg !== undefined ? (env.airport.altimeterUnit === 'hPa' ? `QNH ${digitsSpoken(String(Math.round(c.info.altimeterInHg * 33.8639)))}` : `Altimeter ${digitsSpoken(String(Math.round(c.info.altimeterInHg * 100)))}`) : 'Roger';
       default:
         return 'Roger';
     }

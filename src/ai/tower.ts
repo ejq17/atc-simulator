@@ -485,7 +485,7 @@ export function createTowerAgent(): Agent {
         plans.push({
           key: `${ac.id}:info`, aircraftId: ac.id, callsign: ac.callsign, priority: 88, once: true,
           cmds: [mkCmd('AIRPORT_INFO', ac, { info: { ...(w.windSpeedKt === 0 ? { calm: true } : { windSpeedKt: w.windSpeedKt, ...(magDir !== undefined ? { windDirDeg: magDir } : {}) }), altimeterInHg: Math.round(w.altimeterInHg * 100) / 100 } })],
-          phrase: say.airportInfo(ac, magDir, w.windSpeedKt, w.altimeterInHg), summary: `${ac.callsign} wind and altimeter`,
+          phrase: say.airportInfo(ac, magDir, w.windSpeedKt, w.altimeterInHg, state.airport.altimeterUnit), summary: `${ac.callsign} wind and altimeter`,
         });
         continue;
       }

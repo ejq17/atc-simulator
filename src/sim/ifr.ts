@@ -11,7 +11,7 @@
  *                          airport) contains the bearing to the first fix of the filed route, else the first DEP frequency, else APP
  *   squawk                 the command (validated), else a seeded random 4-digit octal code not in use
  */
-import type { Aircraft, Airport, IfrClearanceDetails, ParsedCommand, SimulationState } from './types';
+import type { Aircraft, Airport, InstrumentProcedure, IfrClearanceDetails, ParsedCommand, SimulationState } from './types';
 import type { SimContext } from './context';
 import { rngInt } from './rng';
 import { frequencyForPosition } from '../radio/frequencies';
@@ -24,8 +24,8 @@ import { spokenAirportName } from '../radio/spoken';
 export const DEFAULT_INITIAL_ALTITUDE_FT = 2000;
 
 /** The altitude a clearance says to maintain: the departure procedure's own (`maintainAltitudeFt`, KMHT: 3000), else the default. */
-export function defaultInitialAltitudeFt(airport: Airport): number {
-  return airport.procedures.find((p) => p.type === 'DP')?.maintainAltitudeFt ?? DEFAULT_INITIAL_ALTITUDE_FT;
+export function defaultInitialAltitudeFt(airport: Airport, o: { runwayEnd?: string; key?: string } = {}): number {
+  return departureProcedureFor(airport, o)?.maintainAltitudeFt ?? DEFAULT_INITIAL_ALTITUDE_FT;
 }
 export const RESERVED_SQUAWKS: ReadonlySet<string> = new Set(['0000', '1200', '7500', '7600', '7700']);
 
@@ -53,10 +53,39 @@ export function assignSquawk(ctx: SimContext, exceptId?: string): string {
   return '2000';
 }
 
+const SID_LETTERS: Record<string, string> = { F: 'FOXTROT', G: 'GOLF', J: 'JULIET', K: 'KILO', H: 'HOTEL', X: 'X-RAY', Y: 'YANKEE', Z: 'ZULU' };
+const SID_DIGITS = ['ZERO', 'ONE', 'TWO', 'THREE', 'FOUR', 'FIVE', 'SIX', 'SEVEN', 'EIGHT', 'NINE'];
+
+/** UK SID designator in words: "MODMI 1J DEPARTURE (SID)" -> "MODMI ONE JULIET" (the name is spoken with its number and letter, CAP 413). */
+export function spokenSidName(chartName: string, airport?: Pick<Airport, 'navaids'>): string {
+  const base = chartName.replace(/\(.*?\)/g, '').replace(/\s+(DEPARTURE|DEP)\s*$/i, '').trim();
+  // a SID named after a navaid ident (CPT, BPK, DET) is spoken with the navaid's name ("Compton", "Brookmans Park")
+  const first = base.split(' ')[0];
+  const nav = airport?.navaids.find((n) => n.id === first && n.name && n.type !== 'FIX' && n.type !== 'LOC' && n.type !== 'ILS' && n.type !== 'DME');
+  const named = nav ? base.replace(first, nav.name!) : base;
+  return named.replace(/\b(\d)([A-Z])\b/, (_m, d: string, l: string) => `${SID_DIGITS[Number(d)]} ${SID_LETTERS[l] ?? l}`);
+}
+
+/**
+ * The departure procedure a clearance names. Airports with one DP (KACY, KMHT): that one. Airports whose DPs each serve one runway end (EGLL SIDs,
+ * `InstrumentProcedure.runwayEnd`): one of the SIDs of the departure runway, chosen by a stable hash of `key` (DESIGN VALUE: the AIP gives no
+ * destination-to-SID table here, so the family is not tied to the route).
+ */
+export function departureProcedureFor(airport: Pick<Airport, 'procedures'>, o: { runwayEnd?: string; key?: string } = {}): InstrumentProcedure | undefined {
+  const dps = airport.procedures.filter((p) => p.type === 'DP');
+  const byRunway = o.runwayEnd ? dps.filter((p) => p.runwayEnd === o.runwayEnd) : [];
+  const pool = byRunway.length ? byRunway : dps;
+  if (pool.length <= 1) return pool[0];
+  let h = 0;
+  for (const ch of o.key ?? '') h = (h * 31 + ch.charCodeAt(0)) >>> 0;
+  return pool[h % pool.length];
+}
+
 /** "ATLANTIC CITY THREE DEPARTURE" -> "ATLANTIC CITY THREE". */
-export function departureProcedureName(airport: Airport): string | undefined {
-  const dp = airport.procedures.find((p) => p.type === 'DP');
-  return dp ? dp.name.replace(/\s+(DEPARTURE|DEP)\s*$/i, '').trim() : undefined;
+export function departureProcedureName(airport: Airport, o: { runwayEnd?: string; key?: string } = {}): string | undefined {
+  const dp = departureProcedureFor(airport, o);
+  if (!dp) return undefined;
+  return dp.runwayEnd ? spokenSidName(dp.name, airport) : dp.name.replace(/\s+(DEPARTURE|DEP)\s*$/i, '').trim();
 }
 
 const stripK = (icao: string) => icao.trim().toUpperCase().replace(/^K(?=[A-Z0-9]{3}$)/, '');
@@ -97,8 +126,11 @@ export function buildIfrClearance(ctx: SimContext, ac: Aircraft, given: ParsedCo
   if (p.destination && !sameAirportId(p.destination, fp.destination)) {
     return { ok: false, reason: `${ac.callsign} filed to ${fp.destination}; the clearance limit ${p.destination} does not match the flight plan.`, pilot: `we filed to ${spokenAirportName(fp.destination)}` };
   }
-  const dpName = departureProcedureName(airport);
-  if (p.departureProcedure && dpName && !dpName.toUpperCase().includes(p.departureProcedure.toUpperCase().replace(/\s+DEPARTURE\s*$/, '').trim())) {
+  const depKey = { runwayEnd: ctx.state.activeRunways.departing[0], key: ac.callsign };
+  const dpName = departureProcedureName(airport, depKey);
+  const allDpNames = airport.procedures.filter((x) => x.type === 'DP').map((x) => (x.runwayEnd ? spokenSidName(x.name, airport) : x.name.replace(/\s+(DEPARTURE|DEP)\s*$/i, '').trim()).toUpperCase());
+  const named = p.departureProcedure?.toUpperCase().replace(/\s+DEPARTURE\s*$/, '').trim();
+  if (p.departureProcedure && dpName && !(allDpNames.length > 1 ? allDpNames.some((n) => n === named) : dpName.toUpperCase().includes(named!))) {
     return { ok: false, reason: `Unknown departure procedure "${p.departureProcedure}" (this airport has ${dpName}).`, pilot: `we don't have that departure procedure` };
   }
   if (p.initialAltitudeFt !== undefined && !(p.initialAltitudeFt >= airport.elevationFt + 500 && p.initialAltitudeFt <= 18000)) {
@@ -114,12 +146,12 @@ export function buildIfrClearance(ctx: SimContext, ac: Aircraft, given: ParsedCo
   const depFreq = p.departureFrequencyMhz ?? departureFrequencyFor(airport, fp.route)?.mhz ?? frequencyForPosition(airport, 'TWR')?.mhz;
   if (depFreq === undefined) return { ok: false, reason: `${airport.icao} has no departure frequency to assign.`, pilot: 'say again the departure frequency', sayAgain: true };
 
-  const dp = dpName;
+  const dp = p.departureProcedure && allDpNames.length > 1 ? p.departureProcedure.replace(/\s+DEPARTURE\s*$/i, '').trim() : dpName;
   const ifr: IfrClearanceDetails = {
     destination: fp.destination,
     routeText: dp ? `${dp} departure, radar vectors, then as filed` : 'as filed',
     departureProcedure: dp,
-    initialAltitudeFt: p.initialAltitudeFt ?? defaultInitialAltitudeFt(airport),
+    initialAltitudeFt: p.initialAltitudeFt ?? defaultInitialAltitudeFt(airport, depKey),
     expectAltitudeFt: p.expectAltitudeFt ?? fp.cruiseAltitudeFt,
     departureFrequencyMhz: depFreq,
     squawk,

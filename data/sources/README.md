@@ -466,3 +466,107 @@ Airlines: those phl.org lists on `https://www.phl.org/about/airlines` (copy `raw
 ## Raw files (`raw/`, not committed)
 
 `kphl_dtpp_2610_pdfs/` (38 PDFs), `kphl_dtpp_2610_txt/`, `kphl_dtpp_http_head_checks.tsv`, `overpass_kphl_raw.json`, `kphl_runway_config/` (noise_office.html, nem2010_part1.pdf and its text, FAA ROA), `kphl_traffic/` (phl.org airlines and cargo pages).
+
+# EGLL (London Heathrow) - hand-transcribed from the UK AIP
+
+First airport outside the US. There is no FAA data and no machine-readable AIP licence, so the source files were **transcribed by hand from the UK AIP** (a script only extracted the text of
+the eAIP pages and PDFs, and converted DMS coordinates to decimals; a person read the text and entered every value). Every field names its AIP section in a `*_source` or `note` field; fields with
+no AIP equivalent are `null` with a note. Retrieved **2026-10-21**, then `npx tsx scripts/build-airport.ts EGLL`.
+
+**Cycle:** UK AIP **AIRAC 10/2026, effective 01 OCT 2026** (GEN 0.2: amendment 10/2026 published 20 AUG 2026), next AIRAC 11/2026 effective 29 OCT 2026 (the offline index also lists 12/2026 on 26 NOV 2026).
+Chart footers show AERO INFO dates between 05 NOV 25 and 20 APR 26 (the date of each chart's last change).
+
+## Downloads (all HTTP 200, 2026-10-21)
+
+| What | URL | Size / note |
+|---|---|---|
+| AIP index page (links to the current AIP, amendments, HTML and PDF downloads) | `https://nats-uk.ead-it.com/cms-nats/opencms/en/Publications/AIP/` | 20,010 bytes, saved `raw/egll/aip_index.html`; footer "(c) Copyright NATS Limited 2026" |
+| eAIP front frameset (online version, dynamic path per AIRAC) | `https://www.aurora.nats.co.uk/htmlAIP/Publications/2026-10-01-AIRAC/html/index-en-GB.html` | |
+| AD 2.EGLL | `.../2026-10-01-AIRAC/html/eAIP/EG-AD-2.EGLL-en-GB.html` | 739,746 bytes, `raw/egll/EG-AD-2.EGLL-en-GB.html` (+ `.txt` extracts) |
+| GEN 0.1 (preface: publishing authority, terms), GEN 0.2 (record of amendments), GEN 1.7, GEN 2.2, GEN 3.5 (meteorology: QNH Q-group, ATIS) | `.../eAIP/EG-GEN-0.1-en-GB.html`, `-0.2`, `-1.7`, `-2.2`, `-3.5` | `raw/egll/` |
+| ENR 4.1 (radio navigation aids - en-route), ENR 4.4 | `.../eAIP/EG-ENR-4.1-en-GB.html`, `EG-ENR-4.4-en-GB.html` | cross-check of OCK / BIG / LAM / BNN / LON |
+| 62 chart PDFs AD 2-EGLL-2-1 ... 8-13 (links in AD 2.24) | `https://www.aurora.nats.co.uk/htmlAIP/Publications/2026-10-01-AIRAC/graphics/<id>.pdf` | each HTTP 200 `application/pdf`, sizes in `raw/egll/pdf_http_checks.tsv`, saved `raw/egll_aip_pdfs/` (git-ignored, for reading only) |
+| NATS terms and conditions | `https://nats-uk.ead-it.com/cms-nats/opencms/en/agb/` | `raw/egll/nats_terms.txt` |
+| Heathrow runway alternation page and 2026 programme PDF | `https://www.heathrow.com/company/local-community/noise/operations/runway-alternation`, `.../Heathrow_Runway_Alternation_Programme_2026.pdf` | operator publication, 177,157 bytes |
+| Heathrow airline list | `https://www.heathrow.com/airline-contact-info` | ~90 airlines |
+| CAP 413 Radiotelephony Manual Edition 24 (1 July 2026) | `https://www.caa.co.uk/publication/download/18165` | 2,989,016 bytes, `raw/cap413/`; the URL given in the task (`.../download/13339`) now serves another document |
+| OpenStreetMap (Overpass) | `https://overpass-api.de/api/interpreter` | 903,015 bytes, `raw/overpass_egll_raw.json`, base timestamp 2026-10-22T01:17:10Z |
+| AWC check | `https://aviationweather.gov/api/data/metar?ids=EGLL&format=json` | returned `METAR EGLL 220050Z AUTO 20008KT 9999 -RA FEW048 10/07 Q1007` |
+
+## Licence and what is bundled
+
+* AIP index page footer: **"(c) Copyright NATS Limited 2026"**. GEN 0.1 para 3.1: "AIS make Aeronautical Information Products (excl VFR Charts) freely available on the internet". GEN 0.1 para 5
+  (UK Aeronautical Information Product Terms and Conditions): NATS "cannot guarantee the accuracy or completeness of content" and "accepts no liability for your use of UK Aeronautical Information Products";
+  para 5.5: "Every data user is liable for any damages caused by any modification made by it to the data". The NATS terms page: by using any UK Aeronautical Information Products "you agree and accept to be bound by
+  these Website Terms and Conditions", "© Copyright NATS Limited 2021".
+* No licence granting redistribution was found (no Open Government Licence statement on the eAIP pages or the terms). **Conclusion:** the chart PDFs are **linked, not bundled**: the chart index
+  (`src/charts/chartIndex.ts`) lists the official URLs with `linkOnly: true`, `isOfficialFaa: false`; the chart viewer shows the links (`LinkOnlyCharts.tsx`); `scripts/fetch-charts.ts` skips EGLL;
+  nothing is proxied or cached. The facts transcribed from the AIP (frequencies, coordinates, procedure data) are kept with attribution in these files and in every `provenance` entry; the PDFs and the
+  eAIP pages themselves are not committed (`data/sources/raw/` is git-ignored). The simulator is not an Aeronautical Information Product and does not claim to be one. The cycle-specific URLs
+  expire with the AIRAC (29 OCT 2026); the chart panel says so and links the AIP index page.
+* The operator pages (heathrow.com) carry no stated licence either; only short facts are used (runway alternation rule and table, airline names), each with its URL.
+
+## Files
+
+| File | What | Source |
+|---|---|---|
+| `egll-facility.json` | ARP, elevation 83 ft, variation 1.23 E (2027, annual change 0.17 E), Class D (AD 2.17), runways 09L/27R and 09R/27L (AD 2.12: bearings, dimensions, thresholds, elevations; AD 2.13 declared distances incl. intersection take-offs; AD 2.14 lighting, PAPI MEHT), ILS per end, `runway_configurations`, `alternation_programme_2026`, `noise_and_operating_rules`, remarks, unverified list | AD 2.2, 2.12-2.15, 2.17, 2.19-2.22; operator alternation programme |
+| `egll-frequencies.json` | Heathrow Delivery / Ground / Tower / Director / Radar / Information / Fire, London Control per SID chart | AD 2.18, SID chart headers |
+| `egll-navaids.json` | LON, OCK, BIG, LAM, BNN, DET, MID, SAM, CPT, BPK, EPM, CHT, WOD, BUR; four ILS/DME (localizer, glidepath, DME antenna coordinates); 42 fixes: 34 STAR waypoints from the coding tables + 8 DERIVED ILS DME fixes | AD 2.19, ENR 4.1, AD 2-EGLL-7-13..7-17, SID charts |
+| `egll-procedures.json` | chart list with URLs and HTTP checks; 12 approach charts (the four ILS/DME transcribed: OCA, RDH, FAP, missed approach verbatim and simplified); aerodrome chart identifiers and hot spots HS1-HS5; 24 SIDs (NPR route text from AD 2.21, cap 6000 ft); 18 RNAV STARs transcribed from the coding tables (`sim_entry_fixes` are DESIGN VALUES) | AD 2.24 charts, AD 2.21, 2.22 |
+| `egll-plate-geometry.json` | GS 3 deg, RDH (the UK plates print the ILS reference datum height where FAA plates print TCH) and missed approach of the four ILS plates | plates 8-1, 8-4, 8-7, 8-10 |
+| `egll-holding-patterns.json` | missed-approach holds CHT / EPM (AD 2.22 para 2) and the four terminal holds (hold coding tables 7-18, 7-19), attached to each ILS entry | AD 2.22, 7-18/7-19 |
+| `egll-stands.json` | stand numbers read from the four stand charts (T5 2-4, T4 and cargo 2-5, T3 2-6, T2 2-7) | AD 2-EGLL-2-4..2-7 |
+| `egll-taxiways.geojson` | OSM aeroway features within **3000 m** of the ARP (1,457: 415 taxiway ways, 371 parking_position, 288 holding_position nodes, 148 gates, 38 aprons ...) | Overpass; **ODbL 1.0, (c) OpenStreetMap contributors**: attribution required, the derived layer is share-alike |
+
+Overpass query: `[out:json][timeout:180];nwr["aeroway"~"^(runway|taxiway|apron|parking_position|holding_position|helipad|terminal|gate|taxilane|aerodrome|hangar|stopway|navigationaid|windsock)$"](around:3000,51.4775,-0.46138889);out geom;` (User-Agent sent).
+
+## Key facts and how each was read
+
+* **Runways (AD 2.12, 2.13).** 09L/27R 3901 x 50 m, asphalt grooved, PCR 1020/R/A/W; 09R/27L 3658 x 50 m, PCR 820/R/A/W. True bearings 089.67 / 269.71 and 089.68 / 269.72; the charts print 088 / 268 magnetic.
+  TORA/TODA/ASDA/LDA: 09L 3901/3901/3901/3592 (displaced 309 m), 27R 3882/3960/3882/3882, 09R 3658/3658/3658/3350 (displaced 308 m), 27L 3658 all. **The AIP threshold coordinates of 09L and 09R are the displaced
+  landing thresholds** (checked: the distance 09L THR - 27R THR is 3592.5 m = the 09L LDA; 09R THR - 27L THR 3350.6 m = the 09R LDA). The simulator wants the pavement end in `threshold`, so the pavement ends are
+  **DERIVED**: the AIP threshold moved back 309 / 308 m along the reciprocal bearing (`threshold.note` says so). The 19 m by which 27R's declared distances are shorter than the pavement is unexplained in the AIP.
+* **ILS (AD 2.19).** I-AA 09L and I-RR 27R 110.300 (DME 40X), I-BB 09R and I-LL 27L 109.500 (DME 32X), all CAT III, 3 deg, RDH 51 / 58 / 50 / 56 ft. The ILS DME reads zero at the landing threshold (AD 2.19 remark);
+  the course in degrees is DERIVED (true bearing - 1.23 = 88.44 etc.; the plates print the rounded 088 / 268).
+* **Derived DME fixes** (`AAIF`/`AAFAP`, `BBIF`/`BBFAP`, `LLIF`/`LLFAP`, `RRIF`/`RRFAP`): IF = D10 ("to be established on the localiser by I-xx D10", initial approach charts 7-20..7-26), FAF = D7.5 (the plate's FAP). The AIP names no
+  waypoints on the ILS final; the simulator's on-course logic needs named fixes. Positions: D10 / D7.5 from the landing threshold along the reciprocal of the true bearing. **Check:** the distance of each D7.5 point to LON agrees
+  with the "LON D8.2 / 8.8" printed on the plates within 0.05 NM, and D4 with "LON D4.7 / 4.8 / 5.4 / 5.3" (`egll.test.ts`).
+* **Frequencies (AD 2.18).** Delivery 121.980; Ground 121.705 (alternates 121.855, 121.905); Tower 118.505 (118.705, 124.480); Director 119.730 (120.400, 127.525, 134.980 "when instructed by ATC"); Radar 125.625;
+  ATIS "Heathrow Information" 128.080 (also on Bovingdon VOR 113.750 and Seaford VOR 117.000), departure ATIS 121.935. Departures go to London Control (134.125, 133.180, 118.825, 119.780, 120.530 by SID chart).
+* **Airspace (AD 2.17).** LONDON CTR and CTA/C are **Class D** (SFC to 2500 ft AL, transition altitude 6000 ft, ATS unit "HEATHROW RADAR"), not Class A.
+* **Navaids.** AD 2.19 lists LON, OCK, BIG, LAM, BNN as VOR/DME, ENR 4.1 lists them as DME with "No associated En-route VOR", and the SID charts say "LON VOR N/A, BIG VOR N/A" (RNAV substitution). Both are recorded; the type
+  follows AD 2.19.
+* **STARs.** 18 RNAV1/RNAV5 STARs (OTMET 1H, ROXOG 1H, ALESO 1H, LAM 1X, TANET 1Z, OCK 1Z, NUGRA 2H, LAM 1Z, HON 2H, BARMI 1H, LOGAN 2H, TOBID 1X, HAZEL 1H, BIG 1Z, LAM 1Y, FITBO 2H, SIRIC 1H, SIRIC 1Z), each ending at
+  one of the four holds (OCK, BIG, LAM, BNN). Coordinates, tracks, distances, level and speed constraints are the coding-table values (text layer, parsed by script and cross-checked by `egll.test.ts`: every leg within 1 NM and
+  2.5 deg of the great-circle values). Level depiction: a bare level in the table is an AT level (both bars checked on charts 7-1 and 7-8); the stack fix level FL070 is the minimum holding level (AT OR ABOVE). Only these two
+  charts were checked at the bar level; the rest follow the same convention (UNVERIFIED per chart).
+* **SIDs.** Six charts x four runway directions (AD 2-EGLL-6-1..6-6): CPT 5J/4K/3F/3G, MODMI 1J/1K and MAXIT 1F/1G, BPK 6J/5K/7F/7G, ULTIB 1J/1K and UMLAT 1F/1G, DET 1J/1K/2F/2G, GASGU 2J/2K and GOGSI 2F/2G. Route text is
+  AD 2.21 sub-para 8 (noise preferential routes). `maintain_altitude_ft` 6000 is the cap printed on every chart ("Due to interaction with other routes do not climb above 6000 until cleared by ATC"); the AIP prints no "initial climb
+  altitude". The simulator flies runway heading then vectors; the SID is only named in the clearance (hash of the callsign among the SIDs of the departure runway: DESIGN VALUE).
+* **Runway configurations.** `W-ALT-27R`, `W-ALT-27L` (land one runway, depart the other; max tailwind 5 kt, AD 2.20 para 6), `E-SEG-09L` (land 09L, depart 09R). Alternation, Cranford ("has now ended" but alternation on easterly
+  operations needs infrastructure works first) and TEAM are from the operator page, not the AIP. The weekly rule was checked against all 52 rows of the 2026 table (0 exceptions).
+* **Stands.** OSM `parking_position` ways with a three-digit ref that appears on the AIP stand charts (195 stands: 183 airline in Terminals 2-5, 12 cargo). MARS L/R variants, unnumbered ways and stands 611-613, 703, 704 (not on the charts)
+  are not used. Gates (OSM `gate` nodes) sit inside the terminals and are not used. The terminal of a stand follows the chart it is on.
+* **Taxiways.** The 18 main taxiways exist in OSM as "Taxiway X" (profile maps to "X"); see `scripts/data/egll-diagram-comparison.md`. Identifiers with a suffix letter (A9E ...) and "Link nn" stubs are not named (the command
+  parser takes a letter and up to two digits); numbered exits that exist in OSM (A1-A13, N1 ...) are named.
+* **Hot spots.** HS1/HS2 (lookout, wing tip clearance), HS3 (Link 28 east of Taxiway Alpha not Code F compliant), HS4 (clearance to enter the runway before crossing the holding point), HS5 (mis-route after vacating): text of the aerodrome chart, no position.
+* **Weather.** GEN 3.5 para 3.8.10: QNH in whole hPa, Q group; metres visibility; METAR example in this repo's test is the AWC record retrieved 2026-10-22.
+* **Traffic.** Airlines: heathrow.com list (British Airways dominant). BA aircraft: BA "Fleet facts" page (A319, A320/A320neo, A321/A321neo, A350-1000, A380-800, 777-200/-300, 787-8/-9/-10, E190 not generated). Virgin
+  Atlantic: its 2024 fleet press release (A330-900, A350-1000, 787-9). Other carriers' types, all weights and destinations: ESTIMATE / DESIGN VALUE. Telephony (Speedbird, Virgin, Shamrock, Lufthansa, Emirates, American, Delta, United):
+  ICAO Doc 8585 words present in FAA JO 7340.2P chapter 3 (checked by search of the page text, retrieved 2026-10-21).
+
+## Not verified (EGLL)
+
+* The 2026 magnetic variation (the AIP prints the 2027 value); the PAPI threshold crossing height (only MEHT is published, `threshold_crossing_height_ft` is null); the ATIS phone number; UHF frequencies.
+* The 19 m difference of 27R; the exact pavement ends of 09L and 09R (derived).
+* STAR level-bar depiction beyond charts 7-1 and 7-8; the SID altitude constraints beyond the route text (the CPT, MODMI and MAXIT tables were read from renders, the others use AD 2.21 text); LOC/DME and RNP charts (listed, not read).
+* Whether the VORs of LON / OCK / BIG / LAM / BNN are in service (AD 2.19 versus ENR 4.1 versus SID charts).
+* OSM: positional accuracy, completeness of stand numbers, whether any OSM taxiway differs from the chart; 7 stands have connectors over 150 m (flagged in the build report); one hold (HP9R-27L-U-1, an unnamed exit)
+  fails the hold-path check and is downgraded to a warning (`relaxedChecks.holdPath`).
+* Aircraft types of carriers other than BA and Virgin; airline weights; destinations.
+* The CAP 413 Supplementary Instructions issued after Edition 24 were not applied.
+
+## Raw files (`raw/`, not committed)
+
+`egll/` (eAIP pages, text extracts, pdf_http_checks.tsv, terms, runway alternation page and PDF), `egll_aip_pdfs/` (62 chart PDFs), `overpass_egll_raw.json`, `cap413/` (CAP 413 Edition 24 PDF and text).

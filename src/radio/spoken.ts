@@ -107,6 +107,7 @@ const AIRLINES: Record<string, string> = {
   EJA: 'Executive Jet', LXJ: 'Flexjet', EDV: 'Endeavor', JIA: 'Blue Streak', BAW: 'Speedbird', ACA: 'Air Canada',
   MXY: 'Moxy', PDT: 'Piedmont', GJS: 'Lindbergh', WIG: 'Wiggins', SCX: 'Sun Country',
   KAP: 'Cair', DLH: 'Lufthansa', AFR: 'Airfrans', EIN: 'Shamrock',
+  VIR: 'Virgin', UAE: 'Emirates',
 };
 
 const GA_PREFIX: Record<string, string> = {
@@ -193,6 +194,7 @@ const AIRPORT_CITIES: Record<string, string> = {
   KOWD: 'Norwood', KPYM: 'Plymouth', KORH: 'Worcester', KHYA: 'Hyannis', KPVC: 'Provincetown', EGLL: 'London Heathrow', EDDF: 'Frankfurt', LFPG: 'Paris', EIDW: 'Dublin',
   KDFW: 'Dallas Fort Worth', KDEN: 'Denver', KSTL: 'St. Louis', KIAH: 'Houston', KSFO: 'San Francisco', KSEA: 'Seattle',
   KSLC: 'Salt Lake City', KLOM: 'Wings Field', KMQS: 'Coatesville', KOQN: 'Brandywine', KDYL: 'Doylestown', KPTW: 'Heritage Field',
+  EHAM: 'Amsterdam', LEMD: 'Madrid', OMDB: 'Dubai',
 };
 
 /** Spoken name of an airport for clearances: "KPHL" -> "Philadelphia"; unknown ids are spelled in phonetics. */

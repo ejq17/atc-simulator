@@ -1,0 +1,69 @@
+{
+ "_provenance": {
+  "source": "UK AIP ILS/DME plates AD 2-EGLL-8-1, 8-4, 8-7, 8-10 (AIRAC 10/2026), read from the text layer and render",
+  "retrieved": "2026-10-21",
+  "method": "Glidepath 3 deg, RDH and missed approach text read from each plate. UK plates print the ILS reference datum height (RDH) where FAA plates print TCH; the AIP AD 2.19 says \"3 deg ILS Ref Datum Hgt 51/50/56/58 FT\". LOC/DME and RNP charts not read.",
+  "terms": "tch_ft = RDH (ILS reference datum height at the threshold)."
+ },
+ "procedures": [
+  {
+   "chart_name": "ILS/DME I-AA RWY 09L",
+   "pdf_name": "EGLL_AD2.EGLL-8-1.pdf",
+   "glidepath": {
+    "kind": "GS",
+    "angle_deg": 3.0,
+    "tch_ft": 51
+   },
+   "missed_approach": {
+    "initial_climb_altitude_ft": 3000,
+    "final_altitude_ft": 3000,
+    "plate_text": "Climb to 3000 - straight ahead until passing 1580 or I-AA DME zero inbound whichever is later, then left onto track 035°. Continue as directed. RCF: On passing LON DME 10 proceed to NDB CHT at 3000."
+   },
+   "read_by": "pdf text layer (pdfjs-dist) and render of the UK AIP plate; tch_ft is the plate RDH (ILS reference datum height, AD 2.19 \"3 deg ILS Ref Datum Hgt\")"
+  },
+  {
+   "chart_name": "ILS/DME I-BB RWY 09R",
+   "pdf_name": "EGLL_AD2.EGLL-8-4.pdf",
+   "glidepath": {
+    "kind": "GS",
+    "angle_deg": 3.0,
+    "tch_ft": 50
+   },
+   "missed_approach": {
+    "final_altitude_ft": 3000,
+    "plate_text": "Climb straight ahead to 3000. Continue as directed. RADIO FAILURE: On passing LON DME 10 turn right to NDB EPM at 3000."
+   },
+   "read_by": "pdf text layer (pdfjs-dist) and render of the UK AIP plate; tch_ft is the plate RDH (ILS reference datum height, AD 2.19 \"3 deg ILS Ref Datum Hgt\")"
+  },
+  {
+   "chart_name": "ILS/DME I-LL RWY 27L",
+   "pdf_name": "EGLL_AD2.EGLL-8-7.pdf",
+   "glidepath": {
+    "kind": "GS",
+    "angle_deg": 3.0,
+    "tch_ft": 56
+   },
+   "missed_approach": {
+    "initial_climb_altitude_ft": 2000,
+    "final_altitude_ft": 3000,
+    "plate_text": "Climb to 2000 - straight ahead until passing 1080 or I-LL DME zero inbound whichever is later, then left onto track 146°. When established and passing LON DME 6 climb to 3000 without delay. Continue as directed. RCF: On reaching 3000 proceed to NDB EPM at 3000."
+   },
+   "read_by": "pdf text layer (pdfjs-dist) and render of the UK AIP plate; tch_ft is the plate RDH (ILS reference datum height, AD 2.19 \"3 deg ILS Ref Datum Hgt\")"
+  },
+  {
+   "chart_name": "ILS/DME I-RR RWY 27R",
+   "pdf_name": "EGLL_AD2.EGLL-8-10.pdf",
+   "glidepath": {
+    "kind": "GS",
+    "angle_deg": 3.0,
+    "tch_ft": 58
+   },
+   "missed_approach": {
+    "initial_climb_altitude_ft": 3000,
+    "final_altitude_ft": 3000,
+    "plate_text": "Climb to 3000 - straight ahead until passing 1580 or I-RR DME zero inbound whichever is later, then turn right onto track 315°. Continue as directed. RADIO FAILURE: On passing LON DME 10 turn right to NDB CHT at 3000."
+   },
+   "read_by": "pdf text layer (pdfjs-dist) and render of the UK AIP plate; tch_ft is the plate RDH (ILS reference datum height, AD 2.19 \"3 deg ILS Ref Datum Hgt\")"
+  }
+ ]
+}

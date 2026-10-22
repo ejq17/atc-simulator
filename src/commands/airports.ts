@@ -24,6 +24,8 @@ const NAMES: readonly (readonly [string, string])[] = [
   ['coatesville', 'KMQS'], ['brandywine', 'KOQN'], ['doylestown', 'KDYL'], ['heritage field', 'KPTW'], ['allentown', 'KABE'],
   ['tampa', 'KTPA'], ['fort myers', 'KRSW'], ['charleston', 'KCHS'], ['raleigh durham', 'KRDU'], ['raleigh', 'KRDU'],
   ['louisville', 'KSDF'], ['memphis', 'KMEM'],
+  ['heathrow', 'EGLL'], ['london heathrow', 'EGLL'], ['london', 'EGLL'], ['paris', 'LFPG'], ['paris charles de gaulle', 'LFPG'], ['amsterdam', 'EHAM'], ['frankfurt', 'EDDF'],
+  ['dublin', 'EIDW'], ['madrid', 'LEMD'], ['dubai', 'OMDB'],
   ['nashua', 'KASH'], ['concord', 'KCON'], ['portsmouth', 'KPSM'], ['portland', 'KPWM'], ['keene', 'KEEN'], ['laconia', 'KLCI'],
   ['detroit', 'KDTW'], ['miami', 'KMIA'],
   ['norwood', 'KOWD'], ['plymouth', 'KPYM'], ['worcester', 'KORH'], ['hyannis', 'KHYA'], ['provincetown', 'KPVC'],
@@ -37,5 +39,5 @@ export const AIRPORT_NAMES: readonly { words: readonly string[]; icao: string }[
 
 /** Three-letter FAA / IATA codes derived from the table (PHL, EWR ...), spoken as letters or typed. */
 export const FAA_CODES: ReadonlyMap<string, string> = new Map(
-  [...new Set(NAMES.map(([, icao]) => icao))].map((icao) => [icao.slice(1).toLowerCase(), icao]),
+  [...new Set(NAMES.map(([, icao]) => icao))].filter((icao) => icao.startsWith('K')).map((icao) => [icao.slice(1).toLowerCase(), icao]),
 );

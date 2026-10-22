@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { KeyboardEvent as ReactKeyboardEvent, PointerEvent as ReactPointerEvent } from 'react';
 import type { PDFDocumentProxy, PDFPageProxy, RenderTask } from 'pdfjs-dist';
-import { CYCLE, isCycleCurrent, listChartGroups, type ChartEntry } from './chartIndex';
+import { CYCLE, isCycleCurrent, isLinkOnly, listChartGroups, type ChartEntry } from './chartIndex';
+import { LinkOnlyCharts } from './LinkOnlyCharts';
 import { bundledChartUrl, ChartLoadError, DEFAULT_PROXY_BASE, destroyDoc, loadChartPdf, type ChartLoadVia } from './pdfLoader';
 import { MAX_SCALE, MIN_SCALE, ZOOM_STEP, clampScale, fitScale, formatPercent, renderScaleFor, type FitMode } from './viewMath';
 
@@ -31,7 +32,12 @@ function isCancel(err: unknown): boolean {
   return err instanceof Error && (err.name === 'RenderingCancelledException' || err.name === 'AbortError');
 }
 
-export function ChartViewer({ icao = 'KACY', initialChartId, onChartChange, proxyBase = DEFAULT_PROXY_BASE, className = '' }: ChartViewerProps) {
+/** FAA d-TPP charts are rendered in the app; airports whose charts are copyrighted (EGLL, UK AIP) only get the official links. */
+export function ChartViewer(props: ChartViewerProps) {
+  return isLinkOnly(props.icao ?? 'KACY') ? <LinkOnlyCharts icao={props.icao ?? 'KACY'} initialChartId={props.initialChartId} onChartChange={props.onChartChange} className={props.className} /> : <PdfChartViewer {...props} />;
+}
+
+function PdfChartViewer({ icao = 'KACY', initialChartId, onChartChange, proxyBase = DEFAULT_PROXY_BASE, className = '' }: ChartViewerProps) {
   const groups = useMemo(() => listChartGroups(icao), [icao]);
   const charts = useMemo(() => groups.flatMap((g) => g.charts), [groups]);
   const [selectedId, setSelectedId] = useState<string>(() => (charts.find((c) => c.id === initialChartId) ?? charts[0]).id);

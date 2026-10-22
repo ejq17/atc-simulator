@@ -95,6 +95,16 @@ export interface AirportProfile {
   slug: string;
   /** Text stored as airport.build.script and printed in the report ("scripts/build-kacy-airport.ts"). */
   buildCommand: string;
+  /**
+   * Integrity checks downgraded for an airport whose real layout cannot satisfy them (each use is documented in the airport's README section):
+   * `noGaFbo` - the airport has no GA ramp / FBO stands (EGLL: light aircraft are not permitted, AD 2.20 para 1); `holdPath` - a hold whose route to its
+   * runway entry crosses an edge outside the runway strip becomes a warning (EGLL rapid exits mapped along the centreline).
+   */
+  relaxedChecks?: { noGaFbo?: boolean; holdPath?: boolean; /** drop a parking lead-in vertex within 0.5 m of the lane foot point (a zero-length connector edge) */ dropTinyLeadIn?: boolean };
+  /** A junction between a runway entry and its hold distance gets a hold line on every branch that leads away from the runway, not only the steepest one (EGLL: routes use the other branches). */
+  holdAllBranches?: boolean;
+  /** Optional normaliser of an OSM `ref` tag before it is compared with `taxiwayIds` (EGLL: "Taxiway A" -> "A"); return null to leave the way unnamed. */
+  osmRef?(ref: string | null): string | null;
   /** Taxiway identifiers printed on the FAA airport diagram. OSM refs outside this set are kept as geometry but unnamed. */
   taxiwayIds: readonly string[];
   /** Airport-diagram PDF name used in provenance strings ("00669AD.PDF"). */

@@ -35,6 +35,7 @@ import { kmhtProfile } from './airports/kmht.ts';
 import { kbosProfile } from './airports/kbos.ts';
 import { kphlProfile } from './airports/kphl.ts';
 import { kpgdProfile } from './airports/kpgd.ts';
+import { egllProfile } from './airports/egll.ts';
 import type { AirportProfile, ApronRec, BuildingRec, ParkingCtx, ParkRec } from './airports/types.ts';
 import type {
   KacyAirport,
@@ -52,7 +53,7 @@ const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(HERE, '..');
 const SRC = path.join(ROOT, 'data/sources');
 
-const PROFILES: Record<string, AirportProfile> = { KACY: kacyProfile, KMHT: kmhtProfile, KBOS: kbosProfile, KPGD: kpgdProfile, KPHL: kphlProfile };
+const PROFILES: Record<string, AirportProfile> = { KACY: kacyProfile, KMHT: kmhtProfile, KBOS: kbosProfile, KPGD: kpgdProfile, KPHL: kphlProfile, EGLL: egllProfile };
 const requested = (process.argv[2] ?? '').toUpperCase();
 const profile = PROFILES[requested] ?? PROFILES[`K${requested}`];
 if (!profile) {
@@ -280,7 +281,7 @@ const wayIns = [...featsOf('taxiway'), ...(profile.includeTaxilanes ? featsOf('t
     return true;
   })
   .map((f: J) => {
-    let ref: string | null = f.properties.ref ?? null;
+    let ref: string | null = profile.osmRef ? profile.osmRef(f.properties.ref ?? null) : (f.properties.ref ?? null);
     if (ref && !FAA_DIAGRAM_IDS.includes(ref)) {
       // an OSM identifier that is not on the FAA diagram (OSM-only "I"): geometry kept, identifier excluded
       if (!excludedOsmRefs.includes(ref)) excludedOsmRefs.push(ref);
@@ -379,15 +380,23 @@ for (const rb of runwayBuilds) {
   for (const n of nodes) {
     const adj = buildAdjacency();
     const taxiNbrs = (adj.get(n) ?? []).filter((x) => x.ways.some((w) => w.kind === 'taxiway') && !x.ways.some((w) => w.kind === 'runway'));
-    for (const nb of taxiNbrs) {
+    // walks: one per taxiway edge at the runway node; with `holdAllBranches` a junction before the hold distance also spawns a walk along each further branch
+    const walks: { sp: number; sc: number; ways: PWay[]; len0: number }[] = taxiNbrs.map((x) => ({ sp: n, sc: x.other, ways: x.ways, len0: dist(pl.pos[n], pl.pos[x.other]) }));
+    for (let wi = 0; wi < walks.length; wi++) {
+      const nb = { other: walks[wi].sc, ways: walks[wi].ways };
       // walk away from the centreline along degree-2 nodes until the perpendicular distance reaches HOLD_M
-      let prev = n;
-      let cur = nb.other;
-      let pathLen = dist(pl.pos[prev], pl.pos[cur]);
+      let prev = walks[wi].sp;
+      let cur = walks[wi].sc;
+      let pathLen = walks[wi].len0;
       let found: { a: number; b: number; point: P; short: boolean } | null = null;
       let spur = false;
       const edgeWays = nb.ways;
       for (let guard = 0; guard < 200; guard++) {
+        if (pl.runwayNodes.get(rb.runway.id)!.has(cur)) {
+          // a mapped taxiway edge that joins two nodes of the same runway (a rapid exit digitised along the centreline before it curves away): not an entry of its own
+          spur = true;
+          break;
+        }
         const dCur = distToRunwayLine(rb, pl.pos[cur]);
         if (dCur >= HOLD_M) {
           // bisect on segment prev->cur
@@ -413,6 +422,7 @@ for (const rb of runwayBuilds) {
             .filter((c) => c.gain > 0.5)
             .sort((p, q) => q.gain - p.gain);
           if (away.length) {
+            if (profile.holdAllBranches) for (const extra of away.slice(1)) walks.push({ sp: cur, sc: extra.x.other, ways: extra.x.ways, len0: pathLen + dist(pl.pos[cur], pl.pos[extra.x.other]) });
             pathLen += dist(pl.pos[cur], pl.pos[away[0].x.other]);
             prev = cur;
             cur = away[0].x.other;
@@ -428,8 +438,8 @@ for (const rb of runwayBuilds) {
           // short stub: junction/dead end reached before 250 ft; put the hold at 60% of the way
           const target = pathLen * 0.6;
           // locate target along the walked path (re-walk)
-          let w2prev = n;
-          let w2cur = nb.other;
+          let w2prev = walks[wi].sp;
+          let w2cur = walks[wi].sc;
           let acc = 0;
           for (let g2 = 0; g2 < 200; g2++) {
             const seg = dist(pl.pos[w2prev], pl.pos[w2cur]);
@@ -618,6 +628,12 @@ function connectParking(rec: ParkRec, maxM: number): void {
     }
   }
   const laneNode = nodeAt(np!);
+  // a lead-in vertex that lands within 0.5 m of the lane foot point would make a zero-length connector edge (the build's hard limit): it is dropped
+  while (profile.relaxedChecks?.dropTinyLeadIn && chain.length > 0 && dist(pl.pos[laneNode], pl.pos[chain[0]]) < 0.5) {
+    const dead = chain.shift()!;
+    pl.alive[dead] = false;
+    apronNodeSet.delete(dead);
+  }
   const seq = [laneNode, ...chain, stopNode];
   if (rec.leadIn.length === 1) {
     // synthetic: straight connector from the foot point
@@ -1095,6 +1111,7 @@ for (const d of procSrc.departure_procedures as J[]) {
     type: 'DP',
     chartPdfUrl: d.pdf.url,
     ...(d.maintain_altitude_ft !== undefined ? { maintainAltitudeFt: d.maintain_altitude_ft as number } : {}),
+    ...(typeof d.runway === 'string' ? { runwayEnd: endId(d.runway) } : {}), // SIDs of a multi-runway airport serve one runway end each (EGLL)
     provenance: dtppProv(d.pdf.url, `${d.type as string}; printed ${d.printed_date as string}; ${d.note as string}`),
   });
 }
@@ -1226,6 +1243,7 @@ const airport: KacyAirport = {
   towerHours: facility.tower?.tower_hours,
   // `airspace.class` ("B" | "C" | "D" | ...) when the facility file gives it; else the legacy NASR class_c flag
   airspaceClass: (facility.airspace?.class as Airport['airspaceClass'] | undefined) ?? (facility.airspace?.class_c ? 'C' : undefined),
+  ...(facility.airport.altimeter_unit === 'hPa' ? { altimeterUnit: 'hPa' as const } : {}),
   ...(typeof facility.airport.time_zone === 'string' ? { timeZone: facility.airport.time_zone as string } : {}),
   ...(runwayConfigurations.length ? { runwayConfigurations } : {}),
   provenance: [
@@ -1335,7 +1353,7 @@ if (mva) {
     for (let x = entryId; ok && x !== h.id; x = prev.get(x)!.from) ok = prev.get(x)!.e!.onRunwayId === h.runwayId;
     if (!ok) badHold.push(h.id);
   }
-  check('every holding position -> entry-node path has onRunwayId === the hold runway', badHold.length === 0, badHold.join(', '));
+  check('every holding position -> entry-node path has onRunwayId === the hold runway', badHold.length === 0, badHold.join(', '), !profile.relaxedChecks?.holdPath);
   const unmarked = edges.filter((e) => (e.kind === 'taxiway' || e.kind === 'unnamed') && !e.onRunwayId && runways.some((r) => pointInPolygon({ x: (nodes[e.from].pos.x + nodes[e.to].pos.x) / 2, y: (nodes[e.from].pos.y + nodes[e.to].pos.y) / 2 }, r.polygon as P[])));
   check('no taxi edge with its midpoint inside a runway polygon lacks onRunwayId', unmarked.length === 0, unmarked.map((e) => e.id).join(', '));
   const rwKindEnd = edges.filter((e) => (e.kind === 'taxiway' || e.kind === 'unnamed') && !e.onRunwayId && (nodes[e.from].kind === 'runway' || nodes[e.to].kind === 'runway'));
@@ -1383,8 +1401,10 @@ const gatesOk = parking.filter((p) => p.category === 'airline' && p.nodeId && !p
 const gaOk = parking.filter((p) => p.category === 'ga' && p.nodeId && !p.connectorOverLimit).length;
 const fboOk = parking.filter((p) => p.category === 'fbo' && p.nodeId && !p.connectorOverLimit).length;
 check('at least 5 airline gates usable', gatesOk >= 5, `${gatesOk}`);
-check('at least 3 GA ramp spots usable', gaOk >= 3, `${gaOk}`);
-check('at least 1 FBO spot usable', fboOk >= 1, `${fboOk}`);
+if (!profile.relaxedChecks?.noGaFbo) {
+  check('at least 3 GA ramp spots usable', gaOk >= 3, `${gaOk}`);
+  check('at least 1 FBO spot usable', fboOk >= 1, `${fboOk}`);
+}
 const parkFlag = parking.filter((p) => p.connectorOverLimit);
 check(`parking connectors <= ${CONFIG.parkingConnectMaxM} m`, parkFlag.length === 0, `flagged: ${parkFlag.map((p) => `${p.id} (${p.connectorLengthM} m)`).join(', ')}`, false);
 const missingIds = FAA_DIAGRAM_IDS.filter((id) => !taxiwayPolylines[id]);
@@ -1428,7 +1448,7 @@ R.push(`# ${profile.icao} airport build report`);
 R.push('');
 R.push(`Generated by \`${profile.buildCommand}\` (deterministic; do not edit by hand).`);
 R.push('');
-R.push(`- FAA data: NASR cycle ${NASR_FROM}, d-TPP cycle ${procSrc._provenance.cycle as string} (${DTPP_FROM} to ${DTPP_TO}); retrieved ${RETRIEVED}.`);
+R.push(`- ${CUSTOM_FACILITY_SOURCE ? `Source data: ${FACILITY_SOURCE_NAME}; procedures cycle ${procSrc._provenance.cycle as string}` : `FAA data: NASR cycle ${NASR_FROM}, d-TPP cycle ${procSrc._provenance.cycle as string}`} (${DTPP_FROM} to ${DTPP_TO}); retrieved ${RETRIEVED}.`);
 R.push(`- OSM base timestamp ${osm.properties.osm_base_timestamp as string}. ${OSM_ATTR}. The OSM-derived taxiway/apron layer is an ODbL derivative and must carry the attribution.`);
 R.push(`- ARP ${arp.lat}, ${arp.lon}; field elevation ${airport.elevationFt} ft; magnetic variation ${magVar} (east-positive; ${facility.airport.magnetic_variation.deg as number} ${facility.airport.magnetic_variation.hemisphere as string}, epoch ${facility.airport.magnetic_variation.epoch_year as string} per NASR).`);
 R.push('');

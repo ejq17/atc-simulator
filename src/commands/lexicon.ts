@@ -33,7 +33,7 @@ export const AIRLINES = rec({
   jetblue: 'JBU', frontier: 'FFT', fedex: 'FDX', ups: 'UPS', allegiant: 'AAY',
   breeze: 'MXY', republic: 'RPA', envoy: 'ENY', skywest: 'SKW', piedmont: 'PDT',
   psa: 'JIA', endeavor: 'EDV', mesa: 'ASH', alaska: 'ASA',
-  cair: 'KAP', speedbird: 'BAW', lufthansa: 'DLH', airfrans: 'AFR', shamrock: 'EIN',
+  cair: 'KAP', speedbird: 'BAW', lufthansa: 'DLH', airfrans: 'AFR', shamrock: 'EIN', virgin: 'VIR', emirates: 'UAE', // UK / ICAO Doc 8585 telephony (FAA JO 7340.2P ch. 3)
   moxy: 'MXY', brickyard: 'RPA', lindbergh: 'GJS', wiggins: 'WIG', streak: 'JIA',
   airport: 'APT', // AC 150/5210-20A: "Airport 21 vehicle" (only before a number, normalize.ts)
 });

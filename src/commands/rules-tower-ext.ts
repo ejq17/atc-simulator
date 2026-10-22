@@ -352,6 +352,16 @@ export const ruleAirportInfo: Rule = (t, i) => {
       any = true;
       continue;
     }
+    if (isOneOf(t, j, ['qnh'])) {
+      // UK: "QNH one zero one three" (hectopascals, CAP 413); stored as inHg like every altimeter setting
+      const q = intAt(t, j + 1);
+      if (q === null) break;
+      const hpa = Number(q);
+      if (hpa < 900 || hpa > 1100) d.issues.push(`implausible QNH ${q}`); else info.altimeterInHg = Math.round((hpa / 33.8639) * 1e4) / 1e4;
+      j += 2;
+      any = true;
+      continue;
+    }
     if (isOneOf(t, j, ['altimeter'])) {
       const a = intAt(t, j + 1) ?? (/^\d{2}\.\d{1,2}$/.test(txt(t, j + 1)) ? txt(t, j + 1) : null); // "3010" or "30.10"
       if (a === null) break;

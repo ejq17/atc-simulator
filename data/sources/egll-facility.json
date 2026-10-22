@@ -1,0 +1,809 @@
+{
+ "_provenance": {
+  "source_name": "UK AIP (NATS AIS eAIP), AIRAC 10/2026, AD 2.EGLL",
+  "source_url": "https://www.aurora.nats.co.uk/htmlAIP/Publications/2026-10-01-AIRAC/html/eAIP/EG-AD-2.EGLL-en-GB.html",
+  "source": "UK Integrated Aeronautical Information Package (UK AIP) published by NATS (Services) Limited as the UK Aeronautical Information Service Provider, eAIP AIRAC 10/2026 effective 01 OCT 2026, section AD 2.EGLL (LONDON HEATHROW). Hand-transcribed: no machine-readable AIP data is licensed; every field below names its AIP section in a *_source or note field.",
+  "retrieved": "2026-10-21",
+  "airac_cycle": "AIRAC 10/2026",
+  "faa_cycle_effective": "2026-10-01",
+  "faa_cycle_next": "2026-10-29",
+  "faa_cycle_note": "Key names kept for the shared build (NASR files use faa_cycle_*); the values are the AIRAC effective date 01 OCT 2026 and the next AIRAC date 29 OCT 2026 (AIRAC 11/2026).",
+  "icao": "EGLL",
+  "iata": "LHR",
+  "files": [
+   "AD 2.EGLL page of the eAIP (EG-AD-2.EGLL-en-GB.html, 739,746 bytes), saved raw/egll/EG-AD-2.EGLL-en-GB.html",
+   "EG-GEN-0.1-en-GB.html (preface and terms)",
+   "EG-ENR-4.1-en-GB.html (cross-check of the radio navigation aids)"
+  ],
+  "method": "Text of the AD 2.EGLL eAIP page extracted with a script (tags and database markers removed), read by a human and entered into this file; decimal coordinates are the AIP degrees-minutes-seconds strings converted by a script (8 decimals), the DMS string is stored next to each decimal and src/airport/egll/egll.test.ts checks them. Values marked DERIVED are computed from published values and say how. Fields with no AIP equivalent are null with a note.",
+  "licence_statement": "The eAIP carries \"(c) Copyright NATS Limited 2026\" (AIP index page footer) and the NATS terms (https://nats-uk.ead-it.com/cms-nats/opencms/en/agb/) say that by using UK Aeronautical Information Products the user is \"bound by these Website Terms and Conditions\"; they grant no reuse licence and state \"NATS accepts no liability for your use of UK Aeronautical Information Products\". GEN 0.1 para 3.1: products are \"freely available on the internet\". See data/sources/README.md EGLL section for the conclusion (facts transcribed with attribution; chart PDFs are linked, never bundled).",
+  "raw_dir": "raw/egll/"
+ },
+ "airport": {
+  "name": "LONDON HEATHROW",
+  "icao": "EGLL",
+  "faa_id": "LHR",
+  "iata": "LHR",
+  "iata_source": "not in the AIP: IATA location code, public assignment (given in the task brief)",
+  "city": "LONDON",
+  "country": "GB",
+  "time_zone": "Europe/London",
+  "time_zone_note": "Not in the AIP as an IANA name. AD 2.21 para 4 defines \"local time\" as \"during any period of summer time, the time fixed by or under the Summer Time Act 1972, and outside that period, Universal Co-ordinated Time\" = Europe/London.",
+  "altimeter_unit": "hPa",
+  "altimeter_unit_source": "GEN 3.5 para 3.8.10: QNH reported in whole hectopascals with the Q indicator (example Q0995); AD 2.21 sub-paragraph 10 uses \"Heathrow QNH\".",
+  "ownership": {
+   "type_code": null,
+   "owner": "HEATHROW AIRPORT LIMITED",
+   "contacts": [
+    {
+     "title": "AD administration (AD 2.2 item 6)",
+     "name": "HEATHROW AIRPORT LIMITED",
+     "address": "The Compass Centre, Nelson Road, Heathrow Airport, Hounslow, TW2 2GW",
+     "phone": "08700-000123 (HAL); 020-8750 2636 (NATS Ltd)"
+    }
+   ]
+  },
+  "facility_use": "IFR/VFR (AD 2.2 item 7; remarks add SVFR)",
+  "status": "O",
+  "arp": {
+   "lat": 51.4775,
+   "lon": -0.46138889,
+   "lat_dms": "512839N",
+   "lon_dms": "0002741W",
+   "source": "AD 2.2 item 1 (ARP coordinates and site at AD: mid point of runway 09L/27R)",
+   "source_date": null
+  },
+  "field_elevation_ft": 83,
+  "elevation_source": "AD 2.2 item 3 (83 FT; reference temperature 20 C; mean low temperature none published)",
+  "geoid_undulation_ft": 151,
+  "magnetic_variation": {
+   "deg": 1.23,
+   "hemisphere": "E",
+   "epoch_year": "2027",
+   "annual_change_deg_e": 0.17,
+   "note": "AD 2.2 item 5: \"1.23°E (2027) / 0.17°E annual change\". The AIP prints the value for the year 2027 (a predicted value, not the 2026 measurement). Charts print \"VAR 1.2°E - 2027, Annual Rate of Change 0.17°E\"."
+  },
+  "artcc": {
+   "id": "LTC",
+   "name": "LONDON TERMINAL CONTROL (ATS unit \"LONDON HEA\" in AD 2.11 item 9; not an ARTCC)"
+  },
+  "tower_type": "ATCT",
+  "beacon": null,
+  "wind_indicator": "LGTD WDI at four positions (AD 2.9 item 5)",
+  "fuel": "AVTUR JET A-1 (AD 2.4 item 2)",
+  "customs": "H24 (AD 2.3 item 2)",
+  "traffic_pattern_altitude_ft": null,
+  "traffic_pattern_altitude_note": "No circuit height is published for EGLL (AD 2.22: ATZ 2000 FT AAL; light aircraft are not permitted, AD 2.20 para 1) - not applicable, null.",
+  "rff_category": "A10 (AD 2.6 item 1)",
+  "apron_surface": "Concrete (AD 2.8 item 1), except Stand 357: block paving"
+ },
+ "tower": {
+  "facility_type": "ATCT",
+  "operator_code": "NATS",
+  "tower_call": "HEATHROW",
+  "tower_hours": "H24",
+  "tower_hours_note": "AD 2.3 item 7 (ATS: H24); AD 2.18: Heathrow Delivery, Tower, Director and Information H24; Ground \"as directed by ATC\".",
+  "approach_radio_call": "HEATHROW DIRECTOR",
+  "departure_radio_call": "HEATHROW DIRECTOR",
+  "approach_provider": "NATS Heathrow (ATS unit \"LONDON HEA\", AD 2.11 item 9)",
+  "services": [
+   "Class D CTR/CTA (AD 2.17)",
+   "Transponder Mandatory Zone (AD 2.22 para 14)"
+  ],
+  "atis": [
+   {
+    "atis_no": "1",
+    "hours": "H24",
+    "phone": null,
+    "frequencies_mhz": [
+     128.08,
+     113.75,
+     117.0
+    ],
+    "departure_atis_mhz": 121.935,
+    "note": "AD 2.18: ATIS \"HEATHROW INFORMATION\" 128.080, 113.750 (Bovingdon VOR), 117.000 (Seaford VOR); departure ATIS 121.935 (DOC 5 NM / GND)."
+   }
+  ],
+  "note": "AD 2.18 ATS communication facilities; see egll-frequencies.json."
+ },
+ "airspace": {
+  "class": "D",
+  "class_c": false,
+  "class_b": false,
+  "class_d": true,
+  "class_e_surface": false,
+  "hours": "H24 (AD 2.18)",
+  "note": "AD 2.17: LONDON CTR and LONDON CTA/C \"LONDON C\" Class D, SFC to 2500 FT AL, ATS unit callsign HEATHROW RADAR, transition altitude 6000 FT; LONDON HEATHROW A: 2.5 NM radius circle, SFC to 2083 FT AL, Class D, \"ATZ 2000 FT AAL\". The task brief said \"Class A CTR\"; the AIP says Class D. The London CTR is a Mode S Elementary TMZ (AD 2.22 para 14). VFR and Special VFR flights are possible in the CTR with a clearance (AD 2.22 para 8) but light aircraft may not use EGLL (AD 2.20 para 1).",
+  "transition_altitude_ft": 6000
+ },
+ "runways": [
+  {
+   "id": "09L/27R",
+   "length_m": 3901,
+   "width_m": 50,
+   "length_ft": 12798.6,
+   "width_ft": 164.0,
+   "surface": "ASPH",
+   "condition": null,
+   "treatment": "GRVD",
+   "pavement_classification": "PCR",
+   "pcr": "1020/R/A/W/",
+   "edge_lights": "HI (white; first 300 M red on full length departures from 09L/09R due to the displaced threshold)",
+   "length_source": "AD 2.12 col 3 (3901 x 50 M)",
+   "type": "RUNWAY",
+   "ends": [
+    {
+     "id": "09L",
+     "true_alignment_deg": 89.67,
+     "charted_magnetic_heading_deg": 88,
+     "charted_magnetic_heading_source": "AD 2.EGLL-2-1 aerodrome chart (runway end heading printed on the chart, e.g. \"088°M\", \"268°M\")",
+     "threshold": {
+      "lat": 51.477484,
+      "lon": -0.48943926,
+      "elev_ft": 78.6,
+      "position_source": "DERIVED",
+      "note": "DERIVED, not published: the AIP threshold of 09L (AD 2.12 col 5, 512839.00N 0002905.97W) is the displaced landing threshold; the pavement end is that point moved 309 m back along the reciprocal true bearing (269.67 deg). Elevation: the AIP threshold elevation (the AIP gives none for the pavement end). The simulator uses the pavement end as the runway-end node."
+     },
+     "displaced_threshold": {
+      "present": true,
+      "length_m": 309,
+      "length_ft": 1013.8,
+      "lat": 51.4775,
+      "lon": -0.48499167,
+      "lat_dms": "512839.00N",
+      "lon_dms": "0002905.97W",
+      "elev_ft": 78.6,
+      "note": "AD 2.13 remark: \"LDA: 09L landing threshold is displaced by 309 M\". Coordinates are the AD 2.12 threshold coordinates as published."
+     },
+     "threshold_elevation_ft_aip": 78.6,
+     "tdz_elev_ft": 81.3,
+     "threshold_crossing_height_ft": null,
+     "visual_glide_path_angle_deg": 3,
+     "visual_glide_path_note": "AD 2.14: PAPI 3 deg, MEHT 66 FT (minimum eye height over threshold). The AIP publishes no threshold crossing height of the PAPI; MEHT is an eye height, not a wheel crossing height, so no TCH is derived (null).",
+     "vgsi": "PAPI",
+     "approach_lighting": "Coded centre-line with five crossbars, supplementary lighting inner 300 M, HI (AD 2.14), 860 M",
+     "tdz_lights": "HI white, 900 M",
+     "centerline_lights": "Y",
+     "reil": null,
+     "ils_type_nasr": "ILS CAT III (AD 2.19)",
+     "declared_distances_m": {
+      "tora": 3901,
+      "toda": 3901,
+      "asda": 3901,
+      "lda": 3592
+     },
+     "declared_distances_ft": {
+      "tora": 12798.6,
+      "toda": 12798.6,
+      "asda": 12798.6,
+      "lda": 11784.8
+     },
+     "declared_distances_source": "AD 2.13 declared distances",
+     "lahso": null,
+     "right_hand_traffic": null
+    },
+    {
+     "id": "27R",
+     "true_alignment_deg": 269.71,
+     "charted_magnetic_heading_deg": 268,
+     "charted_magnetic_heading_source": "AD 2.EGLL-2-1 aerodrome chart (runway end heading printed on the chart, e.g. \"088°M\", \"268°M\")",
+     "threshold": {
+      "lat": 51.477675,
+      "lon": -0.43328333,
+      "lat_dms": "512839.63N",
+      "lon_dms": "0002559.82W",
+      "elev_ft": 78.1,
+      "position_source": "AD 2.12 col 5 (threshold coordinates as published)",
+      "note": "AD 2.12 threshold coordinates. No displaced threshold is published for this end; the AIP threshold is used as the pavement end (see runway note on the 19 m TORA/LDA difference of 27R)."
+     },
+     "displaced_threshold": {
+      "present": false,
+      "length_ft": null,
+      "note": "AD 2.13 declares no displaced threshold for this end."
+     },
+     "threshold_elevation_ft_aip": 78.1,
+     "tdz_elev_ft": 79.3,
+     "threshold_crossing_height_ft": null,
+     "visual_glide_path_angle_deg": 3,
+     "visual_glide_path_note": "AD 2.14: PAPI 3 deg, MEHT 73 FT (minimum eye height over threshold). The AIP publishes no threshold crossing height of the PAPI; MEHT is an eye height, not a wheel crossing height, so no TCH is derived (null).",
+     "vgsi": "PAPI",
+     "approach_lighting": "Coded centre-line with five crossbars, supplementary lighting inner 300 M, HI (AD 2.14), 905 M",
+     "tdz_lights": "HI white, 901 M",
+     "centerline_lights": "Y",
+     "reil": null,
+     "ils_type_nasr": "ILS CAT III (AD 2.19)",
+     "declared_distances_m": {
+      "tora": 3882,
+      "toda": 3960,
+      "asda": 3882,
+      "lda": 3882
+     },
+     "declared_distances_ft": {
+      "tora": 12736.2,
+      "toda": 12992.1,
+      "asda": 12736.2,
+      "lda": 12736.2
+     },
+     "declared_distances_source": "AD 2.13 declared distances",
+     "lahso": null,
+     "right_hand_traffic": null
+    }
+   ],
+   "notes": [
+    "AD 2.12: 09L/27R 3901 x 50 M, asphalt grooved, PCR 1020/R/A/W; strip 4021 x 280 M; clearway 27R 78 x 150 M; OFZ yes.",
+    "AD 2.13: 09L TORA/TODA/ASDA 3901 M, LDA 3592 M (landing threshold displaced 309 M); 27R TORA 3882, TODA 3960, ASDA 3882, LDA 3882 M. The 19 M by which the 27R declared distances are shorter than the 3901 M pavement is not explained in the AIP and is not modelled (the 27R pavement end is placed at the AIP threshold: the distance between the two AIP thresholds, 3592.5 m, equals the 09L LDA).",
+    "Intersection take-off distances (AD 2.13): see declared_distances_intersections."
+   ],
+   "declared_distances_intersections": [
+    {
+     "runway": "09L",
+     "from": "A12",
+     "tora_m": 3362,
+     "toda_m": 3362,
+     "asda_m": 3362
+    },
+    {
+     "runway": "09L",
+     "from": "A11",
+     "tora_m": 2838,
+     "toda_m": 2838,
+     "asda_m": 2838
+    },
+    {
+     "runway": "09L",
+     "from": "A10W",
+     "tora_m": 2661,
+     "toda_m": 2661,
+     "asda_m": 2661
+    },
+    {
+     "runway": "09L",
+     "from": "A10E",
+     "tora_m": 2354,
+     "toda_m": 2354,
+     "asda_m": 2354
+    },
+    {
+     "runway": "09L",
+     "from": "A9W",
+     "tora_m": 1992,
+     "toda_m": 1992,
+     "asda_m": 1992
+    },
+    {
+     "runway": "09L",
+     "from": "A9E",
+     "tora_m": 1789,
+     "toda_m": 1789,
+     "asda_m": 1789
+    },
+    {
+     "runway": "27R",
+     "from": "A4",
+     "tora_m": 3539,
+     "toda_m": 3617,
+     "asda_m": 3539
+    },
+    {
+     "runway": "27R",
+     "from": "A5",
+     "tora_m": 3136,
+     "toda_m": 3214,
+     "asda_m": 3136
+    },
+    {
+     "runway": "27R",
+     "from": "A6",
+     "tora_m": 2862,
+     "toda_m": 2940,
+     "asda_m": 2862
+    },
+    {
+     "runway": "27R",
+     "from": "A7",
+     "tora_m": 2617,
+     "toda_m": 2695,
+     "asda_m": 2617
+    },
+    {
+     "runway": "27R",
+     "from": "A8",
+     "tora_m": 2414,
+     "toda_m": 2492,
+     "asda_m": 2414
+    },
+    {
+     "runway": "27R",
+     "from": "A9E",
+     "tora_m": 2142,
+     "toda_m": 2220,
+     "asda_m": 2142
+    },
+    {
+     "runway": "27R",
+     "from": "A9W",
+     "tora_m": 1947,
+     "toda_m": 2025,
+     "asda_m": 1947
+    }
+   ]
+  },
+  {
+   "id": "09R/27L",
+   "length_m": 3658,
+   "width_m": 50,
+   "length_ft": 12001.3,
+   "width_ft": 164.0,
+   "surface": "ASPH",
+   "condition": null,
+   "treatment": "GRVD",
+   "pavement_classification": "PCR",
+   "pcr": "820/R/A/W/",
+   "edge_lights": "HI (white; first 300 M red on full length departures from 09R due to the displaced threshold)",
+   "length_source": "AD 2.12 col 3 (3658 x 50 M)",
+   "type": "RUNWAY",
+   "ends": [
+    {
+     "id": "09R",
+     "true_alignment_deg": 89.68,
+     "charted_magnetic_heading_deg": 88,
+     "charted_magnetic_heading_source": "AD 2.EGLL-2-1 aerodrome chart (runway end heading printed on the chart, e.g. \"088°M\", \"268°M\")",
+     "threshold": {
+      "lat": 51.46477621,
+      "lon": -0.48674586,
+      "elev_ft": 75.3,
+      "position_source": "DERIVED",
+      "note": "DERIVED, not published: the AIP threshold of 09R (AD 2.12 col 5, 512753.25N 0002856.33W) is the displaced landing threshold; the pavement end is that point moved 308 m back along the reciprocal true bearing (269.68 deg). Elevation: the AIP threshold elevation (the AIP gives none for the pavement end). The simulator uses the pavement end as the runway-end node."
+     },
+     "displaced_threshold": {
+      "present": true,
+      "length_m": 308,
+      "length_ft": 1010.5,
+      "lat": 51.46479167,
+      "lon": -0.48231389,
+      "lat_dms": "512753.25N",
+      "lon_dms": "0002856.33W",
+      "elev_ft": 75.3,
+      "note": "AD 2.13 remark: \"LDA: 09R landing threshold is displaced by 308 M\". Coordinates are the AD 2.12 threshold coordinates as published."
+     },
+     "threshold_elevation_ft_aip": 75.3,
+     "tdz_elev_ft": 76.2,
+     "threshold_crossing_height_ft": null,
+     "visual_glide_path_angle_deg": 3,
+     "visual_glide_path_note": "AD 2.14: PAPI 3 deg, MEHT 65 FT (minimum eye height over threshold). The AIP publishes no threshold crossing height of the PAPI; MEHT is an eye height, not a wheel crossing height, so no TCH is derived (null).",
+     "vgsi": "PAPI",
+     "approach_lighting": "Coded centre-line with five crossbars, supplementary lighting inner 300 M, HI (AD 2.14), 939 M",
+     "tdz_lights": "HI white, 899 M",
+     "centerline_lights": "Y",
+     "reil": null,
+     "ils_type_nasr": "ILS CAT III (AD 2.19)",
+     "declared_distances_m": {
+      "tora": 3658,
+      "toda": 3658,
+      "asda": 3658,
+      "lda": 3350
+     },
+     "declared_distances_ft": {
+      "tora": 12001.3,
+      "toda": 12001.3,
+      "asda": 12001.3,
+      "lda": 10990.8
+     },
+     "declared_distances_source": "AD 2.13 declared distances",
+     "lahso": null,
+     "right_hand_traffic": null
+    },
+    {
+     "id": "27L",
+     "true_alignment_deg": 269.72,
+     "charted_magnetic_heading_deg": 268,
+     "charted_magnetic_heading_source": "AD 2.EGLL-2-1 aerodrome chart (runway end heading printed on the chart, e.g. \"088°M\", \"268°M\")",
+     "threshold": {
+      "lat": 51.46495,
+      "lon": -0.4341,
+      "lat_dms": "512753.82N",
+      "lon_dms": "0002602.76W",
+      "elev_ft": 76.8,
+      "position_source": "AD 2.12 col 5 (threshold coordinates as published)",
+      "note": "AD 2.12 threshold coordinates. No displaced threshold is published for this end; the AIP threshold is used as the pavement end (see runway note on the 19 m TORA/LDA difference of 27R)."
+     },
+     "displaced_threshold": {
+      "present": false,
+      "length_ft": null,
+      "note": "AD 2.13 declares no displaced threshold for this end."
+     },
+     "threshold_elevation_ft_aip": 76.8,
+     "tdz_elev_ft": 77.8,
+     "threshold_crossing_height_ft": null,
+     "visual_glide_path_angle_deg": 3,
+     "visual_glide_path_note": "AD 2.14: PAPI 3 deg, MEHT 65 FT (minimum eye height over threshold). The AIP publishes no threshold crossing height of the PAPI; MEHT is an eye height, not a wheel crossing height, so no TCH is derived (null).",
+     "vgsi": "PAPI",
+     "approach_lighting": "Coded centre-line with five crossbars, supplementary lighting inner 300 M, HI (AD 2.14), 922 M",
+     "tdz_lights": "HI white, 901 M",
+     "centerline_lights": "Y",
+     "reil": null,
+     "ils_type_nasr": "ILS CAT III (AD 2.19)",
+     "declared_distances_m": {
+      "tora": 3658,
+      "toda": 3658,
+      "asda": 3658,
+      "lda": 3658
+     },
+     "declared_distances_ft": {
+      "tora": 12001.3,
+      "toda": 12001.3,
+      "asda": 12001.3,
+      "lda": 12001.3
+     },
+     "declared_distances_source": "AD 2.13 declared distances",
+     "lahso": null,
+     "right_hand_traffic": null
+    }
+   ],
+   "notes": [
+    "AD 2.12: 09R/27L 3658 x 50 M, asphalt grooved, PCR 820/R/A/W; strip 3778 x 280 M; OFZ yes.",
+    "AD 2.13: 09R TORA/TODA/ASDA 3658 M, LDA 3350 M (landing threshold displaced 308 M); 27L 3658 M all four distances."
+   ],
+   "declared_distances_intersections": [
+    {
+     "runway": "09R",
+     "from": "N10",
+     "tora_m": 3528,
+     "toda_m": 3528,
+     "asda_m": 3528
+    },
+    {
+     "runway": "09R",
+     "from": "N8",
+     "tora_m": 3351,
+     "toda_m": 3351,
+     "asda_m": 3351
+    },
+    {
+     "runway": "09R",
+     "from": "S7",
+     "tora_m": 2853,
+     "toda_m": 2853,
+     "asda_m": 2853
+    },
+    {
+     "runway": "09R",
+     "from": "N7",
+     "tora_m": 2852,
+     "toda_m": 2852,
+     "asda_m": 2852
+    },
+    {
+     "runway": "09R",
+     "from": "N6",
+     "tora_m": 2325,
+     "toda_m": 2325,
+     "asda_m": 2325
+    },
+    {
+     "runway": "09R",
+     "from": "S6",
+     "tora_m": 2244,
+     "toda_m": 2244,
+     "asda_m": 2244
+    },
+    {
+     "runway": "09R",
+     "from": "N5W",
+     "tora_m": 1704,
+     "toda_m": 1704,
+     "asda_m": 1704
+    },
+    {
+     "runway": "27L",
+     "from": "N2E",
+     "tora_m": 3536,
+     "toda_m": 3536,
+     "asda_m": 3536
+    },
+    {
+     "runway": "27L",
+     "from": "N2W",
+     "tora_m": 3380,
+     "toda_m": 3380,
+     "asda_m": 3380
+    },
+    {
+     "runway": "27L",
+     "from": "N3",
+     "tora_m": 3224,
+     "toda_m": 3224,
+     "asda_m": 3224
+    },
+    {
+     "runway": "27L",
+     "from": "S3",
+     "tora_m": 3212,
+     "toda_m": 3212,
+     "asda_m": 3212
+    },
+    {
+     "runway": "27L",
+     "from": "N4E",
+     "tora_m": 2702,
+     "toda_m": 2702,
+     "asda_m": 2702
+    },
+    {
+     "runway": "27L",
+     "from": "S4W",
+     "tora_m": 2606,
+     "toda_m": 2606,
+     "asda_m": 2606
+    },
+    {
+     "runway": "27L",
+     "from": "S4E",
+     "tora_m": 2589,
+     "toda_m": 2589,
+     "asda_m": 2589
+    },
+    {
+     "runway": "27L",
+     "from": "N4W",
+     "tora_m": 2441,
+     "toda_m": 2441,
+     "asda_m": 2441
+    },
+    {
+     "runway": "27L",
+     "from": "S5E",
+     "tora_m": 2222,
+     "toda_m": 2222,
+     "asda_m": 2222
+    },
+    {
+     "runway": "27L",
+     "from": "N5E",
+     "tora_m": 2091,
+     "toda_m": 2091,
+     "asda_m": 2091
+    },
+    {
+     "runway": "27L",
+     "from": "S5W",
+     "tora_m": 2081,
+     "toda_m": 2081,
+     "asda_m": 2081
+    }
+   ]
+  }
+ ],
+ "lights_and_aids": {
+  "arresting_gear": [],
+  "note": "AD 2.14/2.15: HI approach, threshold, edge, centre-line, TDZ and end lighting; green taxiway centre-line lights with selective switching; red stop bars; runway guard lights H24; secondary power CAT I/II/III 1 s."
+ },
+ "ils_by_runway_end": {
+  "9L": {
+   "loc_ident": "IAA",
+   "category": "III",
+   "loc_freq_mhz": 110.3,
+   "approach_bearing_mag": 88.44,
+   "approach_bearing_note": "DERIVED: AD 2.12 true bearing 89.67 minus the AD 2.2 variation 1.23 E; the approach chart prints the rounded course 088 deg M.",
+   "glideslope_angle": 3,
+   "gs_freq_mhz": 335.0,
+   "rdh_ft": 51
+  },
+  "27R": {
+   "loc_ident": "IRR",
+   "category": "III",
+   "loc_freq_mhz": 110.3,
+   "approach_bearing_mag": 268.48,
+   "approach_bearing_note": "DERIVED: AD 2.12 true bearing 269.71 minus the AD 2.2 variation 1.23 E; the approach chart prints the rounded course 268 deg M.",
+   "glideslope_angle": 3,
+   "gs_freq_mhz": 335.0,
+   "rdh_ft": 58
+  },
+  "9R": {
+   "loc_ident": "IBB",
+   "category": "III",
+   "loc_freq_mhz": 109.5,
+   "approach_bearing_mag": 88.45,
+   "approach_bearing_note": "DERIVED: AD 2.12 true bearing 89.68 minus the AD 2.2 variation 1.23 E; the approach chart prints the rounded course 088 deg M.",
+   "glideslope_angle": 3,
+   "gs_freq_mhz": 332.6,
+   "rdh_ft": 50
+  },
+  "27L": {
+   "loc_ident": "ILL",
+   "category": "III",
+   "loc_freq_mhz": 109.5,
+   "approach_bearing_mag": 268.49,
+   "approach_bearing_note": "DERIVED: AD 2.12 true bearing 269.72 minus the AD 2.2 variation 1.23 E; the approach chart prints the rounded course 268 deg M.",
+   "glideslope_angle": 3,
+   "gs_freq_mhz": 332.6,
+   "rdh_ft": 56
+  }
+ },
+ "runway_configurations": [
+  {
+   "id": "W-ALT-27R",
+   "name": "Westerly: land 27R (northern), depart 27L (southern)",
+   "landing": [
+    "27R"
+   ],
+   "departing": [
+    "27L"
+   ],
+   "max_tailwind_kt": 5,
+   "notes": "Westerly segregated mode of operations. AD 2.20 para 6 (Preferential Runway System): \"In weather conditions when the tail wind component is no greater than 5 KT on the main Runway 27R and 27L, these runways will normally be used in preference to Runways 09R and 09L, provided the runway(s) surface is dry.\" Runway alternation (operator, not the AIP): one runway for landings and the other for take-offs, swapped at 15:00 local; the pair swaps every week. Programme 2026: landings on 27R 06:00-15:00 and on 27L from 15:00 until the last departure in the weeks commencing 12 Jan, 26 Jan, ... (odd weeks counted from 5 Jan 2026), the reverse in the other weeks (see alternation_programme_2026). 06:00-07:00 both runways may land (not modelled). AD 2.20 para 4 warns of building-induced turbulence on 27R in strong southerly/south-westerly winds; the operator moves landings to the southern runway in that case. Simulator note: configurations are chosen by headwind (src/weather/runwayConfigurations.ts); the time-of-day alternation between W-ALT-27R and W-ALT-27L is not selected automatically (list order: 27R first, the programme state in the week of 2026-10-19 until 15:00).",
+   "time_rule": {
+    "local_time_window": "06:00-15:00 in the weeks where the programme lists 27R first, 15:00-last departure in the other weeks",
+    "weeks_since_2026_01_05_parity": "odd"
+   },
+   "source": "UK AIP AIRAC 10/2026 AD 2.20 para 6 and para 4; AD 2.22",
+   "url": "https://www.aurora.nats.co.uk/htmlAIP/Publications/2026-10-01-AIRAC/html/eAIP/EG-AD-2.EGLL-en-GB.html",
+   "retrieved": "2026-10-21",
+   "provenance_notes": "Preferential runway system, tailwind limit and wind warnings. Alternation from the operator page: https://www.heathrow.com/company/local-community/noise/operations/runway-alternation"
+  },
+  {
+   "id": "W-ALT-27L",
+   "name": "Westerly: land 27L (southern), depart 27R (northern)",
+   "landing": [
+    "27L"
+   ],
+   "departing": [
+    "27R"
+   ],
+   "max_tailwind_kt": 5,
+   "notes": "The other half of the westerly alternation (see W-ALT-27R): landings on 27L 06:00-15:00 in the weeks commencing 5 Jan, 19 Jan, ... (even weeks counted from 5 Jan 2026) and on 27R in the afternoon. Tactically Enhanced Arrivals Mode (TEAM, operator page): after 07:00 on westerly operations, up to six arrivals an hour may land on the departure runway when delays of 20 minutes or more are expected (not modelled). Simulator note: configurations are chosen by headwind (src/weather/runwayConfigurations.ts); the time-of-day alternation between W-ALT-27R and W-ALT-27L is not selected automatically (list order: 27R first, the programme state in the week of 2026-10-19 until 15:00).",
+   "time_rule": {
+    "local_time_window": "06:00-15:00 in the weeks where the programme lists 27L first, 15:00-last departure in the other weeks",
+    "weeks_since_2026_01_05_parity": "even"
+   },
+   "source": "Heathrow Airport Limited, \"Runway alternation\" page and Runway Alternation Programme 2026 (operator publication, not the AIP)",
+   "url": "https://www.heathrow.com/company/local-community/noise/operations/runway-alternation",
+   "retrieved": "2026-10-21",
+   "provenance_notes": "Alternation programme 2026 (PDF https://www.heathrow.com/content/dam/heathrow/web/common/documents/company/local-community/noise/operations/runway-alternation/Heathrow_Runway_Alternation_Programme_2026.pdf); tailwind limit from AD 2.20 para 6."
+  },
+  {
+   "id": "E-SEG-09L",
+   "name": "Easterly: land 09L (northern), depart 09R (southern)",
+   "landing": [
+    "9L"
+   ],
+   "departing": [
+    "9R"
+   ],
+   "notes": "Easterly operations (used when the 5 kt tailwind limit on 27 is exceeded). Operator page: \"On easterly operations, we do not alternate the runways at 15:00 because of the Cranford Agreement which prevented us from using the northern runway for departures during the day. Although the Cranford Agreement has now ended, we need to undertake works to the airport's infrastructure before runway alternation on easterly operations will be possible.\" and \"aircraft cannot take off towards the east from the northern runway\" (status of the Cranford Agreement: ended, not yet exploited, as published by the operator on the retrieval date). The AIP publishes no Cranford text; it gives ILS and noise rules for both ends. AD 2.20 para 6: pilots asking for the runway into wind when 27 is in use \"should understand that their arrival or departure may be delayed\". Simulator note: configurations are chosen by headwind (src/weather/runwayConfigurations.ts); the time-of-day alternation between W-ALT-27R and W-ALT-27L is not selected automatically (list order: 27R first, the programme state in the week of 2026-10-19 until 15:00).",
+   "source": "Heathrow Airport Limited, \"Runway alternation\" page and Runway Alternation Programme 2026 (operator publication, not the AIP)",
+   "url": "https://www.heathrow.com/company/local-community/noise/operations/runway-alternation",
+   "retrieved": "2026-10-21",
+   "provenance_notes": "Easterly operations paragraph of the runway alternation page; AD 2.20 para 6 for the preference rule."
+  }
+ ],
+ "remarks": [
+  {
+   "text": "Types of traffic permitted: IFR/VFR/SVFR (AD 2.2 item 8).",
+   "source": "AD 2.2"
+  },
+  {
+   "text": "Telephone calls to NATS Ltd operational areas may be recorded.",
+   "source": "AD 2.2"
+  },
+  {
+   "text": "Stand 357 has block paving; all other aprons concrete.",
+   "source": "AD 2.8"
+  },
+  {
+   "text": "Nose-in parking throughout; A-VDGS on most stands; MARS and Multi Choice Apron stands exist (stand number with L/R for MARS sub-centrelines).",
+   "source": "AD 2.9"
+  },
+  {
+   "text": "Hot spots: HS1/HS2 maintain a good lookout, wing tip clearance is the pilot's responsibility; HS3 Link 28 east of Taxiway Alpha is not Code F compliant; HS4 ensure clearance to enter the runway before crossing the holding point; HS5 mis-route hot spot after vacating runway.",
+   "source": "AD 2-EGLL-2-1 aerodrome chart"
+  },
+  {
+   "text": "Green taxiway centre-line lights with selective switching, red stop bars controlled from the Tower, runway guard lights H24.",
+   "source": "AD 2.15, AD 2.20 para 2"
+  },
+  {
+   "text": "Pilots report type, stand number, QNH and the ATIS identification letter on first contact with Heathrow Delivery.",
+   "source": "AD 2.20 para 2 (Start-up Procedures)"
+  },
+  {
+   "text": "Taxiway Yankee between HANLI and Taxiway Alpha is restricted to Code C; Link 56 to Code D.",
+   "source": "AD 2.20 para 2"
+  },
+  {
+   "text": "Helicopter operations: PPR; crossing procedures between Sipson/Bedfont/Feltham; helicopter aiming point east of Link 43.",
+   "source": "AD 2.20 para 5"
+  }
+ ],
+ "unverified": [
+  "Magnetic variation 1.23 E is the value predicted for 2027 as printed (AD 2.2 item 5); not a 2026 measurement.",
+  "The 19 m difference between the 27R TORA/LDA (3882 m) and the pavement length (3901 m) is not explained in the AIP; the pavement end of 27R is placed at the AIP threshold.",
+  "Pavement ends of 09L and 09R are DERIVED by moving the AIP landing thresholds back by the displaced-threshold lengths (309 m, 308 m); the AIP publishes no coordinates of the pavement ends.",
+  "Runway alternation, Cranford Agreement status and TEAM come from the operator page (heathrow.com), not from the AIP; the AIP has no text on alternation.",
+  "ILS front course in degrees is DERIVED (true bearing minus variation); the charts print rounded 088 / 268 degrees magnetic.",
+  "PAPI threshold crossing height is not published (only MEHT); visual glidepath TCH left null.",
+  "Frequencies of the ATIS other than via the three channels in AD 2.18, and the phone number of the ATIS, are not in the AIP (null).",
+  "IATA code LHR and the time-zone name Europe/London are not AIP data.",
+  "Traffic pattern altitude: not published, not applicable."
+ ],
+ "alternation_programme_2026": {
+  "source": "https://www.heathrow.com/content/dam/heathrow/web/common/documents/company/local-community/noise/operations/runway-alternation/Heathrow_Runway_Alternation_Programme_2026.pdf",
+  "retrieved": "2026-10-21",
+  "page": "https://www.heathrow.com/company/local-community/noise/operations/runway-alternation",
+  "note": "Heathrow Airport Limited \"Runway alternation programme - 2026\", day-time table: runway used for LANDINGS 06:00-15:00 and 15:00 until the last departure, by week commencing (Monday). The schedule covers landings only. 27R = northern runway from the east side approach; 27L = southern. Both runways may land 06:00-07:00. The table alternates every week without exception: 5 Jan 27L/27R, 12 Jan 27R/27L, ... 28 Dec 27R/27L.",
+  "rule": "Week commencing Monday D: n = (D - 2026-01-05) / 7 weeks. n even: 27L lands 06:00-15:00 and 27R lands 15:00-last departure. n odd: 27R lands 06:00-15:00 and 27L from 15:00. Checked by script against all 52 rows of the table (0 exceptions): 5 Jan n=0 even = 27L first, 19 Oct n=41 odd = 27R first, 28 Dec n=51 odd = 27R first.",
+  "week_of_retrieval": {
+   "week_commencing": "2026-10-19",
+   "landings_06_15": "27R",
+   "landings_15_last": "27L"
+  },
+  "night": "Night-time (after the last departure to 06:00) alternation uses 09L/09R/27L/27R on a four-weekly cycle (primary runway per week in the table); not modelled."
+ },
+ "noise_and_operating_rules": [
+  {
+   "topic": "preferential runway system",
+   "text": "Tail wind component no greater than 5 KT on 27R/27L and runway dry: use 27 in preference to 09.",
+   "source": "AD 2.20 para 6 (Use of Runways)"
+  },
+  {
+   "topic": "ILS intercept altitude by day",
+   "text": "06:00-23:30 local, runway 27: not below 2500 FT (Heathrow QNH) on the glidepath before established on the localizer; runway 09 0700-2300: same 2500 FT.",
+   "source": "AD 2.21 sub-para 10"
+  },
+  {
+   "topic": "ILS intercept altitude at night",
+   "text": "2330-0600 (27) and 2300-0700 (09): not below 3000 FT before established on the localizer at not less than 10 NM from touchdown.",
+   "source": "AD 2.21 sub-para 10"
+  },
+  {
+   "topic": "departure noise",
+   "text": "Height not less than 1000 FT AAL at 6.5 KM from start of roll; jets maintain at least 4% climb gradient to 4000 FT; limits 94 dBA Lmax day (0700-2300), 89 dBA night, 87 dBA in the night quota period 2330-0600.",
+   "source": "AD 2.21 sub-paras 1, 3, 4, 7"
+  },
+  {
+   "topic": "noise preferential routes",
+   "text": "All departures follow the NPR of the SID (SIDs reflect NPRs); an aircraft at 4000 FT (Heathrow QNH) may be directed off the NPR.",
+   "source": "AD 2.21 sub-para 8 and note 9; AD 2.22 para 7"
+  },
+  {
+   "topic": "speed",
+   "text": "250 KT IAS below FL100 on departure until ATC removes it (\"No ATC Speed Restriction\").",
+   "source": "AD 2.22 para 7"
+  },
+  {
+   "topic": "final approach speeds",
+   "text": "220 KT from the holding facility; 180 KT on base / closing heading; between 180 and 160 KT established on final; 160 KT to 4 DME.",
+   "source": "AD 2.22 para 3 (iii)"
+  },
+  {
+   "topic": "APU and engine running at night",
+   "text": "No APU on stands 401-403, 429-432, 601-609 and 614-616 between 2330 and 0600 (2230-0500 in summer).",
+   "source": "AD 2.20 para 2"
+  },
+  {
+   "topic": "low visibility procedures",
+   "text": "Runways 09L, 09R, 27L and 27R are suitable for CAT II/III; ATC Low Visibility Procedures only when RVR is less than 600 M; expected landing rate 34 / 24 / under 20 an hour for IRVR 1000-600 / 600-150 / under 150.",
+   "source": "AD 2.20 para 3"
+  },
+  {
+   "topic": "runway crossings",
+   "text": "Crossings of an active runway are instructed by Ground Movement Control with a holding point as clearance limit; the aircraft then changes to the Air controller; after crossing it reports \"runway vacated\" and reverts to GMC.",
+   "source": "AD 2.20 para 2 (Runway Crossing Procedure)"
+  },
+  {
+   "topic": "conditional line up",
+   "text": "Conditional line-up clearances exist (\"behind the departing ..., line up Runway 27L behind\"; \"behind the landing ..., line up ... behind\").",
+   "source": "AD 2.20 para 2 (Departures - Minimum Runway Occupancy Time)"
+  },
+  {
+   "topic": "wake",
+   "text": "RECAT-EU departure separations and time based separation on final approach.",
+   "source": "AD 2.20 para 6; AD 2.23 para 2"
+  },
+  {
+   "topic": "general / business aviation",
+   "text": "Light aircraft (12,500 lb / 5,670 kg MTOW or less) are not permitted; all other non-scheduled traffic needs PPR and a slot.",
+   "source": "AD 2.20 para 1"
+  }
+ ]
+}

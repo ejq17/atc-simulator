@@ -1,5 +1,5 @@
 /**
- * Typed index of the official FAA d-TPP charts per airport (KACY, KMHT, KBOS, KPGD, KPHL).
+ * Typed index of the official charts per airport: FAA d-TPP (KACY, KMHT, KBOS, KPGD, KPHL) and, for EGLL, the UK AIP (NATS) chart list (link only).
  *
  * Built at import time from `data/sources/<icao>-procedures.json` (verified d-TPP
  * cycle 2610, every PDF URL checked HTTP 200 by the research pass). Nothing is
@@ -12,6 +12,7 @@ import rawKmhtProcedures from '../../data/sources/kmht-procedures.json';
 import rawKbosProcedures from '../../data/sources/kbos-procedures.json';
 import rawKpgdProcedures from '../../data/sources/kpgd-procedures.json';
 import rawKphlProcedures from '../../data/sources/kphl-procedures.json';
+import rawEgllProcedures from '../../data/sources/egll-procedures.json';
 
 export type ChartCategory = 'DIAGRAM' | 'IAP' | 'DP' | 'STAR' | 'HOT_SPOT' | 'LAHSO' | 'MINIMUMS';
 
@@ -37,7 +38,12 @@ export interface ChartEntry {
   printedAmendment?: string;
   /** Short caveat from the data (e.g. authorization required). */
   note?: string;
-  isOfficialFaa: true;
+  /** True for FAA d-TPP charts (bundled or proxied). False for the UK AIP entries of EGLL. */
+  isOfficialFaa: boolean;
+  /** Publishing authority of the chart. */
+  authority: 'FAA d-TPP' | 'UK AIP';
+  /** True when the chart is only LINKED to the official URL (copyrighted: NATS Limited); never bundled, proxied or cached. */
+  linkOnly?: boolean;
 }
 
 export interface ChartGroup {
@@ -71,7 +77,7 @@ interface IapRecord {
 }
 interface SimpleChartRecord { chart_name: string; pdf_name: string; pdf: PdfRef }
 interface ProceduresFile {
-  _provenance: { cycle: string; effective_from: string; effective_to: string; retrieved: string; volume?: string };
+  _provenance: { cycle: string; effective_from: string; effective_to: string; retrieved: string; volume?: string; link_only?: boolean; authority?: string };
   airport_diagram: SimpleChartRecord;
   instrument_approaches: IapRecord[];
   departure_procedures: Array<{ chart_name: string; type?: string; faa_id?: string; printed_date?: string; pdf: PdfRef; continuation_pdf?: PdfRef & { local_file?: string }; radar_required?: boolean }>;
@@ -92,6 +98,7 @@ const DATASETS: Record<string, ProceduresFile> = {
   KBOS: rawKbosProcedures as unknown as ProceduresFile,
   KPGD: rawKpgdProcedures as unknown as ProceduresFile,
   KPHL: rawKphlProcedures as unknown as ProceduresFile,
+  EGLL: rawEgllProcedures as unknown as ProceduresFile,
 };
 const DEFAULT_ICAO = 'KACY';
 
@@ -105,14 +112,19 @@ function cycleOf(data: ProceduresFile): CycleInfo {
     cycle: p.cycle,
     effectiveFrom,
     effectiveTo,
-    label: `FAA d-TPP cycle ${p.cycle}, effective ${effectiveFrom} to ${effectiveTo}`,
-    expiresAtMs: Date.parse(`${effectiveTo}T09:01:00Z`),
+    label: p.authority === 'UK AIP' ? `UK AIP ${p.cycle}, effective ${effectiveFrom} to ${effectiveTo}` : `FAA d-TPP cycle ${p.cycle}, effective ${effectiveFrom} to ${effectiveTo}`,
+    expiresAtMs: Date.parse(`${effectiveTo}T${p.authority === 'UK AIP' ? '00:00:00' : '09:01:00'}Z`),
     retrieved: p.retrieved,
   };
 }
 
 /** The charted cycle of the default airport (all airports are built from the same d-TPP cycle). */
 export const CYCLE: CycleInfo = cycleOf(DATASETS[DEFAULT_ICAO]);
+
+/** True when the airport's charts are only linked to the official source (EGLL: UK AIP, copyright NATS Limited). */
+export function isLinkOnly(icao: string = DEFAULT_ICAO): boolean {
+  return datasetFor(icao)._provenance.link_only === true;
+}
 
 /** Charted cycle of an airport's chart set. */
 export function cycleFor(icao: string = DEFAULT_ICAO): CycleInfo {
@@ -158,6 +170,7 @@ function runwayOrder(runway: string | undefined): number {
 
 function buildCharts(data: ProceduresFile, icao: string): ChartEntry[] {
   const cycle = cycleOf(data);
+  const uk = data._provenance.authority === 'UK AIP';
   const base = (rec: { pdf_name?: string; pdf: PdfRef }, name: string, category: ChartCategory): ChartEntry => {
     const pdfName = rec.pdf_name ?? rec.pdf.url.split('/').pop() ?? '';
     return {
@@ -169,7 +182,9 @@ function buildCharts(data: ProceduresFile, icao: string): ChartEntry[] {
       cycle: cycle.cycle,
       effectiveFrom: cycle.effectiveFrom,
       effectiveTo: cycle.effectiveTo,
-      isOfficialFaa: true,
+      isOfficialFaa: !uk,
+      authority: uk ? 'UK AIP' : 'FAA d-TPP',
+      ...(uk ? { linkOnly: true } : {}),
     };
   };
   const out: ChartEntry[] = [];
@@ -216,7 +231,18 @@ function buildCharts(data: ProceduresFile, icao: string): ChartEntry[] {
   for (const r of data.supporting_charts.takeoff_minimums_pdf) {
     out.push({ ...base(r, r.chart_name, 'MINIMUMS'), note: `${volumeName(data._provenance.volume ?? '')} booklet page (covers many airports; find the ${icao} entry).` });
   }
-  return out;
+  return uk ? mergeSharedPdfs(out) : out;
+}
+
+/** UK AIP charts: one PDF carries several procedures (four SIDs, two or three STARs per page): one entry per PDF, names joined. */
+function mergeSharedPdfs(list: ChartEntry[]): ChartEntry[] {
+  const byPdf = new Map<string, ChartEntry>();
+  for (const c of list) {
+    const prev = byPdf.get(c.pdfName);
+    if (prev) prev.name = `${prev.name} / ${c.name}`;
+    else byPdf.set(c.pdfName, { ...c });
+  }
+  return [...byPdf.values()];
 }
 
 const cache = new Map<string, readonly ChartEntry[]>();

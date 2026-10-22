@@ -51,7 +51,7 @@ export interface AirportTrafficProfile {
    * legacy origin list (KACY).
    */
   gaRemote?: readonly string[];
-  /** GA type variants chosen with the 'C172' selection of the setup screen: [type, weight]. */
+  /** GA type variants chosen with the 'C172' selection of the setup screen: [type, weight]. Empty = no GA traffic at the airport (EGLL). */
   gaTypes: readonly (readonly [string, number])[];
   /** Representative jet used to pick runways that "jets can use" (free play). */
   referenceJet: string;
@@ -356,7 +356,43 @@ const KPGD: AirportTrafficProfile = {
   },
 };
 
-const PROFILES: Readonly<Record<string, AirportTrafficProfile>> = { KACY, KMHT, KBOS, KPGD, KPHL };
+
+// ---------------------------------------------------------------------------
+// EGLL: London Heathrow
+// ---------------------------------------------------------------------------
+
+/**
+ * Airlines: heathrow.com "Airline contact information" (https://www.heathrow.com/airline-contact-info, retrieved 2026-10-21) lists ~90 carriers; British
+ * Airways is dominant, then Virgin Atlantic, then the main European and long-haul carriers. Aircraft types: British Airways from its own "Fleet facts"
+ * page (A319, A320 / A320neo, A321 / A321neo, A350-1000, A380-800, 777-200 and -300, 787-8 / -9 / -10, E190 of BA CityFlyer - not generated);
+ * Virgin Atlantic from its 2024 fleet press release (A330-900, A350-1000, 787-9; the A330-300 is being retired). The types of the other carriers and
+ * every weight and destination are ESTIMATEs / DESIGN VALUES (no operator source read for them). Telephony: ICAO Doc 8585 as listed in FAA JO 7340.2P
+ * chapter 3 (SPEEDBIRD, VIRGIN, SHAMROCK, LUFTHANSA, EMIRATES, AMERICAN, DELTA, UNITED). Light aircraft are not permitted (AD 2.20 para 1):
+ * no GA, no VFR neighbours; airport vehicles exist.
+ */
+const EGLL: AirportTrafficProfile = {
+  icao: 'EGLL',
+  airlines: [
+    { icao3: 'BAW', telephony: 'Speedbird', types: ['A319', 'A320', 'A321', 'A20N', 'A21N'], weight: 32, flightNumbers: [1, 999],
+      destinations: [dest('LFPG', 24000, 28000), dest('EHAM', 24000, 28000), dest('EDDF', 28000, 32000), dest('EIDW', 24000, 28000), dest('LEMD', 32000, 36000)] },
+    { icao3: 'BAW', telephony: 'Speedbird', types: ['A35K', 'B772', 'B77W', 'B788', 'B789', 'A388'], weight: 24, flightNumbers: [1, 299],
+      destinations: [dest('KJFK', 34000, 36000, 38000), dest('KBOS', 34000, 36000, 38000), dest('KORD', 34000, 36000, 38000), dest('OMDB', 36000, 38000, 40000)] },
+    { icao3: 'VIR', telephony: 'Virgin', types: ['A339', 'A35K', 'B789'], weight: 8, flightNumbers: [1, 399],
+      destinations: [dest('KJFK', 34000, 36000, 38000), dest('KBOS', 34000, 36000, 38000)] },
+    { icao3: 'EIN', telephony: 'Shamrock', types: ['A320', 'A321'], weight: 4, flightNumbers: [100, 999], destinations: [dest('EIDW', 24000, 28000)] },
+    { icao3: 'DLH', telephony: 'Lufthansa', types: ['A320', 'A321'], weight: 4, flightNumbers: [900, 999], destinations: [dest('EDDF', 28000, 32000)] },
+    { icao3: 'UAE', telephony: 'Emirates', types: ['A388', 'B77W'], weight: 3, flightNumbers: [1, 99], destinations: [dest('OMDB', 36000, 38000, 40000)] },
+    { icao3: 'AAL', telephony: 'American', types: ['B772'], weight: 2, flightNumbers: [50, 99], destinations: [dest('KORD', 34000, 36000, 38000)] },
+    { icao3: 'DAL', telephony: 'Delta', types: ['A333'], weight: 2, flightNumbers: [1, 99], destinations: [dest('KJFK', 34000, 36000, 38000)] },
+    { icao3: 'UAL', telephony: 'United', types: ['B772'], weight: 2, flightNumbers: [900, 999], destinations: [dest('KORD', 34000, 36000, 38000)] },
+  ],
+  neighbours: {},
+  gaTypes: [],
+  referenceJet: 'A320',
+  special: { vehicles: { perHour: 3 } },
+};
+
+const PROFILES: Readonly<Record<string, AirportTrafficProfile>> = { KACY, KMHT, KBOS, KPGD, KPHL, EGLL };
 
 /** The traffic profile of an airport (unknown ICAO: KACY's). */
 export function profileFor(icao: string | undefined): AirportTrafficProfile {
@@ -488,16 +524,17 @@ export function pickLeg(rng: () => number, icao: string | undefined, flight: Fli
  */
 export function resolveTypeSelection(icao: string | undefined, requested?: readonly string[]): { allowed?: ReadonlySet<string>; ga: boolean; jets: boolean } {
   const profile = profileFor(icao);
-  if (!requested?.length) return { ga: true, jets: true };
+  const gaAllowed = profile.gaTypes.length > 0; // EGLL: light aircraft are not permitted (AD 2.20 para 1)
+  if (!requested?.length) return { ga: gaAllowed, jets: true };
   const set = new Set(requested);
   const ga = profile.gaTypes.some(([t]) => set.has(t));
   const jets = usableAirlines(profile, set).length > 0;
-  if (!ga && !jets) return { ga: true, jets: true };
+  if (!ga && !jets) return { ga: gaAllowed, jets: true };
   return { allowed: set, ga, jets };
 }
 
 /** Every type the profile can generate, GA token first: the free-play default selection. KACY: ['C172', 'A320']. */
 export function profileTypes(icao: string | undefined): string[] {
   const p = profileFor(icao);
-  return [...new Set(['C172', ...p.airlines.flatMap((e) => e.types)])];
+  return [...new Set([...(p.gaTypes.length ? ['C172'] : []), ...p.airlines.flatMap((e) => e.types)])];
 }

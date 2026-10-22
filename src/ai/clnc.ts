@@ -45,8 +45,8 @@ export function ifrClearancePlan(v: AgentView, ac: Aircraft, store: ClearanceSto
   }
   const ifr: NonNullable<ParsedCommand['ifr']> = {
     destination: fp.destination,
-    departureProcedure: departureProcedureName(airport),
-    initialAltitudeFt: defaultInitialAltitudeFt(airport),
+    departureProcedure: departureProcedureName(airport, { runwayEnd: v.state.activeRunways.departing[0], key: ac.callsign }),
+    initialAltitudeFt: defaultInitialAltitudeFt(airport, { runwayEnd: v.state.activeRunways.departing[0], key: ac.callsign }),
     expectAltitudeFt: fp.cruiseAltitudeFt,
     departureFrequencyMhz: dep.mhz,
     squawk,

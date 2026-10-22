@@ -25,6 +25,14 @@ export type LiveWeatherErrorCode =
 
 export const BACKEND_HINT = 'Optional: start the local backend with `npm run server` (http://localhost:8787) to use the Aviation Weather Center feed.';
 
+/** The NWS API only has US stations (K..., P... ids); a station elsewhere (EGLL) is reachable only through the local backend's AWC proxy. */
+export function isNwsStation(icao: string): boolean {
+  return /^[KP][A-Z0-9]{3}$/.test(icao.toUpperCase());
+}
+
+export const NON_US_STATIC_MESSAGE =
+  'Live weather for this airport is unavailable on the static build: the National Weather Service API covers US stations only and the Aviation Weather Center sends no CORS headers, so it is reachable only through the local backend (`npm run server`). Simulated weather is used.';
+
 export const STATIC_HOSTING_MESSAGE =
   'Live weather on this hosted build comes straight from the National Weather Service API (no local backend).';
 
@@ -326,7 +334,8 @@ async function fetchFromNws(id: string, options: FetchLiveMetarOptions): Promise
 export async function fetchLiveMetar(icao = 'KACY', options: FetchLiveMetarOptions = {}): Promise<LiveMetar> {
   const id = icao.toUpperCase();
   const staticHost = options.staticHosting ?? isStaticHosting();
-  const fallback = options.nwsFallback !== false;
+  const fallback = options.nwsFallback !== false && isNwsStation(id);
+  if (staticHost && !isNwsStation(id)) throw new LiveWeatherError('STATIC_HOSTING', NON_US_STATIC_MESSAGE);
 
   let backendError: LiveWeatherError | undefined;
   if (!staticHost) {

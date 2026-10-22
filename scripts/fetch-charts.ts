@@ -16,7 +16,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { listCharts } from '../src/charts/chartIndex.ts';
+import { isLinkOnly, listCharts } from '../src/charts/chartIndex.ts';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const outRoot = path.join(root, 'public', 'charts');
@@ -65,6 +65,10 @@ async function main() {
   const airports = wanted.length ? wanted : AIRPORTS;
   const jobs: Array<{ icao: string; url: string; dest: string; name: string }> = [];
   for (const icao of airports) {
+    if (isLinkOnly(icao)) {
+      console.log(`${icao}: charts are copyrighted (UK AIP, NATS Limited) and only linked in the app; nothing downloaded`);
+      continue;
+    }
     const dir = path.join(outRoot, icao);
     fs.mkdirSync(dir, { recursive: true });
     const seen = new Set<string>();

@@ -1,4 +1,4 @@
-# ATC Simulator (KACY, KMHT and KPHL)
+# ATC Simulator (KACY, KMHT, KBOS, KPHL, KPGD and EGLL)
 
 A browser-based, single-player air traffic control simulator for two real airports,
 chosen on the setup screen: **Atlantic City International (KACY)**, New Jersey (the
@@ -59,6 +59,25 @@ flypgd.com; the aircraft types come from the airlines' fleets, not from the airp
 observations with an **empty `rawMessage`**, like KMHT, so the sim rebuilds the report from the decoded fields. Career steps and training lessons stay KACY-only.
 
 **KPHL (Philadelphia International, Class B)**, same sources and cycle (NASR 2026-10-01, d-TPP 2610, OSM snapshot 2026-10-22 UTC, retrieved 2026-10-21): four runways (8/26 5001 x 150 ft, 9L/27R 9500 x 150, 9R/27L 12000 x 200 with a 1913 ft displaced threshold at 27L, 17/35 6500 x 150), six ILS (9L, 9R, 17, 26, 27L, 27R), the NASR frequency rows serving PHL (Tower 118.5 and 135.1, Ground 121.9, Clearance 118.85, D-ATIS 133.4 / 135.925, Philadelphia Approach 124.35, North and South Departure 124.35 / 119.75; the other 60 NASR rows of the same TRACON that serve Newark, Teterboro and others are not included), all 38 d-TPP charts (22 instrument approaches, 3 visual approaches, the PHILADELPHIA FOUR departure, six STARs of which BOJID FOUR and PAATS FOUR are transcribed, hot-spot and minimums pages), 57 of the 62 diagram taxiway identifiers, about 115 airline gate stands at terminals A-West to F, FedEx, UPS and GA stands (OSM). The two documented runway configurations (west flow: arrivals 27R/27L/26/35, departures 27L/27R/35; east flow: arrivals 9R/9L/17, departures 9L/9R/8/17) come from the PHL Noise Office page and the Part 150 Noise Exposure Maps and are chosen by wind. Traffic mixes the airlines phl.org lists (American hub, American Eagle, Southwest, Frontier, Delta, United, JetBlue, Alaska, Sun Country) and UPS at night; long-haul flights are not generated. Live weather: `https://api.weather.gov/stations/KPHL/observations/latest` returned an observation on 2026-10-21 (rawMessage empty, so the METAR is rebuilt from the decoded fields as for KMHT). No MVA, holding patterns or fix altitudes. Gaps and unverified items: `data/sources/README.md`, "KPHL".
+
+**EGLL (fourth airport and the first outside the US: London Heathrow)**, transcribed by hand from the **UK AIP** (NATS eAIP, AIRAC 10/2026, effective 2026-10-01, retrieved
+2026-10-21) because there is no FAA data: ARP 51 28 39 N 000 27 41 W, elevation 83 ft, variation 1.23 E (the AIP prints the 2027 value), runways 09L/27R (3901 x 50 m) and 09R/27L
+(3658 x 50 m) with declared distances, 09L and 09R landing thresholds displaced 309 / 308 m (the pavement ends are derived from them), four CAT III ILS/DME (I-AA, I-BB, I-LL,
+I-RR), Heathrow Delivery 121.980, Ground 121.705, Tower 118.505, Director 119.730, ATIS 128.080 (AD 2.18), the Class D London CTR (not Class A), 18 RNAV STARs to the four holding fixes
+(OCK, BIG, LAM, BNN; every fix, track, distance and level read from the coding tables), 24 SIDs (route text; initial altitude 6000 ft), 195 stands in Terminals 2 to 5 and the cargo area
+(OSM ways whose number is on the AIP stand charts), 4 transcribed ILS plates with RDH and missed approach, the five hot spots. Runways are used in **segregated mode** (one lands, one
+departs; 27 preferred up to 5 kt tailwind, AD 2.20 para 6; the westerly alternation and the Cranford Agreement come from the operator's published programme, not the AIP). **The UK AIP charts
+are copyright NATS Limited: they are linked to the official URL and never bundled** (the chart viewer shows the links; `npm run fetch-charts` skips EGLL). Weather: METAR Q-group QNH and
+metres are parsed, the ATIS reads QNH and metric visibility; live weather for EGLL needs the local backend (the NWS API has no UK stations; the static build says so). Traffic: airlines
+from heathrow.com (British Airways dominant, then Virgin Atlantic and others; BA and Virgin aircraft types from the operators, the rest ESTIMATEs), no general aviation (light aircraft
+are not permitted, AD 2.20), vehicles yes. Full source list, licence reasoning and unverified items: `data/sources/README.md` (EGLL), UK/FAA differences: `docs/UK-PHRASEOLOGY.md`.
+
+**Known differences (EGLL is not UK ATC training).** Every phrase, readback and rule is the FAA one unless listed as implemented in `docs/UK-PHRASEOLOGY.md`. Not implemented: "line up" /
+"hold position" / "taxi to holding point" / conditional line up wording (FAA "line up and wait", "hold short"), "zero nine left" (the simulator says "nine left"), "stand" for gate, the
+Heathrow start-up call (type, stand, QNH, ATIS), altitude / flight level / transition altitude phraseology, UK wind wording ("surface wind 270 15"), UK ATIS element order, speeds and
+heading-vector phraseology of the Director, time-based separation and RECAT-EU, noise preferential routes and the 250 kt limit, low-visibility procedures and stop bars, the 15:00
+runway swap and weekly alternation (the configuration is chosen by headwind, first listed is 27R landing), runway 09 departures from the northern runway, taxiways with a suffix letter
+(A9E, N4W) and the "Link nn" stubs (they are geometry but unnamed, the command parser takes a letter and up to two digits), the helicopter routes and VFR procedures of the London CTR.
 
 Behavioural realism is verified too: aircraft performance values carry a source each
 (Textron/Cessna, Airbus, EASA, EUROCONTROL), the 250 ft holding-position distance matches

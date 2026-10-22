@@ -58,7 +58,8 @@ export function windText(w: Weather, variationDeg: number): string {
   return `${magHeading(w.windDirDeg, variationDeg)}/${pad(w.windSpeedKt, 2)}${gust}`;
 }
 
-export function altimeterText(inHg: number): string {
+export function altimeterText(inHg: number, unit: 'inHg' | 'hPa' = 'inHg'): string {
+  if (unit === 'hPa') return `Q${pad(Math.round(inHg * 33.8639), 4)}`;
   return `A${pad(Math.round(inHg * 100), 4)}`;
 }
 

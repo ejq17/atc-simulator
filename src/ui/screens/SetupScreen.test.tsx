@@ -17,11 +17,11 @@ afterEach(() => {
 });
 
 describe('<SetupScreen /> airport selector', () => {
-  it('defaults to KACY and offers KMHT, KBOS, KPGD and KPHL', () => {
+  it('defaults to KACY and offers KMHT, KBOS, KPGD, KPHL and EGLL', () => {
     render(<SetupScreen />);
     const select = screen.getByTestId('airport-select') as HTMLSelectElement;
     expect(select.value).toBe('KACY');
-    expect([...select.options].map((o) => o.value)).toEqual(['KACY', 'KMHT', 'KBOS', 'KPHL', 'KPGD']);
+    expect([...select.options].map((o) => o.value)).toEqual(['KACY', 'KMHT', 'KBOS', 'KPHL', 'KPGD', 'EGLL']);
     expect(screen.getByText('KACY ATC Simulator')).toBeInTheDocument();
     expect(fetchLiveMetar).toHaveBeenCalledWith('KACY');
   });
@@ -69,6 +69,19 @@ describe('<SetupScreen /> KPGD', () => {
     expect(screen.getByText('Live KPGD METAR')).toBeInTheDocument();
     expect(screen.getAllByText(/121\.0/).length).toBeGreaterThan(0);
     expect(screen.queryAllByText(/Atlantic City/).filter((el) => el.tagName !== 'OPTION')).toEqual([]);
+  });
+});
+
+describe('<SetupScreen /> EGLL', () => {
+  it('switching to EGLL re-labels the screen, fetches the EGLL METAR, lists the Heathrow frequencies and offers no general aviation', () => {
+    render(<SetupScreen />);
+    fireEvent.change(screen.getByTestId('airport-select'), { target: { value: 'EGLL' } });
+    expect(screen.getByText('EGLL ATC Simulator')).toBeInTheDocument();
+    expect(fetchLiveMetar).toHaveBeenLastCalledWith('EGLL');
+    expect(screen.getByText('Live EGLL METAR')).toBeInTheDocument();
+    expect(screen.getAllByText(/118\.505/).length).toBeGreaterThan(0);
+    expect(screen.queryAllByText(/Atlantic City/).filter((el) => el.tagName !== 'OPTION')).toEqual([]);
+    expect(screen.queryByTestId('type-C172')).toBeNull();
   });
 });
 

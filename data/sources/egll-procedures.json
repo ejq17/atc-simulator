@@ -1,0 +1,3363 @@
+{
+ "_provenance": {
+  "source_name": "UK AIP (NATS AIS eAIP) AIRAC 10/2026, AD 2.EGLL charts (AD 2.24)",
+  "source_url": "https://www.aurora.nats.co.uk/htmlAIP/Publications/2026-10-01-AIRAC/html/eAIP/EG-AD-2.EGLL-en-GB.html",
+  "source": "UK AIP AD 2.EGLL, charts AD 2-EGLL-2-1 .. 8-13; PDFs at https://www.aurora.nats.co.uk/htmlAIP/Publications/2026-10-01-AIRAC/graphics/<id>.pdf",
+  "retrieved": "2026-10-21",
+  "cycle": "AIRAC 10/2026",
+  "effective_from": "2026-10-01 0000Z",
+  "effective_to": "2026-10-29 0000Z",
+  "volume": "UK AIP AD 2.EGLL (NATS eAIP)",
+  "licence": "(c) Copyright NATS Limited. LINK ONLY: the chart PDFs are not bundled in the repository or the site (see data/sources/README.md EGLL section).",
+  "http_checks": "raw/egll/pdf_http_checks.tsv: 62 PDFs, every URL HTTP 200 application/pdf, size recorded",
+  "link_only": true,
+  "authority": "UK AIP",
+  "licence_conclusion": "Copyright NATS Limited; no reuse licence found (AIP index footer and NATS terms). Charts are linked to the official URL and never bundled, proxied or cached."
+ },
+ "primary_navaid_id": "LON",
+ "primary_navaid_note": "LONDON VOR/DME LON 113.60 (83X), AD 2.19.",
+ "navaids_referenced": [],
+ "ils_note": "Four ILS/DME (CAT III): I-AA 09L, I-BB 09R, I-LL 27L, I-RR 27R.",
+ "navaid_unverified": [],
+ "ils_plate_data": {},
+ "airport_diagram": {
+  "chart_name": "AERODROME CHART - ICAO",
+  "pdf_name": "EGLL_AD2.EGLL-2-1.pdf",
+  "printed_header": "AD 2-EGLL-2-1, AERO INFO DATE 27 JAN 26, CHANGE (4/26)",
+  "printed_variation_epoch": "2027",
+  "printed_annual_rate_of_change": "0.17 deg E",
+  "printed_frequencies": {
+   "ATIS": "128.080, 113.750, 117.000 (Arrival) 121.935 (Departure)",
+   "TOWER": "118.705, 118.505, 124.480",
+   "DELIVERY": "121.980 (GM Planning)",
+   "GROUND": "121.905, 121.705, 121.855 (GMC)",
+   "FIRE": "121.605"
+  },
+  "charted_runway_headings_mag": {
+   "9L": 88,
+   "9R": 88,
+   "27L": 268,
+   "27R": 268
+  },
+  "charted_runway_headings_note": "\"088°M\" and \"268°M\" printed on the chart; each equals the AD 2.12 true bearing minus the 1.23 E variation rounded.",
+  "taxiway_identifiers": [
+   "A",
+   "B",
+   "C",
+   "D",
+   "E",
+   "F",
+   "G",
+   "H",
+   "K",
+   "L",
+   "M",
+   "R",
+   "S",
+   "T",
+   "V",
+   "W",
+   "Y",
+   "Z",
+   "A1",
+   "A2",
+   "A3",
+   "A4",
+   "A5",
+   "A6",
+   "A7",
+   "A8",
+   "A9E",
+   "A9W",
+   "A10E",
+   "A10W",
+   "A11",
+   "A12",
+   "A13",
+   "B1",
+   "C1",
+   "C2",
+   "D1",
+   "D2",
+   "E1",
+   "E2",
+   "F1",
+   "F2",
+   "K1",
+   "K2",
+   "L1",
+   "L2",
+   "M1",
+   "N1",
+   "N2E",
+   "N2W",
+   "N3",
+   "N4E",
+   "N4W",
+   "N5E",
+   "N5W",
+   "N6",
+   "N7",
+   "N8",
+   "N10",
+   "N11",
+   "S1",
+   "S3",
+   "S4E",
+   "S4W",
+   "S5E",
+   "S5W",
+   "S6",
+   "S7",
+   "S11"
+  ],
+  "taxiway_identifiers_note": "Main taxiways from AD 2.8 / chart labels; exits from the chart label text (script) and the \"RWY ENTRANCE/EXIT\" legend of AD 2-EGLL-2-1; stub taxiways are \"Link nn\" (08 10 11 13 21 22 23 25 26 27 28 31 35 36 41 42 43 44 51 52 53 54 56 57 58 labels read). Hot spots HS1-HS5 on the chart.",
+  "pdf": {
+   "url": "https://www.aurora.nats.co.uk/htmlAIP/Publications/2026-10-01-AIRAC/graphics/487994.pdf",
+   "http_status": 200,
+   "content_type": "application/pdf",
+   "bytes": 1058868,
+   "verified_by": "curl GET on 2026-10-21 (HTTP status, content type, size); official NATS URL; LINK ONLY, not bundled; the path changes every AIRAC cycle",
+   "local_file": "raw/egll_aip_pdfs/EGLL_AD2.EGLL-2-1.pdf"
+  }
+ },
+ "instrument_approaches": [
+  {
+   "chart_name": "ILS/DME I-AA RWY 09L",
+   "chart_code": "IAP",
+   "pdf_name": "EGLL_AD2.EGLL-8-1.pdf",
+   "printed_amendment_on_plate": "CHANGE (7/26) AERO INFO DATE 20 APR 26",
+   "runway": "9L",
+   "approach_type": "ILS/DME (radar vectored from the STAR holding fixes, plate note 1)",
+   "final_approach_course_mag_deg": 88,
+   "pdf": {
+    "url": "https://www.aurora.nats.co.uk/htmlAIP/Publications/2026-10-01-AIRAC/graphics/505220.pdf",
+    "http_status": 200,
+    "content_type": "application/pdf",
+    "bytes": 170575,
+    "verified_by": "curl GET on 2026-10-21 (HTTP status, content type, size); official NATS URL; LINK ONLY, not bundled; the path changes every AIRAC cycle",
+    "local_file": "raw/egll_aip_pdfs/EGLL_AD2.EGLL-8-1.pdf"
+   },
+   "fixes_and_roles": [
+    {
+     "fix": "OCK",
+     "role": "IAF (initial approach via BIG and OCK, AD 2-EGLL-7-20; vectors normally)"
+    },
+    {
+     "fix": "AAIF",
+     "role": "IF (DERIVED: I-AA D10, localizer established by D10)"
+    },
+    {
+     "fix": "AAFAP",
+     "role": "FAF (DERIVED: I-AA D7.5 = FAP, plate)"
+    },
+    {
+     "fix": "CHT",
+     "role": "missed approach hold (AD 2.22 para 2)"
+    }
+   ],
+   "minima_summary": "ILS/DME I-AA: OCA(OCH) CAT I A 224(145) B 236(157) C 251(172) D 271(192); CAT II 134(55) 145(66) 158(79) 174(95); GP 3 deg, RDH 51; FAP I-AA D7.5 at 2500; D4 1400; D1 450; THR ELEV 79; obstacle elevation 1087 AMSL",
+   "missed_approach": "Climb to 3000 then climbing left turn to 3000 on heading 35 deg and direct CHT and hold",
+   "missed_approach_verbatim": "Climb to 3000 - straight ahead until passing 1580 or I-AA DME zero inbound whichever is later, then left onto track 035°. Continue as directed. RCF: On passing LON DME 10 proceed to NDB CHT at 3000.",
+   "holding": "",
+   "plate_notes": "Transition altitude 6000. Simplified missed approach: the plate says \"Continue as directed\" after the initial track; the simulator flies to the AD 2.22 para 2 missed approach hold instead.",
+   "fix_order_note": "IF and FAF are DERIVED DME fixes (egll-navaids.json); the AIP names no waypoints on the ILS final. Feeder = the initial-approach holding fix of the chart; real arrivals are radar vectored from the stack.",
+   "data_provenance": "UK AIP AD 2.EGLL chart text layer and render, AIRAC 10/2026 (human transcription)"
+  },
+  {
+   "chart_name": "ILS/DME I-BB RWY 09R",
+   "chart_code": "IAP",
+   "pdf_name": "EGLL_AD2.EGLL-8-4.pdf",
+   "printed_amendment_on_plate": "CHANGE (7/26) AERO INFO DATE 20 APR 26",
+   "runway": "9R",
+   "approach_type": "ILS/DME (radar vectored from the STAR holding fixes, plate note 1)",
+   "final_approach_course_mag_deg": 88,
+   "pdf": {
+    "url": "https://www.aurora.nats.co.uk/htmlAIP/Publications/2026-10-01-AIRAC/graphics/505230.pdf",
+    "http_status": 200,
+    "content_type": "application/pdf",
+    "bytes": 169639,
+    "verified_by": "curl GET on 2026-10-21 (HTTP status, content type, size); official NATS URL; LINK ONLY, not bundled; the path changes every AIRAC cycle",
+    "local_file": "raw/egll_aip_pdfs/EGLL_AD2.EGLL-8-4.pdf"
+   },
+   "fixes_and_roles": [
+    {
+     "fix": "OCK",
+     "role": "IAF (initial approach via BIG and OCK, AD 2-EGLL-7-20; vectors normally)"
+    },
+    {
+     "fix": "BBIF",
+     "role": "IF (DERIVED: I-BB D10)"
+    },
+    {
+     "fix": "BBFAP",
+     "role": "FAF (DERIVED: I-BB D7.5 = FAP, plate)"
+    },
+    {
+     "fix": "EPM",
+     "role": "missed approach hold (AD 2.22 para 2)"
+    }
+   ],
+   "minima_summary": "ILS/DME I-BB: OCA(OCH) CAT I A 221(146) B 233(158) C 248(173) D 266(191); CAT II 124(49) 136(61) 151(76) 174(99); GP 3 deg, RDH 50; FAP I-BB D7.5 at 2500; D4 1400; D1 450; THR ELEV 75",
+   "missed_approach": "Climb to 3000 direct EPM and hold",
+   "missed_approach_verbatim": "Climb straight ahead to 3000. Continue as directed. RADIO FAILURE: On passing LON DME 10 turn right to NDB EPM at 3000.",
+   "holding": "",
+   "plate_notes": "Transition altitude 6000. Simplified missed approach: the plate says \"Continue as directed\" after the initial track; the simulator flies to the AD 2.22 para 2 missed approach hold instead.",
+   "fix_order_note": "IF and FAF are DERIVED DME fixes (egll-navaids.json); the AIP names no waypoints on the ILS final. Feeder = the initial-approach holding fix of the chart; real arrivals are radar vectored from the stack.",
+   "data_provenance": "UK AIP AD 2.EGLL chart text layer and render, AIRAC 10/2026 (human transcription)"
+  },
+  {
+   "chart_name": "ILS/DME I-LL RWY 27L",
+   "chart_code": "IAP",
+   "pdf_name": "EGLL_AD2.EGLL-8-7.pdf",
+   "printed_amendment_on_plate": "CHANGE (7/26) AERO INFO DATE 20 APR 26",
+   "runway": "27L",
+   "approach_type": "ILS/DME (radar vectored from the STAR holding fixes, plate note 1)",
+   "final_approach_course_mag_deg": 268,
+   "pdf": {
+    "url": "https://www.aurora.nats.co.uk/htmlAIP/Publications/2026-10-01-AIRAC/graphics/505239.pdf",
+    "http_status": 200,
+    "content_type": "application/pdf",
+    "bytes": 170395,
+    "verified_by": "curl GET on 2026-10-21 (HTTP status, content type, size); official NATS URL; LINK ONLY, not bundled; the path changes every AIRAC cycle",
+    "local_file": "raw/egll_aip_pdfs/EGLL_AD2.EGLL-8-7.pdf"
+   },
+   "fixes_and_roles": [
+    {
+     "fix": "BIG",
+     "role": "IAF (initial approach via BIG, AD 2-EGLL-7-22; vectors normally)"
+    },
+    {
+     "fix": "LLIF",
+     "role": "IF (DERIVED: I-LL D10)"
+    },
+    {
+     "fix": "LLFAP",
+     "role": "FAF (DERIVED: I-LL D7.5 = FAP, plate)"
+    },
+    {
+     "fix": "EPM",
+     "role": "missed approach hold (AD 2.22 para 2)"
+    }
+   ],
+   "minima_summary": "ILS/DME I-LL: OCA(OCH) CAT I A 229(152) B 241(164) C 255(178) D 273(196); CAT II 137(60) 146(69) 159(82) 177(100); GP 3 deg, RDH 56; FAP I-LL D7.5 at 2500; D4 1410; D1 450; THR ELEV 77",
+   "missed_approach": "Climb to 2000 then climbing left turn to 3000 on heading 146 deg and direct EPM and hold",
+   "missed_approach_verbatim": "Climb to 2000 - straight ahead until passing 1080 or I-LL DME zero inbound whichever is later, then left onto track 146°. When established and passing LON DME 6 climb to 3000 without delay. Continue as directed. RCF: On reaching 3000 proceed to NDB EPM at 3000.",
+   "holding": "",
+   "plate_notes": "Transition altitude 6000. Simplified missed approach: the plate says \"Continue as directed\" after the initial track; the simulator flies to the AD 2.22 para 2 missed approach hold instead.",
+   "fix_order_note": "IF and FAF are DERIVED DME fixes (egll-navaids.json); the AIP names no waypoints on the ILS final. Feeder = the initial-approach holding fix of the chart; real arrivals are radar vectored from the stack.",
+   "data_provenance": "UK AIP AD 2.EGLL chart text layer and render, AIRAC 10/2026 (human transcription)"
+  },
+  {
+   "chart_name": "ILS/DME I-RR RWY 27R",
+   "chart_code": "IAP",
+   "pdf_name": "EGLL_AD2.EGLL-8-10.pdf",
+   "printed_amendment_on_plate": "CHANGE (7/26) AERO INFO DATE 20 APR 26",
+   "runway": "27R",
+   "approach_type": "ILS/DME (radar vectored from the STAR holding fixes, plate note 1)",
+   "final_approach_course_mag_deg": 268,
+   "pdf": {
+    "url": "https://www.aurora.nats.co.uk/htmlAIP/Publications/2026-10-01-AIRAC/graphics/505248.pdf",
+    "http_status": 200,
+    "content_type": "application/pdf",
+    "bytes": 170183,
+    "verified_by": "curl GET on 2026-10-21 (HTTP status, content type, size); official NATS URL; LINK ONLY, not bundled; the path changes every AIRAC cycle",
+    "local_file": "raw/egll_aip_pdfs/EGLL_AD2.EGLL-8-10.pdf"
+   },
+   "fixes_and_roles": [
+    {
+     "fix": "BIG",
+     "role": "IAF (initial approach via BIG, AD 2-EGLL-7-22; vectors normally)"
+    },
+    {
+     "fix": "RRIF",
+     "role": "IF (DERIVED: I-RR D10)"
+    },
+    {
+     "fix": "RRFAP",
+     "role": "FAF (DERIVED: I-RR D7.5 = FAP, plate)"
+    },
+    {
+     "fix": "CHT",
+     "role": "missed approach hold (AD 2.22 para 2)"
+    }
+   ],
+   "minima_summary": "ILS/DME I-RR: OCA(OCH) CAT I A 224(146) B 234(156) C 249(171) D 268(190); CAT II 131(53) 141(63) 154(76) 172(94); GP 3 deg, RDH 58; FAP I-RR D7.5 at 2500; D4 1410; D1 450; THR ELEV 78",
+   "missed_approach": "Climb to 3000 then climbing right turn to 3000 on heading 315 deg and direct CHT and hold",
+   "missed_approach_verbatim": "Climb to 3000 - straight ahead until passing 1580 or I-RR DME zero inbound whichever is later, then turn right onto track 315°. Continue as directed. RADIO FAILURE: On passing LON DME 10 turn right to NDB CHT at 3000.",
+   "holding": "",
+   "plate_notes": "Transition altitude 6000. Simplified missed approach: the plate says \"Continue as directed\" after the initial track; the simulator flies to the AD 2.22 para 2 missed approach hold instead.",
+   "fix_order_note": "IF and FAF are DERIVED DME fixes (egll-navaids.json); the AIP names no waypoints on the ILS final. Feeder = the initial-approach holding fix of the chart; real arrivals are radar vectored from the stack.",
+   "data_provenance": "UK AIP AD 2.EGLL chart text layer and render, AIRAC 10/2026 (human transcription)"
+  },
+  {
+   "chart_name": "LOC/DME I-AA RWY 09L",
+   "chart_code": "IAP",
+   "pdf_name": "EGLL_AD2.EGLL-8-2.pdf",
+   "printed_amendment_on_plate": "see chart",
+   "runway": "9L",
+   "approach_type": "LOC/DME",
+   "pdf": {
+    "url": "https://www.aurora.nats.co.uk/htmlAIP/Publications/2026-10-01-AIRAC/graphics/505224.pdf",
+    "http_status": 200,
+    "content_type": "application/pdf",
+    "bytes": 224798,
+    "verified_by": "curl GET on 2026-10-21 (HTTP status, content type, size); official NATS URL; LINK ONLY, not bundled; the path changes every AIRAC cycle",
+    "local_file": "raw/egll_aip_pdfs/EGLL_AD2.EGLL-8-2.pdf"
+   },
+   "fixes_and_roles": [],
+   "minima_summary": "-",
+   "missed_approach": "-",
+   "missed_approach_verbatim": "-",
+   "holding": "",
+   "plate_notes": "Listed for the charts panel, NOT transcribed (not read).",
+   "data_provenance": "chart list from AD 2.24"
+  },
+  {
+   "chart_name": "RNP RWY 09L",
+   "chart_code": "IAP",
+   "pdf_name": "EGLL_AD2.EGLL-8-3.pdf",
+   "printed_amendment_on_plate": "see chart",
+   "runway": "9L",
+   "approach_type": "RNP",
+   "pdf": {
+    "url": "https://www.aurora.nats.co.uk/htmlAIP/Publications/2026-10-01-AIRAC/graphics/505227.pdf",
+    "http_status": 200,
+    "content_type": "application/pdf",
+    "bytes": 229939,
+    "verified_by": "curl GET on 2026-10-21 (HTTP status, content type, size); official NATS URL; LINK ONLY, not bundled; the path changes every AIRAC cycle",
+    "local_file": "raw/egll_aip_pdfs/EGLL_AD2.EGLL-8-3.pdf"
+   },
+   "fixes_and_roles": [],
+   "minima_summary": "-",
+   "missed_approach": "-",
+   "missed_approach_verbatim": "-",
+   "holding": "",
+   "plate_notes": "Listed for the charts panel, NOT transcribed (not read).",
+   "data_provenance": "chart list from AD 2.24"
+  },
+  {
+   "chart_name": "LOC/DME I-BB RWY 09R",
+   "chart_code": "IAP",
+   "pdf_name": "EGLL_AD2.EGLL-8-5.pdf",
+   "printed_amendment_on_plate": "see chart",
+   "runway": "9R",
+   "approach_type": "LOC/DME",
+   "pdf": {
+    "url": "https://www.aurora.nats.co.uk/htmlAIP/Publications/2026-10-01-AIRAC/graphics/505233.pdf",
+    "http_status": 200,
+    "content_type": "application/pdf",
+    "bytes": 223512,
+    "verified_by": "curl GET on 2026-10-21 (HTTP status, content type, size); official NATS URL; LINK ONLY, not bundled; the path changes every AIRAC cycle",
+    "local_file": "raw/egll_aip_pdfs/EGLL_AD2.EGLL-8-5.pdf"
+   },
+   "fixes_and_roles": [],
+   "minima_summary": "-",
+   "missed_approach": "-",
+   "missed_approach_verbatim": "-",
+   "holding": "",
+   "plate_notes": "Listed for the charts panel, NOT transcribed (not read).",
+   "data_provenance": "chart list from AD 2.24"
+  },
+  {
+   "chart_name": "RNP RWY 09R",
+   "chart_code": "IAP",
+   "pdf_name": "EGLL_AD2.EGLL-8-6.pdf",
+   "printed_amendment_on_plate": "see chart",
+   "runway": "9R",
+   "approach_type": "RNP",
+   "pdf": {
+    "url": "https://www.aurora.nats.co.uk/htmlAIP/Publications/2026-10-01-AIRAC/graphics/505235.pdf",
+    "http_status": 200,
+    "content_type": "application/pdf",
+    "bytes": 228369,
+    "verified_by": "curl GET on 2026-10-21 (HTTP status, content type, size); official NATS URL; LINK ONLY, not bundled; the path changes every AIRAC cycle",
+    "local_file": "raw/egll_aip_pdfs/EGLL_AD2.EGLL-8-6.pdf"
+   },
+   "fixes_and_roles": [],
+   "minima_summary": "-",
+   "missed_approach": "-",
+   "missed_approach_verbatim": "-",
+   "holding": "",
+   "plate_notes": "Listed for the charts panel, NOT transcribed (not read).",
+   "data_provenance": "chart list from AD 2.24"
+  },
+  {
+   "chart_name": "LOC/DME I-LL RWY 27L",
+   "chart_code": "IAP",
+   "pdf_name": "EGLL_AD2.EGLL-8-8.pdf",
+   "printed_amendment_on_plate": "see chart",
+   "runway": "27L",
+   "approach_type": "LOC/DME",
+   "pdf": {
+    "url": "https://www.aurora.nats.co.uk/htmlAIP/Publications/2026-10-01-AIRAC/graphics/505242.pdf",
+    "http_status": 200,
+    "content_type": "application/pdf",
+    "bytes": 240123,
+    "verified_by": "curl GET on 2026-10-21 (HTTP status, content type, size); official NATS URL; LINK ONLY, not bundled; the path changes every AIRAC cycle",
+    "local_file": "raw/egll_aip_pdfs/EGLL_AD2.EGLL-8-8.pdf"
+   },
+   "fixes_and_roles": [],
+   "minima_summary": "-",
+   "missed_approach": "-",
+   "missed_approach_verbatim": "-",
+   "holding": "",
+   "plate_notes": "Listed for the charts panel, NOT transcribed (not read).",
+   "data_provenance": "chart list from AD 2.24"
+  },
+  {
+   "chart_name": "RNP RWY 27L",
+   "chart_code": "IAP",
+   "pdf_name": "EGLL_AD2.EGLL-8-9.pdf",
+   "printed_amendment_on_plate": "see chart",
+   "runway": "27L",
+   "approach_type": "RNP",
+   "pdf": {
+    "url": "https://www.aurora.nats.co.uk/htmlAIP/Publications/2026-10-01-AIRAC/graphics/505245.pdf",
+    "http_status": 200,
+    "content_type": "application/pdf",
+    "bytes": 249053,
+    "verified_by": "curl GET on 2026-10-21 (HTTP status, content type, size); official NATS URL; LINK ONLY, not bundled; the path changes every AIRAC cycle",
+    "local_file": "raw/egll_aip_pdfs/EGLL_AD2.EGLL-8-9.pdf"
+   },
+   "fixes_and_roles": [],
+   "minima_summary": "-",
+   "missed_approach": "-",
+   "missed_approach_verbatim": "-",
+   "holding": "",
+   "plate_notes": "Listed for the charts panel, NOT transcribed (not read).",
+   "data_provenance": "chart list from AD 2.24"
+  },
+  {
+   "chart_name": "LOC/DME I-RR RWY 27R",
+   "chart_code": "IAP",
+   "pdf_name": "EGLL_AD2.EGLL-8-11.pdf",
+   "printed_amendment_on_plate": "see chart",
+   "runway": "27R",
+   "approach_type": "LOC/DME",
+   "pdf": {
+    "url": "https://www.aurora.nats.co.uk/htmlAIP/Publications/2026-10-01-AIRAC/graphics/505251.pdf",
+    "http_status": 200,
+    "content_type": "application/pdf",
+    "bytes": 225590,
+    "verified_by": "curl GET on 2026-10-21 (HTTP status, content type, size); official NATS URL; LINK ONLY, not bundled; the path changes every AIRAC cycle",
+    "local_file": "raw/egll_aip_pdfs/EGLL_AD2.EGLL-8-11.pdf"
+   },
+   "fixes_and_roles": [],
+   "minima_summary": "-",
+   "missed_approach": "-",
+   "missed_approach_verbatim": "-",
+   "holding": "",
+   "plate_notes": "Listed for the charts panel, NOT transcribed (not read).",
+   "data_provenance": "chart list from AD 2.24"
+  },
+  {
+   "chart_name": "RNP RWY 27R",
+   "chart_code": "IAP",
+   "pdf_name": "EGLL_AD2.EGLL-8-12.pdf",
+   "printed_amendment_on_plate": "see chart",
+   "runway": "27R",
+   "approach_type": "RNP",
+   "pdf": {
+    "url": "https://www.aurora.nats.co.uk/htmlAIP/Publications/2026-10-01-AIRAC/graphics/505254.pdf",
+    "http_status": 200,
+    "content_type": "application/pdf",
+    "bytes": 232472,
+    "verified_by": "curl GET on 2026-10-21 (HTTP status, content type, size); official NATS URL; LINK ONLY, not bundled; the path changes every AIRAC cycle",
+    "local_file": "raw/egll_aip_pdfs/EGLL_AD2.EGLL-8-12.pdf"
+   },
+   "fixes_and_roles": [],
+   "minima_summary": "-",
+   "missed_approach": "-",
+   "missed_approach_verbatim": "-",
+   "holding": "",
+   "plate_notes": "Listed for the charts panel, NOT transcribed (not read).",
+   "data_provenance": "chart list from AD 2.24"
+  }
+ ],
+ "departure_procedures": [
+  {
+   "chart_name": "CPT 5J DEPARTURE (SID)",
+   "type": "SID (RNAV substitution only), runway 9R. Noise preferential route text from AD 2.21 sub-para 8.",
+   "faa_id": "CPT5J",
+   "printed_date": "AERO INFO DATE per chart (05 NOV 25 .. 02 DEC 25)",
+   "runway": "9R",
+   "pdf": {
+    "url": "https://www.aurora.nats.co.uk/htmlAIP/Publications/2026-10-01-AIRAC/graphics/475382.pdf",
+    "http_status": 200,
+    "content_type": "application/pdf",
+    "bytes": 455415,
+    "verified_by": "curl GET on 2026-10-21 (HTTP status, content type, size); official NATS URL; LINK ONLY, not bundled; the path changes every AIRAC cycle",
+    "local_file": "raw/egll_aip_pdfs/EGLL_AD2.EGLL-6-1.pdf"
+   },
+   "maintain_altitude_ft": 6000,
+   "radar_required": false,
+   "top_altitude_ft": 6000,
+   "london_control_mhz": 134.125,
+   "route_description": {
+    "9R": "Straight ahead to LON D2, then turn right onto NDB WOD QDM 280°, continue to CPT VOR."
+   },
+   "common_text": "Chart warning: \"Due to interaction with other routes do not climb above 6000 until cleared by ATC.\" Maximum 250 KIAS below FL100 unless otherwise authorised. Minimum 4% climb gradient to 4000 after noise monitoring points not below 1083 QNH (1000 QFE). Transition altitude 6000. Report callsign, SID designator, current altitude and cleared altitude on first contact with London Control.",
+   "note": "maintain_altitude_ft 6000 = the level every one of the six SID charts caps the climb at until ATC clears it; the AIP prints no \"initial climb altitude\" phrase. The simulator flies runway heading then vectors; the SID route is not flown."
+  },
+  {
+   "chart_name": "CPT 4K DEPARTURE (SID)",
+   "type": "SID (RNAV substitution only), runway 9L. Noise preferential route text from AD 2.21 sub-para 8.",
+   "faa_id": "CPT4K",
+   "printed_date": "AERO INFO DATE per chart (05 NOV 25 .. 02 DEC 25)",
+   "runway": "9L",
+   "pdf": {
+    "url": "https://www.aurora.nats.co.uk/htmlAIP/Publications/2026-10-01-AIRAC/graphics/475382.pdf",
+    "http_status": 200,
+    "content_type": "application/pdf",
+    "bytes": 455415,
+    "verified_by": "curl GET on 2026-10-21 (HTTP status, content type, size); official NATS URL; LINK ONLY, not bundled; the path changes every AIRAC cycle",
+    "local_file": "raw/egll_aip_pdfs/EGLL_AD2.EGLL-6-1.pdf"
+   },
+   "maintain_altitude_ft": 6000,
+   "radar_required": false,
+   "top_altitude_ft": 6000,
+   "london_control_mhz": 134.125,
+   "route_description": {
+    "9L": "Straight ahead to LON D1.5, then turn right onto NDB WOD QDM 280°, continue to CPT VOR."
+   },
+   "common_text": "Chart warning: \"Due to interaction with other routes do not climb above 6000 until cleared by ATC.\" Maximum 250 KIAS below FL100 unless otherwise authorised. Minimum 4% climb gradient to 4000 after noise monitoring points not below 1083 QNH (1000 QFE). Transition altitude 6000. Report callsign, SID designator, current altitude and cleared altitude on first contact with London Control.",
+   "note": "maintain_altitude_ft 6000 = the level every one of the six SID charts caps the climb at until ATC clears it; the AIP prints no \"initial climb altitude\" phrase. The simulator flies runway heading then vectors; the SID route is not flown."
+  },
+  {
+   "chart_name": "CPT 3F DEPARTURE (SID)",
+   "type": "SID (RNAV substitution only), runway 27R. Noise preferential route text from AD 2.21 sub-para 8.",
+   "faa_id": "CPT3F",
+   "printed_date": "AERO INFO DATE per chart (05 NOV 25 .. 02 DEC 25)",
+   "runway": "27R",
+   "pdf": {
+    "url": "https://www.aurora.nats.co.uk/htmlAIP/Publications/2026-10-01-AIRAC/graphics/475382.pdf",
+    "http_status": 200,
+    "content_type": "application/pdf",
+    "bytes": 455415,
+    "verified_by": "curl GET on 2026-10-21 (HTTP status, content type, size); official NATS URL; LINK ONLY, not bundled; the path changes every AIRAC cycle",
+    "local_file": "raw/egll_aip_pdfs/EGLL_AD2.EGLL-6-1.pdf"
+   },
+   "maintain_altitude_ft": 6000,
+   "radar_required": false,
+   "top_altitude_ft": 6000,
+   "london_control_mhz": 134.125,
+   "route_description": {
+    "27R": "Straight ahead to intercept LON VOR R255 until LON D7, then turn right onto NDB WOD QDM 268°, then to CPT VOR."
+   },
+   "common_text": "Chart warning: \"Due to interaction with other routes do not climb above 6000 until cleared by ATC.\" Maximum 250 KIAS below FL100 unless otherwise authorised. Minimum 4% climb gradient to 4000 after noise monitoring points not below 1083 QNH (1000 QFE). Transition altitude 6000. Report callsign, SID designator, current altitude and cleared altitude on first contact with London Control.",
+   "note": "maintain_altitude_ft 6000 = the level every one of the six SID charts caps the climb at until ATC clears it; the AIP prints no \"initial climb altitude\" phrase. The simulator flies runway heading then vectors; the SID route is not flown."
+  },
+  {
+   "chart_name": "CPT 3G DEPARTURE (SID)",
+   "type": "SID (RNAV substitution only), runway 27L. Noise preferential route text from AD 2.21 sub-para 8.",
+   "faa_id": "CPT3G",
+   "printed_date": "AERO INFO DATE per chart (05 NOV 25 .. 02 DEC 25)",
+   "runway": "27L",
+   "pdf": {
+    "url": "https://www.aurora.nats.co.uk/htmlAIP/Publications/2026-10-01-AIRAC/graphics/475382.pdf",
+    "http_status": 200,
+    "content_type": "application/pdf",
+    "bytes": 455415,
+    "verified_by": "curl GET on 2026-10-21 (HTTP status, content type, size); official NATS URL; LINK ONLY, not bundled; the path changes every AIRAC cycle",
+    "local_file": "raw/egll_aip_pdfs/EGLL_AD2.EGLL-6-1.pdf"
+   },
+   "maintain_altitude_ft": 6000,
+   "radar_required": false,
+   "top_altitude_ft": 6000,
+   "london_control_mhz": 134.125,
+   "route_description": {
+    "27L": "Straight ahead to intercept LON VOR R255 until LON D7, then turn right onto NDB WOD QDM 268°, then to CPT VOR."
+   },
+   "common_text": "Chart warning: \"Due to interaction with other routes do not climb above 6000 until cleared by ATC.\" Maximum 250 KIAS below FL100 unless otherwise authorised. Minimum 4% climb gradient to 4000 after noise monitoring points not below 1083 QNH (1000 QFE). Transition altitude 6000. Report callsign, SID designator, current altitude and cleared altitude on first contact with London Control.",
+   "note": "maintain_altitude_ft 6000 = the level every one of the six SID charts caps the climb at until ATC clears it; the AIP prints no \"initial climb altitude\" phrase. The simulator flies runway heading then vectors; the SID route is not flown."
+  },
+  {
+   "chart_name": "MODMI 1J DEPARTURE (SID)",
+   "type": "SID (RNAV substitution only), runway 9R. Noise preferential route text from AD 2.21 sub-para 8.",
+   "faa_id": "MODMI1J",
+   "printed_date": "AERO INFO DATE per chart (05 NOV 25 .. 02 DEC 25)",
+   "runway": "9R",
+   "pdf": {
+    "url": "https://www.aurora.nats.co.uk/htmlAIP/Publications/2026-10-01-AIRAC/graphics/475385.pdf",
+    "http_status": 200,
+    "content_type": "application/pdf",
+    "bytes": 451258,
+    "verified_by": "curl GET on 2026-10-21 (HTTP status, content type, size); official NATS URL; LINK ONLY, not bundled; the path changes every AIRAC cycle",
+    "local_file": "raw/egll_aip_pdfs/EGLL_AD2.EGLL-6-2.pdf"
+   },
+   "maintain_altitude_ft": 6000,
+   "radar_required": false,
+   "top_altitude_ft": 6000,
+   "london_control_mhz": 133.18,
+   "route_description": {
+    "9R": "Straight ahead to LON D2, then turn right onto LON VOR R124 until LON D3.5, then turn right onto MID VOR R025, continue to MODMI."
+   },
+   "common_text": "Chart warning: \"Due to interaction with other routes do not climb above 6000 until cleared by ATC.\" Maximum 250 KIAS below FL100 unless otherwise authorised. Minimum 4% climb gradient to 4000 after noise monitoring points not below 1083 QNH (1000 QFE). Transition altitude 6000. Report callsign, SID designator, current altitude and cleared altitude on first contact with London Control.",
+   "note": "maintain_altitude_ft 6000 = the level every one of the six SID charts caps the climb at until ATC clears it; the AIP prints no \"initial climb altitude\" phrase. The simulator flies runway heading then vectors; the SID route is not flown."
+  },
+  {
+   "chart_name": "MODMI 1K DEPARTURE (SID)",
+   "type": "SID (RNAV substitution only), runway 9L. Noise preferential route text from AD 2.21 sub-para 8.",
+   "faa_id": "MODMI1K",
+   "printed_date": "AERO INFO DATE per chart (05 NOV 25 .. 02 DEC 25)",
+   "runway": "9L",
+   "pdf": {
+    "url": "https://www.aurora.nats.co.uk/htmlAIP/Publications/2026-10-01-AIRAC/graphics/475385.pdf",
+    "http_status": 200,
+    "content_type": "application/pdf",
+    "bytes": 451258,
+    "verified_by": "curl GET on 2026-10-21 (HTTP status, content type, size); official NATS URL; LINK ONLY, not bundled; the path changes every AIRAC cycle",
+    "local_file": "raw/egll_aip_pdfs/EGLL_AD2.EGLL-6-2.pdf"
+   },
+   "maintain_altitude_ft": 6000,
+   "radar_required": false,
+   "top_altitude_ft": 6000,
+   "london_control_mhz": 133.18,
+   "route_description": {
+    "9L": "Straight ahead to LON D1.5, then turn right onto LON VOR R124 until LON D3.5, then turn right onto MID VOR R025, continue to MODMI."
+   },
+   "common_text": "Chart warning: \"Due to interaction with other routes do not climb above 6000 until cleared by ATC.\" Maximum 250 KIAS below FL100 unless otherwise authorised. Minimum 4% climb gradient to 4000 after noise monitoring points not below 1083 QNH (1000 QFE). Transition altitude 6000. Report callsign, SID designator, current altitude and cleared altitude on first contact with London Control.",
+   "note": "maintain_altitude_ft 6000 = the level every one of the six SID charts caps the climb at until ATC clears it; the AIP prints no \"initial climb altitude\" phrase. The simulator flies runway heading then vectors; the SID route is not flown."
+  },
+  {
+   "chart_name": "MAXIT 1F DEPARTURE (SID)",
+   "type": "SID (RNAV substitution only), runway 27R. Noise preferential route text from AD 2.21 sub-para 8.",
+   "faa_id": "MAXIT1F",
+   "printed_date": "AERO INFO DATE per chart (05 NOV 25 .. 02 DEC 25)",
+   "runway": "27R",
+   "pdf": {
+    "url": "https://www.aurora.nats.co.uk/htmlAIP/Publications/2026-10-01-AIRAC/graphics/475385.pdf",
+    "http_status": 200,
+    "content_type": "application/pdf",
+    "bytes": 451258,
+    "verified_by": "curl GET on 2026-10-21 (HTTP status, content type, size); official NATS URL; LINK ONLY, not bundled; the path changes every AIRAC cycle",
+    "local_file": "raw/egll_aip_pdfs/EGLL_AD2.EGLL-6-2.pdf"
+   },
+   "maintain_altitude_ft": 6000,
+   "radar_required": false,
+   "top_altitude_ft": 6000,
+   "london_control_mhz": 133.18,
+   "route_description": {
+    "27R": "Straight ahead to intercept LON VOR R255. At LON D5 turn left onto BUR NDB QDR 160°. At LON D12 turn right onto MID VOR R010 and continue to MAXIT."
+   },
+   "common_text": "Chart warning: \"Due to interaction with other routes do not climb above 6000 until cleared by ATC.\" Maximum 250 KIAS below FL100 unless otherwise authorised. Minimum 4% climb gradient to 4000 after noise monitoring points not below 1083 QNH (1000 QFE). Transition altitude 6000. Report callsign, SID designator, current altitude and cleared altitude on first contact with London Control.",
+   "note": "maintain_altitude_ft 6000 = the level every one of the six SID charts caps the climb at until ATC clears it; the AIP prints no \"initial climb altitude\" phrase. The simulator flies runway heading then vectors; the SID route is not flown."
+  },
+  {
+   "chart_name": "MAXIT 1G DEPARTURE (SID)",
+   "type": "SID (RNAV substitution only), runway 27L. Noise preferential route text from AD 2.21 sub-para 8.",
+   "faa_id": "MAXIT1G",
+   "printed_date": "AERO INFO DATE per chart (05 NOV 25 .. 02 DEC 25)",
+   "runway": "27L",
+   "pdf": {
+    "url": "https://www.aurora.nats.co.uk/htmlAIP/Publications/2026-10-01-AIRAC/graphics/475385.pdf",
+    "http_status": 200,
+    "content_type": "application/pdf",
+    "bytes": 451258,
+    "verified_by": "curl GET on 2026-10-21 (HTTP status, content type, size); official NATS URL; LINK ONLY, not bundled; the path changes every AIRAC cycle",
+    "local_file": "raw/egll_aip_pdfs/EGLL_AD2.EGLL-6-2.pdf"
+   },
+   "maintain_altitude_ft": 6000,
+   "radar_required": false,
+   "top_altitude_ft": 6000,
+   "london_control_mhz": 133.18,
+   "route_description": {
+    "27L": "Straight ahead to intercept LON VOR R239. At LON D5.5 turn left onto BUR NDB QDR 160°. At LON D12 turn right onto MID VOR R010 and continue to MAXIT."
+   },
+   "common_text": "Chart warning: \"Due to interaction with other routes do not climb above 6000 until cleared by ATC.\" Maximum 250 KIAS below FL100 unless otherwise authorised. Minimum 4% climb gradient to 4000 after noise monitoring points not below 1083 QNH (1000 QFE). Transition altitude 6000. Report callsign, SID designator, current altitude and cleared altitude on first contact with London Control.",
+   "note": "maintain_altitude_ft 6000 = the level every one of the six SID charts caps the climb at until ATC clears it; the AIP prints no \"initial climb altitude\" phrase. The simulator flies runway heading then vectors; the SID route is not flown."
+  },
+  {
+   "chart_name": "BPK 6J DEPARTURE (SID)",
+   "type": "SID (RNAV substitution only), runway 9R. Noise preferential route text from AD 2.21 sub-para 8.",
+   "faa_id": "BPK6J",
+   "printed_date": "AERO INFO DATE per chart (05 NOV 25 .. 02 DEC 25)",
+   "runway": "9R",
+   "pdf": {
+    "url": "https://www.aurora.nats.co.uk/htmlAIP/Publications/2026-10-01-AIRAC/graphics/475388.pdf",
+    "http_status": 200,
+    "content_type": "application/pdf",
+    "bytes": 502341,
+    "verified_by": "curl GET on 2026-10-21 (HTTP status, content type, size); official NATS URL; LINK ONLY, not bundled; the path changes every AIRAC cycle",
+    "local_file": "raw/egll_aip_pdfs/EGLL_AD2.EGLL-6-3.pdf"
+   },
+   "maintain_altitude_ft": 6000,
+   "radar_required": false,
+   "top_altitude_ft": 6000,
+   "london_control_mhz": 118.825,
+   "route_description": {
+    "9R": "Climb straight ahead to LON D2, then turn left onto track 049° to intercept LON VOR R070. Cross LON D10 and turn left onto BPK VOR R195, continue to BAPAG then BPK VOR."
+   },
+   "common_text": "Chart warning: \"Due to interaction with other routes do not climb above 6000 until cleared by ATC.\" Maximum 250 KIAS below FL100 unless otherwise authorised. Minimum 4% climb gradient to 4000 after noise monitoring points not below 1083 QNH (1000 QFE). Transition altitude 6000. Report callsign, SID designator, current altitude and cleared altitude on first contact with London Control.",
+   "note": "maintain_altitude_ft 6000 = the level every one of the six SID charts caps the climb at until ATC clears it; the AIP prints no \"initial climb altitude\" phrase. The simulator flies runway heading then vectors; the SID route is not flown."
+  },
+  {
+   "chart_name": "BPK 5K DEPARTURE (SID)",
+   "type": "SID (RNAV substitution only), runway 9L. Noise preferential route text from AD 2.21 sub-para 8.",
+   "faa_id": "BPK5K",
+   "printed_date": "AERO INFO DATE per chart (05 NOV 25 .. 02 DEC 25)",
+   "runway": "9L",
+   "pdf": {
+    "url": "https://www.aurora.nats.co.uk/htmlAIP/Publications/2026-10-01-AIRAC/graphics/475388.pdf",
+    "http_status": 200,
+    "content_type": "application/pdf",
+    "bytes": 502341,
+    "verified_by": "curl GET on 2026-10-21 (HTTP status, content type, size); official NATS URL; LINK ONLY, not bundled; the path changes every AIRAC cycle",
+    "local_file": "raw/egll_aip_pdfs/EGLL_AD2.EGLL-6-3.pdf"
+   },
+   "maintain_altitude_ft": 6000,
+   "radar_required": false,
+   "top_altitude_ft": 6000,
+   "london_control_mhz": 118.825,
+   "route_description": {
+    "9L": "Climb straight ahead to LON D1.5, then turn left onto track 049° to intercept LON VOR R070. Cross LON D10 and turn left onto BPK VOR R195, continue to BAPAG then BPK VOR."
+   },
+   "common_text": "Chart warning: \"Due to interaction with other routes do not climb above 6000 until cleared by ATC.\" Maximum 250 KIAS below FL100 unless otherwise authorised. Minimum 4% climb gradient to 4000 after noise monitoring points not below 1083 QNH (1000 QFE). Transition altitude 6000. Report callsign, SID designator, current altitude and cleared altitude on first contact with London Control.",
+   "note": "maintain_altitude_ft 6000 = the level every one of the six SID charts caps the climb at until ATC clears it; the AIP prints no \"initial climb altitude\" phrase. The simulator flies runway heading then vectors; the SID route is not flown."
+  },
+  {
+   "chart_name": "BPK 7F DEPARTURE (SID)",
+   "type": "SID (RNAV substitution only), runway 27R. Noise preferential route text from AD 2.21 sub-para 8.",
+   "faa_id": "BPK7F",
+   "printed_date": "AERO INFO DATE per chart (05 NOV 25 .. 02 DEC 25)",
+   "runway": "27R",
+   "pdf": {
+    "url": "https://www.aurora.nats.co.uk/htmlAIP/Publications/2026-10-01-AIRAC/graphics/475388.pdf",
+    "http_status": 200,
+    "content_type": "application/pdf",
+    "bytes": 502341,
+    "verified_by": "curl GET on 2026-10-21 (HTTP status, content type, size); official NATS URL; LINK ONLY, not bundled; the path changes every AIRAC cycle",
+    "local_file": "raw/egll_aip_pdfs/EGLL_AD2.EGLL-6-3.pdf"
+   },
+   "maintain_altitude_ft": 6000,
+   "radar_required": false,
+   "top_altitude_ft": 6000,
+   "london_control_mhz": 118.825,
+   "route_description": {
+    "27R": "Climb straight ahead to be established on BUR NDB QDM 296° by LON D4. At LON D6 turn right onto CHT NDB QDM 052°. At CHT NDB turn right onto BPK VOR R243 to BPK VOR."
+   },
+   "common_text": "Chart warning: \"Due to interaction with other routes do not climb above 6000 until cleared by ATC.\" Maximum 250 KIAS below FL100 unless otherwise authorised. Minimum 4% climb gradient to 4000 after noise monitoring points not below 1083 QNH (1000 QFE). Transition altitude 6000. Report callsign, SID designator, current altitude and cleared altitude on first contact with London Control.",
+   "note": "maintain_altitude_ft 6000 = the level every one of the six SID charts caps the climb at until ATC clears it; the AIP prints no \"initial climb altitude\" phrase. The simulator flies runway heading then vectors; the SID route is not flown."
+  },
+  {
+   "chart_name": "BPK 7G DEPARTURE (SID)",
+   "type": "SID (RNAV substitution only), runway 27L. Noise preferential route text from AD 2.21 sub-para 8.",
+   "faa_id": "BPK7G",
+   "printed_date": "AERO INFO DATE per chart (05 NOV 25 .. 02 DEC 25)",
+   "runway": "27L",
+   "pdf": {
+    "url": "https://www.aurora.nats.co.uk/htmlAIP/Publications/2026-10-01-AIRAC/graphics/475388.pdf",
+    "http_status": 200,
+    "content_type": "application/pdf",
+    "bytes": 502341,
+    "verified_by": "curl GET on 2026-10-21 (HTTP status, content type, size); official NATS URL; LINK ONLY, not bundled; the path changes every AIRAC cycle",
+    "local_file": "raw/egll_aip_pdfs/EGLL_AD2.EGLL-6-3.pdf"
+   },
+   "maintain_altitude_ft": 6000,
+   "radar_required": false,
+   "top_altitude_ft": 6000,
+   "london_control_mhz": 118.825,
+   "route_description": {
+    "27L": "Climb straight ahead to be established on BUR NDB QDM 296° by LON D3. At LON D6 turn right onto CHT NDB QDM 052°. At CHT NDB turn right onto BPK VOR R243 to BPK VOR."
+   },
+   "common_text": "Chart warning: \"Due to interaction with other routes do not climb above 6000 until cleared by ATC.\" Maximum 250 KIAS below FL100 unless otherwise authorised. Minimum 4% climb gradient to 4000 after noise monitoring points not below 1083 QNH (1000 QFE). Transition altitude 6000. Report callsign, SID designator, current altitude and cleared altitude on first contact with London Control.",
+   "note": "maintain_altitude_ft 6000 = the level every one of the six SID charts caps the climb at until ATC clears it; the AIP prints no \"initial climb altitude\" phrase. The simulator flies runway heading then vectors; the SID route is not flown."
+  },
+  {
+   "chart_name": "ULTIB 1J DEPARTURE (SID)",
+   "type": "SID (RNAV substitution only), runway 9R. Noise preferential route text from AD 2.21 sub-para 8.",
+   "faa_id": "ULTIB1J",
+   "printed_date": "AERO INFO DATE per chart (05 NOV 25 .. 02 DEC 25)",
+   "runway": "9R",
+   "pdf": {
+    "url": "https://www.aurora.nats.co.uk/htmlAIP/Publications/2026-10-01-AIRAC/graphics/475391.pdf",
+    "http_status": 200,
+    "content_type": "application/pdf",
+    "bytes": 471621,
+    "verified_by": "curl GET on 2026-10-21 (HTTP status, content type, size); official NATS URL; LINK ONLY, not bundled; the path changes every AIRAC cycle",
+    "local_file": "raw/egll_aip_pdfs/EGLL_AD2.EGLL-6-4.pdf"
+   },
+   "maintain_altitude_ft": 6000,
+   "radar_required": false,
+   "top_altitude_ft": 6000,
+   "london_control_mhz": 119.78,
+   "route_description": {
+    "9R": "Climb straight ahead to LON D2, then turn left onto track 049° to intercept LON VOR R070, cross LON D10 and turn left onto BIG VOR R328. Continue to ULTIB."
+   },
+   "common_text": "Chart warning: \"Due to interaction with other routes do not climb above 6000 until cleared by ATC.\" Maximum 250 KIAS below FL100 unless otherwise authorised. Minimum 4% climb gradient to 4000 after noise monitoring points not below 1083 QNH (1000 QFE). Transition altitude 6000. Report callsign, SID designator, current altitude and cleared altitude on first contact with London Control.",
+   "note": "maintain_altitude_ft 6000 = the level every one of the six SID charts caps the climb at until ATC clears it; the AIP prints no \"initial climb altitude\" phrase. The simulator flies runway heading then vectors; the SID route is not flown."
+  },
+  {
+   "chart_name": "ULTIB 1K DEPARTURE (SID)",
+   "type": "SID (RNAV substitution only), runway 9L. Noise preferential route text from AD 2.21 sub-para 8.",
+   "faa_id": "ULTIB1K",
+   "printed_date": "AERO INFO DATE per chart (05 NOV 25 .. 02 DEC 25)",
+   "runway": "9L",
+   "pdf": {
+    "url": "https://www.aurora.nats.co.uk/htmlAIP/Publications/2026-10-01-AIRAC/graphics/475391.pdf",
+    "http_status": 200,
+    "content_type": "application/pdf",
+    "bytes": 471621,
+    "verified_by": "curl GET on 2026-10-21 (HTTP status, content type, size); official NATS URL; LINK ONLY, not bundled; the path changes every AIRAC cycle",
+    "local_file": "raw/egll_aip_pdfs/EGLL_AD2.EGLL-6-4.pdf"
+   },
+   "maintain_altitude_ft": 6000,
+   "radar_required": false,
+   "top_altitude_ft": 6000,
+   "london_control_mhz": 119.78,
+   "route_description": {
+    "9L": "Climb straight ahead to LON D1.5, then turn left onto track 049° to intercept LON VOR R070, cross LON D10 and turn left onto BIG VOR R328. Continue to ULTIB."
+   },
+   "common_text": "Chart warning: \"Due to interaction with other routes do not climb above 6000 until cleared by ATC.\" Maximum 250 KIAS below FL100 unless otherwise authorised. Minimum 4% climb gradient to 4000 after noise monitoring points not below 1083 QNH (1000 QFE). Transition altitude 6000. Report callsign, SID designator, current altitude and cleared altitude on first contact with London Control.",
+   "note": "maintain_altitude_ft 6000 = the level every one of the six SID charts caps the climb at until ATC clears it; the AIP prints no \"initial climb altitude\" phrase. The simulator flies runway heading then vectors; the SID route is not flown."
+  },
+  {
+   "chart_name": "UMLAT 1F DEPARTURE (SID)",
+   "type": "SID (RNAV substitution only), runway 27R. Noise preferential route text from AD 2.21 sub-para 8.",
+   "faa_id": "UMLAT1F",
+   "printed_date": "AERO INFO DATE per chart (05 NOV 25 .. 02 DEC 25)",
+   "runway": "27R",
+   "pdf": {
+    "url": "https://www.aurora.nats.co.uk/htmlAIP/Publications/2026-10-01-AIRAC/graphics/475391.pdf",
+    "http_status": 200,
+    "content_type": "application/pdf",
+    "bytes": 471621,
+    "verified_by": "curl GET on 2026-10-21 (HTTP status, content type, size); official NATS URL; LINK ONLY, not bundled; the path changes every AIRAC cycle",
+    "local_file": "raw/egll_aip_pdfs/EGLL_AD2.EGLL-6-4.pdf"
+   },
+   "maintain_altitude_ft": 6000,
+   "radar_required": false,
+   "top_altitude_ft": 6000,
+   "london_control_mhz": 119.78,
+   "route_description": {
+    "27R": "Climb straight ahead to be established on BUR NDB QDM 296° by LON D4. At LON D7 turn right onto BUR NDB QDR 355° (MID VOR R355), Continue to UMLAT."
+   },
+   "common_text": "Chart warning: \"Due to interaction with other routes do not climb above 6000 until cleared by ATC.\" Maximum 250 KIAS below FL100 unless otherwise authorised. Minimum 4% climb gradient to 4000 after noise monitoring points not below 1083 QNH (1000 QFE). Transition altitude 6000. Report callsign, SID designator, current altitude and cleared altitude on first contact with London Control.",
+   "note": "maintain_altitude_ft 6000 = the level every one of the six SID charts caps the climb at until ATC clears it; the AIP prints no \"initial climb altitude\" phrase. The simulator flies runway heading then vectors; the SID route is not flown."
+  },
+  {
+   "chart_name": "UMLAT 1G DEPARTURE (SID)",
+   "type": "SID (RNAV substitution only), runway 27L. Noise preferential route text from AD 2.21 sub-para 8.",
+   "faa_id": "UMLAT1G",
+   "printed_date": "AERO INFO DATE per chart (05 NOV 25 .. 02 DEC 25)",
+   "runway": "27L",
+   "pdf": {
+    "url": "https://www.aurora.nats.co.uk/htmlAIP/Publications/2026-10-01-AIRAC/graphics/475391.pdf",
+    "http_status": 200,
+    "content_type": "application/pdf",
+    "bytes": 471621,
+    "verified_by": "curl GET on 2026-10-21 (HTTP status, content type, size); official NATS URL; LINK ONLY, not bundled; the path changes every AIRAC cycle",
+    "local_file": "raw/egll_aip_pdfs/EGLL_AD2.EGLL-6-4.pdf"
+   },
+   "maintain_altitude_ft": 6000,
+   "radar_required": false,
+   "top_altitude_ft": 6000,
+   "london_control_mhz": 119.78,
+   "route_description": {
+    "27L": "Climb straight ahead to be established on BUR NDB QDM 296° by LON D3. At LON D7 turn right onto BUR NDB QDR 355° (MID VOR R355), Continue to UMLAT."
+   },
+   "common_text": "Chart warning: \"Due to interaction with other routes do not climb above 6000 until cleared by ATC.\" Maximum 250 KIAS below FL100 unless otherwise authorised. Minimum 4% climb gradient to 4000 after noise monitoring points not below 1083 QNH (1000 QFE). Transition altitude 6000. Report callsign, SID designator, current altitude and cleared altitude on first contact with London Control.",
+   "note": "maintain_altitude_ft 6000 = the level every one of the six SID charts caps the climb at until ATC clears it; the AIP prints no \"initial climb altitude\" phrase. The simulator flies runway heading then vectors; the SID route is not flown."
+  },
+  {
+   "chart_name": "DET 1J DEPARTURE (SID)",
+   "type": "SID (RNAV substitution only), runway 9R. Noise preferential route text from AD 2.21 sub-para 8.",
+   "faa_id": "DET1J",
+   "printed_date": "AERO INFO DATE per chart (05 NOV 25 .. 02 DEC 25)",
+   "runway": "9R",
+   "pdf": {
+    "url": "https://www.aurora.nats.co.uk/htmlAIP/Publications/2026-10-01-AIRAC/graphics/479231.pdf",
+    "http_status": 200,
+    "content_type": "application/pdf",
+    "bytes": 547269,
+    "verified_by": "curl GET on 2026-10-21 (HTTP status, content type, size); official NATS URL; LINK ONLY, not bundled; the path changes every AIRAC cycle",
+    "local_file": "raw/egll_aip_pdfs/EGLL_AD2.EGLL-6-5.pdf"
+   },
+   "maintain_altitude_ft": 6000,
+   "radar_required": false,
+   "top_altitude_ft": 6000,
+   "london_control_mhz": 120.53,
+   "route_description": {
+    "9R": "Straight ahead to LON D2, then turn right onto track 119°. At LON D4 turn left to establish on DET VOR R282 by DET D34. Continue to DET VOR."
+   },
+   "common_text": "Chart warning: \"Due to interaction with other routes do not climb above 6000 until cleared by ATC.\" Maximum 250 KIAS below FL100 unless otherwise authorised. Minimum 4% climb gradient to 4000 after noise monitoring points not below 1083 QNH (1000 QFE). Transition altitude 6000. Report callsign, SID designator, current altitude and cleared altitude on first contact with London Control.",
+   "note": "maintain_altitude_ft 6000 = the level every one of the six SID charts caps the climb at until ATC clears it; the AIP prints no \"initial climb altitude\" phrase. The simulator flies runway heading then vectors; the SID route is not flown."
+  },
+  {
+   "chart_name": "DET 1K DEPARTURE (SID)",
+   "type": "SID (RNAV substitution only), runway 9L. Noise preferential route text from AD 2.21 sub-para 8.",
+   "faa_id": "DET1K",
+   "printed_date": "AERO INFO DATE per chart (05 NOV 25 .. 02 DEC 25)",
+   "runway": "9L",
+   "pdf": {
+    "url": "https://www.aurora.nats.co.uk/htmlAIP/Publications/2026-10-01-AIRAC/graphics/479231.pdf",
+    "http_status": 200,
+    "content_type": "application/pdf",
+    "bytes": 547269,
+    "verified_by": "curl GET on 2026-10-21 (HTTP status, content type, size); official NATS URL; LINK ONLY, not bundled; the path changes every AIRAC cycle",
+    "local_file": "raw/egll_aip_pdfs/EGLL_AD2.EGLL-6-5.pdf"
+   },
+   "maintain_altitude_ft": 6000,
+   "radar_required": false,
+   "top_altitude_ft": 6000,
+   "london_control_mhz": 120.53,
+   "route_description": {
+    "9L": "Straight ahead to LON D1.5, then turn right onto track 120°. At LON D4 turn left to establish on DET VOR R282 by DET D34. Continue to DET VOR."
+   },
+   "common_text": "Chart warning: \"Due to interaction with other routes do not climb above 6000 until cleared by ATC.\" Maximum 250 KIAS below FL100 unless otherwise authorised. Minimum 4% climb gradient to 4000 after noise monitoring points not below 1083 QNH (1000 QFE). Transition altitude 6000. Report callsign, SID designator, current altitude and cleared altitude on first contact with London Control.",
+   "note": "maintain_altitude_ft 6000 = the level every one of the six SID charts caps the climb at until ATC clears it; the AIP prints no \"initial climb altitude\" phrase. The simulator flies runway heading then vectors; the SID route is not flown."
+  },
+  {
+   "chart_name": "DET 2F DEPARTURE (SID)",
+   "type": "SID (RNAV substitution only), runway 27R. Noise preferential route text from AD 2.21 sub-para 8.",
+   "faa_id": "DET2F",
+   "printed_date": "AERO INFO DATE per chart (05 NOV 25 .. 02 DEC 25)",
+   "runway": "27R",
+   "pdf": {
+    "url": "https://www.aurora.nats.co.uk/htmlAIP/Publications/2026-10-01-AIRAC/graphics/479231.pdf",
+    "http_status": 200,
+    "content_type": "application/pdf",
+    "bytes": 547269,
+    "verified_by": "curl GET on 2026-10-21 (HTTP status, content type, size); official NATS URL; LINK ONLY, not bundled; the path changes every AIRAC cycle",
+    "local_file": "raw/egll_aip_pdfs/EGLL_AD2.EGLL-6-5.pdf"
+   },
+   "maintain_altitude_ft": 6000,
+   "radar_required": false,
+   "top_altitude_ft": 6000,
+   "london_control_mhz": 120.53,
+   "route_description": {
+    "27R": "Straight ahead to LON D2, then turn left onto NDB EPM QDM 135°, to EPM NDB, then continue on DET VOR R270 to DET VOR."
+   },
+   "common_text": "Chart warning: \"Due to interaction with other routes do not climb above 6000 until cleared by ATC.\" Maximum 250 KIAS below FL100 unless otherwise authorised. Minimum 4% climb gradient to 4000 after noise monitoring points not below 1083 QNH (1000 QFE). Transition altitude 6000. Report callsign, SID designator, current altitude and cleared altitude on first contact with London Control.",
+   "note": "maintain_altitude_ft 6000 = the level every one of the six SID charts caps the climb at until ATC clears it; the AIP prints no \"initial climb altitude\" phrase. The simulator flies runway heading then vectors; the SID route is not flown."
+  },
+  {
+   "chart_name": "DET 2G DEPARTURE (SID)",
+   "type": "SID (RNAV substitution only), runway 27L. Noise preferential route text from AD 2.21 sub-para 8.",
+   "faa_id": "DET2G",
+   "printed_date": "AERO INFO DATE per chart (05 NOV 25 .. 02 DEC 25)",
+   "runway": "27L",
+   "pdf": {
+    "url": "https://www.aurora.nats.co.uk/htmlAIP/Publications/2026-10-01-AIRAC/graphics/479231.pdf",
+    "http_status": 200,
+    "content_type": "application/pdf",
+    "bytes": 547269,
+    "verified_by": "curl GET on 2026-10-21 (HTTP status, content type, size); official NATS URL; LINK ONLY, not bundled; the path changes every AIRAC cycle",
+    "local_file": "raw/egll_aip_pdfs/EGLL_AD2.EGLL-6-5.pdf"
+   },
+   "maintain_altitude_ft": 6000,
+   "radar_required": false,
+   "top_altitude_ft": 6000,
+   "london_control_mhz": 120.53,
+   "route_description": {
+    "27L": "Straight ahead to I-LL D1, then turn left onto NDB EPM QDM 135°, to EPM NDB, then continue to DET VOR R270 to DET VOR."
+   },
+   "common_text": "Chart warning: \"Due to interaction with other routes do not climb above 6000 until cleared by ATC.\" Maximum 250 KIAS below FL100 unless otherwise authorised. Minimum 4% climb gradient to 4000 after noise monitoring points not below 1083 QNH (1000 QFE). Transition altitude 6000. Report callsign, SID designator, current altitude and cleared altitude on first contact with London Control.",
+   "note": "maintain_altitude_ft 6000 = the level every one of the six SID charts caps the climb at until ATC clears it; the AIP prints no \"initial climb altitude\" phrase. The simulator flies runway heading then vectors; the SID route is not flown."
+  },
+  {
+   "chart_name": "GASGU 2J DEPARTURE (SID)",
+   "type": "SID (RNAV substitution only), runway 9R. Noise preferential route text from AD 2.21 sub-para 8.",
+   "faa_id": "GASGU2J",
+   "printed_date": "AERO INFO DATE per chart (05 NOV 25 .. 02 DEC 25)",
+   "runway": "9R",
+   "pdf": {
+    "url": "https://www.aurora.nats.co.uk/htmlAIP/Publications/2026-10-01-AIRAC/graphics/475397.pdf",
+    "http_status": 200,
+    "content_type": "application/pdf",
+    "bytes": 577876,
+    "verified_by": "curl GET on 2026-10-21 (HTTP status, content type, size); official NATS URL; LINK ONLY, not bundled; the path changes every AIRAC cycle",
+    "local_file": "raw/egll_aip_pdfs/EGLL_AD2.EGLL-6-6.pdf"
+   },
+   "maintain_altitude_ft": 6000,
+   "radar_required": false,
+   "top_altitude_ft": 6000,
+   "london_control_mhz": 134.125,
+   "route_description": {
+    "9R": "Straight ahead to LON D2, then turn right onto LON VOR R124 until LON D5, then turn right onto OCK VOR R041. At OCK VOR turn right onto OCK VOR R253 to GASGU."
+   },
+   "common_text": "Chart warning: \"Due to interaction with other routes do not climb above 6000 until cleared by ATC.\" Maximum 250 KIAS below FL100 unless otherwise authorised. Minimum 4% climb gradient to 4000 after noise monitoring points not below 1083 QNH (1000 QFE). Transition altitude 6000. Report callsign, SID designator, current altitude and cleared altitude on first contact with London Control.",
+   "note": "maintain_altitude_ft 6000 = the level every one of the six SID charts caps the climb at until ATC clears it; the AIP prints no \"initial climb altitude\" phrase. The simulator flies runway heading then vectors; the SID route is not flown."
+  },
+  {
+   "chart_name": "GASGU 2K DEPARTURE (SID)",
+   "type": "SID (RNAV substitution only), runway 9L. Noise preferential route text from AD 2.21 sub-para 8.",
+   "faa_id": "GASGU2K",
+   "printed_date": "AERO INFO DATE per chart (05 NOV 25 .. 02 DEC 25)",
+   "runway": "9L",
+   "pdf": {
+    "url": "https://www.aurora.nats.co.uk/htmlAIP/Publications/2026-10-01-AIRAC/graphics/475397.pdf",
+    "http_status": 200,
+    "content_type": "application/pdf",
+    "bytes": 577876,
+    "verified_by": "curl GET on 2026-10-21 (HTTP status, content type, size); official NATS URL; LINK ONLY, not bundled; the path changes every AIRAC cycle",
+    "local_file": "raw/egll_aip_pdfs/EGLL_AD2.EGLL-6-6.pdf"
+   },
+   "maintain_altitude_ft": 6000,
+   "radar_required": false,
+   "top_altitude_ft": 6000,
+   "london_control_mhz": 134.125,
+   "route_description": {
+    "9L": "Straight ahead to LON D1.5, then turn right onto LON VOR R124 until LON D5, then turn right onto OCK VOR R041. At OCK VOR turn right onto OCK VOR R253 to GASGU."
+   },
+   "common_text": "Chart warning: \"Due to interaction with other routes do not climb above 6000 until cleared by ATC.\" Maximum 250 KIAS below FL100 unless otherwise authorised. Minimum 4% climb gradient to 4000 after noise monitoring points not below 1083 QNH (1000 QFE). Transition altitude 6000. Report callsign, SID designator, current altitude and cleared altitude on first contact with London Control.",
+   "note": "maintain_altitude_ft 6000 = the level every one of the six SID charts caps the climb at until ATC clears it; the AIP prints no \"initial climb altitude\" phrase. The simulator flies runway heading then vectors; the SID route is not flown."
+  },
+  {
+   "chart_name": "GOGSI 2F DEPARTURE (SID)",
+   "type": "SID (RNAV substitution only), runway 27R. Noise preferential route text from AD 2.21 sub-para 8.",
+   "faa_id": "GOGSI2F",
+   "printed_date": "AERO INFO DATE per chart (05 NOV 25 .. 02 DEC 25)",
+   "runway": "27R",
+   "pdf": {
+    "url": "https://www.aurora.nats.co.uk/htmlAIP/Publications/2026-10-01-AIRAC/graphics/475397.pdf",
+    "http_status": 200,
+    "content_type": "application/pdf",
+    "bytes": 577876,
+    "verified_by": "curl GET on 2026-10-21 (HTTP status, content type, size); official NATS URL; LINK ONLY, not bundled; the path changes every AIRAC cycle",
+    "local_file": "raw/egll_aip_pdfs/EGLL_AD2.EGLL-6-6.pdf"
+   },
+   "maintain_altitude_ft": 6000,
+   "radar_required": false,
+   "top_altitude_ft": 6000,
+   "london_control_mhz": 134.125,
+   "route_description": {
+    "27R": "Straight ahead to intercept LON VOR R255 until LON D7, then turn right onto WOD NDB QDM 268°. Turn left at LON D13 to intercept SAM VOR R032, then to GOGSI."
+   },
+   "common_text": "Chart warning: \"Due to interaction with other routes do not climb above 6000 until cleared by ATC.\" Maximum 250 KIAS below FL100 unless otherwise authorised. Minimum 4% climb gradient to 4000 after noise monitoring points not below 1083 QNH (1000 QFE). Transition altitude 6000. Report callsign, SID designator, current altitude and cleared altitude on first contact with London Control.",
+   "note": "maintain_altitude_ft 6000 = the level every one of the six SID charts caps the climb at until ATC clears it; the AIP prints no \"initial climb altitude\" phrase. The simulator flies runway heading then vectors; the SID route is not flown."
+  },
+  {
+   "chart_name": "GOGSI 2G DEPARTURE (SID)",
+   "type": "SID (RNAV substitution only), runway 27L. Noise preferential route text from AD 2.21 sub-para 8.",
+   "faa_id": "GOGSI2G",
+   "printed_date": "AERO INFO DATE per chart (05 NOV 25 .. 02 DEC 25)",
+   "runway": "27L",
+   "pdf": {
+    "url": "https://www.aurora.nats.co.uk/htmlAIP/Publications/2026-10-01-AIRAC/graphics/475397.pdf",
+    "http_status": 200,
+    "content_type": "application/pdf",
+    "bytes": 577876,
+    "verified_by": "curl GET on 2026-10-21 (HTTP status, content type, size); official NATS URL; LINK ONLY, not bundled; the path changes every AIRAC cycle",
+    "local_file": "raw/egll_aip_pdfs/EGLL_AD2.EGLL-6-6.pdf"
+   },
+   "maintain_altitude_ft": 6000,
+   "radar_required": false,
+   "top_altitude_ft": 6000,
+   "london_control_mhz": 134.125,
+   "route_description": {
+    "27L": "Straight ahead to intercept LON VOR R255 until LON D7, then turn right onto WOD NDB QDM 268°. Turn left at LON D13 to intercept SAM VOR R032, then to GOGSI."
+   },
+   "common_text": "Chart warning: \"Due to interaction with other routes do not climb above 6000 until cleared by ATC.\" Maximum 250 KIAS below FL100 unless otherwise authorised. Minimum 4% climb gradient to 4000 after noise monitoring points not below 1083 QNH (1000 QFE). Transition altitude 6000. Report callsign, SID designator, current altitude and cleared altitude on first contact with London Control.",
+   "note": "maintain_altitude_ft 6000 = the level every one of the six SID charts caps the climb at until ATC clears it; the AIP prints no \"initial climb altitude\" phrase. The simulator flies runway heading then vectors; the SID route is not flown."
+  }
+ ],
+ "obstacle_departure_procedures": {},
+ "stars": [
+  {
+   "chart_name": "OTMET ONE HOTEL ARRIVAL (RNAV)",
+   "pdf_name": "EGLL_AD2.EGLL-7-1.pdf",
+   "type": "STAR",
+   "faa_id": "OTMET1H",
+   "pdf": {
+    "url": "https://www.aurora.nats.co.uk/htmlAIP/Publications/2026-10-01-AIRAC/graphics/461645.pdf",
+    "http_status": 200,
+    "content_type": "application/pdf",
+    "bytes": 545441,
+    "verified_by": "curl GET on 2026-10-21 (HTTP status, content type, size); official NATS URL; LINK ONLY, not bundled; the path changes every AIRAC cycle",
+    "local_file": "raw/egll_aip_pdfs/EGLL_AD2.EGLL-7-1.pdf"
+   },
+   "note": "Transcribed from the coding table AD 2-EGLL-7-13.",
+   "star": {
+    "ident": "OTMET1H",
+    "faa_id": "OTMET1H",
+    "spoken_name": "OTMET ONE HOTEL",
+    "printed_on_chart": "UK AIP AD 2-EGLL-7-1 chart; coding table AD 2-EGLL-7-13 (AERO INFO DATE 08 OCT 25)",
+    "provenance": "UK AIP AIRAC 10/2026 7-13 coding table (waypoints, tracks, distances, constraints parsed from the text layer) and chart 7-1; chart depiction of level bars checked on charts 7-1 and 7-8 only",
+    "notes": [
+     "RNAV 1 (DME/DME or GNSS) STAR ending at the OCK terminal holding fix.",
+     "Standard routes may be varied at the discretion of ATC; adhere to maximum speed limits where specified; aircraft will normally be radar vectored from the holding fix (AD 2.22 para 3).",
+     "Restrictions: levels from the coding table \"Level Constraint\" column converted FL to feet; a bare level is flown as AT (bars above and below on the charts checked), the level at the stack fix as AT OR ABOVE (minimum holding level, underline only); speeds \"-250\" / \"-220\" = maximum, at or below.",
+     "DESIGN VALUE: the simulator starts a STAR arrival over HAZEL (sim_entry_fixes), 20-30 NM from the holding fix, because the published entry fixes are up to 300 NM out; the altitude window comes from the restriction at that fix (else 10000-12000 ft)."
+    ],
+    "transitions": [
+     {
+      "name": "OTMET",
+      "fixes": [
+       "OTMET",
+       "SOKDU",
+       "NEDUL",
+       "BEGTO",
+       "HAZEL",
+       "LLS01",
+       "OCK"
+      ]
+     }
+    ],
+    "runways": [
+     {
+      "runway_end": "9L",
+      "fixes": [
+       "OCK"
+      ],
+      "join_approach_fixes": [
+       "AAIF",
+       "AAFAP"
+      ],
+      "expect": "Hold at OCK, then radar vectors to the ILS for runway 9L (AD 2.22 para 3); the IF/FAP fixes are DERIVED."
+     },
+     {
+      "runway_end": "9R",
+      "fixes": [
+       "OCK"
+      ],
+      "join_approach_fixes": [
+       "BBIF",
+       "BBFAP"
+      ],
+      "expect": "Hold at OCK, then radar vectors to the ILS for runway 9R (AD 2.22 para 3); the IF/FAP fixes are DERIVED."
+     },
+     {
+      "runway_end": "27L",
+      "fixes": [
+       "OCK"
+      ],
+      "join_approach_fixes": [
+       "LLIF",
+       "LLFAP"
+      ],
+      "expect": "Hold at OCK, then radar vectors to the ILS for runway 27L (AD 2.22 para 3); the IF/FAP fixes are DERIVED."
+     },
+     {
+      "runway_end": "27R",
+      "fixes": [
+       "OCK"
+      ],
+      "join_approach_fixes": [
+       "RRIF",
+       "RRFAP"
+      ],
+      "expect": "Hold at OCK, then radar vectors to the ILS for runway 27R (AD 2.22 para 3); the IF/FAP fixes are DERIVED."
+     }
+    ],
+    "restrictions": [
+     {
+      "fix": "OTMET",
+      "at_ft": 27000
+     },
+     {
+      "fix": "NEDUL",
+      "at_ft": 21000
+     },
+     {
+      "fix": "HAZEL",
+      "at_ft": 13000
+     },
+     {
+      "fix": "LLS01",
+      "speed_kt": 250
+     },
+     {
+      "fix": "OCK",
+      "at_or_above_ft": 7000,
+      "speed_kt": 220
+     }
+    ],
+    "legs": [
+     {
+      "from": "OTMET",
+      "to": "SOKDU",
+      "track_mag_deg": 92,
+      "distance_nm": 18.7
+     },
+     {
+      "from": "SOKDU",
+      "to": "NEDUL",
+      "track_mag_deg": 88,
+      "distance_nm": 18.3
+     },
+     {
+      "from": "NEDUL",
+      "to": "BEGTO",
+      "track_mag_deg": 63,
+      "distance_nm": 13.2
+     },
+     {
+      "from": "BEGTO",
+      "to": "HAZEL",
+      "track_mag_deg": 32,
+      "distance_nm": 17.4
+     },
+     {
+      "from": "HAZEL",
+      "to": "LLS01",
+      "track_mag_deg": 47,
+      "distance_nm": 15.1
+     },
+     {
+      "from": "LLS01",
+      "to": "OCK",
+      "track_mag_deg": 47,
+      "distance_nm": 12.0
+     }
+    ],
+    "verification": "distances and tracks as printed; see src/airport/egll/egll.test.ts for the great-circle check against the coordinates",
+    "sim_entry_fixes": [
+     "HAZEL"
+    ]
+   }
+  },
+  {
+   "chart_name": "ROXOG ONE HOTEL ARRIVAL (RNAV)",
+   "pdf_name": "EGLL_AD2.EGLL-7-1.pdf",
+   "type": "STAR",
+   "faa_id": "ROXOG1H",
+   "pdf": {
+    "url": "https://www.aurora.nats.co.uk/htmlAIP/Publications/2026-10-01-AIRAC/graphics/461645.pdf",
+    "http_status": 200,
+    "content_type": "application/pdf",
+    "bytes": 545441,
+    "verified_by": "curl GET on 2026-10-21 (HTTP status, content type, size); official NATS URL; LINK ONLY, not bundled; the path changes every AIRAC cycle",
+    "local_file": "raw/egll_aip_pdfs/EGLL_AD2.EGLL-7-1.pdf"
+   },
+   "note": "Transcribed from the coding table AD 2-EGLL-7-13.",
+   "star": {
+    "ident": "ROXOG1H",
+    "faa_id": "ROXOG1H",
+    "spoken_name": "ROXOG ONE HOTEL",
+    "printed_on_chart": "UK AIP AD 2-EGLL-7-1 chart; coding table AD 2-EGLL-7-13 (AERO INFO DATE 08 OCT 25)",
+    "provenance": "UK AIP AIRAC 10/2026 7-13 coding table (waypoints, tracks, distances, constraints parsed from the text layer) and chart 7-1; chart depiction of level bars checked on charts 7-1 and 7-8 only",
+    "notes": [
+     "RNAV 1 (DME/DME or GNSS) STAR ending at the OCK terminal holding fix.",
+     "Standard routes may be varied at the discretion of ATC; adhere to maximum speed limits where specified; aircraft will normally be radar vectored from the holding fix (AD 2.22 para 3).",
+     "Restrictions: levels from the coding table \"Level Constraint\" column converted FL to feet; a bare level is flown as AT (bars above and below on the charts checked), the level at the stack fix as AT OR ABOVE (minimum holding level, underline only); speeds \"-250\" / \"-220\" = maximum, at or below.",
+     "DESIGN VALUE: the simulator starts a STAR arrival over HAZEL (sim_entry_fixes), 20-30 NM from the holding fix, because the published entry fixes are up to 300 NM out; the altitude window comes from the restriction at that fix (else 10000-12000 ft)."
+    ],
+    "transitions": [
+     {
+      "name": "ROXOG",
+      "fixes": [
+       "ROXOG",
+       "AMTOD",
+       "BEGTO",
+       "HAZEL",
+       "LLS01",
+       "OCK"
+      ]
+     }
+    ],
+    "runways": [
+     {
+      "runway_end": "9L",
+      "fixes": [
+       "OCK"
+      ],
+      "join_approach_fixes": [
+       "AAIF",
+       "AAFAP"
+      ],
+      "expect": "Hold at OCK, then radar vectors to the ILS for runway 9L (AD 2.22 para 3); the IF/FAP fixes are DERIVED."
+     },
+     {
+      "runway_end": "9R",
+      "fixes": [
+       "OCK"
+      ],
+      "join_approach_fixes": [
+       "BBIF",
+       "BBFAP"
+      ],
+      "expect": "Hold at OCK, then radar vectors to the ILS for runway 9R (AD 2.22 para 3); the IF/FAP fixes are DERIVED."
+     },
+     {
+      "runway_end": "27L",
+      "fixes": [
+       "OCK"
+      ],
+      "join_approach_fixes": [
+       "LLIF",
+       "LLFAP"
+      ],
+      "expect": "Hold at OCK, then radar vectors to the ILS for runway 27L (AD 2.22 para 3); the IF/FAP fixes are DERIVED."
+     },
+     {
+      "runway_end": "27R",
+      "fixes": [
+       "OCK"
+      ],
+      "join_approach_fixes": [
+       "RRIF",
+       "RRFAP"
+      ],
+      "expect": "Hold at OCK, then radar vectors to the ILS for runway 27R (AD 2.22 para 3); the IF/FAP fixes are DERIVED."
+     }
+    ],
+    "restrictions": [
+     {
+      "fix": "HAZEL",
+      "at_ft": 13000
+     },
+     {
+      "fix": "LLS01",
+      "speed_kt": 250
+     },
+     {
+      "fix": "OCK",
+      "at_or_above_ft": 7000,
+      "speed_kt": 220
+     }
+    ],
+    "legs": [
+     {
+      "from": "ROXOG",
+      "to": "AMTOD",
+      "track_mag_deg": 16,
+      "distance_nm": 17.1
+     },
+     {
+      "from": "AMTOD",
+      "to": "BEGTO",
+      "track_mag_deg": 27,
+      "distance_nm": 15.4
+     },
+     {
+      "from": "BEGTO",
+      "to": "HAZEL",
+      "track_mag_deg": 32,
+      "distance_nm": 17.4
+     },
+     {
+      "from": "HAZEL",
+      "to": "LLS01",
+      "track_mag_deg": 47,
+      "distance_nm": 15.1
+     },
+     {
+      "from": "LLS01",
+      "to": "OCK",
+      "track_mag_deg": 47,
+      "distance_nm": 12.0
+     }
+    ],
+    "verification": "distances and tracks as printed; see src/airport/egll/egll.test.ts for the great-circle check against the coordinates",
+    "sim_entry_fixes": [
+     "HAZEL"
+    ]
+   }
+  },
+  {
+   "chart_name": "ALESO ONE HOTEL ARRIVAL (RNAV)",
+   "pdf_name": "EGLL_AD2.EGLL-7-2.pdf",
+   "type": "STAR",
+   "faa_id": "ALESO1H",
+   "pdf": {
+    "url": "https://www.aurora.nats.co.uk/htmlAIP/Publications/2026-10-01-AIRAC/graphics/479234.pdf",
+    "http_status": 200,
+    "content_type": "application/pdf",
+    "bytes": 403141,
+    "verified_by": "curl GET on 2026-10-21 (HTTP status, content type, size); official NATS URL; LINK ONLY, not bundled; the path changes every AIRAC cycle",
+    "local_file": "raw/egll_aip_pdfs/EGLL_AD2.EGLL-7-2.pdf"
+   },
+   "note": "Transcribed from the coding table AD 2-EGLL-7-13.",
+   "star": {
+    "ident": "ALESO1H",
+    "faa_id": "ALESO1H",
+    "spoken_name": "ALESO ONE HOTEL",
+    "printed_on_chart": "UK AIP AD 2-EGLL-7-2 chart; coding table AD 2-EGLL-7-13 (AERO INFO DATE 08 OCT 25)",
+    "provenance": "UK AIP AIRAC 10/2026 7-13 coding table (waypoints, tracks, distances, constraints parsed from the text layer) and chart 7-2; chart depiction of level bars checked on charts 7-1 and 7-8 only",
+    "notes": [
+     "RNAV 5 (DME/DME or GNSS) STAR ending at the BIG terminal holding fix.",
+     "Standard routes may be varied at the discretion of ATC; adhere to maximum speed limits where specified; aircraft will normally be radar vectored from the holding fix (AD 2.22 para 3).",
+     "Restrictions: levels from the coding table \"Level Constraint\" column converted FL to feet; a bare level is flown as AT (bars above and below on the charts checked), the level at the stack fix as AT OR ABOVE (minimum holding level, underline only); speeds \"-250\" / \"-220\" = maximum, at or below.",
+     "DESIGN VALUE: the simulator starts a STAR arrival over TIGER (sim_entry_fixes), 20-30 NM from the holding fix, because the published entry fixes are up to 300 NM out; the altitude window comes from the restriction at that fix (else 10000-12000 ft)."
+    ],
+    "transitions": [
+     {
+      "name": "ALESO",
+      "fixes": [
+       "ALESO",
+       "ROTNO",
+       "ETVAX",
+       "TIGER",
+       "LLE01",
+       "BIG"
+      ]
+     }
+    ],
+    "runways": [
+     {
+      "runway_end": "9L",
+      "fixes": [
+       "BIG"
+      ],
+      "join_approach_fixes": [
+       "AAIF",
+       "AAFAP"
+      ],
+      "expect": "Hold at BIG, then radar vectors to the ILS for runway 9L (AD 2.22 para 3); the IF/FAP fixes are DERIVED."
+     },
+     {
+      "runway_end": "9R",
+      "fixes": [
+       "BIG"
+      ],
+      "join_approach_fixes": [
+       "BBIF",
+       "BBFAP"
+      ],
+      "expect": "Hold at BIG, then radar vectors to the ILS for runway 9R (AD 2.22 para 3); the IF/FAP fixes are DERIVED."
+     },
+     {
+      "runway_end": "27L",
+      "fixes": [
+       "BIG"
+      ],
+      "join_approach_fixes": [
+       "LLIF",
+       "LLFAP"
+      ],
+      "expect": "Hold at BIG, then radar vectors to the ILS for runway 27L (AD 2.22 para 3); the IF/FAP fixes are DERIVED."
+     },
+     {
+      "runway_end": "27R",
+      "fixes": [
+       "BIG"
+      ],
+      "join_approach_fixes": [
+       "RRIF",
+       "RRFAP"
+      ],
+      "expect": "Hold at BIG, then radar vectors to the ILS for runway 27R (AD 2.22 para 3); the IF/FAP fixes are DERIVED."
+     }
+    ],
+    "restrictions": [
+     {
+      "fix": "ETVAX",
+      "at_ft": 18000
+     },
+     {
+      "fix": "LLE01",
+      "speed_kt": 250
+     },
+     {
+      "fix": "BIG",
+      "at_or_above_ft": 7000,
+      "speed_kt": 220
+     }
+    ],
+    "legs": [
+     {
+      "from": "ALESO",
+      "to": "ROTNO",
+      "track_mag_deg": 314,
+      "distance_nm": 24.0
+     },
+     {
+      "from": "ROTNO",
+      "to": "ETVAX",
+      "track_mag_deg": 313,
+      "distance_nm": 9.5
+     },
+     {
+      "from": "ETVAX",
+      "to": "TIGER",
+      "track_mag_deg": 313,
+      "distance_nm": 8.5
+     },
+     {
+      "from": "TIGER",
+      "to": "LLE01",
+      "track_mag_deg": 315,
+      "distance_nm": 10.0
+     },
+     {
+      "from": "LLE01",
+      "to": "BIG",
+      "track_mag_deg": 315,
+      "distance_nm": 12.0
+     }
+    ],
+    "verification": "distances and tracks as printed; see src/airport/egll/egll.test.ts for the great-circle check against the coordinates",
+    "sim_entry_fixes": [
+     "TIGER"
+    ]
+   }
+  },
+  {
+   "chart_name": "LAM ONE X-RAY ARRIVAL (RNAV)",
+   "pdf_name": "EGLL_AD2.EGLL-7-2.pdf",
+   "type": "STAR",
+   "faa_id": "LAM1X",
+   "pdf": {
+    "url": "https://www.aurora.nats.co.uk/htmlAIP/Publications/2026-10-01-AIRAC/graphics/479234.pdf",
+    "http_status": 200,
+    "content_type": "application/pdf",
+    "bytes": 403141,
+    "verified_by": "curl GET on 2026-10-21 (HTTP status, content type, size); official NATS URL; LINK ONLY, not bundled; the path changes every AIRAC cycle",
+    "local_file": "raw/egll_aip_pdfs/EGLL_AD2.EGLL-7-2.pdf"
+   },
+   "note": "Transcribed from the coding table AD 2-EGLL-7-13.",
+   "star": {
+    "ident": "LAM1X",
+    "faa_id": "LAM1X",
+    "spoken_name": "LAM ONE X-RAY",
+    "printed_on_chart": "UK AIP AD 2-EGLL-7-2 chart; coding table AD 2-EGLL-7-13 (AERO INFO DATE 08 OCT 25)",
+    "provenance": "UK AIP AIRAC 10/2026 7-13 coding table (waypoints, tracks, distances, constraints parsed from the text layer) and chart 7-2; chart depiction of level bars checked on charts 7-1 and 7-8 only",
+    "notes": [
+     "RNAV 5 (DME/DME or GNSS) STAR ending at the BIG terminal holding fix.",
+     "Standard routes may be varied at the discretion of ATC; adhere to maximum speed limits where specified; aircraft will normally be radar vectored from the holding fix (AD 2.22 para 3).",
+     "Restrictions: levels from the coding table \"Level Constraint\" column converted FL to feet; a bare level is flown as AT (bars above and below on the charts checked), the level at the stack fix as AT OR ABOVE (minimum holding level, underline only); speeds \"-250\" / \"-220\" = maximum, at or below.",
+     "DESIGN VALUE: the simulator starts a STAR arrival over LAM (sim_entry_fixes), 20-30 NM from the holding fix, because the published entry fixes are up to 300 NM out; the altitude window comes from the restriction at that fix (else 10000-12000 ft)."
+    ],
+    "transitions": [
+     {
+      "name": "LAM",
+      "fixes": [
+       "LAM",
+       "HILLY",
+       "BIG"
+      ]
+     }
+    ],
+    "runways": [
+     {
+      "runway_end": "9L",
+      "fixes": [
+       "BIG"
+      ],
+      "join_approach_fixes": [
+       "AAIF",
+       "AAFAP"
+      ],
+      "expect": "Hold at BIG, then radar vectors to the ILS for runway 9L (AD 2.22 para 3); the IF/FAP fixes are DERIVED."
+     },
+     {
+      "runway_end": "9R",
+      "fixes": [
+       "BIG"
+      ],
+      "join_approach_fixes": [
+       "BBIF",
+       "BBFAP"
+      ],
+      "expect": "Hold at BIG, then radar vectors to the ILS for runway 9R (AD 2.22 para 3); the IF/FAP fixes are DERIVED."
+     },
+     {
+      "runway_end": "27L",
+      "fixes": [
+       "BIG"
+      ],
+      "join_approach_fixes": [
+       "LLIF",
+       "LLFAP"
+      ],
+      "expect": "Hold at BIG, then radar vectors to the ILS for runway 27L (AD 2.22 para 3); the IF/FAP fixes are DERIVED."
+     },
+     {
+      "runway_end": "27R",
+      "fixes": [
+       "BIG"
+      ],
+      "join_approach_fixes": [
+       "RRIF",
+       "RRFAP"
+      ],
+      "expect": "Hold at BIG, then radar vectors to the ILS for runway 27R (AD 2.22 para 3); the IF/FAP fixes are DERIVED."
+     }
+    ],
+    "restrictions": [
+     {
+      "fix": "LAM",
+      "speed_kt": 250
+     },
+     {
+      "fix": "HILLY",
+      "speed_kt": 220
+     },
+     {
+      "fix": "BIG",
+      "at_or_above_ft": 7000,
+      "speed_kt": 220
+     }
+    ],
+    "legs": [
+     {
+      "from": "LAM",
+      "to": "HILLY",
+      "track_mag_deg": 168,
+      "distance_nm": 19.0
+     }
+    ],
+    "verification": "distances and tracks as printed; see src/airport/egll/egll.test.ts for the great-circle check against the coordinates",
+    "sim_entry_fixes": [
+     "LAM"
+    ]
+   }
+  },
+  {
+   "chart_name": "TANET ONE ZULU ARRIVAL (RNAV)",
+   "pdf_name": "EGLL_AD2.EGLL-7-2.pdf",
+   "type": "STAR",
+   "faa_id": "TANET1Z",
+   "pdf": {
+    "url": "https://www.aurora.nats.co.uk/htmlAIP/Publications/2026-10-01-AIRAC/graphics/479234.pdf",
+    "http_status": 200,
+    "content_type": "application/pdf",
+    "bytes": 403141,
+    "verified_by": "curl GET on 2026-10-21 (HTTP status, content type, size); official NATS URL; LINK ONLY, not bundled; the path changes every AIRAC cycle",
+    "local_file": "raw/egll_aip_pdfs/EGLL_AD2.EGLL-7-2.pdf"
+   },
+   "note": "Transcribed from the coding table AD 2-EGLL-7-14.",
+   "star": {
+    "ident": "TANET1Z",
+    "faa_id": "TANET1Z",
+    "spoken_name": "TANET ONE ZULU",
+    "printed_on_chart": "UK AIP AD 2-EGLL-7-2 chart; coding table AD 2-EGLL-7-14 (AERO INFO DATE 08 OCT 25)",
+    "provenance": "UK AIP AIRAC 10/2026 7-14 coding table (waypoints, tracks, distances, constraints parsed from the text layer) and chart 7-2; chart depiction of level bars checked on charts 7-1 and 7-8 only",
+    "notes": [
+     "RNAV 5 (DME/DME or GNSS) STAR ending at the BIG terminal holding fix.",
+     "Standard routes may be varied at the discretion of ATC; adhere to maximum speed limits where specified; aircraft will normally be radar vectored from the holding fix (AD 2.22 para 3).",
+     "Restrictions: levels from the coding table \"Level Constraint\" column converted FL to feet; a bare level is flown as AT (bars above and below on the charts checked), the level at the stack fix as AT OR ABOVE (minimum holding level, underline only); speeds \"-250\" / \"-220\" = maximum, at or below.",
+     "DESIGN VALUE: the simulator starts a STAR arrival over DET (sim_entry_fixes), 20-30 NM from the holding fix, because the published entry fixes are up to 300 NM out; the altitude window comes from the restriction at that fix (else 10000-12000 ft)."
+    ],
+    "transitions": [
+     {
+      "name": "TANET",
+      "fixes": [
+       "TANET",
+       "DET",
+       "LLE02",
+       "BIG"
+      ]
+     }
+    ],
+    "runways": [
+     {
+      "runway_end": "9L",
+      "fixes": [
+       "BIG"
+      ],
+      "join_approach_fixes": [
+       "AAIF",
+       "AAFAP"
+      ],
+      "expect": "Hold at BIG, then radar vectors to the ILS for runway 9L (AD 2.22 para 3); the IF/FAP fixes are DERIVED."
+     },
+     {
+      "runway_end": "9R",
+      "fixes": [
+       "BIG"
+      ],
+      "join_approach_fixes": [
+       "BBIF",
+       "BBFAP"
+      ],
+      "expect": "Hold at BIG, then radar vectors to the ILS for runway 9R (AD 2.22 para 3); the IF/FAP fixes are DERIVED."
+     },
+     {
+      "runway_end": "27L",
+      "fixes": [
+       "BIG"
+      ],
+      "join_approach_fixes": [
+       "LLIF",
+       "LLFAP"
+      ],
+      "expect": "Hold at BIG, then radar vectors to the ILS for runway 27L (AD 2.22 para 3); the IF/FAP fixes are DERIVED."
+     },
+     {
+      "runway_end": "27R",
+      "fixes": [
+       "BIG"
+      ],
+      "join_approach_fixes": [
+       "RRIF",
+       "RRFAP"
+      ],
+      "expect": "Hold at BIG, then radar vectors to the ILS for runway 27R (AD 2.22 para 3); the IF/FAP fixes are DERIVED."
+     }
+    ],
+    "restrictions": [
+     {
+      "fix": "LLE02",
+      "speed_kt": 250
+     },
+     {
+      "fix": "BIG",
+      "at_or_above_ft": 7000,
+      "speed_kt": 220
+     }
+    ],
+    "legs": [
+     {
+      "from": "TANET",
+      "to": "DET",
+      "track_mag_deg": 234,
+      "distance_nm": 15.1
+     },
+     {
+      "from": "DET",
+      "to": "LLE02",
+      "track_mag_deg": 273,
+      "distance_nm": 9.2
+     },
+     {
+      "from": "LLE02",
+      "to": "BIG",
+      "track_mag_deg": 273,
+      "distance_nm": 12.0
+     }
+    ],
+    "verification": "distances and tracks as printed; see src/airport/egll/egll.test.ts for the great-circle check against the coordinates",
+    "sim_entry_fixes": [
+     "DET"
+    ]
+   }
+  },
+  {
+   "chart_name": "OCK ONE ZULU ARRIVAL (RNAV)",
+   "pdf_name": "EGLL_AD2.EGLL-7-3.pdf",
+   "type": "STAR",
+   "faa_id": "OCK1Z",
+   "pdf": {
+    "url": "https://www.aurora.nats.co.uk/htmlAIP/Publications/2026-10-01-AIRAC/graphics/475464.pdf",
+    "http_status": 200,
+    "content_type": "application/pdf",
+    "bytes": 261247,
+    "verified_by": "curl GET on 2026-10-21 (HTTP status, content type, size); official NATS URL; LINK ONLY, not bundled; the path changes every AIRAC cycle",
+    "local_file": "raw/egll_aip_pdfs/EGLL_AD2.EGLL-7-3.pdf"
+   },
+   "note": "Transcribed from the coding table AD 2-EGLL-7-14.",
+   "star": {
+    "ident": "OCK1Z",
+    "faa_id": "OCK1Z",
+    "spoken_name": "OCK ONE ZULU",
+    "printed_on_chart": "UK AIP AD 2-EGLL-7-3 chart; coding table AD 2-EGLL-7-14 (AERO INFO DATE 08 OCT 25)",
+    "provenance": "UK AIP AIRAC 10/2026 7-14 coding table (waypoints, tracks, distances, constraints parsed from the text layer) and chart 7-3; chart depiction of level bars checked on charts 7-1 and 7-8 only",
+    "notes": [
+     "RNAV 5 (DME/DME or GNSS) STAR ending at the BIG terminal holding fix.",
+     "Standard routes may be varied at the discretion of ATC; adhere to maximum speed limits where specified; aircraft will normally be radar vectored from the holding fix (AD 2.22 para 3).",
+     "Restrictions: levels from the coding table \"Level Constraint\" column converted FL to feet; a bare level is flown as AT (bars above and below on the charts checked), the level at the stack fix as AT OR ABOVE (minimum holding level, underline only); speeds \"-250\" / \"-220\" = maximum, at or below.",
+     "DESIGN VALUE: the simulator starts a STAR arrival over DORKI (sim_entry_fixes), 20-30 NM from the holding fix, because the published entry fixes are up to 300 NM out; the altitude window comes from the restriction at that fix (else 10000-12000 ft)."
+    ],
+    "transitions": [
+     {
+      "name": "OCK",
+      "fixes": [
+       "OCK",
+       "DORKI",
+       "HILLY",
+       "BIG"
+      ]
+     }
+    ],
+    "runways": [
+     {
+      "runway_end": "9L",
+      "fixes": [
+       "BIG"
+      ],
+      "join_approach_fixes": [
+       "AAIF",
+       "AAFAP"
+      ],
+      "expect": "Hold at BIG, then radar vectors to the ILS for runway 9L (AD 2.22 para 3); the IF/FAP fixes are DERIVED."
+     },
+     {
+      "runway_end": "9R",
+      "fixes": [
+       "BIG"
+      ],
+      "join_approach_fixes": [
+       "BBIF",
+       "BBFAP"
+      ],
+      "expect": "Hold at BIG, then radar vectors to the ILS for runway 9R (AD 2.22 para 3); the IF/FAP fixes are DERIVED."
+     },
+     {
+      "runway_end": "27L",
+      "fixes": [
+       "BIG"
+      ],
+      "join_approach_fixes": [
+       "LLIF",
+       "LLFAP"
+      ],
+      "expect": "Hold at BIG, then radar vectors to the ILS for runway 27L (AD 2.22 para 3); the IF/FAP fixes are DERIVED."
+     },
+     {
+      "runway_end": "27R",
+      "fixes": [
+       "BIG"
+      ],
+      "join_approach_fixes": [
+       "RRIF",
+       "RRFAP"
+      ],
+      "expect": "Hold at BIG, then radar vectors to the ILS for runway 27R (AD 2.22 para 3); the IF/FAP fixes are DERIVED."
+     }
+    ],
+    "restrictions": [
+     {
+      "fix": "DORKI",
+      "speed_kt": 250
+     },
+     {
+      "fix": "HILLY",
+      "speed_kt": 220
+     },
+     {
+      "fix": "BIG",
+      "at_or_above_ft": 7000,
+      "speed_kt": 220
+     }
+    ],
+    "legs": [
+     {
+      "from": "OCK",
+      "to": "DORKI",
+      "track_mag_deg": 103,
+      "distance_nm": 7.1
+     },
+     {
+      "from": "DORKI",
+      "to": "HILLY",
+      "track_mag_deg": 78,
+      "distance_nm": 19.5
+     }
+    ],
+    "verification": "distances and tracks as printed; see src/airport/egll/egll.test.ts for the great-circle check against the coordinates",
+    "sim_entry_fixes": [
+     "DORKI"
+    ]
+   }
+  },
+  {
+   "chart_name": "NUGRA TWO HOTEL ARRIVAL (RNAV)",
+   "pdf_name": "EGLL_AD2.EGLL-7-4.pdf",
+   "type": "STAR",
+   "faa_id": "NUGRA2H",
+   "pdf": {
+    "url": "https://www.aurora.nats.co.uk/htmlAIP/Publications/2026-10-01-AIRAC/graphics/482565.pdf",
+    "http_status": 200,
+    "content_type": "application/pdf",
+    "bytes": 439472,
+    "verified_by": "curl GET on 2026-10-21 (HTTP status, content type, size); official NATS URL; LINK ONLY, not bundled; the path changes every AIRAC cycle",
+    "local_file": "raw/egll_aip_pdfs/EGLL_AD2.EGLL-7-4.pdf"
+   },
+   "note": "Transcribed from the coding table AD 2-EGLL-7-14.",
+   "star": {
+    "ident": "NUGRA2H",
+    "faa_id": "NUGRA2H",
+    "spoken_name": "NUGRA TWO HOTEL",
+    "printed_on_chart": "UK AIP AD 2-EGLL-7-4 chart; coding table AD 2-EGLL-7-14 (AERO INFO DATE 08 OCT 25)",
+    "provenance": "UK AIP AIRAC 10/2026 7-14 coding table (waypoints, tracks, distances, constraints parsed from the text layer) and chart 7-4; chart depiction of level bars checked on charts 7-1 and 7-8 only",
+    "notes": [
+     "RNAV 5 (DME/DME or GNSS) STAR ending at the BNN terminal holding fix.",
+     "Standard routes may be varied at the discretion of ATC; adhere to maximum speed limits where specified; aircraft will normally be radar vectored from the holding fix (AD 2.22 para 3).",
+     "Restrictions: levels from the coding table \"Level Constraint\" column converted FL to feet; a bare level is flown as AT (bars above and below on the charts checked), the level at the stack fix as AT OR ABOVE (minimum holding level, underline only); speeds \"-250\" / \"-220\" = maximum, at or below.",
+     "DESIGN VALUE: the simulator starts a STAR arrival over SOPIT (sim_entry_fixes), 20-30 NM from the holding fix, because the published entry fixes are up to 300 NM out; the altitude window comes from the restriction at that fix (else 10000-12000 ft)."
+    ],
+    "transitions": [
+     {
+      "name": "NUGRA",
+      "fixes": [
+       "NUGRA",
+       "TOBID",
+       "SOPIT",
+       "WEZKO",
+       "BNN"
+      ]
+     }
+    ],
+    "runways": [
+     {
+      "runway_end": "9L",
+      "fixes": [
+       "BNN"
+      ],
+      "join_approach_fixes": [
+       "AAIF",
+       "AAFAP"
+      ],
+      "expect": "Hold at BNN, then radar vectors to the ILS for runway 9L (AD 2.22 para 3); the IF/FAP fixes are DERIVED."
+     },
+     {
+      "runway_end": "9R",
+      "fixes": [
+       "BNN"
+      ],
+      "join_approach_fixes": [
+       "BBIF",
+       "BBFAP"
+      ],
+      "expect": "Hold at BNN, then radar vectors to the ILS for runway 9R (AD 2.22 para 3); the IF/FAP fixes are DERIVED."
+     },
+     {
+      "runway_end": "27L",
+      "fixes": [
+       "BNN"
+      ],
+      "join_approach_fixes": [
+       "LLIF",
+       "LLFAP"
+      ],
+      "expect": "Hold at BNN, then radar vectors to the ILS for runway 27L (AD 2.22 para 3); the IF/FAP fixes are DERIVED."
+     },
+     {
+      "runway_end": "27R",
+      "fixes": [
+       "BNN"
+      ],
+      "join_approach_fixes": [
+       "RRIF",
+       "RRFAP"
+      ],
+      "expect": "Hold at BNN, then radar vectors to the ILS for runway 27R (AD 2.22 para 3); the IF/FAP fixes are DERIVED."
+     }
+    ],
+    "restrictions": [
+     {
+      "fix": "TOBID",
+      "at_ft": 20000
+     },
+     {
+      "fix": "SOPIT",
+      "at_ft": 15000
+     },
+     {
+      "fix": "WEZKO",
+      "speed_kt": 220
+     },
+     {
+      "fix": "BNN",
+      "at_or_above_ft": 7000,
+      "speed_kt": 220
+     }
+    ],
+    "legs": [
+     {
+      "from": "NUGRA",
+      "to": "TOBID",
+      "track_mag_deg": 146,
+      "distance_nm": 57.7
+     },
+     {
+      "from": "TOBID",
+      "to": "SOPIT",
+      "track_mag_deg": 138,
+      "distance_nm": 20.4
+     },
+     {
+      "from": "SOPIT",
+      "to": "WEZKO",
+      "track_mag_deg": 138,
+      "distance_nm": 8.3
+     },
+     {
+      "from": "WEZKO",
+      "to": "BNN",
+      "track_mag_deg": 115,
+      "distance_nm": 17.2
+     }
+    ],
+    "verification": "distances and tracks as printed; see src/airport/egll/egll.test.ts for the great-circle check against the coordinates",
+    "sim_entry_fixes": [
+     "SOPIT"
+    ]
+   }
+  },
+  {
+   "chart_name": "LAM ONE ZULU ARRIVAL (RNAV)",
+   "pdf_name": "EGLL_AD2.EGLL-7-4.pdf",
+   "type": "STAR",
+   "faa_id": "LAM1Z",
+   "pdf": {
+    "url": "https://www.aurora.nats.co.uk/htmlAIP/Publications/2026-10-01-AIRAC/graphics/482565.pdf",
+    "http_status": 200,
+    "content_type": "application/pdf",
+    "bytes": 439472,
+    "verified_by": "curl GET on 2026-10-21 (HTTP status, content type, size); official NATS URL; LINK ONLY, not bundled; the path changes every AIRAC cycle",
+    "local_file": "raw/egll_aip_pdfs/EGLL_AD2.EGLL-7-4.pdf"
+   },
+   "note": "Transcribed from the coding table AD 2-EGLL-7-14.",
+   "star": {
+    "ident": "LAM1Z",
+    "faa_id": "LAM1Z",
+    "spoken_name": "LAM ONE ZULU",
+    "printed_on_chart": "UK AIP AD 2-EGLL-7-4 chart; coding table AD 2-EGLL-7-14 (AERO INFO DATE 08 OCT 25)",
+    "provenance": "UK AIP AIRAC 10/2026 7-14 coding table (waypoints, tracks, distances, constraints parsed from the text layer) and chart 7-4; chart depiction of level bars checked on charts 7-1 and 7-8 only",
+    "notes": [
+     "RNAV 5 (DME/DME or GNSS) STAR ending at the BNN terminal holding fix.",
+     "Standard routes may be varied at the discretion of ATC; adhere to maximum speed limits where specified; aircraft will normally be radar vectored from the holding fix (AD 2.22 para 3).",
+     "Restrictions: levels from the coding table \"Level Constraint\" column converted FL to feet; a bare level is flown as AT (bars above and below on the charts checked), the level at the stack fix as AT OR ABOVE (minimum holding level, underline only); speeds \"-250\" / \"-220\" = maximum, at or below.",
+     "DESIGN VALUE: the simulator starts a STAR arrival over DONNA (sim_entry_fixes), 20-30 NM from the holding fix, because the published entry fixes are up to 300 NM out; the altitude window comes from the restriction at that fix (else 10000-12000 ft)."
+    ],
+    "transitions": [
+     {
+      "name": "LAM",
+      "fixes": [
+       "LAM",
+       "DONNA",
+       "BNN"
+      ]
+     }
+    ],
+    "runways": [
+     {
+      "runway_end": "9L",
+      "fixes": [
+       "BNN"
+      ],
+      "join_approach_fixes": [
+       "AAIF",
+       "AAFAP"
+      ],
+      "expect": "Hold at BNN, then radar vectors to the ILS for runway 9L (AD 2.22 para 3); the IF/FAP fixes are DERIVED."
+     },
+     {
+      "runway_end": "9R",
+      "fixes": [
+       "BNN"
+      ],
+      "join_approach_fixes": [
+       "BBIF",
+       "BBFAP"
+      ],
+      "expect": "Hold at BNN, then radar vectors to the ILS for runway 9R (AD 2.22 para 3); the IF/FAP fixes are DERIVED."
+     },
+     {
+      "runway_end": "27L",
+      "fixes": [
+       "BNN"
+      ],
+      "join_approach_fixes": [
+       "LLIF",
+       "LLFAP"
+      ],
+      "expect": "Hold at BNN, then radar vectors to the ILS for runway 27L (AD 2.22 para 3); the IF/FAP fixes are DERIVED."
+     },
+     {
+      "runway_end": "27R",
+      "fixes": [
+       "BNN"
+      ],
+      "join_approach_fixes": [
+       "RRIF",
+       "RRFAP"
+      ],
+      "expect": "Hold at BNN, then radar vectors to the ILS for runway 27R (AD 2.22 para 3); the IF/FAP fixes are DERIVED."
+     }
+    ],
+    "restrictions": [
+     {
+      "fix": "LAM",
+      "speed_kt": 250
+     },
+     {
+      "fix": "DONNA",
+      "speed_kt": 220
+     },
+     {
+      "fix": "BNN",
+      "at_or_above_ft": 7000,
+      "speed_kt": 220
+     }
+    ],
+    "legs": [
+     {
+      "from": "LAM",
+      "to": "DONNA",
+      "track_mag_deg": 275,
+      "distance_nm": 33.6
+     }
+    ],
+    "verification": "distances and tracks as printed; see src/airport/egll/egll.test.ts for the great-circle check against the coordinates",
+    "sim_entry_fixes": [
+     "DONNA"
+    ]
+   }
+  },
+  {
+   "chart_name": "HON TWO HOTEL ARRIVAL (RNAV)",
+   "pdf_name": "EGLL_AD2.EGLL-7-5.pdf",
+   "type": "STAR",
+   "faa_id": "HON2H",
+   "pdf": {
+    "url": "https://www.aurora.nats.co.uk/htmlAIP/Publications/2026-10-01-AIRAC/graphics/483111.pdf",
+    "http_status": 200,
+    "content_type": "application/pdf",
+    "bytes": 351515,
+    "verified_by": "curl GET on 2026-10-21 (HTTP status, content type, size); official NATS URL; LINK ONLY, not bundled; the path changes every AIRAC cycle",
+    "local_file": "raw/egll_aip_pdfs/EGLL_AD2.EGLL-7-5.pdf"
+   },
+   "note": "Transcribed from the coding table AD 2-EGLL-7-15.",
+   "star": {
+    "ident": "HON2H",
+    "faa_id": "HON2H",
+    "spoken_name": "HON TWO HOTEL",
+    "printed_on_chart": "UK AIP AD 2-EGLL-7-5 chart; coding table AD 2-EGLL-7-15 (AERO INFO DATE 08 OCT 25)",
+    "provenance": "UK AIP AIRAC 10/2026 7-15 coding table (waypoints, tracks, distances, constraints parsed from the text layer) and chart 7-5; chart depiction of level bars checked on charts 7-1 and 7-8 only",
+    "notes": [
+     "RNAV 5 (DME/DME or GNSS) STAR ending at the BNN terminal holding fix.",
+     "Standard routes may be varied at the discretion of ATC; adhere to maximum speed limits where specified; aircraft will normally be radar vectored from the holding fix (AD 2.22 para 3).",
+     "Restrictions: levels from the coding table \"Level Constraint\" column converted FL to feet; a bare level is flown as AT (bars above and below on the charts checked), the level at the stack fix as AT OR ABOVE (minimum holding level, underline only); speeds \"-250\" / \"-220\" = maximum, at or below.",
+     "DESIGN VALUE: the simulator starts a STAR arrival over SOPIT (sim_entry_fixes), 20-30 NM from the holding fix, because the published entry fixes are up to 300 NM out; the altitude window comes from the restriction at that fix (else 10000-12000 ft)."
+    ],
+    "transitions": [
+     {
+      "name": "HON",
+      "fixes": [
+       "HON",
+       "TOBID",
+       "SOPIT",
+       "WEZKO",
+       "BNN"
+      ]
+     }
+    ],
+    "runways": [
+     {
+      "runway_end": "9L",
+      "fixes": [
+       "BNN"
+      ],
+      "join_approach_fixes": [
+       "AAIF",
+       "AAFAP"
+      ],
+      "expect": "Hold at BNN, then radar vectors to the ILS for runway 9L (AD 2.22 para 3); the IF/FAP fixes are DERIVED."
+     },
+     {
+      "runway_end": "9R",
+      "fixes": [
+       "BNN"
+      ],
+      "join_approach_fixes": [
+       "BBIF",
+       "BBFAP"
+      ],
+      "expect": "Hold at BNN, then radar vectors to the ILS for runway 9R (AD 2.22 para 3); the IF/FAP fixes are DERIVED."
+     },
+     {
+      "runway_end": "27L",
+      "fixes": [
+       "BNN"
+      ],
+      "join_approach_fixes": [
+       "LLIF",
+       "LLFAP"
+      ],
+      "expect": "Hold at BNN, then radar vectors to the ILS for runway 27L (AD 2.22 para 3); the IF/FAP fixes are DERIVED."
+     },
+     {
+      "runway_end": "27R",
+      "fixes": [
+       "BNN"
+      ],
+      "join_approach_fixes": [
+       "RRIF",
+       "RRFAP"
+      ],
+      "expect": "Hold at BNN, then radar vectors to the ILS for runway 27R (AD 2.22 para 3); the IF/FAP fixes are DERIVED."
+     }
+    ],
+    "restrictions": [
+     {
+      "fix": "SOPIT",
+      "at_ft": 15000
+     },
+     {
+      "fix": "WEZKO",
+      "speed_kt": 220
+     },
+     {
+      "fix": "BNN",
+      "at_or_above_ft": 7000,
+      "speed_kt": 220
+     }
+    ],
+    "legs": [
+     {
+      "from": "HON",
+      "to": "TOBID",
+      "track_mag_deg": 138,
+      "distance_nm": 11.1
+     },
+     {
+      "from": "TOBID",
+      "to": "SOPIT",
+      "track_mag_deg": 138,
+      "distance_nm": 20.4
+     },
+     {
+      "from": "SOPIT",
+      "to": "WEZKO",
+      "track_mag_deg": 138,
+      "distance_nm": 8.3
+     },
+     {
+      "from": "WEZKO",
+      "to": "BNN",
+      "track_mag_deg": 115,
+      "distance_nm": 17.2
+     }
+    ],
+    "verification": "distances and tracks as printed; see src/airport/egll/egll.test.ts for the great-circle check against the coordinates",
+    "sim_entry_fixes": [
+     "SOPIT"
+    ]
+   }
+  },
+  {
+   "chart_name": "BARMI ONE HOTEL ARRIVAL (RNAV)",
+   "pdf_name": "EGLL_AD2.EGLL-7-6.pdf",
+   "type": "STAR",
+   "faa_id": "BARMI1H",
+   "pdf": {
+    "url": "https://www.aurora.nats.co.uk/htmlAIP/Publications/2026-10-01-AIRAC/graphics/479237.pdf",
+    "http_status": 200,
+    "content_type": "application/pdf",
+    "bytes": 590582,
+    "verified_by": "curl GET on 2026-10-21 (HTTP status, content type, size); official NATS URL; LINK ONLY, not bundled; the path changes every AIRAC cycle",
+    "local_file": "raw/egll_aip_pdfs/EGLL_AD2.EGLL-7-6.pdf"
+   },
+   "note": "Transcribed from the coding table AD 2-EGLL-7-15.",
+   "star": {
+    "ident": "BARMI1H",
+    "faa_id": "BARMI1H",
+    "spoken_name": "BARMI ONE HOTEL",
+    "printed_on_chart": "UK AIP AD 2-EGLL-7-6 chart; coding table AD 2-EGLL-7-15 (AERO INFO DATE 08 OCT 25)",
+    "provenance": "UK AIP AIRAC 10/2026 7-15 coding table (waypoints, tracks, distances, constraints parsed from the text layer) and chart 7-6; chart depiction of level bars checked on charts 7-1 and 7-8 only",
+    "notes": [
+     "RNAV 5 (DME/DME or GNSS) STAR ending at the LAM terminal holding fix.",
+     "Standard routes may be varied at the discretion of ATC; adhere to maximum speed limits where specified; aircraft will normally be radar vectored from the holding fix (AD 2.22 para 3).",
+     "Restrictions: levels from the coding table \"Level Constraint\" column converted FL to feet; a bare level is flown as AT (bars above and below on the charts checked), the level at the stack fix as AT OR ABOVE (minimum holding level, underline only); speeds \"-250\" / \"-220\" = maximum, at or below.",
+     "DESIGN VALUE: the simulator starts a STAR arrival over BRASO (sim_entry_fixes), 20-30 NM from the holding fix, because the published entry fixes are up to 300 NM out; the altitude window comes from the restriction at that fix (else 10000-12000 ft)."
+    ],
+    "transitions": [
+     {
+      "name": "BARMI",
+      "fixes": [
+       "BARMI",
+       "SONOG",
+       "LOGAN",
+       "SABER",
+       "BRASO",
+       "WESUL",
+       "LAM"
+      ]
+     }
+    ],
+    "runways": [
+     {
+      "runway_end": "9L",
+      "fixes": [
+       "LAM"
+      ],
+      "join_approach_fixes": [
+       "AAIF",
+       "AAFAP"
+      ],
+      "expect": "Hold at LAM, then radar vectors to the ILS for runway 9L (AD 2.22 para 3); the IF/FAP fixes are DERIVED."
+     },
+     {
+      "runway_end": "9R",
+      "fixes": [
+       "LAM"
+      ],
+      "join_approach_fixes": [
+       "BBIF",
+       "BBFAP"
+      ],
+      "expect": "Hold at LAM, then radar vectors to the ILS for runway 9R (AD 2.22 para 3); the IF/FAP fixes are DERIVED."
+     },
+     {
+      "runway_end": "27L",
+      "fixes": [
+       "LAM"
+      ],
+      "join_approach_fixes": [
+       "LLIF",
+       "LLFAP"
+      ],
+      "expect": "Hold at LAM, then radar vectors to the ILS for runway 27L (AD 2.22 para 3); the IF/FAP fixes are DERIVED."
+     },
+     {
+      "runway_end": "27R",
+      "fixes": [
+       "LAM"
+      ],
+      "join_approach_fixes": [
+       "RRIF",
+       "RRFAP"
+      ],
+      "expect": "Hold at LAM, then radar vectors to the ILS for runway 27R (AD 2.22 para 3); the IF/FAP fixes are DERIVED."
+     }
+    ],
+    "restrictions": [
+     {
+      "fix": "BARMI",
+      "at_ft": 30000
+     },
+     {
+      "fix": "LOGAN",
+      "at_ft": 25000
+     },
+     {
+      "fix": "SABER",
+      "at_ft": 16000
+     },
+     {
+      "fix": "WESUL",
+      "speed_kt": 250
+     },
+     {
+      "fix": "LAM",
+      "at_or_above_ft": 7000,
+      "speed_kt": 220
+     }
+    ],
+    "legs": [
+     {
+      "from": "BARMI",
+      "to": "SONOG",
+      "track_mag_deg": 205,
+      "distance_nm": 25.0
+     },
+     {
+      "from": "SONOG",
+      "to": "LOGAN",
+      "track_mag_deg": 228,
+      "distance_nm": 32.5
+     },
+     {
+      "from": "LOGAN",
+      "to": "SABER",
+      "track_mag_deg": 263,
+      "distance_nm": 24.9
+     },
+     {
+      "from": "SABER",
+      "to": "BRASO",
+      "track_mag_deg": 262,
+      "distance_nm": 10.0
+     },
+     {
+      "from": "BRASO",
+      "to": "WESUL",
+      "track_mag_deg": 262,
+      "distance_nm": 7.4
+     },
+     {
+      "from": "WESUL",
+      "to": "LAM",
+      "track_mag_deg": 262,
+      "distance_nm": 12.6
+     }
+    ],
+    "verification": "distances and tracks as printed; see src/airport/egll/egll.test.ts for the great-circle check against the coordinates",
+    "sim_entry_fixes": [
+     "BRASO"
+    ]
+   }
+  },
+  {
+   "chart_name": "LOGAN TWO HOTEL ARRIVAL (RNAV)",
+   "pdf_name": "EGLL_AD2.EGLL-7-6.pdf",
+   "type": "STAR",
+   "faa_id": "LOGAN2H",
+   "pdf": {
+    "url": "https://www.aurora.nats.co.uk/htmlAIP/Publications/2026-10-01-AIRAC/graphics/479237.pdf",
+    "http_status": 200,
+    "content_type": "application/pdf",
+    "bytes": 590582,
+    "verified_by": "curl GET on 2026-10-21 (HTTP status, content type, size); official NATS URL; LINK ONLY, not bundled; the path changes every AIRAC cycle",
+    "local_file": "raw/egll_aip_pdfs/EGLL_AD2.EGLL-7-6.pdf"
+   },
+   "note": "Transcribed from the coding table AD 2-EGLL-7-15.",
+   "star": {
+    "ident": "LOGAN2H",
+    "faa_id": "LOGAN2H",
+    "spoken_name": "LOGAN TWO HOTEL",
+    "printed_on_chart": "UK AIP AD 2-EGLL-7-6 chart; coding table AD 2-EGLL-7-15 (AERO INFO DATE 08 OCT 25)",
+    "provenance": "UK AIP AIRAC 10/2026 7-15 coding table (waypoints, tracks, distances, constraints parsed from the text layer) and chart 7-6; chart depiction of level bars checked on charts 7-1 and 7-8 only",
+    "notes": [
+     "RNAV 5 (DME/DME or GNSS) STAR ending at the LAM terminal holding fix.",
+     "Standard routes may be varied at the discretion of ATC; adhere to maximum speed limits where specified; aircraft will normally be radar vectored from the holding fix (AD 2.22 para 3).",
+     "Restrictions: levels from the coding table \"Level Constraint\" column converted FL to feet; a bare level is flown as AT (bars above and below on the charts checked), the level at the stack fix as AT OR ABOVE (minimum holding level, underline only); speeds \"-250\" / \"-220\" = maximum, at or below.",
+     "DESIGN VALUE: the simulator starts a STAR arrival over BRASO (sim_entry_fixes), 20-30 NM from the holding fix, because the published entry fixes are up to 300 NM out; the altitude window comes from the restriction at that fix (else 10000-12000 ft)."
+    ],
+    "transitions": [
+     {
+      "name": "LOGAN",
+      "fixes": [
+       "LOGAN",
+       "SABER",
+       "BRASO",
+       "WESUL",
+       "LAM"
+      ]
+     }
+    ],
+    "runways": [
+     {
+      "runway_end": "9L",
+      "fixes": [
+       "LAM"
+      ],
+      "join_approach_fixes": [
+       "AAIF",
+       "AAFAP"
+      ],
+      "expect": "Hold at LAM, then radar vectors to the ILS for runway 9L (AD 2.22 para 3); the IF/FAP fixes are DERIVED."
+     },
+     {
+      "runway_end": "9R",
+      "fixes": [
+       "LAM"
+      ],
+      "join_approach_fixes": [
+       "BBIF",
+       "BBFAP"
+      ],
+      "expect": "Hold at LAM, then radar vectors to the ILS for runway 9R (AD 2.22 para 3); the IF/FAP fixes are DERIVED."
+     },
+     {
+      "runway_end": "27L",
+      "fixes": [
+       "LAM"
+      ],
+      "join_approach_fixes": [
+       "LLIF",
+       "LLFAP"
+      ],
+      "expect": "Hold at LAM, then radar vectors to the ILS for runway 27L (AD 2.22 para 3); the IF/FAP fixes are DERIVED."
+     },
+     {
+      "runway_end": "27R",
+      "fixes": [
+       "LAM"
+      ],
+      "join_approach_fixes": [
+       "RRIF",
+       "RRFAP"
+      ],
+      "expect": "Hold at LAM, then radar vectors to the ILS for runway 27R (AD 2.22 para 3); the IF/FAP fixes are DERIVED."
+     }
+    ],
+    "restrictions": [
+     {
+      "fix": "LOGAN",
+      "at_ft": 25000
+     },
+     {
+      "fix": "SABER",
+      "at_ft": 16000
+     },
+     {
+      "fix": "WESUL",
+      "speed_kt": 250
+     },
+     {
+      "fix": "LAM",
+      "at_or_above_ft": 7000,
+      "speed_kt": 220
+     }
+    ],
+    "legs": [
+     {
+      "from": "LOGAN",
+      "to": "SABER",
+      "track_mag_deg": 263,
+      "distance_nm": 24.9
+     },
+     {
+      "from": "SABER",
+      "to": "BRASO",
+      "track_mag_deg": 262,
+      "distance_nm": 10.0
+     },
+     {
+      "from": "BRASO",
+      "to": "WESUL",
+      "track_mag_deg": 262,
+      "distance_nm": 7.4
+     },
+     {
+      "from": "WESUL",
+      "to": "LAM",
+      "track_mag_deg": 262,
+      "distance_nm": 12.6
+     }
+    ],
+    "verification": "distances and tracks as printed; see src/airport/egll/egll.test.ts for the great-circle check against the coordinates",
+    "sim_entry_fixes": [
+     "BRASO"
+    ]
+   }
+  },
+  {
+   "chart_name": "TOBID ONE X-RAY ARRIVAL (RNAV)",
+   "pdf_name": "EGLL_AD2.EGLL-7-7.pdf",
+   "type": "STAR",
+   "faa_id": "TOBID1X",
+   "pdf": {
+    "url": "https://www.aurora.nats.co.uk/htmlAIP/Publications/2026-10-01-AIRAC/graphics/482568.pdf",
+    "http_status": 200,
+    "content_type": "application/pdf",
+    "bytes": 372946,
+    "verified_by": "curl GET on 2026-10-21 (HTTP status, content type, size); official NATS URL; LINK ONLY, not bundled; the path changes every AIRAC cycle",
+    "local_file": "raw/egll_aip_pdfs/EGLL_AD2.EGLL-7-7.pdf"
+   },
+   "note": "Transcribed from the coding table AD 2-EGLL-7-15.",
+   "star": {
+    "ident": "TOBID1X",
+    "faa_id": "TOBID1X",
+    "spoken_name": "TOBID ONE X-RAY",
+    "printed_on_chart": "UK AIP AD 2-EGLL-7-7 chart; coding table AD 2-EGLL-7-15 (AERO INFO DATE 08 OCT 25)",
+    "provenance": "UK AIP AIRAC 10/2026 7-15 coding table (waypoints, tracks, distances, constraints parsed from the text layer) and chart 7-7; chart depiction of level bars checked on charts 7-1 and 7-8 only",
+    "notes": [
+     "RNAV 5 (DME/DME or GNSS) STAR ending at the OCK terminal holding fix.",
+     "Standard routes may be varied at the discretion of ATC; adhere to maximum speed limits where specified; aircraft will normally be radar vectored from the holding fix (AD 2.22 para 3).",
+     "Restrictions: levels from the coding table \"Level Constraint\" column converted FL to feet; a bare level is flown as AT (bars above and below on the charts checked), the level at the stack fix as AT OR ABOVE (minimum holding level, underline only); speeds \"-250\" / \"-220\" = maximum, at or below.",
+     "DESIGN VALUE: the simulator starts a STAR arrival over WOD (sim_entry_fixes), 20-30 NM from the holding fix, because the published entry fixes are up to 300 NM out; the altitude window comes from the restriction at that fix (else 10000-12000 ft)."
+    ],
+    "transitions": [
+     {
+      "name": "TOBID",
+      "fixes": [
+       "TOBID",
+       "WOD",
+       "LLW02",
+       "OCK"
+      ]
+     }
+    ],
+    "runways": [
+     {
+      "runway_end": "9L",
+      "fixes": [
+       "OCK"
+      ],
+      "join_approach_fixes": [
+       "AAIF",
+       "AAFAP"
+      ],
+      "expect": "Hold at OCK, then radar vectors to the ILS for runway 9L (AD 2.22 para 3); the IF/FAP fixes are DERIVED."
+     },
+     {
+      "runway_end": "9R",
+      "fixes": [
+       "OCK"
+      ],
+      "join_approach_fixes": [
+       "BBIF",
+       "BBFAP"
+      ],
+      "expect": "Hold at OCK, then radar vectors to the ILS for runway 9R (AD 2.22 para 3); the IF/FAP fixes are DERIVED."
+     },
+     {
+      "runway_end": "27L",
+      "fixes": [
+       "OCK"
+      ],
+      "join_approach_fixes": [
+       "LLIF",
+       "LLFAP"
+      ],
+      "expect": "Hold at OCK, then radar vectors to the ILS for runway 27L (AD 2.22 para 3); the IF/FAP fixes are DERIVED."
+     },
+     {
+      "runway_end": "27R",
+      "fixes": [
+       "OCK"
+      ],
+      "join_approach_fixes": [
+       "RRIF",
+       "RRFAP"
+      ],
+      "expect": "Hold at OCK, then radar vectors to the ILS for runway 27R (AD 2.22 para 3); the IF/FAP fixes are DERIVED."
+     }
+    ],
+    "restrictions": [
+     {
+      "fix": "LLW02",
+      "speed_kt": 250
+     },
+     {
+      "fix": "OCK",
+      "at_or_above_ft": 7000,
+      "speed_kt": 220
+     }
+    ],
+    "legs": [
+     {
+      "from": "TOBID",
+      "to": "WOD",
+      "track_mag_deg": 153,
+      "distance_nm": 50.8
+     },
+     {
+      "from": "WOD",
+      "to": "LLW02",
+      "track_mag_deg": 117,
+      "distance_nm": 6.5
+     },
+     {
+      "from": "LLW02",
+      "to": "OCK",
+      "track_mag_deg": 117,
+      "distance_nm": 12.0
+     }
+    ],
+    "verification": "distances and tracks as printed; see src/airport/egll/egll.test.ts for the great-circle check against the coordinates",
+    "sim_entry_fixes": [
+     "WOD"
+    ]
+   }
+  },
+  {
+   "chart_name": "HAZEL ONE HOTEL ARRIVAL (RNAV)",
+   "pdf_name": "EGLL_AD2.EGLL-7-8.pdf",
+   "type": "STAR",
+   "faa_id": "HAZEL1H",
+   "pdf": {
+    "url": "https://www.aurora.nats.co.uk/htmlAIP/Publications/2026-10-01-AIRAC/graphics/475480.pdf",
+    "http_status": 200,
+    "content_type": "application/pdf",
+    "bytes": 257602,
+    "verified_by": "curl GET on 2026-10-21 (HTTP status, content type, size); official NATS URL; LINK ONLY, not bundled; the path changes every AIRAC cycle",
+    "local_file": "raw/egll_aip_pdfs/EGLL_AD2.EGLL-7-8.pdf"
+   },
+   "note": "Transcribed from the coding table AD 2-EGLL-7-16.",
+   "star": {
+    "ident": "HAZEL1H",
+    "faa_id": "HAZEL1H",
+    "spoken_name": "HAZEL ONE HOTEL",
+    "printed_on_chart": "UK AIP AD 2-EGLL-7-8 chart; coding table AD 2-EGLL-7-16 (AERO INFO DATE 08 OCT 25)",
+    "provenance": "UK AIP AIRAC 10/2026 7-16 coding table (waypoints, tracks, distances, constraints parsed from the text layer) and chart 7-8; chart depiction of level bars checked on charts 7-1 and 7-8 only",
+    "notes": [
+     "RNAV 5 (DME/DME or GNSS) STAR ending at the OCK terminal holding fix.",
+     "Standard routes may be varied at the discretion of ATC; adhere to maximum speed limits where specified; aircraft will normally be radar vectored from the holding fix (AD 2.22 para 3).",
+     "Restrictions: levels from the coding table \"Level Constraint\" column converted FL to feet; a bare level is flown as AT (bars above and below on the charts checked), the level at the stack fix as AT OR ABOVE (minimum holding level, underline only); speeds \"-250\" / \"-220\" = maximum, at or below.",
+     "DESIGN VALUE: the simulator starts a STAR arrival over HAZEL (sim_entry_fixes), 20-30 NM from the holding fix, because the published entry fixes are up to 300 NM out; the altitude window comes from the restriction at that fix (else 10000-12000 ft)."
+    ],
+    "transitions": [
+     {
+      "name": "HAZEL",
+      "fixes": [
+       "HAZEL",
+       "LLS01",
+       "OCK"
+      ]
+     }
+    ],
+    "runways": [
+     {
+      "runway_end": "9L",
+      "fixes": [
+       "OCK"
+      ],
+      "join_approach_fixes": [
+       "AAIF",
+       "AAFAP"
+      ],
+      "expect": "Hold at OCK, then radar vectors to the ILS for runway 9L (AD 2.22 para 3); the IF/FAP fixes are DERIVED."
+     },
+     {
+      "runway_end": "9R",
+      "fixes": [
+       "OCK"
+      ],
+      "join_approach_fixes": [
+       "BBIF",
+       "BBFAP"
+      ],
+      "expect": "Hold at OCK, then radar vectors to the ILS for runway 9R (AD 2.22 para 3); the IF/FAP fixes are DERIVED."
+     },
+     {
+      "runway_end": "27L",
+      "fixes": [
+       "OCK"
+      ],
+      "join_approach_fixes": [
+       "LLIF",
+       "LLFAP"
+      ],
+      "expect": "Hold at OCK, then radar vectors to the ILS for runway 27L (AD 2.22 para 3); the IF/FAP fixes are DERIVED."
+     },
+     {
+      "runway_end": "27R",
+      "fixes": [
+       "OCK"
+      ],
+      "join_approach_fixes": [
+       "RRIF",
+       "RRFAP"
+      ],
+      "expect": "Hold at OCK, then radar vectors to the ILS for runway 27R (AD 2.22 para 3); the IF/FAP fixes are DERIVED."
+     }
+    ],
+    "restrictions": [
+     {
+      "fix": "HAZEL",
+      "at_ft": 13000
+     },
+     {
+      "fix": "LLS01",
+      "speed_kt": 250
+     },
+     {
+      "fix": "OCK",
+      "at_or_above_ft": 7000,
+      "speed_kt": 220
+     }
+    ],
+    "legs": [
+     {
+      "from": "HAZEL",
+      "to": "LLS01",
+      "track_mag_deg": 47,
+      "distance_nm": 15.1
+     },
+     {
+      "from": "LLS01",
+      "to": "OCK",
+      "track_mag_deg": 47,
+      "distance_nm": 12.0
+     }
+    ],
+    "verification": "distances and tracks as printed; see src/airport/egll/egll.test.ts for the great-circle check against the coordinates",
+    "sim_entry_fixes": [
+     "HAZEL"
+    ]
+   }
+  },
+  {
+   "chart_name": "BIG ONE ZULU ARRIVAL (RNAV)",
+   "pdf_name": "EGLL_AD2.EGLL-7-9.pdf",
+   "type": "STAR",
+   "faa_id": "BIG1Z",
+   "pdf": {
+    "url": "https://www.aurora.nats.co.uk/htmlAIP/Publications/2026-10-01-AIRAC/graphics/461683.pdf",
+    "http_status": 200,
+    "content_type": "application/pdf",
+    "bytes": 297072,
+    "verified_by": "curl GET on 2026-10-21 (HTTP status, content type, size); official NATS URL; LINK ONLY, not bundled; the path changes every AIRAC cycle",
+    "local_file": "raw/egll_aip_pdfs/EGLL_AD2.EGLL-7-9.pdf"
+   },
+   "note": "Transcribed from the coding table AD 2-EGLL-7-16.",
+   "star": {
+    "ident": "BIG1Z",
+    "faa_id": "BIG1Z",
+    "spoken_name": "BIG ONE ZULU",
+    "printed_on_chart": "UK AIP AD 2-EGLL-7-9 chart; coding table AD 2-EGLL-7-16 (AERO INFO DATE 08 OCT 25)",
+    "provenance": "UK AIP AIRAC 10/2026 7-16 coding table (waypoints, tracks, distances, constraints parsed from the text layer) and chart 7-9; chart depiction of level bars checked on charts 7-1 and 7-8 only",
+    "notes": [
+     "RNAV 5 (DME/DME or GNSS) STAR ending at the OCK terminal holding fix.",
+     "Standard routes may be varied at the discretion of ATC; adhere to maximum speed limits where specified; aircraft will normally be radar vectored from the holding fix (AD 2.22 para 3).",
+     "Restrictions: levels from the coding table \"Level Constraint\" column converted FL to feet; a bare level is flown as AT (bars above and below on the charts checked), the level at the stack fix as AT OR ABOVE (minimum holding level, underline only); speeds \"-250\" / \"-220\" = maximum, at or below.",
+     "DESIGN VALUE: the simulator starts a STAR arrival over DORKI (sim_entry_fixes), 20-30 NM from the holding fix, because the published entry fixes are up to 300 NM out; the altitude window comes from the restriction at that fix (else 10000-12000 ft)."
+    ],
+    "transitions": [
+     {
+      "name": "BIG",
+      "fixes": [
+       "BIG",
+       "DORKI",
+       "OCK"
+      ]
+     }
+    ],
+    "runways": [
+     {
+      "runway_end": "9L",
+      "fixes": [
+       "OCK"
+      ],
+      "join_approach_fixes": [
+       "AAIF",
+       "AAFAP"
+      ],
+      "expect": "Hold at OCK, then radar vectors to the ILS for runway 9L (AD 2.22 para 3); the IF/FAP fixes are DERIVED."
+     },
+     {
+      "runway_end": "9R",
+      "fixes": [
+       "OCK"
+      ],
+      "join_approach_fixes": [
+       "BBIF",
+       "BBFAP"
+      ],
+      "expect": "Hold at OCK, then radar vectors to the ILS for runway 9R (AD 2.22 para 3); the IF/FAP fixes are DERIVED."
+     },
+     {
+      "runway_end": "27L",
+      "fixes": [
+       "OCK"
+      ],
+      "join_approach_fixes": [
+       "LLIF",
+       "LLFAP"
+      ],
+      "expect": "Hold at OCK, then radar vectors to the ILS for runway 27L (AD 2.22 para 3); the IF/FAP fixes are DERIVED."
+     },
+     {
+      "runway_end": "27R",
+      "fixes": [
+       "OCK"
+      ],
+      "join_approach_fixes": [
+       "RRIF",
+       "RRFAP"
+      ],
+      "expect": "Hold at OCK, then radar vectors to the ILS for runway 27R (AD 2.22 para 3); the IF/FAP fixes are DERIVED."
+     }
+    ],
+    "restrictions": [
+     {
+      "fix": "BIG",
+      "speed_kt": 250
+     },
+     {
+      "fix": "OCK",
+      "at_or_above_ft": 7000,
+      "speed_kt": 220
+     }
+    ],
+    "legs": [
+     {
+      "from": "BIG",
+      "to": "DORKI",
+      "track_mag_deg": 253,
+      "distance_nm": 11.7
+     },
+     {
+      "from": "DORKI",
+      "to": "OCK",
+      "track_mag_deg": 283,
+      "distance_nm": 7.1
+     }
+    ],
+    "verification": "distances and tracks as printed; see src/airport/egll/egll.test.ts for the great-circle check against the coordinates",
+    "sim_entry_fixes": [
+     "DORKI"
+    ]
+   }
+  },
+  {
+   "chart_name": "LAM ONE YANKEE ARRIVAL (RNAV)",
+   "pdf_name": "EGLL_AD2.EGLL-7-9.pdf",
+   "type": "STAR",
+   "faa_id": "LAM1Y",
+   "pdf": {
+    "url": "https://www.aurora.nats.co.uk/htmlAIP/Publications/2026-10-01-AIRAC/graphics/461683.pdf",
+    "http_status": 200,
+    "content_type": "application/pdf",
+    "bytes": 297072,
+    "verified_by": "curl GET on 2026-10-21 (HTTP status, content type, size); official NATS URL; LINK ONLY, not bundled; the path changes every AIRAC cycle",
+    "local_file": "raw/egll_aip_pdfs/EGLL_AD2.EGLL-7-9.pdf"
+   },
+   "note": "Transcribed from the coding table AD 2-EGLL-7-16.",
+   "star": {
+    "ident": "LAM1Y",
+    "faa_id": "LAM1Y",
+    "spoken_name": "LAM ONE YANKEE",
+    "printed_on_chart": "UK AIP AD 2-EGLL-7-9 chart; coding table AD 2-EGLL-7-16 (AERO INFO DATE 08 OCT 25)",
+    "provenance": "UK AIP AIRAC 10/2026 7-16 coding table (waypoints, tracks, distances, constraints parsed from the text layer) and chart 7-9; chart depiction of level bars checked on charts 7-1 and 7-8 only",
+    "notes": [
+     "RNAV 5 (DME/DME or GNSS) STAR ending at the OCK terminal holding fix.",
+     "Standard routes may be varied at the discretion of ATC; adhere to maximum speed limits where specified; aircraft will normally be radar vectored from the holding fix (AD 2.22 para 3).",
+     "Restrictions: levels from the coding table \"Level Constraint\" column converted FL to feet; a bare level is flown as AT (bars above and below on the charts checked), the level at the stack fix as AT OR ABOVE (minimum holding level, underline only); speeds \"-250\" / \"-220\" = maximum, at or below.",
+     "DESIGN VALUE: the simulator starts a STAR arrival over DORKI (sim_entry_fixes), 20-30 NM from the holding fix, because the published entry fixes are up to 300 NM out; the altitude window comes from the restriction at that fix (else 10000-12000 ft)."
+    ],
+    "transitions": [
+     {
+      "name": "LAM",
+      "fixes": [
+       "LAM",
+       "DORKI",
+       "OCK"
+      ]
+     }
+    ],
+    "runways": [
+     {
+      "runway_end": "9L",
+      "fixes": [
+       "OCK"
+      ],
+      "join_approach_fixes": [
+       "AAIF",
+       "AAFAP"
+      ],
+      "expect": "Hold at OCK, then radar vectors to the ILS for runway 9L (AD 2.22 para 3); the IF/FAP fixes are DERIVED."
+     },
+     {
+      "runway_end": "9R",
+      "fixes": [
+       "OCK"
+      ],
+      "join_approach_fixes": [
+       "BBIF",
+       "BBFAP"
+      ],
+      "expect": "Hold at OCK, then radar vectors to the ILS for runway 9R (AD 2.22 para 3); the IF/FAP fixes are DERIVED."
+     },
+     {
+      "runway_end": "27L",
+      "fixes": [
+       "OCK"
+      ],
+      "join_approach_fixes": [
+       "LLIF",
+       "LLFAP"
+      ],
+      "expect": "Hold at OCK, then radar vectors to the ILS for runway 27L (AD 2.22 para 3); the IF/FAP fixes are DERIVED."
+     },
+     {
+      "runway_end": "27R",
+      "fixes": [
+       "OCK"
+      ],
+      "join_approach_fixes": [
+       "RRIF",
+       "RRFAP"
+      ],
+      "expect": "Hold at OCK, then radar vectors to the ILS for runway 27R (AD 2.22 para 3); the IF/FAP fixes are DERIVED."
+     }
+    ],
+    "restrictions": [
+     {
+      "fix": "LAM",
+      "speed_kt": 250
+     },
+     {
+      "fix": "OCK",
+      "at_or_above_ft": 7000,
+      "speed_kt": 220
+     }
+    ],
+    "legs": [
+     {
+      "from": "LAM",
+      "to": "DORKI",
+      "track_mag_deg": 214,
+      "distance_nm": 27.2
+     },
+     {
+      "from": "DORKI",
+      "to": "OCK",
+      "track_mag_deg": 283,
+      "distance_nm": 7.1
+     }
+    ],
+    "verification": "distances and tracks as printed; see src/airport/egll/egll.test.ts for the great-circle check against the coordinates",
+    "sim_entry_fixes": [
+     "DORKI"
+    ]
+   }
+  },
+  {
+   "chart_name": "FITBO TWO HOTEL ARRIVAL (RNAV)",
+   "pdf_name": "EGLL_AD2.EGLL-7-10.pdf",
+   "type": "STAR",
+   "faa_id": "FITBO2H",
+   "pdf": {
+    "url": "https://www.aurora.nats.co.uk/htmlAIP/Publications/2026-10-01-AIRAC/graphics/482571.pdf",
+    "http_status": 200,
+    "content_type": "application/pdf",
+    "bytes": 312335,
+    "verified_by": "curl GET on 2026-10-21 (HTTP status, content type, size); official NATS URL; LINK ONLY, not bundled; the path changes every AIRAC cycle",
+    "local_file": "raw/egll_aip_pdfs/EGLL_AD2.EGLL-7-10.pdf"
+   },
+   "note": "Transcribed from the coding table AD 2-EGLL-7-16.",
+   "star": {
+    "ident": "FITBO2H",
+    "faa_id": "FITBO2H",
+    "spoken_name": "FITBO TWO HOTEL",
+    "printed_on_chart": "UK AIP AD 2-EGLL-7-10 chart; coding table AD 2-EGLL-7-16 (AERO INFO DATE 08 OCT 25)",
+    "provenance": "UK AIP AIRAC 10/2026 7-16 coding table (waypoints, tracks, distances, constraints parsed from the text layer) and chart 7-10; chart depiction of level bars checked on charts 7-1 and 7-8 only",
+    "notes": [
+     "RNAV 1 (DME/DME or GNSS) STAR ending at the BNN terminal holding fix.",
+     "Standard routes may be varied at the discretion of ATC; adhere to maximum speed limits where specified; aircraft will normally be radar vectored from the holding fix (AD 2.22 para 3).",
+     "Restrictions: levels from the coding table \"Level Constraint\" column converted FL to feet; a bare level is flown as AT (bars above and below on the charts checked), the level at the stack fix as AT OR ABOVE (minimum holding level, underline only); speeds \"-250\" / \"-220\" = maximum, at or below.",
+     "DESIGN VALUE: the simulator starts a STAR arrival over WEZKO (sim_entry_fixes), 20-30 NM from the holding fix, because the published entry fixes are up to 300 NM out; the altitude window comes from the restriction at that fix (else 10000-12000 ft)."
+    ],
+    "transitions": [
+     {
+      "name": "FITBO",
+      "fixes": [
+       "FITBO",
+       "SOPIT",
+       "WEZKO",
+       "BNN"
+      ]
+     }
+    ],
+    "runways": [
+     {
+      "runway_end": "9L",
+      "fixes": [
+       "BNN"
+      ],
+      "join_approach_fixes": [
+       "AAIF",
+       "AAFAP"
+      ],
+      "expect": "Hold at BNN, then radar vectors to the ILS for runway 9L (AD 2.22 para 3); the IF/FAP fixes are DERIVED."
+     },
+     {
+      "runway_end": "9R",
+      "fixes": [
+       "BNN"
+      ],
+      "join_approach_fixes": [
+       "BBIF",
+       "BBFAP"
+      ],
+      "expect": "Hold at BNN, then radar vectors to the ILS for runway 9R (AD 2.22 para 3); the IF/FAP fixes are DERIVED."
+     },
+     {
+      "runway_end": "27L",
+      "fixes": [
+       "BNN"
+      ],
+      "join_approach_fixes": [
+       "LLIF",
+       "LLFAP"
+      ],
+      "expect": "Hold at BNN, then radar vectors to the ILS for runway 27L (AD 2.22 para 3); the IF/FAP fixes are DERIVED."
+     },
+     {
+      "runway_end": "27R",
+      "fixes": [
+       "BNN"
+      ],
+      "join_approach_fixes": [
+       "RRIF",
+       "RRFAP"
+      ],
+      "expect": "Hold at BNN, then radar vectors to the ILS for runway 27R (AD 2.22 para 3); the IF/FAP fixes are DERIVED."
+     }
+    ],
+    "restrictions": [
+     {
+      "fix": "FITBO",
+      "at_ft": 18000
+     },
+     {
+      "fix": "SOPIT",
+      "at_ft": 15000
+     },
+     {
+      "fix": "WEZKO",
+      "speed_kt": 220
+     },
+     {
+      "fix": "BNN",
+      "at_or_above_ft": 7000,
+      "speed_kt": 220
+     }
+    ],
+    "legs": [
+     {
+      "from": "FITBO",
+      "to": "SOPIT",
+      "track_mag_deg": 106,
+      "distance_nm": 50.5
+     },
+     {
+      "from": "SOPIT",
+      "to": "WEZKO",
+      "track_mag_deg": 138,
+      "distance_nm": 8.3
+     },
+     {
+      "from": "WEZKO",
+      "to": "BNN",
+      "track_mag_deg": 115,
+      "distance_nm": 17.2
+     }
+    ],
+    "verification": "distances and tracks as printed; see src/airport/egll/egll.test.ts for the great-circle check against the coordinates",
+    "sim_entry_fixes": [
+     "WEZKO"
+    ]
+   }
+  },
+  {
+   "chart_name": "SIRIC ONE HOTEL ARRIVAL (RNAV)",
+   "pdf_name": "EGLL_AD2.EGLL-7-11.pdf",
+   "type": "STAR",
+   "faa_id": "SIRIC1H",
+   "pdf": {
+    "url": "https://www.aurora.nats.co.uk/htmlAIP/Publications/2026-10-01-AIRAC/graphics/482574.pdf",
+    "http_status": 200,
+    "content_type": "application/pdf",
+    "bytes": 383921,
+    "verified_by": "curl GET on 2026-10-21 (HTTP status, content type, size); official NATS URL; LINK ONLY, not bundled; the path changes every AIRAC cycle",
+    "local_file": "raw/egll_aip_pdfs/EGLL_AD2.EGLL-7-11.pdf"
+   },
+   "note": "Transcribed from the coding table AD 2-EGLL-7-17.",
+   "star": {
+    "ident": "SIRIC1H",
+    "faa_id": "SIRIC1H",
+    "spoken_name": "SIRIC ONE HOTEL",
+    "printed_on_chart": "UK AIP AD 2-EGLL-7-11 chart; coding table AD 2-EGLL-7-17 (AERO INFO DATE 08 OCT 25)",
+    "provenance": "UK AIP AIRAC 10/2026 7-17 coding table (waypoints, tracks, distances, constraints parsed from the text layer) and chart 7-11; chart depiction of level bars checked on charts 7-1 and 7-8 only",
+    "notes": [
+     "RNAV 1 (DME/DME or GNSS) STAR ending at the OCK terminal holding fix.",
+     "Standard routes may be varied at the discretion of ATC; adhere to maximum speed limits where specified; aircraft will normally be radar vectored from the holding fix (AD 2.22 para 3).",
+     "Restrictions: levels from the coding table \"Level Constraint\" column converted FL to feet; a bare level is flown as AT (bars above and below on the charts checked), the level at the stack fix as AT OR ABOVE (minimum holding level, underline only); speeds \"-250\" / \"-220\" = maximum, at or below.",
+     "DESIGN VALUE: the simulator starts a STAR arrival over NIGIT (sim_entry_fixes), 20-30 NM from the holding fix, because the published entry fixes are up to 300 NM out; the altitude window comes from the restriction at that fix (else 10000-12000 ft)."
+    ],
+    "transitions": [
+     {
+      "name": "SIRIC",
+      "fixes": [
+       "SIRIC",
+       "NIGIT",
+       "LLW03",
+       "OCK"
+      ]
+     }
+    ],
+    "runways": [
+     {
+      "runway_end": "9L",
+      "fixes": [
+       "OCK"
+      ],
+      "join_approach_fixes": [
+       "AAIF",
+       "AAFAP"
+      ],
+      "expect": "Hold at OCK, then radar vectors to the ILS for runway 9L (AD 2.22 para 3); the IF/FAP fixes are DERIVED."
+     },
+     {
+      "runway_end": "9R",
+      "fixes": [
+       "OCK"
+      ],
+      "join_approach_fixes": [
+       "BBIF",
+       "BBFAP"
+      ],
+      "expect": "Hold at OCK, then radar vectors to the ILS for runway 9R (AD 2.22 para 3); the IF/FAP fixes are DERIVED."
+     },
+     {
+      "runway_end": "27L",
+      "fixes": [
+       "OCK"
+      ],
+      "join_approach_fixes": [
+       "LLIF",
+       "LLFAP"
+      ],
+      "expect": "Hold at OCK, then radar vectors to the ILS for runway 27L (AD 2.22 para 3); the IF/FAP fixes are DERIVED."
+     },
+     {
+      "runway_end": "27R",
+      "fixes": [
+       "OCK"
+      ],
+      "join_approach_fixes": [
+       "RRIF",
+       "RRFAP"
+      ],
+      "expect": "Hold at OCK, then radar vectors to the ILS for runway 27R (AD 2.22 para 3); the IF/FAP fixes are DERIVED."
+     }
+    ],
+    "restrictions": [
+     {
+      "fix": "SIRIC",
+      "at_ft": 14000
+     },
+     {
+      "fix": "LLW03",
+      "speed_kt": 250
+     },
+     {
+      "fix": "OCK",
+      "at_or_above_ft": 7000,
+      "speed_kt": 220
+     }
+    ],
+    "legs": [
+     {
+      "from": "SIRIC",
+      "to": "NIGIT",
+      "track_mag_deg": 96,
+      "distance_nm": 15.0
+     },
+     {
+      "from": "NIGIT",
+      "to": "LLW03",
+      "track_mag_deg": 90,
+      "distance_nm": 15.3
+     },
+     {
+      "from": "LLW03",
+      "to": "OCK",
+      "track_mag_deg": 90,
+      "distance_nm": 12.0
+     }
+    ],
+    "verification": "distances and tracks as printed; see src/airport/egll/egll.test.ts for the great-circle check against the coordinates",
+    "sim_entry_fixes": [
+     "NIGIT"
+    ]
+   }
+  },
+  {
+   "chart_name": "SIRIC ONE ZULU ARRIVAL (RNAV)",
+   "pdf_name": "EGLL_AD2.EGLL-7-12.pdf",
+   "type": "STAR",
+   "faa_id": "SIRIC1Z",
+   "pdf": {
+    "url": "https://www.aurora.nats.co.uk/htmlAIP/Publications/2026-10-01-AIRAC/graphics/483114.pdf",
+    "http_status": 200,
+    "content_type": "application/pdf",
+    "bytes": 377205,
+    "verified_by": "curl GET on 2026-10-21 (HTTP status, content type, size); official NATS URL; LINK ONLY, not bundled; the path changes every AIRAC cycle",
+    "local_file": "raw/egll_aip_pdfs/EGLL_AD2.EGLL-7-12.pdf"
+   },
+   "note": "Transcribed from the coding table AD 2-EGLL-7-17.",
+   "star": {
+    "ident": "SIRIC1Z",
+    "faa_id": "SIRIC1Z",
+    "spoken_name": "SIRIC ONE ZULU",
+    "printed_on_chart": "UK AIP AD 2-EGLL-7-12 chart; coding table AD 2-EGLL-7-17 (AERO INFO DATE 08 OCT 25)",
+    "provenance": "UK AIP AIRAC 10/2026 7-17 coding table (waypoints, tracks, distances, constraints parsed from the text layer) and chart 7-12; chart depiction of level bars checked on charts 7-1 and 7-8 only",
+    "notes": [
+     "RNAV 1 (DME/DME or GNSS) STAR ending at the BNN terminal holding fix.",
+     "Standard routes may be varied at the discretion of ATC; adhere to maximum speed limits where specified; aircraft will normally be radar vectored from the holding fix (AD 2.22 para 3).",
+     "Restrictions: levels from the coding table \"Level Constraint\" column converted FL to feet; a bare level is flown as AT (bars above and below on the charts checked), the level at the stack fix as AT OR ABOVE (minimum holding level, underline only); speeds \"-250\" / \"-220\" = maximum, at or below.",
+     "DESIGN VALUE: the simulator starts a STAR arrival over CPT (sim_entry_fixes), 20-30 NM from the holding fix, because the published entry fixes are up to 300 NM out; the altitude window comes from the restriction at that fix (else 10000-12000 ft)."
+    ],
+    "transitions": [
+     {
+      "name": "SIRIC",
+      "fixes": [
+       "SIRIC",
+       "CPT",
+       "BNN"
+      ]
+     }
+    ],
+    "runways": [
+     {
+      "runway_end": "9L",
+      "fixes": [
+       "BNN"
+      ],
+      "join_approach_fixes": [
+       "AAIF",
+       "AAFAP"
+      ],
+      "expect": "Hold at BNN, then radar vectors to the ILS for runway 9L (AD 2.22 para 3); the IF/FAP fixes are DERIVED."
+     },
+     {
+      "runway_end": "9R",
+      "fixes": [
+       "BNN"
+      ],
+      "join_approach_fixes": [
+       "BBIF",
+       "BBFAP"
+      ],
+      "expect": "Hold at BNN, then radar vectors to the ILS for runway 9R (AD 2.22 para 3); the IF/FAP fixes are DERIVED."
+     },
+     {
+      "runway_end": "27L",
+      "fixes": [
+       "BNN"
+      ],
+      "join_approach_fixes": [
+       "LLIF",
+       "LLFAP"
+      ],
+      "expect": "Hold at BNN, then radar vectors to the ILS for runway 27L (AD 2.22 para 3); the IF/FAP fixes are DERIVED."
+     },
+     {
+      "runway_end": "27R",
+      "fixes": [
+       "BNN"
+      ],
+      "join_approach_fixes": [
+       "RRIF",
+       "RRFAP"
+      ],
+      "expect": "Hold at BNN, then radar vectors to the ILS for runway 27R (AD 2.22 para 3); the IF/FAP fixes are DERIVED."
+     }
+    ],
+    "restrictions": [
+     {
+      "fix": "SIRIC",
+      "at_ft": 14000
+     },
+     {
+      "fix": "CPT",
+      "speed_kt": 250
+     },
+     {
+      "fix": "BNN",
+      "at_or_above_ft": 7000,
+      "speed_kt": 220
+     }
+    ],
+    "legs": [
+     {
+      "from": "SIRIC",
+      "to": "CPT",
+      "track_mag_deg": 54,
+      "distance_nm": 15.8
+     },
+     {
+      "from": "CPT",
+      "to": "BNN",
+      "track_mag_deg": 59,
+      "distance_nm": 28.8
+     }
+    ],
+    "verification": "distances and tracks as printed; see src/airport/egll/egll.test.ts for the great-circle check against the coordinates",
+    "sim_entry_fixes": [
+     "CPT"
+    ]
+   }
+  }
+ ],
+ "stars_note": "18 RNAV STARs (AD 2-EGLL-7-1..7-12), all transcribed from the coding tables; every STAR ends at a terminal holding fix (OCK, BIG, LAM, BNN); radar vectors follow.",
+ "sids": [],
+ "sids_note": "Departure procedures are the 24 SIDs (6 charts x 4 runway directions), listed under departure_procedures.",
+ "supporting_charts": {
+  "takeoff_minimums_pdf": [],
+  "lahso": [],
+  "hot_spot": [
+   {
+    "chart_name": "AERODROME CHART - ICAO (hot spots HS1-HS5)",
+    "pdf": {
+     "url": "https://www.aurora.nats.co.uk/htmlAIP/Publications/2026-10-01-AIRAC/graphics/487994.pdf",
+     "http_status": 200,
+     "content_type": "application/pdf",
+     "bytes": 1058868,
+     "verified_by": "curl GET on 2026-10-21 (HTTP status, content type, size); official NATS URL; LINK ONLY, not bundled; the path changes every AIRAC cycle",
+     "local_file": "raw/egll_aip_pdfs/EGLL_AD2.EGLL-2-1.pdf"
+    }
+   }
+  ],
+  "hot_spot_text": "HS1/HS2: pilots are to maintain a good lookout at all times and are responsible for wing tip clearance. HS3: pilots of Code F aircraft must take care - Link 28 east of Taxiway Alpha is NOT Code F compliant. HS4: pilots are to ensure they have clearance to enter the runway before crossing the holding point. HS5: mis-route hotspot - after vacating the runway, pilots to be aware of the potential to mis-route. (AD 2-EGLL-2-1)",
+  "hot_spot_note": "Hot spots are printed on the aerodrome chart."
+ },
+ "not_included": [
+  "LOC/DME and RNP approach charts (listed, not transcribed)",
+  "Terminal stand charts 2-4..2-7 (read for stand numbering only)",
+  "ATC surveillance minimum altitude chart AD 2-EGLL-5-1 (not transcribed, no MVA sectors)",
+  "Helicopter and VFR charts"
+ ],
+ "readback_note": "AD 2.20 para 2: aircraft report \"runway vacated\" on the Air controller frequency after a crossing; the hold-short instruction with a clearance limit is the UK equivalent of FAA hold short."
+}

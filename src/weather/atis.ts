@@ -19,6 +19,7 @@
  * Numbers follow 2-4-17 (separate digits; "niner"). See docs/PHRASEOLOGY-AUDIT.md.
  */
 import type { Atis, BrakingTerm, Weather } from '../sim/types';
+import { inHgToHpa, qnhDigits, visibilityMetres, visibilityText } from './units';
 import { ceilingCategory, ceilingFt, visibilityCategory, windMagnetic } from './metar';
 import { termRank } from './runwayCondition';
 import { isNewObservation } from './observation';
@@ -86,6 +87,8 @@ export interface GenerateAtisInput {
    */
   approachesInUse?: string[];
   notams?: string[];
+  /** 'hPa' (EGLL): QNH in hectopascals, visibility in metres, UK ATIS wording (see `src/weather/units.ts`). Default 'inHg'. */
+  altimeterUnit?: 'inHg' | 'hPa';
   /**
    * Add "Read back all runway hold short instructions." (7110.65 2-9-3; the KACY airport diagram requires readback of
    * all runway holding instructions). Default true.
@@ -287,9 +290,13 @@ function windSegment(w: Weather, variationDeg: number): Segment {
   return { display: `Wind ${d} at ${w.windSpeedKt}${gustD}.`, spoken: `Wind ${spokenDigits(d)} at ${spokenDigits(w.windSpeedKt)}${gustS}.` };
 }
 
-function visibilitySegment(w: Weather): Segment {
+function visibilitySegment(w: Weather, metric = false): Segment {
   const wx = w.phenomena.map(describePhenomenon);
   const tail = wx.length ? `, ${wx.join(', ')}` : '';
+  if (metric) {
+    const v = visibilityMetres(w.visibilitySm);
+    return { display: `Visibility ${visibilityText(w.visibilitySm)}${tail}.`, spoken: `Visibility ${v.tenKmOrMore ? 'ten kilometres or more' : `${spokenDigits(v.metres)} metres`}${tail}.` };
+  }
   return {
     display: `Visibility ${displayVisibility(w.visibilitySm)}${tail}.`,
     spoken: `Visibility ${spokenVisibility(w.visibilitySm)}${tail}.`,
@@ -346,7 +353,8 @@ function tempSegment(w: Weather): Segment {
   };
 }
 
-function altimeterSegment(w: Weather): Segment {
+function altimeterSegment(w: Weather, hpa = false): Segment {
+  if (hpa) return { display: `QNH ${inHgToHpa(w.altimeterInHg)}.`, spoken: `QNH ${spokenDigits(qnhDigits(w.altimeterInHg))}.` };
   return {
     display: `Altimeter ${w.altimeterInHg.toFixed(2)}.`,
     spoken: `Altimeter ${spokenAltimeter(w.altimeterInHg)}.`,
@@ -410,7 +418,7 @@ export function generateAtis(input: GenerateAtisInput): SimulatedAtis {
   const letter = (input.letter || 'A').trim().toUpperCase().charAt(0) || 'A';
   const phonetic = phoneticForLetter(letter);
   const timeZulu = formatTimeZulu(input.timeUtc);
-  const name = /airport$/i.test(input.airportName.trim()) ? input.airportName.trim() : `${input.airportName.trim()} Airport`;
+  const name = input.altimeterUnit === 'hPa' || /airport$/i.test(input.airportName.trim()) ? input.airportName.trim() : `${input.airportName.trim()} Airport`;
   const approaches = input.approachesInUse?.length ? input.approachesInUse : defaultApproaches(weather, activeRunways.landing);
   const notams = (input.notams ?? []).map((n) => n.trim().replace(/[.\s]+$/, '')).filter(Boolean);
 
@@ -421,12 +429,13 @@ export function generateAtis(input: GenerateAtisInput): SimulatedAtis {
   disp.push(`${name} information ${phonetic}, ${timeZulu} Zulu.`);
   spok.push(`${name} information ${phonetic}, ${spokenDigits(timeZulu)} Zulu.`);
   push(windSegment(weather, variationDeg));
-  push(visibilitySegment(weather));
+  const hpa = input.altimeterUnit === 'hPa';
+  push(visibilitySegment(weather, hpa));
   const rvr = rvrSegment(input.ops);
   if (rvr) push(rvr);
   push(skySegment(weather));
   push(tempSegment(weather));
-  push(altimeterSegment(weather));
+  push(altimeterSegment(weather, hpa));
   if (approaches.length) {
     const joined = approaches.join(' and ');
     disp.push(`${capitalize(joined)} in use.`);
@@ -459,12 +468,19 @@ export function generateAtis(input: GenerateAtisInput): SimulatedAtis {
     disp.push(seg.display);
     spok.push(seg.spoken);
   }
-  if (input.holdShortReadback ?? true) {
+  if (!hpa && (input.holdShortReadback ?? true)) {
     disp.push('Read back all runway hold short instructions.');
     spok.push('Read back all runway hold short instructions.');
   }
-  disp.push(`Advise on initial contact you have information ${phonetic}.`);
-  spok.push(`Advise on initial contact you have information ${phonetic}.`);
+  if (hpa) {
+    // CAP 413 4.214: the UK ATIS example ends "Acknowledge receipt of information Alpha on first contact with <unit>"; the pilot quotes the
+    // letter with type, stand and QNH on first contact with Heathrow Delivery (AD 2.20 para 2)
+    disp.push(`Acknowledge receipt of information ${phonetic} on first contact.`);
+    spok.push(`Acknowledge receipt of information ${phonetic} on first contact.`);
+  } else {
+    disp.push(`Advise on initial contact you have information ${phonetic}.`);
+    spok.push(`Advise on initial contact you have information ${phonetic}.`);
+  }
 
   return {
     letter,

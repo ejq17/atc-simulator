@@ -5,6 +5,7 @@ import { fetchLiveMetar } from '../../weather/liveWeather';
 import { WEATHER_PRESETS, WEATHER_PRESET_IDS, getPresetWeather } from '../../weather/presets';
 import type { WeatherPresetId } from '../../weather/presets';
 import { windText, altimeterText } from '../lib/format';
+import { visibilityText } from '../../weather/units';
 import { Btn, Field, LABEL, SELECT } from '../components/ui';
 import { Drawer } from './Drawer';
 import { AirportStatusBlock } from '../components/AirportNotices';
@@ -50,7 +51,7 @@ export function WeatherPanel() {
       <div className="flex flex-col gap-5 p-4 text-xs" data-testid="weather-panel">
         <section className="flex flex-col gap-1">
           <span className={LABEL}>Current weather ({st.weather.source})</span>
-          <div className="text-[13px] tabular-nums">Wind {windText(st.weather, st.airport.magneticVariationDeg)} · {altimeterText(st.weather.altimeterInHg)} · {st.weather.visibilitySm} SM · {st.weather.flightCategory}</div>
+          <div className="text-[13px] tabular-nums">Wind {windText(st.weather, st.airport.magneticVariationDeg)} · {altimeterText(st.weather.altimeterInHg, st.airport.altimeterUnit)} · {st.airport.altimeterUnit === 'hPa' ? visibilityText(st.weather.visibilitySm) : `${st.weather.visibilitySm} SM`} · {st.weather.flightCategory}</div>
           <table className="mt-1 w-full max-w-[22rem] text-[11px] tabular-nums" data-testid="runway-winds" aria-label="Wind components per runway end">
             <thead><tr className="text-left text-atc-muted"><th className="font-normal">End</th><th className="font-normal">Head/tail (kt)</th><th className="font-normal">Crosswind (kt)</th><th className="font-normal">At gusts</th></tr></thead>
             <tbody>

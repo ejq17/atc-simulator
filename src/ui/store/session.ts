@@ -12,6 +12,7 @@ import type { ScenarioEventRunner, TrainingController, TrainingStepState } from 
 import { game } from '../../game';
 import { sameFrequency } from '../../radio/frequencies';
 import { altimeterText, windText } from '../lib/format';
+import { visibilityText } from '../../weather/units';
 import { atisNeedsUpdate, atisUpdateReasons, generateAtis, nextAtisLetter } from '../../weather/atis';
 import { closedRunwayEnds } from '../../sim/airportOps';
 import { runwayChangeForWind } from './runwayConfig';
@@ -191,6 +192,7 @@ export function makeAtis(state: SimulationState, letter: string, startUtcMs: num
     approachesInUse: approachesInUseFor(state),
     airportName: airportCallName(state.airport),
     icao: state.airport.icao,
+    ...(state.airport.altimeterUnit ? { altimeterUnit: state.airport.altimeterUnit } : {}),
     weather: state.weather,
     variationDeg: state.airport.magneticVariationDeg,
     activeRunways: state.activeRunways,
@@ -656,7 +658,7 @@ export function startSession(p: SessionParams): Session {
       engine.setWeather(w);
       engine.logEvent({
         kind: 'INFO', speaker: 'SYSTEM', severity: 'info',
-        text: `Weather: wind ${windText(w, st.airport.magneticVariationDeg)} (magnetic), ${altimeterText(w.altimeterInHg)}, ${w.visibilitySm} SM, ${w.flightCategory}.`,
+        text: `Weather: wind ${windText(w, st.airport.magneticVariationDeg)} (magnetic), ${altimeterText(w.altimeterInHg, st.airport.altimeterUnit)}, ${st.airport.altimeterUnit === 'hPa' ? visibilityText(w.visibilitySm) : `${w.visibilitySm} SM`}, ${w.flightCategory}.`,
       });
       if (needs) reissueAtis('weather change');
       hooks.onRev();

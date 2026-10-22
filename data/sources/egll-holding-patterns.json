@@ -1,0 +1,273 @@
+{
+ "_provenance": {
+  "source": "UK AIP AD 2.22 para 2 (missed approach holds) and RNAV hold coding tables AD 2-EGLL-7-18/7-19",
+  "retrieved": "2026-10-21",
+  "method": "Human transcription; the four terminal holds are attached to every ILS entry so that \"hold as published\" finds them (they belong to the STARs)."
+ },
+ "procedures": [
+  {
+   "chart_name": "ILS/DME I-AA RWY 09L",
+   "pdf_name": "EGLL_AD2.EGLL-8-1.pdf",
+   "holds": [
+    {
+     "fix": "CHT",
+     "inbound_course_mag_deg": 293,
+     "outbound_course_mag_deg": 113,
+     "turns": "left",
+     "role": "missed_approach",
+     "leg_minutes": 1,
+     "leg_source": "not published (default 1 minute)",
+     "max_speed_kt": 220,
+     "notes": "AD 2.22 para 2: holding axis 293 deg M inbound, turning left, max 220 KT, holding level 3000 FT ALT.",
+     "provenance": "UK AIP AD 2.22 para 2"
+    },
+    {
+     "fix": "BIG",
+     "inbound_course_mag_deg": 301,
+     "outbound_course_mag_deg": 121,
+     "turns": "right",
+     "role": "arrival",
+     "leg_minutes": 1,
+     "leg_source": "1 min up to FL140, 1.5 min above (hold coding tables AD 2-EGLL-7-18/19)",
+     "max_speed_kt": 220,
+     "notes": "Terminal holding fix; levels FL070 to FL150 (BIG, OCK); see the hold coding table.",
+     "provenance": "UK AIP AD 2-EGLL-7-18 / 7-19 hold coding tables"
+    },
+    {
+     "fix": "BNN",
+     "inbound_course_mag_deg": 115,
+     "outbound_course_mag_deg": 295,
+     "turns": "right",
+     "role": "arrival",
+     "leg_minutes": 1,
+     "leg_source": "1 min up to FL140, 1.5 min above (hold coding tables AD 2-EGLL-7-18/19)",
+     "max_speed_kt": 220,
+     "notes": "Terminal holding fix; levels FL070 to FL150 (BIG, OCK); see the hold coding table.",
+     "provenance": "UK AIP AD 2-EGLL-7-18 / 7-19 hold coding tables"
+    },
+    {
+     "fix": "LAM",
+     "inbound_course_mag_deg": 262,
+     "outbound_course_mag_deg": 82,
+     "turns": "left",
+     "role": "arrival",
+     "leg_minutes": 1,
+     "leg_source": "1 min up to FL140, 1.5 min above (hold coding tables AD 2-EGLL-7-18/19)",
+     "max_speed_kt": 220,
+     "notes": "Terminal holding fix; levels FL070 to FL150 (BIG, OCK); see the hold coding table.",
+     "provenance": "UK AIP AD 2-EGLL-7-18 / 7-19 hold coding tables"
+    },
+    {
+     "fix": "OCK",
+     "inbound_course_mag_deg": 327,
+     "outbound_course_mag_deg": 147,
+     "turns": "right",
+     "role": "arrival",
+     "leg_minutes": 1,
+     "leg_source": "1 min up to FL140, 1.5 min above (hold coding tables AD 2-EGLL-7-18/19)",
+     "max_speed_kt": 220,
+     "notes": "Terminal holding fix; levels FL070 to FL150 (BIG, OCK); see the hold coding table.",
+     "provenance": "UK AIP AD 2-EGLL-7-18 / 7-19 hold coding tables"
+    }
+   ]
+  },
+  {
+   "chart_name": "ILS/DME I-BB RWY 09R",
+   "pdf_name": "EGLL_AD2.EGLL-8-4.pdf",
+   "holds": [
+    {
+     "fix": "EPM",
+     "inbound_course_mag_deg": 274,
+     "outbound_course_mag_deg": 94,
+     "turns": "left",
+     "role": "missed_approach",
+     "leg_minutes": 1,
+     "leg_source": "not published (default 1 minute)",
+     "max_speed_kt": 220,
+     "notes": "AD 2.22 para 2: holding axis 274 deg M inbound, turning left, max 220 KT, holding level 3000 FT ALT.",
+     "provenance": "UK AIP AD 2.22 para 2"
+    },
+    {
+     "fix": "BIG",
+     "inbound_course_mag_deg": 301,
+     "outbound_course_mag_deg": 121,
+     "turns": "right",
+     "role": "arrival",
+     "leg_minutes": 1,
+     "leg_source": "1 min up to FL140, 1.5 min above (hold coding tables AD 2-EGLL-7-18/19)",
+     "max_speed_kt": 220,
+     "notes": "Terminal holding fix; levels FL070 to FL150 (BIG, OCK); see the hold coding table.",
+     "provenance": "UK AIP AD 2-EGLL-7-18 / 7-19 hold coding tables"
+    },
+    {
+     "fix": "BNN",
+     "inbound_course_mag_deg": 115,
+     "outbound_course_mag_deg": 295,
+     "turns": "right",
+     "role": "arrival",
+     "leg_minutes": 1,
+     "leg_source": "1 min up to FL140, 1.5 min above (hold coding tables AD 2-EGLL-7-18/19)",
+     "max_speed_kt": 220,
+     "notes": "Terminal holding fix; levels FL070 to FL150 (BIG, OCK); see the hold coding table.",
+     "provenance": "UK AIP AD 2-EGLL-7-18 / 7-19 hold coding tables"
+    },
+    {
+     "fix": "LAM",
+     "inbound_course_mag_deg": 262,
+     "outbound_course_mag_deg": 82,
+     "turns": "left",
+     "role": "arrival",
+     "leg_minutes": 1,
+     "leg_source": "1 min up to FL140, 1.5 min above (hold coding tables AD 2-EGLL-7-18/19)",
+     "max_speed_kt": 220,
+     "notes": "Terminal holding fix; levels FL070 to FL150 (BIG, OCK); see the hold coding table.",
+     "provenance": "UK AIP AD 2-EGLL-7-18 / 7-19 hold coding tables"
+    },
+    {
+     "fix": "OCK",
+     "inbound_course_mag_deg": 327,
+     "outbound_course_mag_deg": 147,
+     "turns": "right",
+     "role": "arrival",
+     "leg_minutes": 1,
+     "leg_source": "1 min up to FL140, 1.5 min above (hold coding tables AD 2-EGLL-7-18/19)",
+     "max_speed_kt": 220,
+     "notes": "Terminal holding fix; levels FL070 to FL150 (BIG, OCK); see the hold coding table.",
+     "provenance": "UK AIP AD 2-EGLL-7-18 / 7-19 hold coding tables"
+    }
+   ]
+  },
+  {
+   "chart_name": "ILS/DME I-LL RWY 27L",
+   "pdf_name": "EGLL_AD2.EGLL-8-7.pdf",
+   "holds": [
+    {
+     "fix": "EPM",
+     "inbound_course_mag_deg": 274,
+     "outbound_course_mag_deg": 94,
+     "turns": "left",
+     "role": "missed_approach",
+     "leg_minutes": 1,
+     "leg_source": "not published (default 1 minute)",
+     "max_speed_kt": 220,
+     "notes": "AD 2.22 para 2: holding axis 274 deg M inbound, turning left, max 220 KT, holding level 3000 FT ALT.",
+     "provenance": "UK AIP AD 2.22 para 2"
+    },
+    {
+     "fix": "BIG",
+     "inbound_course_mag_deg": 301,
+     "outbound_course_mag_deg": 121,
+     "turns": "right",
+     "role": "arrival",
+     "leg_minutes": 1,
+     "leg_source": "1 min up to FL140, 1.5 min above (hold coding tables AD 2-EGLL-7-18/19)",
+     "max_speed_kt": 220,
+     "notes": "Terminal holding fix; levels FL070 to FL150 (BIG, OCK); see the hold coding table.",
+     "provenance": "UK AIP AD 2-EGLL-7-18 / 7-19 hold coding tables"
+    },
+    {
+     "fix": "BNN",
+     "inbound_course_mag_deg": 115,
+     "outbound_course_mag_deg": 295,
+     "turns": "right",
+     "role": "arrival",
+     "leg_minutes": 1,
+     "leg_source": "1 min up to FL140, 1.5 min above (hold coding tables AD 2-EGLL-7-18/19)",
+     "max_speed_kt": 220,
+     "notes": "Terminal holding fix; levels FL070 to FL150 (BIG, OCK); see the hold coding table.",
+     "provenance": "UK AIP AD 2-EGLL-7-18 / 7-19 hold coding tables"
+    },
+    {
+     "fix": "LAM",
+     "inbound_course_mag_deg": 262,
+     "outbound_course_mag_deg": 82,
+     "turns": "left",
+     "role": "arrival",
+     "leg_minutes": 1,
+     "leg_source": "1 min up to FL140, 1.5 min above (hold coding tables AD 2-EGLL-7-18/19)",
+     "max_speed_kt": 220,
+     "notes": "Terminal holding fix; levels FL070 to FL150 (BIG, OCK); see the hold coding table.",
+     "provenance": "UK AIP AD 2-EGLL-7-18 / 7-19 hold coding tables"
+    },
+    {
+     "fix": "OCK",
+     "inbound_course_mag_deg": 327,
+     "outbound_course_mag_deg": 147,
+     "turns": "right",
+     "role": "arrival",
+     "leg_minutes": 1,
+     "leg_source": "1 min up to FL140, 1.5 min above (hold coding tables AD 2-EGLL-7-18/19)",
+     "max_speed_kt": 220,
+     "notes": "Terminal holding fix; levels FL070 to FL150 (BIG, OCK); see the hold coding table.",
+     "provenance": "UK AIP AD 2-EGLL-7-18 / 7-19 hold coding tables"
+    }
+   ]
+  },
+  {
+   "chart_name": "ILS/DME I-RR RWY 27R",
+   "pdf_name": "EGLL_AD2.EGLL-8-10.pdf",
+   "holds": [
+    {
+     "fix": "CHT",
+     "inbound_course_mag_deg": 293,
+     "outbound_course_mag_deg": 113,
+     "turns": "left",
+     "role": "missed_approach",
+     "leg_minutes": 1,
+     "leg_source": "not published (default 1 minute)",
+     "max_speed_kt": 220,
+     "notes": "AD 2.22 para 2: holding axis 293 deg M inbound, turning left, max 220 KT, holding level 3000 FT ALT.",
+     "provenance": "UK AIP AD 2.22 para 2"
+    },
+    {
+     "fix": "BIG",
+     "inbound_course_mag_deg": 301,
+     "outbound_course_mag_deg": 121,
+     "turns": "right",
+     "role": "arrival",
+     "leg_minutes": 1,
+     "leg_source": "1 min up to FL140, 1.5 min above (hold coding tables AD 2-EGLL-7-18/19)",
+     "max_speed_kt": 220,
+     "notes": "Terminal holding fix; levels FL070 to FL150 (BIG, OCK); see the hold coding table.",
+     "provenance": "UK AIP AD 2-EGLL-7-18 / 7-19 hold coding tables"
+    },
+    {
+     "fix": "BNN",
+     "inbound_course_mag_deg": 115,
+     "outbound_course_mag_deg": 295,
+     "turns": "right",
+     "role": "arrival",
+     "leg_minutes": 1,
+     "leg_source": "1 min up to FL140, 1.5 min above (hold coding tables AD 2-EGLL-7-18/19)",
+     "max_speed_kt": 220,
+     "notes": "Terminal holding fix; levels FL070 to FL150 (BIG, OCK); see the hold coding table.",
+     "provenance": "UK AIP AD 2-EGLL-7-18 / 7-19 hold coding tables"
+    },
+    {
+     "fix": "LAM",
+     "inbound_course_mag_deg": 262,
+     "outbound_course_mag_deg": 82,
+     "turns": "left",
+     "role": "arrival",
+     "leg_minutes": 1,
+     "leg_source": "1 min up to FL140, 1.5 min above (hold coding tables AD 2-EGLL-7-18/19)",
+     "max_speed_kt": 220,
+     "notes": "Terminal holding fix; levels FL070 to FL150 (BIG, OCK); see the hold coding table.",
+     "provenance": "UK AIP AD 2-EGLL-7-18 / 7-19 hold coding tables"
+    },
+    {
+     "fix": "OCK",
+     "inbound_course_mag_deg": 327,
+     "outbound_course_mag_deg": 147,
+     "turns": "right",
+     "role": "arrival",
+     "leg_minutes": 1,
+     "leg_source": "1 min up to FL140, 1.5 min above (hold coding tables AD 2-EGLL-7-18/19)",
+     "max_speed_kt": 220,
+     "notes": "Terminal holding fix; levels FL070 to FL150 (BIG, OCK); see the hold coding table.",
+     "provenance": "UK AIP AD 2-EGLL-7-18 / 7-19 hold coding tables"
+    }
+   ]
+  }
+ ]
+}

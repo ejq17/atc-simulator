@@ -105,6 +105,7 @@ export function facilityCallName(airport: Airport, mhz: number, frequencyId?: st
   const byId = frequencyId ? frequencyById(airport, frequencyId) : undefined;
   const f = byId && sameFrequency(byId.mhz, mhz) ? byId : frequencyByMhz(airport, mhz);
   if (f && f.position !== 'OTHER') {
+    if (f.callName) return f.callName;
     // the frequency's own name carries the facility's radio call ("Boston Approach" at KMHT, where the TRACON is not the tower's city)
     const named = f.name.replace(/\s*\(.*?\)\s*/g, ' ').trim();
     if (named.toLowerCase().endsWith(` ${positionWord(f.position).toLowerCase()}`)) return named;

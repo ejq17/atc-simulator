@@ -490,7 +490,14 @@ export function planSquawk(env: Env): PlanResult {
 export function infoMismatch(ctx: SimContext, info: NonNullable<ParsedCommand['info']>): string | undefined {
   const w = ctx.state.weather;
   const out: string[] = [];
-  if (info.altimeterInHg !== undefined && Math.abs(info.altimeterInHg - w.altimeterInHg) > 0.015) out.push(`altimeter ${info.altimeterInHg.toFixed(2)} (observed ${w.altimeterInHg.toFixed(2)})`);
+  if (info.altimeterInHg !== undefined) {
+    if (ctx.state.airport.altimeterUnit === 'hPa') {
+      // hectopascals are read whole: compare the whole numbers (1 hPa = 0.03 inHg, the stored value is rounded to 0.01 inHg)
+      const given = Math.round(info.altimeterInHg * 33.8639);
+      const seen = Math.round(w.altimeterInHg * 33.8639);
+      if (Math.abs(given - seen) > 1) out.push(`QNH ${given} (observed ${seen})`);
+    } else if (Math.abs(info.altimeterInHg - w.altimeterInHg) > 0.015) out.push(`altimeter ${info.altimeterInHg.toFixed(2)} (observed ${w.altimeterInHg.toFixed(2)})`);
+  }
   if (info.calm && w.windSpeedKt > 3) out.push(`wind calm (observed ${w.windSpeedKt} kt)`);
   if (info.windSpeedKt !== undefined && Math.abs(info.windSpeedKt - w.windSpeedKt) > 3) out.push(`wind speed ${info.windSpeedKt} kt (observed ${w.windSpeedKt} kt)`);
   if (info.windDirDeg !== undefined && w.windDirDeg !== 'VRB' && w.windSpeedKt >= 4) {

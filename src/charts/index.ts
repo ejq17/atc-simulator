@@ -9,6 +9,7 @@ export {
   chartsByCategory,
   getChart,
   isCycleCurrent,
+  isLinkOnly,
   listChartGroups,
   listCharts,
 } from './chartIndex';

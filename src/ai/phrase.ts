@@ -165,12 +165,12 @@ export function stoppedExit(ac: Aircraft, airport: Airport, taxiway: string, sid
 }
 
 /** "N1AA, wind 130 at 8, altimeter 3010" (3-9-1 / 3-10-1: wind and altimeter for a pilot who did not report the ATIS). */
-export function airportInfo(ac: Aircraft, dirDeg: number | undefined, speedKt: number, altimeterInHg: number): Phrase {
-  const alt = String(Math.round(altimeterInHg * 100));
+export function airportInfo(ac: Aircraft, dirDeg: number | undefined, speedKt: number, altimeterInHg: number, unit: 'inHg' | 'hPa' = 'inHg'): Phrase {
+  const alt = unit === 'hPa' ? String(Math.round(altimeterInHg * 33.8639)) : String(Math.round(altimeterInHg * 100));
   const wind: Phrase = speedKt === 0 || dirDeg === undefined
     ? { text: speedKt === 0 ? 'wind calm' : `wind variable at ${speedKt}`, spoken: speedKt === 0 ? 'wind calm' : `wind variable at ${digitsSpoken(String(speedKt))}` }
     : { text: `wind ${String(dirDeg).padStart(3, '0')} at ${speedKt}`, spoken: `wind ${digitsSpoken(String(dirDeg).padStart(3, '0'))} at ${digitsSpoken(String(speedKt))}` };
-  return clauses(callsign(ac), wind, { text: `altimeter ${alt}`, spoken: `altimeter ${digitsSpoken(alt)}` });
+  return clauses(callsign(ac), wind, unit === 'hPa' ? { text: `QNH ${alt}`, spoken: `QNH ${digitsSpoken(alt)}` } : { text: `altimeter ${alt}`, spoken: `altimeter ${digitsSpoken(alt)}` });
 }
 
 export const clearedForTakeoff = (ac: Aircraft, runwayEnd: string, runwayHeading: boolean): Phrase =>

@@ -312,3 +312,11 @@ Totals: 1740 vitest tests in 91 files, 34 Playwright tests passing across 6 proj
 ## Fourth airport, KBOS (Boston Logan, task/kbos, 2026-10-21)
 - Added from NASR 2026-10-01, d-TPP 2610, OSM and Massport / FAA runway-use documents (`data/sources/README.md`, KBOS section): 6 runways, 5 ILS, 19 approach charts, LOGAN FOUR and nine RNAV SIDs, ROBUC THREE and JFUND TWO STARs, hot spots, LAHSO, 4 documented runway configurations, about 100 gates, traffic profile, live weather from NWS KBOS.
 - Findings: taxiway Y and two connectors at the 4R threshold are left out of the graph (they merge into, or overlap, another runway so no hold line is possible); 14/32 and 15L/33R have few taxiway links; DP maintain altitude is the jet value (5000, props 3000 not modelled); no wind limits for the configurations; late-night configuration documented but not selectable (selection is by wind only); airline fleets per carrier unsourced.
+
+
+## Fourth airport, EGLL (London Heathrow, task/egll, 2026-10-21)
+- Added from the UK AIP AIRAC 10/2026 (hand-transcribed, `data/sources/README.md` EGLL section), OSM (3 km) and the Heathrow runway alternation programme 2026: two parallel runways, four ILS/DME, 18 STARs, 24 SIDs, 195 stands, hot spots, runway configurations, Class D, hPa/metres weather and ATIS, live weather through the backend only, UK phraseology differences (`docs/UK-PHRASEOLOGY.md`).
+- Shared types changed (announced here): `Airport.altimeterUnit`, `RadioFrequency.callName`, `ChartEntry.isOfficialFaa: boolean` + `authority` + `linkOnly`, `AirportProfile.osmRef` / `relaxedChecks`, `InstrumentProcedure.runwayEnd` on DPs, `AirportTrafficProfile.gaTypes: []` = no GA.
+- Build changes: a way end within 1.5 m of a runway end joins the end node, a parking lead-in vertex within 0.5 m of the lane foot is dropped, a taxiway edge joining two nodes of one runway is not a hold entry (KACY, KMHT and KPGD outputs are byte-identical).
+- Findings: the AIP says Class D (not Class A); AD 2.19 lists the stack navaids as VOR/DME while ENR 4.1 lists DME only; the AIP landing thresholds of 09L/09R are the displaced thresholds; the ILS DME reads zero at the landing threshold (checked: derived D7.5 fixes agree with the plates' LON D8.2 / 8.8 within 0.05 NM); HS1-HS5 are on the aerodrome chart.
+- Not done: see "Known differences" in README.md.

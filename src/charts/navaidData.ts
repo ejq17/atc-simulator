@@ -1,6 +1,6 @@
 /**
  * Typed accessors over data/sources/<icao>-navaids.json (NASR 2026-10-01 +
- * d-TPP 2610 plate readings). Display-only; nothing is derived except the
+ * d-TPP 2610 plate readings; EGLL: UK AIP AD 2.19 / coding tables, AIRAC 10/2026). Display-only; nothing is derived except the
  * great-circle distance/bearing from the airport's own navaid (ACY VORTAC,
  * MHT DME, BOS VOR/DME, KPHL: OOD VORTAC), which is labelled as computed in the UI.
  */
@@ -9,6 +9,7 @@ import rawKmhtNavaids from '../../data/sources/kmht-navaids.json';
 import rawKbosNavaids from '../../data/sources/kbos-navaids.json';
 import rawKpgdNavaids from '../../data/sources/kpgd-navaids.json';
 import rawKphlNavaids from '../../data/sources/kphl-navaids.json';
+import rawEgllNavaids from '../../data/sources/egll-navaids.json';
 
 export interface Vortac {
   id: string;
@@ -81,6 +82,8 @@ export interface NavaidDataset {
   nearby: NearbyNavaid[];
   fixes: ApproachFix[];
   provenance: { sources: string[]; retrieved: string; cycle: string };
+  /** Publishing authority of the data: FAA NASR / d-TPP, or the UK AIP (EGLL). */
+  authority: 'FAA' | 'UK AIP';
   unverified: string[];
 }
 
@@ -112,7 +115,7 @@ interface RawIls {
 interface RawOther { id: string; type: string; name: string; status: string; freq_mhz: string | number; channel: string; lat: number; lon: number }
 /** Two key spellings exist: the first airport's hand-written file and the extractor's generic output. */
 interface RawNav {
-  _provenance: { sources: string[]; retrieved: string; faa_cycle_effective: string };
+  _provenance: { sources: string[]; retrieved: string; faa_cycle_effective: string; source_name?: string; airac_cycle?: string };
   vortac_acy?: Record<string, unknown> & { remarks: string[] };
   primary_navaid?: Record<string, unknown> & { remarks: string[] };
   ils_localizers_at_kacy?: RawIls;
@@ -136,6 +139,7 @@ const AIRPORTS: Record<string, { raw: RawNav; faaId: string; noIlsNote: string; 
   KPGD: { raw: rawKpgdNavaids as unknown as RawNav, faaId: 'PGD', noIlsNote: 'ILS runway 4 only; RNAV (GPS) approaches to runways 4, 15, 22 and 33.', primaryNearby: ['RSW'] },
   // KPHL has no navaid of its own (the on-field PHL VOT is a test signal); OOD is the VORTAC of most missed approach holds.
   KPHL: { raw: rawKphlNavaids as unknown as RawNav, faaId: 'PHL', noIlsNote: 'Runway 35 has an RNAV (GPS) approach (LP/LNAV); no instrument approach is published for runway 8 (see the approach charts).', primaryNearby: ['MXE', 'DQO', 'PTW', 'CYN', 'ARD', 'RBV'] },
+  EGLL: { raw: rawEgllNavaids as unknown as RawNav, faaId: 'LHR', noIlsNote: 'All four runway ends have ILS/DME (CAT III).', primaryNearby: ['OCK', 'BIG', 'LAM', 'BNN'] },
 };
 
 const toRad = (d: number) => (d * Math.PI) / 180;
@@ -224,6 +228,7 @@ function build(icao: string): NavaidDataset {
     nearby,
     fixes,
     provenance: { sources: raw._provenance.sources, retrieved: raw._provenance.retrieved, cycle: raw._provenance.faa_cycle_effective },
+    authority: raw._provenance.source_name?.startsWith('UK AIP') ? 'UK AIP' : 'FAA',
     unverified: raw.unverified,
   };
 }

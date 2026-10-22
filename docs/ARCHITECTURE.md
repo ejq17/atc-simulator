@@ -69,6 +69,13 @@ the build from `data/sources/<icao>-*.json` and `<icao>-taxiways.geojson`. Addin
   (119.55); the engine routes a radio call by the position the aircraft needs (`aircraftPosition`, `src/radio/frequencies.ts`), not by the first row that owns the frequency. Tower hours (0600-2100) are not simulated: the setup screen shows them and notes when the real clock is outside them. STAR arrivals are generated
   for any airport whose STARs are transcribed with a runway leg: the entry fixes come from `StarProcedure.simEntryFixes` (data), else `STAR_SIM_ENTRY_FIXES_BY_STAR` in `src/game/ifr.ts` (ROZZE2, ROBUC3, JFUND2), else the first two fixes after the common fix of the runway leg (KPGD: ZEBON, RUNNE, GUSEC); with several STARs on a runway end `starArrival` returns the entries of all of them.
 
+* EGLL (fourth airport, first non-US) is built from hand-transcribed UK AIP data (`_provenance.source_name` / `source_url` labels instead of NASR / d-TPP), has two parallel runways and
+  no runway crossing, `Airport.timeZone` Europe/London, `Airport.altimeterUnit` 'hPa' (QNH and metres in the ATIS, displays, AI phrases and the parser), published runway configurations
+  (segregated mode), SIDs that each serve one runway end (`InstrumentProcedure.runwayEnd`, `departureProcedureFor` in `src/sim/ifr.ts`), a per-frequency radio call
+  (`RadioFrequency.callName`: "Heathrow Director") and link-only charts (`ChartEntry.linkOnly`, `isOfficialFaa: false`). Profile hooks added for it: `osmRef` (OSM "Taxiway A" -> "A") and
+  `relaxedChecks` (no GA ramp, hold path) in `scripts/airports/types.ts`. STARs end at the OCK / BIG / LAM / BNN holding fixes and are not assigned by the traffic generator
+  (more than one STAR): arrivals use the ILS procedure with derived DME fixes (`LLIF`, `LLFAP` ...) as feeder, IF and FAF.
+
 ## Key contracts
 
 * `src/sim/types.ts` — all entity models. Changing a type is a cross-team change: announce it in `docs/PROGRESS.md`.

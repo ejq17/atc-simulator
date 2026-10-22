@@ -122,6 +122,8 @@ export interface RadioFrequency {
   id: string;              // "ATIS" | "CLNC" | "GND" | "TWR" | "APP" | "DEP" ...
   name: string;            // "Atlantic City Tower"
   mhz: number;
+  /** Radio call as published when it is not "<city> <position word>" (EGLL: "Heathrow Director", "Heathrow Delivery"). */
+  callName?: string;
   position: ControllerPositionId | 'ATIS' | 'OTHER';
   /** Sectorization from NASR (e.g. KACY approach/departure south 130-309, north 310-129), magnetic bearings from the airport. */
   sectorBearings?: { fromDeg: number; toDeg: number };
@@ -246,6 +248,8 @@ export interface Airport {
   towerHours?: string;
   /** IANA time zone of the airport ("America/New_York", "Europe/London"); drives local-time traffic density, sunrise / sunset and the ATIS clock. Absent = 'America/New_York' (KACY, KMHT). */
   timeZone?: string;
+  /** Unit of the QNH / altimeter setting the airport reports and ATIS reads: 'inHg' (default, FAA) or 'hPa' (EGLL, UK AIP GEN 3.5 para 3.8.10). */
+  altimeterUnit?: 'inHg' | 'hPa';
   /** Published runway configurations in operator-preference order (see `RunwayConfiguration`). Absent: one best-headwind runway for arrivals and departures. */
   runwayConfigurations?: RunwayConfiguration[];
   /** Published traffic pattern altitude (ft MSL) when the dataset has one (NASR carries none for KACY / KMHT: the AIM 4-3-3 defaults apply). */

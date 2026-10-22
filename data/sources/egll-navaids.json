@@ -1,0 +1,1091 @@
+{
+ "_provenance": {
+  "source_name": "UK AIP (NATS AIS eAIP) AIRAC 10/2026, AD 2.19, ENR 4.1, AD 2.EGLL charts",
+  "source_url": "https://www.aurora.nats.co.uk/htmlAIP/Publications/2026-10-01-AIRAC/html/eAIP/EG-AD-2.EGLL-en-GB.html",
+  "sources": [
+   "https://www.aurora.nats.co.uk/htmlAIP/Publications/2026-10-01-AIRAC/html/eAIP/EG-AD-2.EGLL-en-GB.html",
+   "https://www.aurora.nats.co.uk/htmlAIP/Publications/2026-10-01-AIRAC/html/eAIP/EG-ENR-4.1-en-GB.html"
+  ],
+  "retrieved": "2026-10-21",
+  "faa_cycle_effective": "2026-10-01",
+  "faa_cycle_next": "2026-10-29",
+  "airac_cycle": "AIRAC 10/2026",
+  "method": "AD 2.19 table transcribed; STAR waypoint coordinates parsed by script from the coding tables AD 2-EGLL-7-13..7-17 (text layer of the PDFs) and decimal-converted from the printed DMS; ILS fixes DERIVED as labelled.",
+  "raw": "raw/egll/, raw/egll_aip_pdfs/"
+ },
+ "primary_navaid": {
+  "id": "LON",
+  "type": "VOR/DME",
+  "name": "LONDON",
+  "status": "operational (H24 / HO per AD 2.19)",
+  "freq_mhz": 113.6,
+  "channel": "83X",
+  "lat": 51.48724722,
+  "lon": -0.46653889,
+  "lat_dms": "512914.09N",
+  "lon_dms": "0002759.54W",
+  "elev_ft": 113,
+  "mag_var": "1.22E (2027); VOR declination 0.8E (2023)",
+  "remarks": [
+   "AD 2.19 lists VOR/DME; ENR 4.1 lists LONDON as DME \"No associated En-route VOR\"; SID charts: LON VOR N/A (RNAV substitution only)."
+  ],
+  "source": "AD 2.19",
+  "tacan_dme_channel": "83X",
+  "mag_var_epoch": "2027"
+ },
+ "ils_localizers": {
+  "runways_with_ils": [
+   "09L",
+   "09R",
+   "27L",
+   "27R"
+  ],
+  "runways_without_ils_or_loc": [],
+  "note": "Four ILS/DME, I-AA 09L and I-RR 27R share 110.300 / 40X; I-BB 09R and I-LL 27L share 109.500 / 32X (AD 2.19: DME frequency paired).",
+  "systems": [
+   {
+    "runway_end": "09L",
+    "system_type_code": "ILS/DME",
+    "system_type_meaning": "ILS with DME (AD 2.19: ILS/LOC, ILS/GP, ILS/DME)",
+    "loc_ident": "IAA",
+    "plate_ident": "I-AA",
+    "category": "CAT III",
+    "loc_freq_mhz": 110.3,
+    "dme_channel": "40X",
+    "front_course_mag_deg": 88.44,
+    "mag_var": "1.22-1.24E (2027)",
+    "status": "operational (HO)",
+    "status_date": null,
+    "localizer_antenna": {
+     "lat": 51.47769722,
+     "lon": -0.42696111,
+     "lat_dms": "512839.71N",
+     "lon_dms": "0002537.06W",
+     "elev_ft": null
+    },
+    "glideslope": {
+     "angle_deg": 3,
+     "freq_mhz": 335.0,
+     "type": "GS",
+     "antenna": {
+      "lat": 51.47875,
+      "lon": -0.480675,
+      "lat_dms": "512843.50N",
+      "lon_dms": "0002850.43W",
+      "elev_ft": null
+     },
+     "status": "operational (HO)"
+    },
+    "dme_antenna": {
+     "lat": 51.47884444,
+     "lon": -0.45903056,
+     "lat_dms": "512843.84N",
+     "lon_dms": "0002732.51W",
+     "elev_ft": 99,
+     "status": "operational (HO)"
+    },
+    "marker_beacons": "none listed in AD 2.19",
+    "classification_remark": [
+     "AD 2.19: particular care in selecting the ILS facility as more than one ILS is normally radiating."
+    ],
+    "approach_lighting": "Coded centre-line with five crossbars (AD 2.14)",
+    "plate_data": {
+     "plate_minima": "ILS/DME I-AA RWY 09L (AD 2-EGLL-8-1): OCA(OCH) CAT I A 224(145) B 236(157) C 251(172) D 271(192); CAT II 134(55) 145(66) 158(79) 174(95). GP 3 deg, RDH 51, FAP I-AA D7.5 at 2500, D4 at 1400, D1 at 450.",
+     "tdze_plate_ft": 79
+    },
+    "plate_data_source": "UK AIP AD 2-EGLL-8 ILS/DME plates (AIRAC 10/2026), text layer and render read",
+    "front_course_note": "DERIVED: AD 2.12 true bearing minus 1.23 deg E variation; the plates print the rounded course 088 / 268."
+   },
+   {
+    "runway_end": "27R",
+    "system_type_code": "ILS/DME",
+    "system_type_meaning": "ILS with DME (AD 2.19: ILS/LOC, ILS/GP, ILS/DME)",
+    "loc_ident": "IRR",
+    "plate_ident": "I-RR",
+    "category": "CAT III",
+    "loc_freq_mhz": 110.3,
+    "dme_channel": "40X",
+    "front_course_mag_deg": 268.49,
+    "mag_var": "1.22-1.24E (2027)",
+    "status": "operational (HO)",
+    "status_date": null,
+    "localizer_antenna": {
+     "lat": 51.47746667,
+     "lon": -0.49371944,
+     "lat_dms": "512838.88N",
+     "lon_dms": "0002937.39W",
+     "elev_ft": null
+    },
+    "glideslope": {
+     "angle_deg": 3,
+     "freq_mhz": 335.0,
+     "type": "GS",
+     "antenna": {
+      "lat": 51.47884167,
+      "lon": -0.43819444,
+      "lat_dms": "512843.83N",
+      "lon_dms": "0002617.50W",
+      "elev_ft": null
+     },
+     "status": "operational (HO)"
+    },
+    "dme_antenna": {
+     "lat": 51.47884444,
+     "lon": -0.45903056,
+     "lat_dms": "512843.84N",
+     "lon_dms": "0002732.51W",
+     "elev_ft": 99,
+     "status": "operational (HO)"
+    },
+    "marker_beacons": "none listed in AD 2.19",
+    "classification_remark": [
+     "AD 2.19: particular care in selecting the ILS facility as more than one ILS is normally radiating."
+    ],
+    "approach_lighting": "Coded centre-line with five crossbars (AD 2.14)",
+    "plate_data": {
+     "plate_minima": "ILS/DME I-RR RWY 27R (AD 2-EGLL-8-10): OCA(OCH) CAT I A 224(146) B 234(156) C 249(171) D 268(190); CAT II 131(53) 141(63) 154(76) 172(94). GP 3 deg, RDH 58, FAP I-RR D7.5 at 2500, D4 at 1410, D1 at 450.",
+     "tdze_plate_ft": 78
+    },
+    "plate_data_source": "UK AIP AD 2-EGLL-8 ILS/DME plates (AIRAC 10/2026), text layer and render read",
+    "front_course_note": "DERIVED: AD 2.12 true bearing minus 1.23 deg E variation; the plates print the rounded course 088 / 268."
+   },
+   {
+    "runway_end": "09R",
+    "system_type_code": "ILS/DME",
+    "system_type_meaning": "ILS with DME (AD 2.19: ILS/LOC, ILS/GP, ILS/DME)",
+    "loc_ident": "IBB",
+    "plate_ident": "I-BB",
+    "category": "CAT III",
+    "loc_freq_mhz": 109.5,
+    "dme_channel": "32X",
+    "front_course_mag_deg": 88.45,
+    "mag_var": "1.22-1.24E (2027)",
+    "status": "operational (HO)",
+    "status_date": null,
+    "localizer_antenna": {
+     "lat": 51.46496944,
+     "lon": -0.42823056,
+     "lat_dms": "512753.89N",
+     "lon_dms": "0002541.63W",
+     "elev_ft": null
+    },
+    "glideslope": {
+     "angle_deg": 3,
+     "freq_mhz": 332.6,
+     "type": "GS",
+     "antenna": {
+      "lat": 51.46360278,
+      "lon": -0.47792778,
+      "lat_dms": "512748.97N",
+      "lon_dms": "0002840.54W",
+      "elev_ft": null
+     },
+     "status": "operational (HO)"
+    },
+    "dme_antenna": {
+     "lat": 51.46381667,
+     "lon": -0.45858333,
+     "lat_dms": "512749.74N",
+     "lon_dms": "0002730.90W",
+     "elev_ft": 93,
+     "status": "operational (HO)"
+    },
+    "marker_beacons": "none listed in AD 2.19",
+    "classification_remark": [
+     "AD 2.19: particular care in selecting the ILS facility as more than one ILS is normally radiating."
+    ],
+    "approach_lighting": "Coded centre-line with five crossbars (AD 2.14)",
+    "plate_data": {
+     "plate_minima": "ILS/DME I-BB RWY 09R (AD 2-EGLL-8-4): OCA(OCH) CAT I A 221(146) B 233(158) C 248(173) D 266(191); CAT II 124(49) 136(61) 151(76) 174(99). GP 3 deg, RDH 50, FAP I-BB D7.5 at 2500, D4 at 1400, D1 at 450.",
+     "tdze_plate_ft": 75
+    },
+    "plate_data_source": "UK AIP AD 2-EGLL-8 ILS/DME plates (AIRAC 10/2026), text layer and render read",
+    "front_course_note": "DERIVED: AD 2.12 true bearing minus 1.23 deg E variation; the plates print the rounded course 088 / 268."
+   },
+   {
+    "runway_end": "27L",
+    "system_type_code": "ILS/DME",
+    "system_type_meaning": "ILS with DME (AD 2.19: ILS/LOC, ILS/GP, ILS/DME)",
+    "loc_ident": "ILL",
+    "plate_ident": "I-LL",
+    "category": "CAT III",
+    "loc_freq_mhz": 109.5,
+    "dme_channel": "32X",
+    "front_course_mag_deg": 268.48,
+    "mag_var": "1.22-1.24E (2027)",
+    "status": "operational (HO)",
+    "status_date": null,
+    "localizer_antenna": {
+     "lat": 51.46476111,
+     "lon": -0.49116667,
+     "lat_dms": "512753.14N",
+     "lon_dms": "0002928.20W",
+     "elev_ft": null
+    },
+    "glideslope": {
+     "angle_deg": 3,
+     "freq_mhz": 332.6,
+     "type": "GS",
+     "antenna": {
+      "lat": 51.46374167,
+      "lon": -0.43888889,
+      "lat_dms": "512749.47N",
+      "lon_dms": "0002620.00W",
+      "elev_ft": null
+     },
+     "status": "operational (HO)"
+    },
+    "dme_antenna": {
+     "lat": 51.46381667,
+     "lon": -0.45858333,
+     "lat_dms": "512749.74N",
+     "lon_dms": "0002730.90W",
+     "elev_ft": 93,
+     "status": "operational (HO)"
+    },
+    "marker_beacons": "none listed in AD 2.19",
+    "classification_remark": [
+     "AD 2.19: particular care in selecting the ILS facility as more than one ILS is normally radiating."
+    ],
+    "approach_lighting": "Coded centre-line with five crossbars (AD 2.14)",
+    "plate_data": {
+     "plate_minima": "ILS/DME I-LL RWY 27L (AD 2-EGLL-8-7): OCA(OCH) CAT I A 229(152) B 241(164) C 255(178) D 273(196); CAT II 137(60) 146(69) 159(82) 177(100). GP 3 deg, RDH 56, FAP I-LL D7.5 at 2500, D4 at 1410, D1 at 450.",
+     "tdze_plate_ft": 77
+    },
+    "plate_data_source": "UK AIP AD 2-EGLL-8 ILS/DME plates (AIRAC 10/2026), text layer and render read",
+    "front_course_note": "DERIVED: AD 2.12 true bearing minus 1.23 deg E variation; the plates print the rounded course 088 / 268."
+   }
+  ]
+ },
+ "other_navaids_referenced": [
+  {
+   "id": "OCK",
+   "type": "VOR/DME",
+   "name": "OCKHAM",
+   "status": "operational (H24 / HO per AD 2.19)",
+   "freq_mhz": 115.3,
+   "channel": "100X",
+   "lat": 51.30504722,
+   "lon": -0.44718333,
+   "lat_dms": "511818.17N",
+   "lon_dms": "0002649.86W",
+   "elev_ft": 200,
+   "mag_var": "1.24E (2027)",
+   "remarks": [
+    "RNAV substitution only. ENR 4.1: DME only."
+   ],
+   "source": "AD 2.19"
+  },
+  {
+   "id": "BIG",
+   "type": "VOR/DME",
+   "name": "BIGGIN",
+   "status": "operational (H24 / HO per AD 2.19)",
+   "freq_mhz": 115.1,
+   "channel": "98X",
+   "lat": 51.330875,
+   "lon": 0.03481111,
+   "lat_dms": "511951.15N",
+   "lon_dms": "0000205.32E",
+   "elev_ft": 589,
+   "mag_var": "1.39E (2027)",
+   "remarks": [
+    "ENR 4.1: DME only."
+   ],
+   "source": "AD 2.19"
+  },
+  {
+   "id": "LAM",
+   "type": "VOR/DME",
+   "name": "LAMBOURNE",
+   "status": "operational (H24 / HO per AD 2.19)",
+   "freq_mhz": 115.6,
+   "channel": "103X",
+   "lat": 51.646025,
+   "lon": 0.15170278,
+   "lat_dms": "513845.69N",
+   "lon_dms": "0000906.13E",
+   "elev_ft": 241,
+   "mag_var": "1.41E (2027)",
+   "remarks": [
+    "ENR 4.1: DME only."
+   ],
+   "source": "AD 2.19"
+  },
+  {
+   "id": "BNN",
+   "type": "VOR/DME",
+   "name": "BOVINGDON",
+   "status": "operational (H24 / HO per AD 2.19)",
+   "freq_mhz": 113.75,
+   "channel": "84Y",
+   "lat": 51.72616389,
+   "lon": -0.54975,
+   "lat_dms": "514334.19N",
+   "lon_dms": "0003259.10W",
+   "elev_ft": 558,
+   "mag_var": "1.18E (2027)",
+   "remarks": [
+    "ENR 4.1: DME only."
+   ],
+   "source": "AD 2.19"
+  },
+  {
+   "id": "DET",
+   "type": "VOR/DME",
+   "name": "DETLING",
+   "status": "operational (H24 / HO per AD 2.19)",
+   "freq_mhz": 117.3,
+   "channel": "120X",
+   "lat": 51.30400278,
+   "lon": 0.597275,
+   "lat_dms": "511814.41N",
+   "lon_dms": "0003550.19E",
+   "elev_ft": 645,
+   "mag_var": "1.58E (2027)",
+   "remarks": [
+    "AD 2.19 prints the ident as \"DE\"; charts print DET."
+   ],
+   "source": "AD 2.19"
+  },
+  {
+   "id": "MID",
+   "type": "VOR/DME",
+   "name": "MIDHURST",
+   "status": "operational (H24 / HO per AD 2.19)",
+   "freq_mhz": 114.0,
+   "channel": "87X",
+   "lat": 51.05395278,
+   "lon": -0.62500278,
+   "lat_dms": "510314.23N",
+   "lon_dms": "0003730.01W",
+   "elev_ft": 233,
+   "mag_var": "1.20E (2027)",
+   "remarks": [],
+   "source": "AD 2.19"
+  },
+  {
+   "id": "SAM",
+   "type": "VOR/DME",
+   "name": "SOUTHAMPTON",
+   "status": "operational (H24 / HO per AD 2.19)",
+   "freq_mhz": 113.35,
+   "channel": "80Y",
+   "lat": 50.95525,
+   "lon": -1.34505556,
+   "lat_dms": "505718.90N",
+   "lon_dms": "0012042.20W",
+   "elev_ft": 64,
+   "mag_var": "0.98E (2027)",
+   "remarks": [],
+   "source": "AD 2.19"
+  },
+  {
+   "id": "CPT",
+   "type": "VOR",
+   "name": "COMPTON",
+   "status": "operational (H24 / HO per AD 2.19)",
+   "freq_mhz": 114.35,
+   "channel": "90Y",
+   "lat": 51.49157222,
+   "lon": -1.21969167,
+   "lat_dms": "512929.66N",
+   "lon_dms": "0011310.89W",
+   "elev_ft": null,
+   "mag_var": "",
+   "remarks": [
+    "Coordinates from the SIRIC 1Z coding table (AD 2-EGLL-7-17); frequency and channel from SID chart AD 2-EGLL-6-1 (114.35, Ch 90Y). Not listed in AD 2.19."
+   ],
+   "source": "AD 2.19"
+  },
+  {
+   "id": "EPM",
+   "type": "NDB",
+   "name": "EPSOM",
+   "status": "operational (H24 / HO per AD 2.19)",
+   "freq_mhz": 0.316,
+   "channel": null,
+   "lat": 51.31956389,
+   "lon": -0.37197778,
+   "lat_dms": "511910.43N",
+   "lon_dms": "0002219.12W",
+   "elev_ft": null,
+   "mag_var": "1.27E (2027)",
+   "remarks": [
+    "316 kHz (frequencyMhz field holds 0.316 = kHz/1000); range 25 NM; missed approach hold 274 deg inbound, left, 3000 FT (AD 2.22 para 2)."
+   ],
+   "source": "AD 2.19"
+  },
+  {
+   "id": "CHT",
+   "type": "NDB",
+   "name": "CHILTERN",
+   "status": "operational (H24 / HO per AD 2.19)",
+   "freq_mhz": 0.277,
+   "channel": null,
+   "lat": 51.62314444,
+   "lon": -0.518575,
+   "lat_dms": "513723.32N",
+   "lon_dms": "0003106.87W",
+   "elev_ft": null,
+   "mag_var": "1.20E (2027)",
+   "remarks": [
+    "277 kHz; AD 2.19 prints ident \"CH\", charts print CHT; missed approach hold 293 deg inbound, left, 3000 FT (AD 2.22 para 2)."
+   ],
+   "source": "AD 2.19"
+  },
+  {
+   "id": "WOD",
+   "type": "NDB",
+   "name": "WOODLEY",
+   "status": "operational (H24 / HO per AD 2.19)",
+   "freq_mhz": 0.352,
+   "channel": null,
+   "lat": 51.45278333,
+   "lon": -0.8788,
+   "lat_dms": "512710.02N",
+   "lon_dms": "0005243.68W",
+   "elev_ft": null,
+   "mag_var": "1.09E (2027)",
+   "remarks": [
+    "352 kHz; range 25 NM; used by SIDs and the TOBID 1X STAR."
+   ],
+   "source": "AD 2.19"
+  },
+  {
+   "id": "BUR",
+   "type": "NDB",
+   "name": "BURNHAM",
+   "status": "operational (H24 / HO per AD 2.19)",
+   "freq_mhz": 0.421,
+   "channel": null,
+   "lat": 51.51901111,
+   "lon": -0.67719167,
+   "lat_dms": "513108.44N",
+   "lon_dms": "0004037.89W",
+   "elev_ft": null,
+   "mag_var": "1.15E (2027)",
+   "remarks": [
+    "421 kHz; RNAV substitution only."
+   ],
+   "source": "AD 2.19"
+  },
+  {
+   "id": "BPK",
+   "type": "VOR",
+   "name": "BROOKMANS PARK",
+   "status": "operational (H24 / HO per AD 2.19)",
+   "freq_mhz": 117.5,
+   "channel": "122X",
+   "lat": 51.74973611,
+   "lon": -0.10673611,
+   "lat_dms": "514459.05N",
+   "lon_dms": "0000624.25W",
+   "elev_ft": null,
+   "mag_var": "",
+   "remarks": [
+    "Coordinates from AD 2.21 note listing positions of the old NAVAIDs; BPK 117.50 per SID chart AD 2-EGLL-6-3. Not in AD 2.19."
+   ],
+   "source": "AD 2.19"
+  }
+ ],
+ "fixes_named_on_approach_charts": [
+  {
+   "id": "AAFAP",
+   "lat": 51.47678094,
+   "lon": -0.68491724,
+   "fix_use_code": "DERIVED DME fix",
+   "charted_on": "IAP",
+   "reference_navaid_radial_distance": [],
+   "roles_on_plates": {
+    "ILS/DME I-AA RWY 09L": "FAF (DERIVED)"
+   },
+   "source": "DERIVED, not a published waypoint: 7.5 NM from the AIP landing threshold of runway 09L along the reciprocal of the true bearing 89.67, = I-AA DME 7.5 (the ILS DME reads zero at the threshold, AD 2.19). Basis: FAP I-AA D7.5 (ILS plate). For D7.5 the position was checked against the plate value \"LON D8.2/8.8\" (within 0.05 NM)."
+  },
+  {
+   "id": "AAIF",
+   "lat": 51.47654126,
+   "lon": -0.75155909,
+   "fix_use_code": "DERIVED DME fix",
+   "charted_on": "IAP",
+   "reference_navaid_radial_distance": [],
+   "roles_on_plates": {
+    "ILS/DME I-AA RWY 09L": "IF (DERIVED)"
+   },
+   "source": "DERIVED, not a published waypoint: 10 NM from the AIP landing threshold of runway 09L along the reciprocal of the true bearing 89.67, = I-AA DME 10 (the ILS DME reads zero at the threshold, AD 2.19). Basis: localizer established by D10 (initial approach charts AD 2-EGLL-7-20..7-26: \"to be established by I-AA/I-BB D 10\"). For D7.5 the position was checked against the plate value \"LON D8.2/8.8\" (within 0.05 NM)."
+  },
+  {
+   "id": "ALESO",
+   "lat": 50.57562222,
+   "lon": 1.22541667,
+   "lat_dms": "503432.24N",
+   "lon_dms": "0011331.50E",
+   "fix_use_code": "RNAV waypoint",
+   "charted_on": "STAR",
+   "reference_navaid_radial_distance": [],
+   "roles_on_plates": {
+    "ALESO1H": "waypoint"
+   },
+   "source": "UK AIP AD 2-EGLL-7-13..7-17 STAR coding tables (coordinates as printed)"
+  },
+  {
+   "id": "AMTOD",
+   "lat": 50.53769167,
+   "lon": -1.42901667,
+   "lat_dms": "503215.69N",
+   "lon_dms": "0012544.46W",
+   "fix_use_code": "RNAV waypoint",
+   "charted_on": "STAR",
+   "reference_navaid_radial_distance": [],
+   "roles_on_plates": {
+    "ROXOG1H": "waypoint"
+   },
+   "source": "UK AIP AD 2-EGLL-7-13..7-17 STAR coding tables (coordinates as printed)"
+  },
+  {
+   "id": "BARMI",
+   "lat": 52.47826667,
+   "lon": 2.57048056,
+   "lat_dms": "522841.76N",
+   "lon_dms": "0023413.73E",
+   "fix_use_code": "RNAV waypoint",
+   "charted_on": "STAR",
+   "reference_navaid_radial_distance": [],
+   "roles_on_plates": {
+    "BARMI1H": "waypoint"
+   },
+   "source": "UK AIP AD 2-EGLL-7-13..7-17 STAR coding tables (coordinates as printed)"
+  },
+  {
+   "id": "BBFAP",
+   "lat": 51.4640944,
+   "lon": -0.68218412,
+   "fix_use_code": "DERIVED DME fix",
+   "charted_on": "IAP",
+   "reference_navaid_radial_distance": [],
+   "roles_on_plates": {
+    "ILS/DME I-BB RWY 09R": "FAF (DERIVED)"
+   },
+   "source": "DERIVED, not a published waypoint: 7.5 NM from the AIP landing threshold of runway 09R along the reciprocal of the true bearing 89.68, = I-BB DME 7.5 (the ILS DME reads zero at the threshold, AD 2.19). Basis: FAP I-BB D7.5 (ILS plate). For D7.5 the position was checked against the plate value \"LON D8.2/8.8\" (within 0.05 NM)."
+  },
+  {
+   "id": "BBIF",
+   "lat": 51.46386198,
+   "lon": -0.74880753,
+   "fix_use_code": "DERIVED DME fix",
+   "charted_on": "IAP",
+   "reference_navaid_radial_distance": [],
+   "roles_on_plates": {
+    "ILS/DME I-BB RWY 09R": "IF (DERIVED)"
+   },
+   "source": "DERIVED, not a published waypoint: 10 NM from the AIP landing threshold of runway 09R along the reciprocal of the true bearing 89.68, = I-BB DME 10 (the ILS DME reads zero at the threshold, AD 2.19). Basis: localizer established by D10 (initial approach charts AD 2-EGLL-7-20..7-26: \"to be established by I-AA/I-BB D 10\"). For D7.5 the position was checked against the plate value \"LON D8.2/8.8\" (within 0.05 NM)."
+  },
+  {
+   "id": "BEGTO",
+   "lat": 50.76253333,
+   "lon": -1.23555278,
+   "lat_dms": "504545.12N",
+   "lon_dms": "0011407.99W",
+   "fix_use_code": "RNAV waypoint",
+   "charted_on": "STAR",
+   "reference_navaid_radial_distance": [],
+   "roles_on_plates": {
+    "OTMET1H": "waypoint",
+    "ROXOG1H": "waypoint"
+   },
+   "source": "UK AIP AD 2-EGLL-7-13..7-17 STAR coding tables (coordinates as printed)"
+  },
+  {
+   "id": "BRASO",
+   "lat": 51.68515833,
+   "lon": 0.68334167,
+   "lat_dms": "514106.57N",
+   "lon_dms": "0004100.03E",
+   "fix_use_code": "RNAV waypoint",
+   "charted_on": "STAR",
+   "reference_navaid_radial_distance": [],
+   "roles_on_plates": {
+    "BARMI1H": "waypoint",
+    "LOGAN2H": "waypoint"
+   },
+   "source": "UK AIP AD 2-EGLL-7-13..7-17 STAR coding tables (coordinates as printed)"
+  },
+  {
+   "id": "DONNA",
+   "lat": 51.70010556,
+   "lon": -0.74362222,
+   "lat_dms": "514200.38N",
+   "lon_dms": "0004437.04W",
+   "fix_use_code": "RNAV waypoint",
+   "charted_on": "STAR",
+   "reference_navaid_radial_distance": [],
+   "roles_on_plates": {
+    "LAM1Z": "waypoint"
+   },
+   "source": "UK AIP AD 2-EGLL-7-13..7-17 STAR coding tables (coordinates as printed)"
+  },
+  {
+   "id": "DORKI",
+   "lat": 51.27583333,
+   "lon": -0.26444444,
+   "lat_dms": "511633.00N",
+   "lon_dms": "0001552.00W",
+   "fix_use_code": "RNAV waypoint",
+   "charted_on": "STAR",
+   "reference_navaid_radial_distance": [],
+   "roles_on_plates": {
+    "OCK1Z": "waypoint",
+    "BIG1Z": "waypoint",
+    "LAM1Y": "waypoint"
+   },
+   "source": "UK AIP AD 2-EGLL-7-13..7-17 STAR coding tables (coordinates as printed)"
+  },
+  {
+   "id": "ETVAX",
+   "lat": 50.96860833,
+   "lon": 0.59896389,
+   "lat_dms": "505806.99N",
+   "lon_dms": "0003556.27E",
+   "fix_use_code": "RNAV waypoint",
+   "charted_on": "STAR",
+   "reference_navaid_radial_distance": [],
+   "roles_on_plates": {
+    "ALESO1H": "waypoint"
+   },
+   "source": "UK AIP AD 2-EGLL-7-13..7-17 STAR coding tables (coordinates as printed)"
+  },
+  {
+   "id": "FITBO",
+   "lat": 52.21904167,
+   "lon": -2.40348611,
+   "lat_dms": "521308.55N",
+   "lon_dms": "0022412.55W",
+   "fix_use_code": "RNAV waypoint",
+   "charted_on": "STAR",
+   "reference_navaid_radial_distance": [],
+   "roles_on_plates": {
+    "FITBO2H": "waypoint"
+   },
+   "source": "UK AIP AD 2-EGLL-7-13..7-17 STAR coding tables (coordinates as printed)"
+  },
+  {
+   "id": "HAZEL",
+   "lat": 51.00528611,
+   "lon": -0.98446111,
+   "lat_dms": "510019.03N",
+   "lon_dms": "0005904.06W",
+   "fix_use_code": "RNAV waypoint",
+   "charted_on": "STAR",
+   "reference_navaid_radial_distance": [],
+   "roles_on_plates": {
+    "OTMET1H": "waypoint",
+    "ROXOG1H": "waypoint",
+    "HAZEL1H": "waypoint"
+   },
+   "source": "UK AIP AD 2-EGLL-7-13..7-17 STAR coding tables (coordinates as printed)"
+  },
+  {
+   "id": "HILLY",
+   "lat": 51.33501111,
+   "lon": 0.24371667,
+   "lat_dms": "512006.04N",
+   "lon_dms": "0001437.38E",
+   "fix_use_code": "RNAV waypoint",
+   "charted_on": "STAR",
+   "reference_navaid_radial_distance": [],
+   "roles_on_plates": {
+    "LAM1X": "waypoint",
+    "OCK1Z": "waypoint"
+   },
+   "source": "UK AIP AD 2-EGLL-7-13..7-17 STAR coding tables (coordinates as printed)"
+  },
+  {
+   "id": "HON",
+   "lat": 52.35667778,
+   "lon": -1.663725,
+   "lat_dms": "522124.04N",
+   "lon_dms": "0013949.41W",
+   "fix_use_code": "RNAV waypoint",
+   "charted_on": "STAR",
+   "reference_navaid_radial_distance": [],
+   "roles_on_plates": {
+    "HON2H": "waypoint"
+   },
+   "source": "UK AIP AD 2-EGLL-7-13..7-17 STAR coding tables (coordinates as printed)"
+  },
+  {
+   "id": "LLE01",
+   "lat": 51.18721111,
+   "lon": 0.25602222,
+   "lat_dms": "511113.96N",
+   "lon_dms": "0001521.68E",
+   "fix_use_code": "RNAV waypoint",
+   "charted_on": "STAR",
+   "reference_navaid_radial_distance": [],
+   "roles_on_plates": {
+    "ALESO1H": "waypoint"
+   },
+   "source": "UK AIP AD 2-EGLL-7-13..7-17 STAR coding tables (coordinates as printed)"
+  },
+  {
+   "id": "LLE02",
+   "lat": 51.31602222,
+   "lon": 0.35274167,
+   "lat_dms": "511857.68N",
+   "lon_dms": "0002109.87E",
+   "fix_use_code": "RNAV waypoint",
+   "charted_on": "STAR",
+   "reference_navaid_radial_distance": [],
+   "roles_on_plates": {
+    "TANET1Z": "waypoint"
+   },
+   "source": "UK AIP AD 2-EGLL-7-13..7-17 STAR coding tables (coordinates as printed)"
+  },
+  {
+   "id": "LLFAP",
+   "lat": 51.46556011,
+   "lon": -0.23422835,
+   "fix_use_code": "DERIVED DME fix",
+   "charted_on": "IAP",
+   "reference_navaid_radial_distance": [],
+   "roles_on_plates": {
+    "ILS/DME I-LL RWY 27L": "FAF (DERIVED)"
+   },
+   "source": "DERIVED, not a published waypoint: 7.5 NM from the AIP landing threshold of runway 27L along the reciprocal of the true bearing 269.72, = I-LL DME 7.5 (the ILS DME reads zero at the threshold, AD 2.19). Basis: FAP I-LL D7.5 (ILS plate). For D7.5 the position was checked against the plate value \"LON D8.2/8.8\" (within 0.05 NM)."
+  },
+  {
+   "id": "LLIF",
+   "lat": 51.46576348,
+   "lon": -0.16760447,
+   "fix_use_code": "DERIVED DME fix",
+   "charted_on": "IAP",
+   "reference_navaid_radial_distance": [],
+   "roles_on_plates": {
+    "ILS/DME I-LL RWY 27L": "IF (DERIVED)"
+   },
+   "source": "DERIVED, not a published waypoint: 10 NM from the AIP landing threshold of runway 27L along the reciprocal of the true bearing 269.72, = I-LL DME 10 (the ILS DME reads zero at the threshold, AD 2.19). Basis: localizer established by D10 (initial approach charts AD 2-EGLL-7-20..7-26: \"to be established by I-LL/I-RR D 10\"). For D7.5 the position was checked against the plate value \"LON D8.2/8.8\" (within 0.05 NM)."
+  },
+  {
+   "id": "LLS01",
+   "lat": 51.172775,
+   "lon": -0.685675,
+   "lat_dms": "511021.99N",
+   "lon_dms": "0004108.43W",
+   "fix_use_code": "RNAV waypoint",
+   "charted_on": "STAR",
+   "reference_navaid_radial_distance": [],
+   "roles_on_plates": {
+    "OTMET1H": "waypoint",
+    "ROXOG1H": "waypoint",
+    "HAZEL1H": "waypoint"
+   },
+   "source": "UK AIP AD 2-EGLL-7-13..7-17 STAR coding tables (coordinates as printed)"
+  },
+  {
+   "id": "LLW02",
+   "lat": 51.40108611,
+   "lon": -0.72691389,
+   "lat_dms": "512403.91N",
+   "lon_dms": "0004336.89W",
+   "fix_use_code": "RNAV waypoint",
+   "charted_on": "STAR",
+   "reference_navaid_radial_distance": [],
+   "roles_on_plates": {
+    "TOBID1X": "waypoint"
+   },
+   "source": "UK AIP AD 2-EGLL-7-13..7-17 STAR coding tables (coordinates as printed)"
+  },
+  {
+   "id": "LLW03",
+   "lat": 51.30911944,
+   "lon": -0.76581667,
+   "lat_dms": "511832.83N",
+   "lon_dms": "0004556.94W",
+   "fix_use_code": "RNAV waypoint",
+   "charted_on": "STAR",
+   "reference_navaid_radial_distance": [],
+   "roles_on_plates": {
+    "SIRIC1H": "waypoint"
+   },
+   "source": "UK AIP AD 2-EGLL-7-13..7-17 STAR coding tables (coordinates as printed)"
+  },
+  {
+   "id": "LOGAN",
+   "lat": 51.74758889,
+   "lon": 1.61182778,
+   "lat_dms": "514451.32N",
+   "lon_dms": "0013642.58E",
+   "fix_use_code": "RNAV waypoint",
+   "charted_on": "STAR",
+   "reference_navaid_radial_distance": [],
+   "roles_on_plates": {
+    "BARMI1H": "waypoint",
+    "LOGAN2H": "waypoint"
+   },
+   "source": "UK AIP AD 2-EGLL-7-13..7-17 STAR coding tables (coordinates as printed)"
+  },
+  {
+   "id": "NEDUL",
+   "lat": 50.66611111,
+   "lon": -1.54773889,
+   "lat_dms": "503958.00N",
+   "lon_dms": "0013251.86W",
+   "fix_use_code": "RNAV waypoint",
+   "charted_on": "STAR",
+   "reference_navaid_radial_distance": [],
+   "roles_on_plates": {
+    "OTMET1H": "waypoint"
+   },
+   "source": "UK AIP AD 2-EGLL-7-13..7-17 STAR coding tables (coordinates as printed)"
+  },
+  {
+   "id": "NIGIT",
+   "lat": 51.31304444,
+   "lon": -1.17075278,
+   "lat_dms": "511846.96N",
+   "lon_dms": "0011014.71W",
+   "fix_use_code": "RNAV waypoint",
+   "charted_on": "STAR",
+   "reference_navaid_radial_distance": [],
+   "roles_on_plates": {
+    "SIRIC1H": "waypoint"
+   },
+   "source": "UK AIP AD 2-EGLL-7-13..7-17 STAR coding tables (coordinates as printed)"
+  },
+  {
+   "id": "NUGRA",
+   "lat": 53.02956389,
+   "lon": -2.30375556,
+   "lat_dms": "530146.43N",
+   "lon_dms": "0021813.52W",
+   "fix_use_code": "RNAV waypoint",
+   "charted_on": "STAR",
+   "reference_navaid_radial_distance": [],
+   "roles_on_plates": {
+    "NUGRA2H": "waypoint"
+   },
+   "source": "UK AIP AD 2-EGLL-7-13..7-17 STAR coding tables (coordinates as printed)"
+  },
+  {
+   "id": "OTMET",
+   "lat": 50.68196111,
+   "lon": -2.514825,
+   "lat_dms": "504055.06N",
+   "lon_dms": "0023053.37W",
+   "fix_use_code": "RNAV waypoint",
+   "charted_on": "STAR",
+   "reference_navaid_radial_distance": [],
+   "roles_on_plates": {
+    "OTMET1H": "waypoint"
+   },
+   "source": "UK AIP AD 2-EGLL-7-13..7-17 STAR coding tables (coordinates as printed)"
+  },
+  {
+   "id": "ROTNO",
+   "lat": 50.85724167,
+   "lon": 0.77811111,
+   "lat_dms": "505126.07N",
+   "lon_dms": "0004641.20E",
+   "fix_use_code": "RNAV waypoint",
+   "charted_on": "STAR",
+   "reference_navaid_radial_distance": [],
+   "roles_on_plates": {
+    "ALESO1H": "waypoint"
+   },
+   "source": "UK AIP AD 2-EGLL-7-13..7-17 STAR coding tables (coordinates as printed)"
+  },
+  {
+   "id": "ROXOG",
+   "lat": 50.26619167,
+   "lon": -1.56233611,
+   "lat_dms": "501558.29N",
+   "lon_dms": "0013344.41W",
+   "fix_use_code": "RNAV waypoint",
+   "charted_on": "STAR",
+   "reference_navaid_radial_distance": [],
+   "roles_on_plates": {
+    "ROXOG1H": "waypoint"
+   },
+   "source": "UK AIP AD 2-EGLL-7-13..7-17 STAR coding tables (coordinates as printed)"
+  },
+  {
+   "id": "RRFAP",
+   "lat": 51.4783069,
+   "lon": -0.23335624,
+   "fix_use_code": "DERIVED DME fix",
+   "charted_on": "IAP",
+   "reference_navaid_radial_distance": [],
+   "roles_on_plates": {
+    "ILS/DME I-RR RWY 27R": "FAF (DERIVED)"
+   },
+   "source": "DERIVED, not a published waypoint: 7.5 NM from the AIP landing threshold of runway 27R along the reciprocal of the true bearing 269.71, = I-RR DME 7.5 (the ILS DME reads zero at the threshold, AD 2.19). Basis: FAP I-RR D7.5 (ILS plate). For D7.5 the position was checked against the plate value \"LON D8.2/8.8\" (within 0.05 NM)."
+  },
+  {
+   "id": "RRIF",
+   "lat": 51.47851753,
+   "lon": -0.16671388,
+   "fix_use_code": "DERIVED DME fix",
+   "charted_on": "IAP",
+   "reference_navaid_radial_distance": [],
+   "roles_on_plates": {
+    "ILS/DME I-RR RWY 27R": "IF (DERIVED)"
+   },
+   "source": "DERIVED, not a published waypoint: 10 NM from the AIP landing threshold of runway 27R along the reciprocal of the true bearing 269.71, = I-RR DME 10 (the ILS DME reads zero at the threshold, AD 2.19). Basis: localizer established by D10 (initial approach charts AD 2-EGLL-7-20..7-26: \"to be established by I-LL/I-RR D 10\"). For D7.5 the position was checked against the plate value \"LON D8.2/8.8\" (within 0.05 NM)."
+  },
+  {
+   "id": "SABER",
+   "lat": 51.70382222,
+   "lon": 0.94949722,
+   "lat_dms": "514213.76N",
+   "lon_dms": "0005658.19E",
+   "fix_use_code": "RNAV waypoint",
+   "charted_on": "STAR",
+   "reference_navaid_radial_distance": [],
+   "roles_on_plates": {
+    "BARMI1H": "waypoint",
+    "LOGAN2H": "waypoint"
+   },
+   "source": "UK AIP AD 2-EGLL-7-13..7-17 STAR coding tables (coordinates as printed)"
+  },
+  {
+   "id": "SIRIC",
+   "lat": 51.34338056,
+   "lon": -1.56635833,
+   "lat_dms": "512036.17N",
+   "lon_dms": "0013358.89W",
+   "fix_use_code": "RNAV waypoint",
+   "charted_on": "STAR",
+   "reference_navaid_radial_distance": [],
+   "roles_on_plates": {
+    "SIRIC1H": "waypoint",
+    "SIRIC1Z": "waypoint"
+   },
+   "source": "UK AIP AD 2-EGLL-7-13..7-17 STAR coding tables (coordinates as printed)"
+  },
+  {
+   "id": "SOKDU",
+   "lat": 50.66089444,
+   "lon": -2.02585,
+   "lat_dms": "503939.22N",
+   "lon_dms": "0020133.06W",
+   "fix_use_code": "RNAV waypoint",
+   "charted_on": "STAR",
+   "reference_navaid_radial_distance": [],
+   "roles_on_plates": {
+    "OTMET1H": "waypoint"
+   },
+   "source": "UK AIP AD 2-EGLL-7-13..7-17 STAR coding tables (coordinates as printed)"
+  },
+  {
+   "id": "SONOG",
+   "lat": 52.105475,
+   "lon": 2.26946667,
+   "lat_dms": "520619.71N",
+   "lon_dms": "0021610.08E",
+   "fix_use_code": "RNAV waypoint",
+   "charted_on": "STAR",
+   "reference_navaid_radial_distance": [],
+   "roles_on_plates": {
+    "BARMI1H": "waypoint"
+   },
+   "source": "UK AIP AD 2-EGLL-7-13..7-17 STAR coding tables (coordinates as printed)"
+  },
+  {
+   "id": "SOPIT",
+   "lat": 51.95828889,
+   "lon": -1.10731944,
+   "lat_dms": "515729.84N",
+   "lon_dms": "0010626.35W",
+   "fix_use_code": "RNAV waypoint",
+   "charted_on": "STAR",
+   "reference_navaid_radial_distance": [],
+   "roles_on_plates": {
+    "NUGRA2H": "waypoint",
+    "HON2H": "waypoint",
+    "FITBO2H": "waypoint"
+   },
+   "source": "UK AIP AD 2-EGLL-7-13..7-17 STAR coding tables (coordinates as printed)"
+  },
+  {
+   "id": "TANET",
+   "lat": 51.44944444,
+   "lon": 0.92555278,
+   "lat_dms": "512658.00N",
+   "lon_dms": "0005531.99E",
+   "fix_use_code": "RNAV waypoint",
+   "charted_on": "STAR",
+   "reference_navaid_radial_distance": [],
+   "roles_on_plates": {
+    "TANET1Z": "waypoint"
+   },
+   "source": "UK AIP AD 2-EGLL-7-13..7-17 STAR coding tables (coordinates as printed)"
+  },
+  {
+   "id": "TIGER",
+   "lat": 51.06717222,
+   "lon": 0.43931667,
+   "lat_dms": "510401.82N",
+   "lon_dms": "0002621.54E",
+   "fix_use_code": "RNAV waypoint",
+   "charted_on": "STAR",
+   "reference_navaid_radial_distance": [],
+   "roles_on_plates": {
+    "ALESO1H": "waypoint"
+   },
+   "source": "UK AIP AD 2-EGLL-7-13..7-17 STAR coding tables (coordinates as printed)"
+  },
+  {
+   "id": "TOBID",
+   "lat": 52.21654167,
+   "lon": -1.46644722,
+   "lat_dms": "521259.55N",
+   "lon_dms": "0012759.21W",
+   "fix_use_code": "RNAV waypoint",
+   "charted_on": "STAR",
+   "reference_navaid_radial_distance": [],
+   "roles_on_plates": {
+    "NUGRA2H": "waypoint",
+    "HON2H": "waypoint",
+    "TOBID1X": "waypoint"
+   },
+   "source": "UK AIP AD 2-EGLL-7-13..7-17 STAR coding tables (coordinates as printed)"
+  },
+  {
+   "id": "WESUL",
+   "lat": 51.67091389,
+   "lon": 0.48590833,
+   "lat_dms": "514015.29N",
+   "lon_dms": "0002909.27E",
+   "fix_use_code": "RNAV waypoint",
+   "charted_on": "STAR",
+   "reference_navaid_radial_distance": [],
+   "roles_on_plates": {
+    "BARMI1H": "waypoint",
+    "LOGAN2H": "waypoint"
+   },
+   "source": "UK AIP AD 2-EGLL-7-13..7-17 STAR coding tables (coordinates as printed)"
+  },
+  {
+   "id": "WEZKO",
+   "lat": 51.85291944,
+   "lon": -0.96240833,
+   "lat_dms": "515110.51N",
+   "lon_dms": "0005744.67W",
+   "fix_use_code": "RNAV waypoint",
+   "charted_on": "STAR",
+   "reference_navaid_radial_distance": [],
+   "roles_on_plates": {
+    "NUGRA2H": "waypoint",
+    "HON2H": "waypoint",
+    "FITBO2H": "waypoint"
+   },
+   "source": "UK AIP AD 2-EGLL-7-13..7-17 STAR coding tables (coordinates as printed)"
+  }
+ ],
+ "unverified": [
+  "ENR 4.1 lists LON/OCK/BIG/LAM/BNN as DME only; AD 2.19 lists VOR/DME: the VOR service status is not resolved.",
+  "CPT and BPK are not in AD 2.19; coordinates come from charts / AD 2.21 notes.",
+  "Elevations of the localizer / glideslope antennas and of the NDBs are not published (null).",
+  "Derived IF/FAP fixes are not published waypoints."
+ ]
+}

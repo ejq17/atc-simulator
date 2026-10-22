@@ -1,0 +1,224 @@
+{
+ "_provenance": {
+  "source_name": "UK AIP (NATS AIS eAIP) AIRAC 10/2026, AD 2.18 and SID chart headers",
+  "source_url": "https://www.aurora.nats.co.uk/htmlAIP/Publications/2026-10-01-AIRAC/html/eAIP/EG-AD-2.EGLL-en-GB.html",
+  "retrieved": "2026-10-21",
+  "airac_cycle": "AIRAC 10/2026",
+  "faa_cycle_effective": "2026-10-01",
+  "faa_cycle_next": "2026-10-29",
+  "method": "AD 2.18 table read from the eAIP HTML (service designation, callsign, frequency, remarks). London Control frequencies read from the SID charts AD 2-EGLL-6-1..6-6 headers. No value from memory."
+ },
+ "facility": {
+  "id": "EGLL",
+  "name": "LONDON HEATHROW",
+  "type": "ATCT",
+  "tower_hours": "H24",
+  "radio_call": "HEATHROW",
+  "approach_radio_call": "HEATHROW DIRECTOR",
+  "departure_radio_call": "LONDON CONTROL"
+ },
+ "summary_by_function": {
+  "ATIS": {
+   "callsign": "HEATHROW INFORMATION",
+   "arrival_mhz": 128.08,
+   "departure_mhz": 121.935,
+   "vor_broadcast_mhz": [
+    {
+     "mhz": 113.75,
+     "on": "Bovingdon VOR"
+    },
+    {
+     "mhz": 117.0,
+     "on": "Seaford VOR"
+    }
+   ],
+   "hours": "H24",
+   "phone": null,
+   "source": "AD 2.18 ATIS and ATIS DEP rows"
+  },
+  "delivery": {
+   "callsign": "HEATHROW DELIVERY",
+   "mhz": 121.98,
+   "source": "AD 2.18 TWR service, \"Ground Movement Planning; departing aircraft are to make initial call to Heathrow Delivery\""
+  },
+  "ground": {
+   "callsign": "HEATHROW GROUND",
+   "mhz": 121.705,
+   "alternates_mhz": [
+    121.855,
+    121.905
+   ],
+   "source": "AD 2.18 (Ground Movement Control, DOC 5 NM/GND, hours as directed by ATC)"
+  },
+  "tower": {
+   "callsign": "HEATHROW TOWER",
+   "mhz": 118.505,
+   "alternates_mhz": [
+    118.705,
+    124.48
+   ],
+   "emergency_mhz": 121.5,
+   "source": "AD 2.18; SID charts print TWR 118.505; AD 2.22 para 3 names 118.705 for radio failure at the ATC unit"
+  },
+  "director": {
+   "callsign": "HEATHROW DIRECTOR",
+   "mhz": 119.73,
+   "alternates_mhz": [
+    120.4,
+    127.525,
+    134.98
+   ],
+   "source": "AD 2.18 APP row; alternates \"when instructed by ATC\""
+  },
+  "radar": {
+   "callsign": "HEATHROW RADAR",
+   "mhz": 125.625,
+   "alternates_mhz": [
+    127.525
+   ],
+   "note": "VFR and Special VFR in the London CTR",
+   "source": "AD 2.18 RADAR row"
+  },
+  "london_control": {
+   "callsign": "LONDON CONTROL",
+   "default_mhz": 134.125,
+   "by_sid_chart": [
+    {
+     "chart": "AD 2-EGLL-6-1",
+     "sids": "CPT",
+     "mhz": 134.125
+    },
+    {
+     "chart": "AD 2-EGLL-6-2",
+     "sids": "MODMI/MAXIT",
+     "mhz": 133.18
+    },
+    {
+     "chart": "AD 2-EGLL-6-3",
+     "sids": "BPK",
+     "mhz": 118.825
+    },
+    {
+     "chart": "AD 2-EGLL-6-4",
+     "sids": "ULTIB/UMLAT",
+     "mhz": 119.78
+    },
+    {
+     "chart": "AD 2-EGLL-6-5",
+     "sids": "DET",
+     "mhz": 120.53
+    },
+    {
+     "chart": "AD 2-EGLL-6-6",
+     "sids": "GASGU/GOGSI",
+     "mhz": 134.125
+    }
+   ],
+   "source": "SID chart headers (ACC row)"
+  },
+  "fire": {
+   "callsign": "HEATHROW FIRE",
+   "mhz": 121.605,
+   "note": "Non-ATS channel, when instructed by ATC",
+   "source": "AD 2.18 OTHER row"
+  },
+  "emergency": {
+   "mhz": 121.5
+  }
+ },
+ "all_frequencies_serving_airport": [
+  {
+   "freq_mhz": 119.73,
+   "use": "APP",
+   "remark": "HEATHROW DIRECTOR"
+  },
+  {
+   "freq_mhz": 120.4,
+   "use": "APP",
+   "remark": "when instructed by ATC"
+  },
+  {
+   "freq_mhz": 127.525,
+   "use": "APP/RADAR",
+   "remark": "when instructed by ATC"
+  },
+  {
+   "freq_mhz": 134.98,
+   "use": "APP",
+   "remark": "when instructed by ATC"
+  },
+  {
+   "freq_mhz": 121.98,
+   "use": "DELIVERY",
+   "remark": null
+  },
+  {
+   "freq_mhz": 121.705,
+   "use": "GROUND",
+   "remark": null
+  },
+  {
+   "freq_mhz": 121.855,
+   "use": "GROUND",
+   "remark": null
+  },
+  {
+   "freq_mhz": 121.905,
+   "use": "GROUND",
+   "remark": null
+  },
+  {
+   "freq_mhz": 118.505,
+   "use": "TOWER",
+   "remark": null
+  },
+  {
+   "freq_mhz": 118.705,
+   "use": "TOWER",
+   "remark": null
+  },
+  {
+   "freq_mhz": 124.48,
+   "use": "TOWER",
+   "remark": "when instructed by ATC"
+  },
+  {
+   "freq_mhz": 125.625,
+   "use": "RADAR",
+   "remark": null
+  },
+  {
+   "freq_mhz": 128.08,
+   "use": "ATIS",
+   "remark": null
+  },
+  {
+   "freq_mhz": 113.75,
+   "use": "ATIS",
+   "remark": "Bovingdon VOR"
+  },
+  {
+   "freq_mhz": 117.0,
+   "use": "ATIS",
+   "remark": "Seaford VOR"
+  },
+  {
+   "freq_mhz": 121.935,
+   "use": "ATIS DEP",
+   "remark": null
+  },
+  {
+   "freq_mhz": 121.605,
+   "use": "FIRE",
+   "remark": null
+  },
+  {
+   "freq_mhz": 121.5,
+   "use": "EMERGENCY",
+   "remark": null
+  }
+ ],
+ "notes": [
+  "Approach is \"Heathrow Director\" (AD 2.18); departures leave on London Control per SID chart. No UHF values are published in AD 2.18."
+ ]
+}

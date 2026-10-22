@@ -8,12 +8,14 @@ import { loadKmht } from './kmht';
 import { loadKbos } from './kbos';
 import { loadKpgd } from './kpgd';
 import { loadKphl } from './kphl';
+import { loadEgll } from './egll';
 
 export { loadKacy } from './kacy';
 export { loadKmht } from './kmht';
 export { loadKbos } from './kbos';
 export { loadKpgd } from './kpgd';
 export { loadKphl } from './kphl';
+export { loadEgll } from './egll';
 export { createProjection, trueToMagnetic, magneticToTrue, normalizeDeg, bearingDeg, angleDiffDeg } from './projection';
 export type { Projection } from './projection';
 export {
@@ -53,6 +55,7 @@ const AIRPORTS: Record<string, () => Airport> = {
   KBOS: loadKbos,
   KPHL: loadKphl,
   KPGD: loadKpgd,
+  EGLL: loadEgll,
 };
 
 /** The airport used when none is chosen. */

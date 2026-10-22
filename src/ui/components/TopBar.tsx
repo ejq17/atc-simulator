@@ -6,6 +6,7 @@ import { Popover, MenuItem } from './Popover';
 import { openTool, revealPanel } from '../layout/actions';
 import { useAlertCount } from '../layout/GroupView';
 import { altimeterText, formatElapsed, formatZulu, windText } from '../lib/format';
+import { visibilityText } from '../../weather/units';
 import { Btn, LABEL } from './ui';
 import { isDaylight, simUtcMs, sunriseSunsetUtc } from '../../sim/solar';
 import type { SimulationState } from '../../sim/types';
@@ -142,9 +143,9 @@ export function TopBar() {
         <Rule />
         <Stat label="Wind (mag)" title="Magnetic direction, as the tower would say it"><span data-testid="wind">{windText(w, v)}</span></Stat>
         {liveWx && <WxBadge status={liveWx} />}
-        <Stat label="Altimeter"><span data-testid="altimeter">{altimeterText(w.altimeterInHg)}</span></Stat>
+        <Stat label="Altimeter"><span data-testid="altimeter">{altimeterText(w.altimeterInHg, state.airport.altimeterUnit)}</span></Stat>
         <div className="hidden sm:block">
-          <Stat label="Conditions"><span className={CAT_COLOR[w.flightCategory]}>{w.flightCategory}</span> <span className="text-[11px] font-normal text-atc-muted">{w.visibilitySm} SM</span></Stat>
+          <Stat label="Conditions"><span className={CAT_COLOR[w.flightCategory]}>{w.flightCategory}</span> <span className="text-[11px] font-normal text-atc-muted">{state.airport.altimeterUnit === 'hPa' ? visibilityText(w.visibilitySm) : `${w.visibilitySm} SM`}</span></Stat>
         </div>
         <Rule />
         <button type="button" onClick={() => openTool('atis')} data-testid="atis-button" className={`flex items-center gap-2 border px-2 py-0.5 text-left hover:border-atc-cyan ${drawer === 'atis' ? 'border-atc-cyan' : 'border-atc-border'}`}>

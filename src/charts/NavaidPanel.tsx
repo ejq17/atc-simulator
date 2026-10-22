@@ -42,7 +42,8 @@ export function NavaidPanel({ className = '', icao = 'KACY' }: NavaidPanelProps)
   }, [fixes, showAll, query]);
 
   const noIls = runwaysWithoutIls.join(' and ');
-  const src = `Source: ${provenance.sources[0]}. Retrieved ${provenance.retrieved}, FAA cycle ${provenance.cycle}.`;
+  const uk = NAVAIDS.authority === 'UK AIP';
+  const src = `Source: ${provenance.sources[0]}. Retrieved ${provenance.retrieved}, ${uk ? 'AIRAC' : 'FAA'} cycle ${provenance.cycle}.`;
 
   return (
     <div aria-label="Navigation aids reference" className={`flex flex-col gap-3 overflow-y-auto bg-atc-bg p-3 text-atc-text ${className}`}>
@@ -53,7 +54,7 @@ export function NavaidPanel({ className = '', icao = 'KACY' }: NavaidPanelProps)
 
       <Section
         title={`${faaId} ${vortac.type}`}
-        footer={<>{src} Unusable sectors, where listed, are quoted from the NASR remarks. Position vs ARP: {vortac.locationNote}</>}
+        footer={<>{src} {uk ? 'Coverage and remarks are quoted from AD 2.19.' : 'Unusable sectors, where listed, are quoted from the NASR remarks.'} Position vs ARP: {vortac.locationNote}</>}
       >
         <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
           <span className="text-lg text-atc-green">{vortac.id}</span>
@@ -79,10 +80,10 @@ export function NavaidPanel({ className = '', icao = 'KACY' }: NavaidPanelProps)
 
       <Section
         title="ILS / localizers"
-        footer={<>{src} Decision altitudes, RVR and TDZE are read from the d-TPP plates (not in NASR) by transcription - verify against the chart. {NAVAIDS.ilsNote}</>}
+        footer={<>{src} {uk ? 'OCA(OCH), RDH and missed approach are read from the UK AIP plates by transcription - verify against the chart.' : 'Decision altitudes, RVR and TDZE are read from the d-TPP plates (not in NASR) by transcription - verify against the chart.'} {NAVAIDS.ilsNote}</>}
       >
         <div className="mb-2 border-l-2 border-atc-red bg-atc-panel-2 px-3 py-1.5 text-xs">
-          No ILS or localizer on runway {noIls}. {NAVAIDS.noIlsNote}
+          {noIls ? `No ILS or localizer on runway ${noIls}. ` : ''}{NAVAIDS.noIlsNote}
         </div>
         <div className="overflow-x-auto">
           <table className="w-full min-w-[34rem] border-collapse">
@@ -119,7 +120,7 @@ export function NavaidPanel({ className = '', icao = 'KACY' }: NavaidPanelProps)
 
       <Section
         title="Nearby VOR / VORTAC / VOR-DME"
-        footer={<>{src} Distance and bearing are computed here from the NASR coordinates (great circle, true bearing from the {faaId} {vortac.type}), not FAA-published.</>}
+        footer={<>{src} Distance and bearing are computed here from the {uk ? 'AIP' : 'NASR'} coordinates (great circle, true bearing from the {faaId} {vortac.type}), not {uk ? 'AIP-published' : 'FAA-published'}.</>}
       >
         <div className="overflow-x-auto">
           <table className="w-full min-w-[34rem] border-collapse">
