@@ -100,7 +100,7 @@ export interface AirportProfile {
    * `noGaFbo` - the airport has no GA ramp / FBO stands (EGLL: light aircraft are not permitted, AD 2.20 para 1); `holdPath` - a hold whose route to its
    * runway entry crosses an edge outside the runway strip becomes a warning (EGLL rapid exits mapped along the centreline).
    */
-  relaxedChecks?: { noGaFbo?: boolean; holdPath?: boolean; /** drop a parking lead-in vertex within 0.5 m of the lane foot point (a zero-length connector edge) */ dropTinyLeadIn?: boolean };
+  relaxedChecks?: { noGaFbo?: boolean; holdPath?: boolean; /** drop a parking lead-in vertex within 0.5 m of the lane foot point (a zero-length connector edge) */ dropTinyLeadIn?: boolean; /** a stand joined by a sub-3 m connector to a dead-end taxilane vertex takes over the lane edge behind it (pushback needs a real lead-in) */ mergeTinyStandLeadIn?: boolean };
   /** A junction between a runway entry and its hold distance gets a hold line on every branch that leads away from the runway, not only the steepest one (EGLL: routes use the other branches). */
   holdAllBranches?: boolean;
   /** Optional normaliser of an OSM `ref` tag before it is compared with `taxiwayIds` (EGLL: "Taxiway A" -> "A"); return null to leave the way unnamed. */

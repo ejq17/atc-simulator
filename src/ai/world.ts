@@ -713,11 +713,24 @@ function lastClearanceOf(o: Aircraft, kind: string) {
   return undefined;
 }
 
+/**
+ * An arrival that already stands at the head of the stub another lander has reserved (it exited there and waits for taxi instructions) is not blocked by that
+ * reservation: sending it off the stub is what frees the stub. Without this rule a stub that landers keep reserving (KPGD: runway 22 landers all take Delta, a lander
+ * is always inside 2 nm) never releases the aircraft standing on it, and its "request taxi to parking" stays unanswered (new-airport soak, KPGD seed 1).
+ */
+function standsAtHeadOf(state: SimulationState, aircraftId: string, holdNodeId: string): boolean {
+  const me = state.aircraft[aircraftId];
+  if (!me || me.isDeparture || me.phase !== 'RUNWAY_EXIT' || !me.onGround || me.groundSpeedKt >= 1) return false;
+  if (me.route && me.route.nodeIds[me.route.nodeIds.length - 1] === holdNodeId) return true;
+  const hold = state.airport.taxiwayGraph.nodes[holdNodeId];
+  return !!hold && Math.hypot(me.pos.x - hold.pos.x, me.pos.y - hold.pos.y) <= 40;
+}
+
 export function opposingTraffic(state: SimulationState, nodeIds: string[], exceptId: string, opts: { ignoreStopped?: boolean; ignoreStoppedAhead?: boolean } = {}): Aircraft | undefined {
   // The exit stub a lander inside 2 nm (or rolling out) is about to use is as good as occupied: a route over it ends head-on with the lander
   // (exitStubs.ts). AI Ground waits; the lander is returned as the blocker.
   const lander = landerStubOnRoute(state, nodeIds, exceptId);
-  if (lander) return state.aircraft[lander.aircraftId];
+  if (lander && !standsAtHeadOf(state, exceptId, lander.holdNodeId)) return state.aircraft[lander.aircraftId];
   const graph = state.airport.taxiwayGraph;
   const mine = new Map<string, number>();
   nodeIds.forEach((id, i) => mine.set(id, i));

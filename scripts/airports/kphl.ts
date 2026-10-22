@@ -25,6 +25,7 @@ export const kphlProfile: AirportProfile = {
   icao: 'KPHL',
   slug: 'kphl',
   buildCommand: 'scripts/build-airport.ts KPHL',
+  relaxedChecks: { mergeTinyStandLeadIn: true },
   // Printed on the FAA airport diagram 00320AD.PDF (data/sources/kphl-procedures.json airport_diagram.taxiway_identifiers)
   taxiwayIds: [
     'A', 'A1', 'A2', 'A3', 'B', 'D', 'D1', 'D2', 'D4', 'E', 'E1', 'E2', 'E3', 'E4', 'E5', 'F', 'G', 'H', 'J', 'J1', 'K', 'K1', 'K2', 'K3', 'K4', 'K5', 'K6', 'K7', 'K8',

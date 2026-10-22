@@ -751,6 +751,38 @@ for (const e of rawEdges) {
 }
 for (const c of connectors) fedges.push({ a: c.a, b: c.b, taxiway: '', kind: 'apron_connector', osmWayIds: [], approximate: true });
 
+// A stand that ends on the dead-end vertex of an OSM taxilane (the lead-in line stops on the lane) is joined to that vertex by a sub-3 m connector. The pushback
+// takes the first edge at the stand as the lead-in, so it pushes 0.6 m and never settles (KBOS soak: AAL1784 at B39 pushed back for an hour). The vertex is removed
+// and the stand takes over the lane edge behind it, which becomes the stand's connector (pushback along the lane).
+if (profile.relaxedChecks?.mergeTinyStandLeadIn) {
+  for (const r of parkRecs) {
+    if (r.node < 0 || !r.connected) continue;
+    const inc = fedges.filter((e) => e.a === r.node || e.b === r.node);
+    if (inc.length !== 1 || inc[0].kind !== 'apron_connector') continue;
+    const e0 = inc[0];
+    const m = e0.a === r.node ? e0.b : e0.a;
+    if (dist(pl.pos[r.node], pl.pos[m]) >= 3 || pl.pinned.has(m) || holdNodeSet.has(m) || parkNodeSet.has(m)) continue;
+    const mInc = fedges.filter((e) => e.a === m || e.b === m);
+    // the edge the stand takes over: the lane edge behind a dead-end vertex, or the lead-in's own connector chain when the vertex is a lane junction
+    const others = mInc.filter((e) => e !== e0);
+    const e1 = others.length === 1 ? others[0] : others.length > 1 && others.filter((e) => e.kind === 'apron_connector').length === 1 ? others.find((e) => e.kind === 'apron_connector') : undefined;
+    if (!e1 || e1.kind === 'runway') continue;
+    fedges.splice(fedges.indexOf(e0), 1);
+    const k = e1.a === m ? e1.b : e1.a;
+    if (others.length === 1) {
+      e1.a = r.node;
+      e1.b = k;
+      e1.kind = 'apron_connector';
+      e1.taxiway = '';
+      pl.alive[m] = false;
+    } else {
+      // a lane junction: it stays (other stands and the lane hang on it); the stand gets its own connector to the far end of the chain
+      fedges.push({ a: r.node, b: k, taxiway: '', kind: 'apron_connector', osmWayIds: [], approximate: true });
+    }
+    r.connectorLengthM = dist(pl.pos[r.node], pl.pos[k]);
+  }
+}
+
 // node membership
 const usedNodes = new Set<number>();
 for (const e of fedges) {

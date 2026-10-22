@@ -9,7 +9,7 @@ describe('KPGD free play, every AI position (shared CLNC/GND frequency)', () => 
   // Seeds 1 and 3 stall since STAR arrivals are generated at KPGD (LUBBR FOUR / PIKKR SEVEN end in a heading with no IAF join and the
   // AI Approach does not take over with vectors; seed 1 also leaves landers on the Delta exit stub): tracked on the new-airport soak task,
   // which restores seeds 1-3 with the fix. Seed 2 covers the shared CLNC/GND frequency routing this test is for.
-  for (const seed of [2]) {
+  for (const seed of [1, 2, 3]) {
     it(`seed ${seed}: 30 simulated minutes, landers reach parking, no stall`, () => {
       const r = runFreePlaySoak(seed, 'off', 0.5, {}, { airport, activeRunways: { landing: ['22'], departing: ['22'] }, arrivalsPerHour: 10, departuresPerHour: 10 });
       if (process.env.FREEPLAY_REPORT === '1') console.log(`seed ${seed}: landed ${r.landed.join(',')} departed ${r.departed.join(',')} spawned ${r.spawnedArrivals}+${r.spawnedDepartures} max wait ${r.maxWaitText} safety ${r.safety.length}\n${r.rows.join('\n')}`);

@@ -462,7 +462,8 @@
      "Jet and turboprop aircraft only.",
      "Do not file KRVUR and SSPAZ transitions - to be assigned by ATC.",
      "Chart is for several airports: only the PGD body (LUBBR-ROSTY, 'Landing FA54/VNC/PGD') is transcribed; the SRQ (runways 14 and 32 via RUTAE / MURDO) and LAL (ZEPHR) bodies are not.",
-     "Tampa Approach Control 119.65 353.575 (FA54/PGD) as printed on the chart; PGD ATIS 135.675."
+     "Tampa Approach Control 119.65 353.575 (FA54/PGD) as printed on the chart; PGD ATIS 135.675.",
+     "DESIGN VALUE: the simulator starts a STAR arrival over WUDDY or LYFIE (sim_entry_fixes), 47-53 NM from KPGD, because the published entry fixes are up to 105 NM out (LUBBR 105.5, RUNNE 82.5 NM): a 30 minute free-play session otherwise sees no arrival for 15 minutes (new-airport soak, KPGD seed 3, AAY407 spawned 77 NM out). The altitude window comes from the restriction at that fix (else 10000-12000 ft)."
     ],
     "transitions": [
      {
@@ -643,7 +644,11 @@
      }
     ],
     "verification": "NASR 2026-10-01 STAR_RTE.csv lists exactly these three transitions (KRVUR, KYYUU, SSPAZ, each ending at LUBBR) and the body LUBBR-ROSTY (LUBBR ZEBON RUNNE BREKR WUDDY LYFIE ROSTY, ARPT_RWY_ASSOC 'FA54, PGD, VNC'); every printed distance agrees with the great-circle distance between the NASR FIX_BASE coordinates within 1 NM and every printed magnetic track within 2 degrees of true + 6 W (checked by src/airport/kpgd/stars.test.ts).",
-    "not_transcribed": "The SRQ (RUTAE, MURDO) and LAL (ZEPHR) bodies; the hold at LUBBR (8 NM, 004 depicted); restrictions after ROSTY (none printed)."
+    "not_transcribed": "The SRQ (RUTAE, MURDO) and LAL (ZEPHR) bodies; the hold at LUBBR (8 NM, 004 depicted); restrictions after ROSTY (none printed).",
+    "sim_entry_fixes": [
+     "WUDDY",
+     "LYFIE"
+    ]
    }
   },
   {
@@ -687,7 +692,8 @@
      "Jet and turboprops only.",
      "CODGR transition ATC assigned only.",
      "Chart serves several airports: only the PGD body (PIKKR-GUSEC, 'Landing KPGD/FA54') is transcribed; the KAPF/KMKY body (ZEILR, ISAJY) is not.",
-     "Fort Myers App Con 127.05 306.2 (5000 below), 134.425 306.2 (6000 above); PGD ATIS 135.675 as printed on the chart."
+     "Fort Myers App Con 127.05 306.2 (5000 below), 134.425 306.2 (6000 above); PGD ATIS 135.675 as printed on the chart.",
+     "DESIGN VALUE: the simulator starts a STAR arrival over GUSEC (sim_entry_fixes), 28.5 NM from KPGD, because the published entry fixes are up to 50 NM out (BAGGS 47 NM, PIKKR 37.5 NM): a 30 minute free-play session otherwise sees no arrival for 15 minutes (new-airport soak, KPGD seed 3, AAY407 spawned 77 NM out). The altitude window comes from the restriction at that fix (else 10000-12000 ft)."
     ],
     "transitions": [
      {
@@ -826,7 +832,10 @@
      }
     ],
     "verification": "NASR 2026-10-01 STAR_RTE.csv lists exactly these transitions (CODGR, PLYER, REMIS, all ending at PIKKR) and the body PIKKR-GUSEC; printed distances agree with the great-circle distances between the NASR FIX_BASE coordinates within 1 NM and printed tracks with true + 3 W within 2 degrees (src/airport/kpgd/stars.test.ts).",
-    "not_transcribed": "The KAPF/KMKY body (ZEILR, ISAJY); the holding patterns at OBESE, WHITL and CODGR; the FL180 / 11000 maximum altitudes as structured data."
+    "not_transcribed": "The KAPF/KMKY body (ZEILR, ISAJY); the holding patterns at OBESE, WHITL and CODGR; the FL180 / 11000 maximum altitudes as structured data.",
+    "sim_entry_fixes": [
+     "GUSEC"
+    ]
    }
   }
  ],

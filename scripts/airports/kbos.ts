@@ -19,6 +19,7 @@ export const kbosProfile: AirportProfile = {
   icao: 'KBOS',
   slug: 'kbos',
   buildCommand: 'scripts/build-airport.ts KBOS',
+  relaxedChecks: { mergeTinyStandLeadIn: true },
   // Printed on the FAA airport diagram 00058AD.PDF (data/sources/kbos-procedures.json airport_diagram.taxiway_identifiers)
   taxiwayIds: ['A', 'A1', 'A2', 'B', 'C', 'C1', 'D', 'D1', 'D2', 'E', 'E1', 'E2', 'F', 'G', 'H', 'J', 'J1', 'K', 'L', 'M', 'M1', 'N', 'N1', 'N2', 'N3', 'P', 'Q', 'R', 'T', 'Y', 'Z'],
   diagramPdf: '00058AD.PDF',
