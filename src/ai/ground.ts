@@ -284,6 +284,22 @@ export function createGroundAgent(store: ClearanceStore): Agent {
         }
       }
 
+      // 1d. The departure runway left the configuration (it is in neither the departing nor the landing list: the runway configuration was changed, a wind shift): a departure that has not reached its runway, or stands at the hold
+      // line of a runway no longer in use, is given a new taxi instruction to a departure runway now in use. An aircraft already on the runway keeps its takeoff.
+      if (ac.isDeparture && !isVehicleType(ac.type) && !isRotorcraftType(ac.type) && (ac.phase === 'TAXIING' || ac.phase === 'HOLDING_SHORT') && ac.occupyingRunways.length === 0
+        && ac.assignedRunwayEnd !== undefined && state.activeRunways.departing.length > 0 && ![...state.activeRunways.departing, ...state.activeRunways.landing].includes(ac.assignedRunwayEnd)
+        && (ac.phase === 'HOLDING_SHORT' || !!lastClearance(ac, 'TAXI')?.destination?.startsWith('RWY')) && v.settled(ac) >= 2) {
+        const dep = planDeparture(airport, ac, state.activeRunways.departing, busyHoldIds(state, ac.id), closedTaxiways(state));
+        if (dep && !opposing(ac, dep.nodeIds)) {
+          plans.push({
+            key: `${ac.id}:reroute-cfg:${ac.assignedRunwayEnd}>${dep.runwayEnd}`, aircraftId: ac.id, callsign: ac.callsign, priority: 53, cooldownSec: 30,
+            cmds: [mkCmd('TAXI', ac, { destination: `RWY${dep.runwayEnd}`, runwayEnd: dep.runwayEnd, route: dep.via, holdShort: dep.holdShort })],
+            phrase: say.taxiToRunway(ac, dep.runwayEnd, dep.via, dep.holdShort), summary: `${ac.callsign} re-routed to runway ${dep.runwayEnd}: runway ${ac.assignedRunwayEnd} is no longer in use`,
+          });
+        }
+        continue;
+      }
+
       // 1c. Stopped short of a taxiway that closed under its route (pilot: "holding short of Bravo, taxiway closed, request taxi instructions"):
       // re-route it around the closure (the engine plans every taxi instruction around closed taxiways).
       const closedStop = pending === 'TAXI' && ac.groundSpeedKt < 1 && !!ac.pendingRequest && /\(closed\)/.test(ac.pendingRequest.text) && (ac.phase === 'TAXIING' || ac.phase === 'TAXI_TO_PARKING');

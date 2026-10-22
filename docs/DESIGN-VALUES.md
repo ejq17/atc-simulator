@@ -417,3 +417,17 @@ Soak, 24 runs after these changes (same command). Cell: landings / departures / 
 | total | | 376 / 528 / - / 270; fails 1, stalls 0 | 376 / 534 / - / 274; fails 0, stalls 0 |
 
 Totals: cdcd09b 376 / 528 / 270, 1 failing; now **376 / 534 / 274, 0 failing, 0 stalls**. Landings equal, departures 6 more, safety events 4 more (274 against 270: chance level, the 48-run mean is below the baseline's). Go-arounds **41** against 58, the most by one aircraft **3** against 4. 48 runs (seeds 1-24): mean wait at the hold 179 s (baseline 180 s), runs with a wait over 12 minutes 11 (baseline 15); 3 failing runs, all in seeds 13-24 (16 and 20 moderate: stalls; 24 moderate: 23 min), the unperturbed baseline has 2 and the same tree with another AI seed 5. The blocked-transmission protocol was not re-run (pilot timing is unchanged; the figures of the first round stand).
+
+### Multi-runway round (2026-10-21, task/multirunway-ops)
+
+All of these serve the simulator's near-miss alert (1.5 nm and 500 ft, both aircraft airborne) on parallel runways; the order gives no figure for them.
+
+| Value | Where | Meaning |
+|---|---|---|
+| `PROJECTION_MARGIN_NM` 0.2, `PROJECTION_MARGIN_FT` 100, `HORIZON_SEC` 240 | `ai/airbornePath.ts` | Margins added to the alert and the length of the departure projection. |
+| 30 and 60 degrees | `airbornePath.divergenceOptions` | Departure divergences tried, away from a parallel runway first (5-8-3 needs 15). |
+| `DEPENDENT_ALERT_MARGIN_NM` 0.2, `PARALLEL_PROJECTION_MARGIN_NM` 0.6 | `ai/world.ts` | The diagonal kept on adjacent finals is max(5-9-6, 1.5 + 0.2); the projection adds 0.6 nm along the course (flare float of the leader). |
+| `NOMINAL_APPROACH_LIGHT_KT` 66, `NOMINAL_APPROACH_JET_KT` 150 | `game/placement.ts` | Mean speeds from 10 nm to the threshold used to project two arrivals at spawn. |
+| `LEADER_ETA_FACTOR` 1.1 | `ai/tower.ts` | The leader on the adjacent final slows in the flare. |
+| `QUEUE_PENALTY_M` 400 | `ai/world.ts` | One departure queued for a runway costs as much as 400 m (about a minute) of taxiing when Ground chooses the departure runway. |
+

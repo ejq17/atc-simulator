@@ -568,7 +568,7 @@ docs/PHRASEOLOGY-AUDIT.md section G, docs/BEHAVIOUR-ACCURACY.md T8, T11, T13-T17
   flags `extend`, `short`, `circle` (see `PatternState` in `context.ts`; AIM 4-3-2 / 4-3-3 geometry). ENTER_PATTERN from a go-around (or a low
   departure) starts on UPWIND. LAND carries the operation (`rt.landingOp`: full stop, touch-and-go, low approach, stop-and-go (= full stop),
   option (seeded touch-and-go or full stop)); a touch-and-go / low approach calls `continueInPattern` (LANDING -> PATTERN, UPWIND on the
-  `rt.closedTraffic` side, left by default) and a departure with `rt.closedTraffic` joins the upwind leg at lift-off
+  `rt.closedTraffic` side, `runways.defaultPatternSide` by default: left, but right for the right-hand runway of a parallel pair, AIM 4-3-3) and a departure with `rt.closedTraffic` joins the upwind leg at lift-off
   (`startClosedTrafficPattern`). Requested reports are `rt.reports`; `towerVocabularyCalls` fires them at midfield abeam (along <= half the
   runway), when `rt.pattern.leg` becomes BASE, or at the requested distance on final.
 * **Frequency, squawk, information.** `FREQUENCY_CHANGE_APPROVED` (airborne VFR only): `handedOff`, then a silent `pendingFreq` with

@@ -38,10 +38,13 @@ const GA_TAXI = (cs = 'N60DX', parking = 'GA-3'): ScenarioAircraftSpawn => ({
   atSec: 0, callsign: cs, type: 'C172', flightRules: 'VFR', start: { kind: 'parked', parkingId: parking }, isDeparture: true, initialFrequencyId: 'GND', initialRequest: 'TAXI',
 });
 
-/** AI Ground, a human Tower that has not answered yet: one Cessna taxis to runway 13 via Bravo, crossing the (active) runway 4/22. */
+/**
+ * AI Ground, a human Tower that has not answered yet: one Cessna taxis to runway 13 via Bravo, crossing the (active) runway 4/22. Runway 13 is the only departure runway:
+ * with 13 and 22 both listed Ground sends the Cessna to the nearer one (22 from this stand), which crosses 13/31 instead.
+ */
 function crossingSetup(extra: Partial<Parameters<typeof createHarness>[0]> = {}) {
   return createHarness({
-    player: ['TWR'], ai: ['GND', 'CLNC', 'APP', 'DEP'], humanAnswers: false, activeRunways: { departing: ['13', '22'], landing: ['13'] },
+    player: ['TWR'], ai: ['GND', 'CLNC', 'APP', 'DEP'], humanAnswers: false, activeRunways: { departing: ['13'], landing: ['13', '22'] },
     spawns: [GA_TAXI()], ...extra,
   });
 }

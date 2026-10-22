@@ -18,6 +18,9 @@ export interface SoakResult {
   maxWaitText: string;
   stallDump?: string;
   safety: string[];
+  /** The engine's airborne near-miss alerts (1.5 nm and 500 ft) and the runway incursions of the run: "time text". */
+  airborneAlerts: string[];
+  incursions: string[];
   finalCount: number;
   events: SimEvent[];
   /** Distinct (lander, departure) pairs that stood within `STUB_PAIR_M` of each other on a taxiway, one of them stopped, for `STUB_PAIR_SEC` (an exit stub shared by a lander and a departure). */
@@ -92,7 +95,7 @@ export function runFreePlaySoak(seed: number, realism: Realism, simHours: number
   const landedIds = new Set<string>();
   const departedIds = new Set<string>();
   const phaseSince = new Map<string, { phase: string; since: number }>();
-  const res: SoakResult = { rows: [], landed: [], departed: [], msPerSimSec: [], maxWaitSec: 0, maxWaitText: '', safety: [], finalCount: 0, events, stubPairs: [], noseToNose: 0, holdWaitsSec: [], towerWaitsSec: [], goArounds: 0, maxGoArounds: { count: 0, callsign: '' }, spawnedArrivals: 0, spawnedDepartures: 0, longWaits: [], exitHolds: {} };
+  const res: SoakResult = { rows: [], landed: [], departed: [], msPerSimSec: [], maxWaitSec: 0, maxWaitText: '', safety: [], airborneAlerts: [], incursions: [], finalCount: 0, events, stubPairs: [], noseToNose: 0, holdWaitsSec: [], towerWaitsSec: [], goArounds: 0, maxGoArounds: { count: 0, callsign: '' }, spawnedArrivals: 0, spawnedDepartures: 0, longWaits: [], exitHolds: {} };
   const pairs = new Map<string, string>();
   const pairSince = new Map<string, number>();
   const waitLog: { sec: number; text: string }[] = [];
@@ -190,6 +193,8 @@ export function runFreePlaySoak(seed: number, realism: Realism, simHours: number
   for (const [callsign, count] of perAircraft) if (count > res.maxGoArounds.count) res.maxGoArounds = { count, callsign };
   res.noseToNose = events.filter((e) => /nose to nose/i.test(e.text)).length;
   res.finalCount = Object.keys(engine.getState().aircraft).length;
+  res.airborneAlerts = events.filter((e) => e.kind === 'SEPARATION_VIOLATION' && e.text.startsWith('Near-miss alert')).map((e) => `${Math.round(e.timeSec)} ${e.text}`);
+  res.incursions = events.filter((e) => e.kind === 'RUNWAY_INCURSION').map((e) => `${Math.round(e.timeSec)} ${e.text}`);
   res.safety = events.filter((e) => e.kind === 'RUNWAY_INCURSION' || e.kind === 'SEPARATION_VIOLATION').map((e) => `${Math.round(e.timeSec)} ${e.kind} ${e.text}`);
   return res;
 }

@@ -22,7 +22,7 @@ import { projectArrival } from '../sim/runwayTiming';
 import { BASE_ALONG_M, EXTEND_LIMIT_M } from '../sim/flightDynamics';
 import { BASE_NOW_MIN_NM } from '../sim/towerCommands';
 import { getPerformance } from '../sim/performance';
-import { assignedEnd, interactingRunways } from './world';
+import { assignedEnd, dependentMates, dependentStaggerSec, interactingRunways } from './world';
 
 /** Seconds between one aircraft being clear of the runway and the next crossing the threshold, and the other way round (DESIGN VALUE). */
 export const SEQ_MARGIN_SEC = 15;
@@ -108,10 +108,22 @@ export function occupancySec(state: SimulationState, ac: Aircraft, g: RunwayEndG
 export interface SeqWindow {
   start: number;
   end: number;
+  /**
+   * An arrival on the adjacent final of a parallel runway (JO 7110.65 5-9-6 stagger): `start` is its threshold time, `end` the same; it does not occupy this runway, but
+   * the threshold times of the two must be at least `staggerSec(slower follower)` apart (`alongNm` at the speed of whichever crosses second).
+   */
+  mate?: { alongNm: number; kt: number };
 }
 
-const free = (windows: SeqWindow[], start: number, end: number): boolean =>
-  windows.every((w) => end + SEQ_MARGIN_SEC <= w.start || start >= w.end + SEQ_MARGIN_SEC);
+/** Is [start, end] free of the windows? `selfKt`: the approach speed of the aircraft being placed (for the stagger to a parallel final). */
+const free = (windows: SeqWindow[], start: number, end: number, selfKt = 65): boolean =>
+  windows.every((w) => {
+    if (w.mate) {
+      const behindKt = start >= w.start ? selfKt : w.mate.kt;
+      return Math.abs(start - w.start) >= dependentStaggerSec(w.mate.alongNm, behindKt) + SEQ_MARGIN_SEC;
+    }
+    return end + SEQ_MARGIN_SEC <= w.start || start >= w.end + SEQ_MARGIN_SEC;
+  });
 
 /** Aircraft the sequencer may delay: anything flying the pattern, a fighter after its break included (3-8-1 applies to every type: "extend downwind" for the F-16 as for the Cessna, soak seed 13: 15 minutes of go-arounds). Only an overhead maneuver that has not broken yet is its own. */
 export function isSequenceable(ac: Aircraft): boolean {
@@ -163,6 +175,15 @@ export function committedWindows(state: SimulationState, g: RunwayEndGeom, depar
     }
     out.push(arrivalWindow(state, o, og));
   }
+  // The adjacent finals of parallel runways: an arrival there that cannot wait is a point in time this runway's arrivals must keep the stagger from.
+  for (const m of dependentMates(state.airport, g)) {
+    for (const o of Object.values(state.aircraft)) {
+      if (exceptIds.has(o.id) || o.isDeparture || o.onGround || o.assignedRunwayEnd !== m.end.end.id || o.phase === 'GO_AROUND' || o.phase === 'HOLDING') continue;
+      if (o.phase === 'PATTERN' && patternLeg(o, m.end) !== 'BASE' && patternLeg(o, m.end) !== 'FINAL') continue;
+      const w = arrivalWindow(state, o, m.end);
+      out.push({ start: w.start, end: w.start, mate: { alongNm: m.alongNm, kt: getPerformance(o.type).approachSpeedKt } });
+    }
+  }
   return out;
 }
 
@@ -178,13 +199,13 @@ export function sequenceDownwind(state: SimulationState, g: RunwayEndGeom, depar
     const { behindM } = geometry(ac, g);
     const extended = extendedByController(ac) || behindM > BASE_ALONG_M;
     const eNormal = etaNormalSec(ac, g);
-    if (!extended && free(windows, eNormal, eNormal + occ)) {
+    if (!extended && free(windows, eNormal, eNormal + occ, getPerformance(ac.type).approachSpeedKt)) {
       windows.push({ start: eNormal, end: eNormal + occ });
       out.push({ ac, action: 'ok', etaSec: eNormal });
       continue;
     }
     const eNow = etaBaseNowSec(ac, g);
-    if (extended && free(windows, eNow, eNow + occ)) {
+    if (extended && free(windows, eNow, eNow + occ, getPerformance(ac.type).approachSpeedKt)) {
       windows.push({ start: eNow, end: eNow + occ });
       out.push({ ac, action: behindM >= nmToM(BASE_NOW_MIN_NM) + nmToM(0.1) ? 'release' : 'hold', etaSec: eNow });
       continue;

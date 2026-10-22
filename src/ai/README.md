@@ -75,6 +75,7 @@ fly runway heading, cleared for takeoff".
 | `core.ts` | `Plan`, `AgentView`, memory, `mkCmd`. |
 | `clnc.ts` `ground.ts` `tower.ts` `approach.ts` (APP and DEP) `corrections.ts` | The agents. |
 | `coordination.ts` | Landline answers, rescinds, announcements and point outs (see "Coordination"). |
+| `airbornePath.ts` | Kinematic projection of a departure's path (roll, lift-off, climb, departure heading from 400 ft AGL) against the other airborne traffic, judged by the engine's near-miss alert; used by Tower (`departureInstruction`). |
 | `world.ts` | Read-only world queries: ETA, taxi planning (mirrors `commandExecutor.planTaxi`), hold queues, opposing traffic. |
 | `phrase.ts` | ATC phraseology, each phrase as `text` (digits) and `spokenText` (words); callsign first. |
 | `testkit.ts`, `ai.test.ts` | Harness (real engine + KACY, seeded) and the scenarios below. |
@@ -122,6 +123,41 @@ JO 7110.65 3-8-1 (sequence / spacing application: EXTEND DOWNWIND, MAKE SHORT AP
 * Ground: a crossing request is made by the aircraft nearest the runway on an exit stub (`aheadInCrossingQueue`), never toward a departure standing head-on at the far hold line (`opposingTraffic`), and a pushback is held while another aircraft's route passes within 90 m of the stand. `planDeparture` / `planParking` cache their route searches (static data), so a waiting aircraft costs nothing per second.
 * Engine side: `HOLD_START_SNAP_M` (a route starting at a hold line the aircraft is up to 40 m past counts as holding there), `findLeader` ignores points behind the aircraft and breaks ties between aircraft on one spot by id, the wind-and-altimeter answer restores the pilot's earlier landing / departure request.
 * Test: `freePlaySoak.test.ts` (guarded, `FREEPLAY_SOAK=1`), `patternSequence.test.ts`.
+
+## Multi-runway operations (parallel runways)
+
+Reference: JO 7110.65 3-9-6 (same runway separation: 3,000 / 4,500 / 6,000 ft by category), 5-5-4 (wake turbulence), 5-8-2 / 5-8-3 (departure heading,
+successive departures: divergence of 15 degrees or the radar minimum; parallel runways 2,500 ft or more apart), 5-9-6 (dependent parallel approaches), 3-10
+(landing), AIM 4-3-3 (patterns of parallel runways). The simulator's own bar is the near-miss alert (1.5 nm and 500 ft, both aircraft airborne), which is
+stricter than a legal parallel operation, so the AI keeps that distance (plus margins, all DESIGN VALUES) where the rules would allow less.
+
+* **Departures** (`airbornePath.ts`, `tower.departureInstruction`): before a takeoff clearance Tower projects the aircraft's path (roll at its acceleration, lift-off,
+  the climb rate of its type, the departure heading from 400 ft AGL) against the paths of every airborne departure and go-around, of every departure rolling or
+  cleared on another runway, and of the arrivals on the finals of the parallel runways (straight to the threshold, altitude falling linearly). It touches the alert
+  (1.5 nm + 0.2 nm, 500 ft + 100 ft) at some second of the next 240 s: the runway heading is not used. The Tower then tries a divergence of 30 and of 60 degrees,
+  away from a parallel runway first (5-8-2 / 5-8-3), and holds the departure when none is clear. The engine's 3 nm rule (`departureTrailConflict`) still applies.
+  Arrivals on a parallel runway also enter `releaseSlackSec` with the alert distance alone (`neededEtaSec`, `lateralNm`; no 3-9-6 distance for another runway).
+* **Arrivals on adjacent finals** (`world.dependentMates`, `dependentPairClear`, `dependentStaggerSec`): the along-course spacing is the diagonal of 5-9-6 or the alert
+  distance + 0.2 nm, whichever is larger (1.7 nm for 4,003 ft), plus `PARALLEL_PROJECTION_MARGIN_NM` (0.6 nm: a leader that floats in the flare stays airborne 15 to
+  25 s after its threshold, a follower 70 kt faster closes 0.3 to 0.5 nm). The generator places a new arrival (spawn point, `placement.arrivalPositionOk`; traffic.ts
+  `dependentSlotOk`) only where the projection at nominal speeds (66 kt light, 150 kt jet) keeps that spacing and the two never pass each other; an arrival for a
+  runway with a parallel neighbour starts on the extended centreline, not on a base leg that would cross the neighbour's final. Approach spaces IFR arrivals against the
+  same figure (`approach.leaderOf`), Tower holds a landing clearance (`blockedByLeader`) and sends an established follower around (`earlyGoAroundReason`) when the stagger
+  to the leader on the adjacent final is lost, and the pattern sequence (`sequence.ts`) treats an arrival on the adjacent final as a point in time to keep the stagger from.
+* **Patterns** (`runways.defaultPatternSide`, `tower.patternSideAt`): the right-hand runway of a pair flies right traffic (AIM 4-3-3), so the downwind of one never runs
+  over the final of the other; go-arounds, "make straight-in" conversions and "make three sixty for spacing" use the side. The engine's default for closed traffic and
+  touch-and-go follows it.
+* **Ground** (`world.planDepartureOnce`): among the departure ends of the configuration that leave the type its takeoff distance, the one with the shortest taxi route from
+  the stand (per end, the entry choice is the old one: first free full-length entry, else first free hold, else the least crowded), plus `QUEUE_PENALTY_M` (400 m: one
+  minute of taxiing) for each departure queued for that runway, so a runway whose queue is much longer is not picked while another is nearly as near; a tie goes to the
+  configuration's order.
+* **Runway change in the session** (`ground.ts` 1d, `tower.ts`): when a runway leaves the configuration (it is in neither the departing nor the landing list; a landing-only runway still takes the departures a human Ground sends there), a departure that is taxiing to it or waits at its hold is
+  sent back to Ground by Tower (never cleared there) and Ground gives it a new taxi instruction to a runway now in use; an arrival that is neither established on final nor
+  cleared to land gets "make straight-in runway N" for the nearest landing runway now in use. A departure that is lined up or rolling keeps its takeoff, an arrival on final its
+  landing. The ATIS is reissued by the session (`session.setActiveRunways`) with the same runways the AI reads (`src/ui/store/sessionRunwayConfig.test.ts`).
+* Soak: `src/ai/multiRunwaySoak.test.ts` (smoke always; `FREEPLAY_SOAK=1` runs seeds 1 to 4, 30 minutes, 20 + 20 per hour, both configurations: zero near-miss alerts, zero
+  incursions). Known limits: the fixture has three stands, so at 20 + 20 per hour the apron fills and departures leave at about a third of the offered rate; a jet that goes
+  around is flown in the pattern like a light aircraft (its wide circuit regularly ends in another go-around); IFR flows (`ifrArrivalSpawn`) do not apply the stagger at spawn.
 
 ## Known simplifications
 

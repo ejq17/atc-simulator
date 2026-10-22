@@ -112,6 +112,48 @@ export function isOnFinal(g: RunwayEndGeom, p: Vec2, headingDeg: number, maxNm: 
   return diff < 60;
 }
 
+/** A runway end on a parallel runway (same direction within 15 degrees, a different runway) near `g`. */
+export interface ParallelNeighbour {
+  end: RunwayEndGeom;
+  /** Centreline spacing (ft); + = the neighbour is to the right of `g`'s landing direction. */
+  lateralFt: number;
+  /** The neighbour's threshold along `g`'s course (m): + = ahead of `g`'s threshold, - = behind it. */
+  staggerM: number;
+}
+
+/** Parallel runways whose centrelines are within `maxFt` of `g`'s (default 9,000 ft: the dependent approach limit of JO 7110.65 5-9-6), same landing direction. */
+export function parallelNeighbours(airport: Airport, g: RunwayEndGeom, maxFt = 9000): ParallelNeighbour[] {
+  const out: ParallelNeighbour[] = [];
+  for (const r of airport.runways) {
+    if (r.id === g.runway.id) continue;
+    for (const e of r.ends) {
+      const og = findRunwayEnd(airport, e.id);
+      if (!og) continue;
+      let dh = Math.abs(og.headingDeg - g.headingDeg) % 360;
+      if (dh > 180) dh = 360 - dh;
+      if (dh > 15) continue;
+      const { along, cross } = alongCross(g, og.end.threshold);
+      const latFt = Math.abs(cross) / 0.3048;
+      if (latFt > maxFt || latFt < 1) continue;
+      // two runways that cross each other are not "parallel" however close their headings are
+      if (polygonsOverlap(g.runway.polygon, r.polygon)) continue;
+      out.push({ end: og, lateralFt: cross >= 0 ? latFt : -latFt, staggerM: along });
+    }
+  }
+  return out;
+}
+
+/**
+ * The traffic pattern side an arrival or a touch-and-go uses at `g` when nothing says otherwise: left (AIM 4-3-2), except that the patterns of parallel runways
+ * turn away from each other (AIM 4-3-3, JO 7110.65 3-10: the right-hand runway of a pair flies right traffic), so that the downwind of one never runs over the
+ * final of the other. A runway with a parallel neighbour on its left flies right traffic.
+ */
+export function defaultPatternSide(airport: Airport, g: RunwayEndGeom): 'left' | 'right' {
+  const near = parallelNeighbours(airport, g);
+  if (near.some((n) => n.lateralFt > 0)) return 'left';
+  return near.some((n) => n.lateralFt < 0) ? 'right' : 'left';
+}
+
 /** Point where the centrelines of two runways cross (undefined if they do not intersect). */
 export function runwayIntersection(a: Runway, b: Runway): Vec2 | undefined {
   const [a1, a2] = [a.ends[0].threshold, a.ends[1].threshold];

@@ -22,7 +22,7 @@ import { frequencyForPosition } from '../radio/frequencies';
 import { hasActive, lastClearance, mkCmd } from './core';
 import { GAP_HOLD_DELAY_SEC } from './gap';
 import type { Agent, AgentView, Plan } from './core';
-import { distToThresholdNm, holdNodeAt, inboundSpeedKt, isInboundArrival, projectedGapNm } from './world';
+import { DEPENDENT_PARALLEL_MAX_FT, dependentDiagonalNm, distToThresholdNm, holdNodeAt, inboundSpeedKt, isInboundArrival, projectedGapNm } from './world';
 import { ARRIVAL_RUNWAY_GAP_SEC } from './tower';
 import * as say from './phrase';
 
@@ -140,18 +140,7 @@ function joinFix(v: AgentView, ac: Aircraft, info: ProcedureInfo): string | unde
   return bestD < JOIN_FIX_PASSED_NM && best + 1 < usable.length ? usable[best + 1] : usable[best];
 }
 
-/** Longest centreline spacing (ft) of adjacent parallel finals still handled as dependent approaches (JO 7110.65 5-9-6: up to 9,000 ft). */
-export const DEPENDENT_PARALLEL_MAX_FT = 9000;
-/**
- * Diagonal radar separation between successive aircraft on adjacent final approach courses (JO 7110.65 5-9-6, read on faa.gov 2026-10-21): 1 nm when the
- * centrelines are 2,500 to 3,600 ft apart, 1.5 nm for 3,600 to 8,300 ft, 2 nm for 8,300 to 9,000 ft. Closer than 2,500 ft the paragraph gives no
- * stagger: the AI keeps the 3 nm radar separation then.
- */
-export function dependentDiagonalNm(centrelineFt: number): number {
-  if (centrelineFt < 2500) return 3;
-  if (centrelineFt <= 3600) return 1;
-  return centrelineFt <= 8300 ? 1.5 : 2;
-}
+export { DEPENDENT_PARALLEL_MAX_FT, dependentDiagonalNm };
 /** Margin the AI adds to the diagonal minimum when it builds the stagger (DESIGN VALUE: the finals converge and speeds differ). */
 const DEPENDENT_MARGIN_NM = 1;
 

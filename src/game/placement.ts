@@ -4,6 +4,8 @@
  */
 import type { Airport, ParkingPosition, ScenarioAircraftSpawn, Vec2 } from '../sim/types';
 import { getPerformance } from '../sim/performance';
+import { alongCross, findRunwayEnd } from '../sim/runways';
+import { dependentMates, dependentPairClear } from '../ai/world';
 import { endOf, finalPosition, NM, norm360, parkingPoolFor } from './world';
 import type { Rng } from '../sim/rng';
 
@@ -20,6 +22,13 @@ export interface AirbornePoint {
 export const MIN_ARRIVAL_GAP_NM = 3;
 /** Larger gap when a faster aircraft would spawn behind a slower one on the same final. */
 export const OVERTAKE_GAP_NM = 5;
+/**
+ * Nominal speeds (kt) to the threshold used to project two arrivals on adjacent parallel finals against each other (`dependentPairClear`): the mean from 10 nm out
+ * (APPROACH phase flies (climb + approach speed) / 2, then the final approach speed): Cessna about 66 kt, A320 about 150 kt. DESIGN VALUES.
+ */
+export const NOMINAL_APPROACH_LIGHT_KT = 66;
+export const NOMINAL_APPROACH_JET_KT = 150;
+const nominalKt = (type: string): number => (getPerformance(type).category === 'light' ? NOMINAL_APPROACH_LIGHT_KT : NOMINAL_APPROACH_JET_KT);
 
 const typicalSpeed = (type: string): number => (getPerformance(type).category === 'light' ? 100 : 170);
 
@@ -30,11 +39,17 @@ function dNm(a: Vec2, b: Vec2): number {
 /** Is `pos` acceptable given the airborne aircraft already in play? */
 export function arrivalPositionOk(airport: Airport, pos: Vec2, type: string, endId: string, others: AirbornePoint[]): boolean {
   const thr = endOf(airport, endId).threshold;
+  const g = findRunwayEnd(airport, endId)!;
+  const mates = dependentMates(airport, g);
   const hdg = (endOf(airport, endId).trueHeadingDeg * Math.PI) / 180;
   const dir = { x: Math.sin(hdg), y: Math.cos(hdg) };
   for (const o of others) {
     const d = dNm(pos, o.pos);
     if (d < MIN_ARRIVAL_GAP_NM) return false;
+    // The adjacent final of a parallel runway (dependent approaches, JO 7110.65 5-9-6): projected straight to the thresholds at nominal speeds the two keep the
+    // stagger along the course and never pass each other (`dependentPairClear`).
+    const mate = o.runwayEnd !== undefined && o.runwayEnd !== endId ? mates.find((m) => m.end.end.id === o.runwayEnd) : undefined;
+    if (mate && !dependentPairClear(mate, alongCross(g, pos).along / NM, nominalKt(type), alongCross(g, o.pos).along / NM, nominalKt(o.type))) return false;
     // Same final (both within a 2 nm wide corridor of the extended centreline): faster behind slower needs more room.
     if (o.runwayEnd === endId) {
       const cross = (p: Vec2): number => (p.x - thr.x) * dir.y - (p.y - thr.y) * dir.x;
@@ -64,7 +79,10 @@ export function pickArrivalStart(
   for (let i = 0; i < (o.tries ?? 24); i++) {
     const nm = minNm + rng() * (maxNm - minNm);
     const altitudeFt = Math.round((2500 + rng() * 500) / 100) * 100;
-    const onFinalLine = o.forceFinal || rng() < 0.5;
+    // (an arrival for a runway with a parallel neighbour is placed on its final: a base-leg start is offset from the course and its along-course speed is lower than
+    // the neighbour's traffic, so the stagger of `dependentPairClear` would not hold)
+    const dependent = dependentMates(airport, findRunwayEnd(airport, endId)!).length > 0;
+    const onFinalLine = o.forceFinal || dependent || rng() < 0.5;
     if (onFinalLine) {
       const pos = finalPosition(airport, endId, nm);
       if (!arrivalPositionOk(airport, pos, type, endId, others)) continue;

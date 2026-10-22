@@ -5,7 +5,7 @@
  */
 import type { Aircraft, Airport, ParkingPosition, SimulationState, TaxiNode } from '../sim/types';
 import { dist, ftToM, mToNm } from '../sim/geo';
-import { alongCross, crossingRunways, findRunwayEnd, normalizeRunwayEndId } from '../sim/runways';
+import { alongCross, crossingRunways, findRunwayEnd, normalizeRunwayEndId, parallelNeighbours } from '../sim/runways';
 import type { RunwayEndGeom } from '../sim/runways';
 import { pushbackGeometry } from '../sim/pushback';
 import { findTaxiRoute, nearestNode, routeStartNode, shortestDistances } from '../sim/pathfinding';
@@ -84,6 +84,84 @@ export function interactingRunways(airport: Airport, runwayId: string): string[]
 }
 
 // ---------------------------------------------------------------------------------------------------------------------
+// Dependent parallel finals
+// ---------------------------------------------------------------------------------------------------------------------
+
+/** Longest centreline spacing (ft) of adjacent parallel finals still handled as dependent approaches (JO 7110.65 5-9-6: up to 9,000 ft). */
+export const DEPENDENT_PARALLEL_MAX_FT = 9000;
+/**
+ * Diagonal radar separation between successive aircraft on adjacent final approach courses (JO 7110.65 5-9-6, read on faa.gov 2026-10-21): 1 nm when the
+ * centrelines are 2,500 to 3,600 ft apart, 1.5 nm for 3,600 to 8,300 ft, 2 nm for 8,300 to 9,000 ft. Closer than 2,500 ft the paragraph gives no
+ * stagger: the AI keeps the 3 nm radar separation then.
+ */
+export function dependentDiagonalNm(centrelineFt: number): number {
+  if (centrelineFt < 2500) return 3;
+  if (centrelineFt <= 3600) return 1;
+  return centrelineFt <= 8300 ? 1.5 : 2;
+}
+/** The simulator's near-miss alert distance (1.5 nm, conflicts.ts) plus a margin the stagger keeps above it (DESIGN VALUE: speeds differ and the finals converge). */
+export const DEPENDENT_ALERT_MARGIN_NM = 0.2;
+/**
+ * The diagonal the AI keeps between aircraft on adjacent finals that are not yet established: the 5-9-6 minimum, and never less than the alert distance plus
+ * `DEPENDENT_ALERT_MARGIN_NM` (a 1 nm stagger is a legal radar separation but the simulator's near-miss alert fires at 1.5 nm below 500 ft of altitude difference).
+ */
+export function dependentKeepDiagonalNm(centrelineFt: number): number {
+  return Math.max(dependentDiagonalNm(centrelineFt), 1.5 + DEPENDENT_ALERT_MARGIN_NM);
+}
+
+export interface DependentMate {
+  end: RunwayEndGeom;
+  latFt: number;
+  /** Along-course distance (nm) between the two aircraft that keeps the diagonal at `dependentKeepDiagonalNm`. */
+  alongNm: number;
+  /** The mate's threshold ahead of (+) or behind (-) this end's threshold along the course, nm. */
+  staggerNm: number;
+}
+
+/** The runway ends whose finals are adjacent and dependent on the final of `g` (same direction, centrelines up to 9,000 ft apart), with the along-course spacing they need. */
+export function dependentMates(airport: Airport, g: RunwayEndGeom): DependentMate[] {
+  return parallelNeighbours(airport, g, DEPENDENT_PARALLEL_MAX_FT).map((n) => {
+    const latFt = Math.abs(n.lateralFt);
+    const latNm = (latFt * 0.3048) / 1852;
+    const diag = dependentKeepDiagonalNm(latFt);
+    return { end: n.end, latFt, alongNm: Math.sqrt(Math.max(0, diag * diag - latNm * latNm)), staggerNm: n.staggerM / 1852 };
+  });
+}
+
+/** How far behind (+nm along the course; - = ahead) the aircraft `ac`, going to `g`, is of `o`, going to the parallel end `og`: both measured to their own thresholds, `staggerNm` removed. */
+export function parallelGapNm(ac: Aircraft, g: RunwayEndGeom, o: Aircraft, og: RunwayEndGeom, staggerNm: number): number {
+  return distToThresholdNm(ac, g) - (distToThresholdNm(o, og) - staggerNm);
+}
+
+/**
+ * Margin (nm) added to the along-course spacing of two arrivals on adjacent finals when their paths are projected at nominal speeds. DESIGN VALUE: speeds and paths differ,
+ * and a leader that floats in the flare stays airborne (for the near-miss alert) 15 to 25 s after its threshold crossing, during which a follower 70 kt faster closes 0.3 to 0.5 nm.
+ */
+export const PARALLEL_PROJECTION_MARGIN_NM = 0.6;
+
+/**
+ * Two arrivals for adjacent dependent finals, both flying straight to their thresholds at constant speeds (`kNew`, `kOther`): do they keep `mate.alongNm` plus the
+ * margin between them along the course until the first one reaches its threshold, without passing each other? Positions are along `g`'s course (nm, the threshold of
+ * `g` at 0, negative before it); the other aircraft's threshold is `mate.staggerNm` ahead. The gap is linear in time, so its ends decide: a faster aircraft behind a
+ * slower one that reaches its threshold first has overtaken it (abreast, 0.7 nm apart for a 4,000 ft pair) and fails; a slower one behind keeps the gap it had.
+ */
+export function dependentPairClear(mate: DependentMate, aNewNm: number, kNew: number, aOtherNm: number, kOther: number): boolean {
+  const need = mate.alongNm + PARALLEL_PROJECTION_MARGIN_NM;
+  const tEnd = Math.min(Math.max(0, -aNewNm) / Math.max(kNew, 1), Math.max(0, mate.staggerNm - aOtherNm) / Math.max(kOther, 1)); // hours
+  const gap0 = aNewNm - aOtherNm;
+  const gapEnd = aNewNm + kNew * tEnd - (aOtherNm + kOther * tEnd);
+  return Math.sign(gap0) === Math.sign(gapEnd) && Math.min(Math.abs(gap0), Math.abs(gapEnd)) >= need;
+}
+
+/**
+ * Seconds that must separate the threshold crossings of an aircraft and one on the dependent final next to it: the along-course spacing at the speed of the one
+ * that crosses second (it closes on the first until the first crosses: faster behind slower is the worst case). Used with `etaToThresholdSec`-like times.
+ */
+export function dependentStaggerSec(alongNm: number, followerKt: number): number {
+  return (alongNm / Math.max(followerKt, 40)) * 3600;
+}
+
+// ---------------------------------------------------------------------------------------------------------------------
 // Taxi planning
 // ---------------------------------------------------------------------------------------------------------------------
 
@@ -159,20 +237,46 @@ export function planDeparture(airport: Airport, ac: Aircraft, ends: string[], bu
 
 const AVOID_EXTRA = 100;
 
+/**
+ * Taxi-equivalent distance (m) one departure already queued for a runway adds to the cost of sending another aircraft there. DESIGN VALUE: a departure occupies the
+ * runway about a minute (roll, climb-out spacing, the arrivals in between), which a taxiing aircraft at the plan speed (`LANE_PLAN_SPEED_MPS`, 6.7 m/s) covers in 400 m.
+ */
+export const QUEUE_PENALTY_M = 400;
+
+/** Departures waiting for or taxiing to a hold of the runway of `holdId` (the artificial "avoid" counts of `busyHoldIds` are not queue length). */
+function runwayQueue(graph: Airport['taxiwayGraph'], busyHolds: ReadonlyMap<string, number>, runwayId: string): number {
+  let n = 0;
+  for (const [id, k] of busyHolds) if (graph.nodes[id]?.runwayId === runwayId && k < AVOID_EXTRA) n += k;
+  return n;
+}
+
+/**
+ * Which route a departure gets, among the runway ends of the departure configuration that leave the type its takeoff distance. The tiers of the old rule stay: an
+ * unoccupied full-length entry first, then any unoccupied hold, then the least crowded hold with room (three deep at most). Inside a tier the choice is the shortest
+ * taxi route from the stand, plus `QUEUE_PENALTY_M` for every departure already queued for that runway (so a runway whose queue is much longer is not picked while another
+ * is nearly as close); the order in which the configuration lists the ends decides a tie (an operator preference).
+ */
 function planDepartureOnce(airport: Airport, ac: Aircraft, ends: string[], busyHolds: ReadonlyMap<string, number>, closed?: ReadonlySet<string>): DeparturePlan | undefined {
   const start = taxiStartNode(airport, ac);
   if (!start) return undefined;
   const need = ftToM(getPerformance(ac.type).takeoffDistanceFt) + 50;
-  let fallback: DeparturePlan | undefined;
-  let queued: { plan: DeparturePlan; n: number } | undefined;
+  const graph = airport.taxiwayGraph;
+  // Within one runway end the entries keep the order of `departureCandidates` (the first unoccupied full-length entry, else the first unoccupied hold, else the least crowded one).
+  const perEnd = new Map<string, { plan: DeparturePlan; tier: number; n: number }>();
   for (const { plan, fullEntry } of departureCandidates(airport, start.id, ends, need, closed)) {
     const n = busyHolds.get(plan.holdId) ?? 0;
-    // An unoccupied full-length entry wins; otherwise the least crowded one (aircraft queue behind each other, at most three deep).
-    if (fullEntry && n === 0) return plan;
-    if (n < MAX_QUEUE && (!queued || n < queued.n)) queued = { plan, n };
-    if (!fallback && n === 0) fallback = plan;
+    const tier = fullEntry && n === 0 ? 0 : n === 0 ? 1 : n < MAX_QUEUE ? 2 : undefined;
+    if (tier === undefined) continue;
+    const cur = perEnd.get(plan.runwayEnd);
+    if (!cur || tier < cur.tier || (tier === 2 && cur.tier === 2 && n < cur.n)) perEnd.set(plan.runwayEnd, { plan, tier, n });
   }
-  return fallback ?? queued?.plan;
+  let best: { plan: DeparturePlan; tier: number; cost: number } | undefined;
+  for (const { plan, tier, n } of perEnd.values()) {
+    const rid = graph.nodes[plan.holdId]?.runwayId;
+    const cost = plan.lengthM + QUEUE_PENALTY_M * (rid ? runwayQueue(graph, busyHolds, rid) : 0) + (tier === 2 ? 1e6 * n : 0);
+    if (!best || tier < best.tier || (tier === best.tier && cost < best.cost)) best = { plan, tier, cost };
+  }
+  return best?.plan;
 }
 
 interface DepartureCandidate {

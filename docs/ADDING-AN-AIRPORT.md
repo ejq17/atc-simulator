@@ -81,12 +81,18 @@ max_tailwind_kt?, notes, source, url?, retrieved?, approximate? }`. Ends are run
 * **Parallel runways:** runways whose surfaces do not overlap do not block each other, so a clearance on one is not held by traffic on the other.
   JO 7110.65 (faa.gov, read 2026-10-21): the 3-9 wake-turbulence departure intervals apply to "the same runway or a parallel runway separated by
   less than 2,500 feet"; 5-8-3 allows simultaneous same-direction departures from parallel runways at least 2,500 ft apart when the courses diverge
-  (10 / 15 degrees; the divergence rule is not simulated); 5-9-6 gives the dependent parallel approach stagger (1 nm diagonal for centrelines 2,500
-  to 3,600 ft apart, 1.5 nm for 3,600 to 8,300 ft, 2 nm for 8,300 to 9,000 ft, 3 nm or 1,000 ft during turn-on), which the AI Approach applies to
-  IFR arrivals on adjacent finals (`DEPENDENT_MARGIN_NM` of 1 nm is a DESIGN VALUE). VFR arrivals to parallel runways are not staggered by the AI.
+  (10 / 15 degrees); 5-9-6 gives the dependent parallel approach stagger (1 nm diagonal for centrelines 2,500 to 3,600 ft apart, 1.5 nm for 3,600 to
+  8,300 ft, 2 nm for 8,300 to 9,000 ft, 3 nm or 1,000 ft during turn-on); AIM 4-3-3 has the patterns of parallel runways turn away from each other.
+  What the AI does with them (`src/ai/README.md`, "Multi-runway operations"): arrivals (IFR and VFR) are staggered along the course so that the
+  diagonal never falls below the simulator's near-miss alert distance (1.5 nm) plus a margin, arrivals for a runway with a parallel neighbour are
+  placed on the extended centreline, the right-hand runway of a pair flies right traffic, departures are projected against the other airborne traffic
+  (the same runway's earlier departure, departures of the parallel runway, arrivals on the parallel final) and held or given a diverging heading, and
+  Ground sends a departure to the departing runway with the shortest taxi route from its stand (a queue much longer than the other's costs
+  `QUEUE_PENALTY_M`). The margins are DESIGN VALUES, labelled in the code.
 * **Fixture:** `src/sim/__fixtures__/multiRunwayAirport.ts` (two parallels 4,003 ft apart, a runway crossing both, a short runway, four
   configurations) with tests in `src/sim/multiRunway.test.ts`, `src/game/multiRunwayTraffic.test.ts`, `src/weather/runwayConfigurations.test.ts`,
-  `src/ai/multiRunwaySoak.test.ts`.
+  `src/ai/multiRunwaySoak.test.ts`, `src/ai/multiRunwayOps.test.ts`, `src/ai/departureSeparation.test.ts`, `src/ai/runwayConfigChange.test.ts`,
+  `src/ui/store/sessionRunwayConfig.test.ts`.
 
 ## Provenance for non-FAA airports
 

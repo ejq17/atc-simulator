@@ -15,7 +15,7 @@ import {
 import { patternAltitudeFt } from './performance';
 import { activeClearance, completeClearances, emitEvent, getRuntime, perfOf, pilotSay, setPhase } from './context';
 import type { AircraftRuntime, ExitInstruction, SimContext } from './context';
-import { alongCross, crossingRunways, findRunwayEnd } from './runways';
+import { alongCross, crossingRunways, defaultPatternSide, findRunwayEnd } from './runways';
 import type { RunwayEndGeom } from './runways';
 import { neighborIds } from './pathfinding';
 import { arrivalParkingTargets, parkingSide, scoreExit } from './exitChoice';
@@ -697,7 +697,7 @@ function continueInPattern(ctx: SimContext, ac: Aircraft, rt: AircraftRuntime, g
     kind: 'INFO', aircraftId: ac.id, callsign: ac.callsign, severity: 'info', speaker: 'SYSTEM',
     text: `${ac.callsign} ${what} runway ${g.end.id}`, data: { touchAndGo: what === 'touch and go', lowApproach: what === 'low approach', runwayEnd: g.end.id },
   });
-  startClosedTrafficPattern(ctx, ac, g, rt.closedTraffic?.side ?? 'left');
+  startClosedTrafficPattern(ctx, ac, g, rt.closedTraffic?.side ?? defaultPatternSide(ctx.state.airport, g));
 }
 
 function touchdown(ctx: SimContext, ac: Aircraft, rt: AircraftRuntime, g: RunwayEndGeom): void {

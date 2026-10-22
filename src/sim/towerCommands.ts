@@ -10,7 +10,7 @@
 import type { Aircraft, Clearance, ParsedCommand, TrafficRef } from './types';
 import type { Env, PlanResult } from './commandExecutor';
 import { unable } from './commandExecutor';
-import { alongCross, crossingRunways, findRunway, findRunwayEnd } from './runways';
+import { alongCross, crossingRunways, defaultPatternSide, findRunway, findRunwayEnd } from './runways';
 import type { RunwayEndGeom } from './runways';
 import { bearingDeg, dist, headingDiff, ktToMps, mToNm, nmToM } from './geo';
 import { completeClearances, emitEvent, getRuntime, perfOf, setPhase } from './context';
@@ -416,7 +416,7 @@ export function planPatternInstruction(env: Env): PlanResult {
     }
     case 'CLOSED_TRAFFIC': {
       if (ac.onGround && !ac.isDeparture) return unable(env, `${ac.callsign} is on the ground.`, "we're on the ground", false);
-      const side = cmd.turnDirection ?? rt.pattern?.side ?? rt.closedTraffic?.side ?? 'left';
+      const side = cmd.turnDirection ?? rt.pattern?.side ?? rt.closedTraffic?.side ?? (g ? defaultPatternSide(airport, g) : 'left');
       return {
         plan: {
           patch,

@@ -32,6 +32,7 @@ import type { GameScenario } from '../types';
 import { randomNNumber, runwayIdOf, runwayLongEnoughFor, callsignTail } from '../world';
 import { pickFlight, pickGaType, pickLeg, profileFor, profileTypes, resolveTypeSelection, usableAirlines } from '../airportProfile';
 import type { Flight } from '../airportProfile';
+import { landingEndPool } from '../arrivalRunways';
 import { pickArrivalStart, pickParking } from '../placement';
 import type { AirbornePoint } from '../placement';
 import { arrivalProcedure, ifrArrivalSpawn, ifrDepartureSpawn, isTurbojet, starArrival } from '../ifr';
@@ -247,11 +248,16 @@ export function initialAircraft(airport: Airport, rng: Rng, o: InitialOpts): Sce
   const placed: AirbornePoint[] = [];
   const ifrFixes: Vec2[] = [];
   const ifrCount = new Map<string, number>();
+  const perEnd = new Map<string, number>();
   arrKinds.forEach((kind, i) => {
-    const endId = landingEnds[i % landingEnds.length];
     const f = flight(kind === 'ga');
     if (!f) return;
     const type = f.type;
+    // The runway is chosen as the running generator chooses it (`landingEndPool`: the type's landing distance must fit the end, an airliner prefers the ends with an
+    // arrival procedure when IFR flows are on); among the ends that qualify the opening arrivals alternate, the one with the fewest so far first.
+    const pool = landingEndPool(airport, landingEnds, type, kind === 'ga', !!o.ifrArrivals);
+    const endId = pool.reduce((best, e) => ((perEnd.get(e) ?? 0) < (perEnd.get(best) ?? 0) ? e : best), pool[0]);
+    perEnd.set(endId, (perEnd.get(endId) ?? 0) + 1);
     if (kind === 'jet' && o.ifrArrivals && ((isTurbojet(type) && starArrival(airport, endId)) || arrivalProcedure(airport, endId))) {
       const k = ifrCount.get(endId) ?? 0;
       const spec = ifrArrivalSpawn(airport, rng, { callsign: f.callsign, type, runwayEnd: endId, atSec: k * INITIAL_IFR_ARRIVAL_STAGGER_SEC });

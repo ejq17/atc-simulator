@@ -31,12 +31,14 @@ import { mulberry32 } from '../sim/rng';
 import type { Rng } from '../sim/rng';
 import { resolvePilotBehaviour } from '../sim/pilotBehaviour';
 import { NM, callsignTail, randomNNumber, runwayLongEnoughFor } from './world';
+import { dependentMates, dependentPairClear } from '../ai/world';
 import { pickFlight, pickGaType, pickLeg, profileFor, resolveTypeSelection, usableAirlines } from './airportProfile';
 import type { Flight } from './airportProfile';
 import { CARGO_PREFIXES } from './airportProfile';
 import { airportTimeZone, localHourAt } from './trafficDensity';
 import { simUtcMs } from '../sim/solar';
-import { pickArrivalStart, pickParking } from './placement';
+import { landingEndPool } from './arrivalRunways';
+import { NOMINAL_APPROACH_JET_KT, NOMINAL_APPROACH_LIGHT_KT, pickArrivalStart, pickParking } from './placement';
 import type { AirbornePoint } from './placement';
 import type { Difficulty, GameScenario } from './types';
 import { arrivalJoinNm, arrivalProcedure, ifrArrivalSpawn, ifrDepartureSpawn, isTurbojet, resolveIfrFlows, starArrival, starArrivalSpawn } from './ifr';
@@ -227,9 +229,9 @@ export function createTrafficGenerator(scenario: Scenario, airport: Airport, opt
       if (a.onGround || a.isDeparture || a.assignedRunwayEnd === undefined || a.flags.transit || a.type === 'H65') continue;
       if (a.phase === 'DEPARTURE' || a.phase === 'INITIAL_CLIMB') continue;
       inFlight++;
-      if (a.assignedRunwayEnd !== endId) continue;
       const near = a.phase === 'PATTERN' || a.phase === 'GO_AROUND' || a.phase === 'HOLDING';
       const kt = getPerformance(a.type).category === 'light' ? EXPECTED_SPEED_LIGHT_KT : EXPECTED_SPEED_JET_KT;
+      if (a.assignedRunwayEnd !== endId) continue;
       const eta = near ? NEAR_FIELD_ETA_SEC : (mToNm(Math.hypot(a.pos.x - g.end.threshold.x, a.pos.y - g.end.threshold.y)) / kt) * 3600;
       if (Math.abs(eta - mine) < slot) return false;
     }
@@ -247,18 +249,30 @@ export function createTrafficGenerator(scenario: Scenario, airport: Airport, opt
 
   const withParkingOpt = (spec: SpawnSpec | undefined, flight: Flight): SpawnSpec | undefined => (spec ? withParkingIntent(spec, flight) : spec);
 
-  /** Landing runway ends an arrival of `type` may be given: long enough (declared LDA), approach available first, arrival slot free. */
+  /** Landing runway ends an arrival of `type` may be given: long enough (declared LDA), approach available first (`landingEndPool`), arrival slot free. */
   const arrivalEndsFor = (state: Readonly<SimulationState>, ends: readonly string[], type: string, ga: boolean): string[] => {
     if (ends.length === 1) return arrivalFits(state, ends[0], type) ? [ends[0]] : [];
-    const ldaOk = (e: string): boolean => {
-      const g = findRunwayEnd(airport, e);
-      return !g || getPerformance(type).landingDistanceFt <= g.ldaM / 0.3048;
-    };
-    const long = ends.filter(ldaOk);
-    const base = long.length ? long : [...ends];
-    const withApproach = !ga && flows.arrivals ? base.filter((e) => (isTurbojet(type) && starArrival(airport, e)) || arrivalProcedure(airport, e)) : [];
-    const preferred = withApproach.length ? withApproach : base;
-    return preferred.filter((e) => arrivalFits(state, e, type));
+    return landingEndPool(airport, ends, type, ga, flows.arrivals).filter((e) => arrivalFits(state, e, type));
+  };
+
+  /**
+   * The adjacent final of a parallel runway (dependent approaches, JO 7110.65 5-9-6): the new arrival, placed at `pos`, and each arrival airborne for a dependent end
+   * must keep the stagger along the course and never pass each other, projected straight to the thresholds at nominal speeds (`dependentPairClear`).
+   */
+  const dependentSlotOk = (state: Readonly<SimulationState>, endId: string, type: string, pos: { x: number; y: number }): boolean => {
+    const g = findRunwayEnd(airport, endId);
+    if (!g) return true;
+    const mates = dependentMates(airport, g);
+    if (!mates.length) return true;
+    const kind = (t: string): number => (getPerformance(t).category === 'light' ? NOMINAL_APPROACH_LIGHT_KT : NOMINAL_APPROACH_JET_KT);
+    for (const a of Object.values(state.aircraft)) {
+      if (a.onGround || a.isDeparture || a.flags.transit || a.type === 'H65' || a.assignedRunwayEnd === undefined) continue;
+      const mate = mates.find((m) => m.end.end.id === a.assignedRunwayEnd);
+      if (!mate) continue;
+      if (a.phase === 'PATTERN' || a.phase === 'GO_AROUND' || a.phase === 'HOLDING') continue; // near the field: the Tower sequences it (sequence.ts)
+      if (!dependentPairClear(mate, alongCross(g, pos).along / NM, kind(type), alongCross(g, a.pos).along / NM, kind(a.type))) return false;
+    }
+    return true;
   };
 
   const trySpawnArrival = (state: Readonly<SimulationState>): SpawnSpec | undefined => {
@@ -282,6 +296,7 @@ export function createTrafficGenerator(scenario: Scenario, airport: Airport, opt
       .map((a) => ({ pos: a.pos, type: a.type, runwayEnd: a.isDeparture ? undefined : a.assignedRunwayEnd }));
     const start = pickArrivalStart(airport, endId, type, rng!, others);
     if (!start) return undefined;
+    if (!dependentSlotOk(state, endId, type, start.pos)) return undefined;
     const leg = pickLeg(rng!, icao, flight);
     // Flight training: a seeded share of the GA arrivals fly touch-and-go circuits (decided from the callsign: no random number is drawn)
     const training = ga && specialSel.training && isTrainingFlight(flight.callsign, trainingShare);
