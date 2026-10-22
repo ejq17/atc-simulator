@@ -22,8 +22,8 @@
 import { looksLikeLandline, parseTransmission } from '../../commands';
 import type { AircraftRef, FixInfo, ParseContext } from '../../commands';
 import type { SimulationEngine } from '../../sim/api';
-import type { Aircraft, CommandOutcome, ControllerPositionId, ParsedCommand, ParseResult, SimulationState } from '../../sim/types';
-import { frequencyForPosition, positionWord, sameFrequency } from '../../radio/frequencies';
+import type { Aircraft, Airport, CommandOutcome, ControllerPositionId, ParsedCommand, ParseResult, SimulationState } from '../../sim/types';
+import { aircraftPosition, frequencyForPosition, positionWord, sameFrequency } from '../../radio/frequencies';
 
 /** The positions the controller is currently working. The first is primary. */
 export interface ControllerSetup {
@@ -123,11 +123,17 @@ export function buildParseContext(state: SimulationState, aircraft: Aircraft[] =
 export function positionFor(state: SimulationState, setup: ControllerSetup, ac: Aircraft | undefined): ControllerPositionId {
   const primary = setup.positions[0] ?? state.controllerPosition;
   if (!ac) return primary;
-  for (const p of setup.positions) {
+  // Positions sharing the aircraft's frequency (KACY APP/DEP, KPGD CLNC/GND): the one its phase needs, else the first the controller works.
+  const owners = setup.positions.filter((p) => {
     const f = frequencyForPosition(state.airport, p);
-    if (f && sameFrequency(f.mhz, ac.frequencyMhz)) return p;
+    return f && sameFrequency(f.mhz, ac.frequencyMhz);
+  });
+  if (owners.length > 1) {
+    const want = aircraftPosition(state.airport, ac);
+    const hit = owners.find((p) => p === want);
+    if (hit) return hit;
   }
-  return primary;
+  return owners[0] ?? primary;
 }
 
 function findAircraft(state: SimulationState, callsign: string | null): Aircraft | undefined {
@@ -142,14 +148,17 @@ export function mhzText(mhz: number): string {
 }
 
 /** The AI position an aircraft is currently with, if its frequency is an AI one and not also one of the player's. */
-export function aiPositionOf(state: Pick<SimulationState, 'airport'>, setup: ControllerSetup, ac: Pick<Aircraft, 'frequencyMhz'> | undefined): { position: ControllerPositionId; mhz: number } | undefined {
+export function aiPositionOf(state: Pick<SimulationState, 'airport'>, setup: ControllerSetup, ac: Pick<Aircraft, 'frequencyMhz' | 'frequencyId' | 'phase' | 'onGround' | 'isDeparture' | 'flightPlan'> | undefined): { position: ControllerPositionId; mhz: number } | undefined {
   if (!ac || !setup.aiPositions?.length) return undefined;
   if (controllerFrequencies(state, setup).some((m) => sameFrequency(m, ac.frequencyMhz))) return undefined;
-  for (const p of setup.aiPositions) {
+  const owners = setup.aiPositions.filter((p) => {
     const f = frequencyForPosition(state.airport, p);
-    if (f && sameFrequency(f.mhz, ac.frequencyMhz)) return { position: p, mhz: f.mhz };
-  }
-  return undefined;
+    return f && sameFrequency(f.mhz, ac.frequencyMhz);
+  });
+  if (!owners.length) return undefined;
+  const want = aircraftPosition(state.airport as Airport, ac);
+  const position = owners.find((p) => p === want) ?? owners[0];
+  return { position, mhz: frequencyForPosition(state.airport, position)!.mhz };
 }
 
 export function aiRefusal(callsign: string, position: ControllerPositionId, mhz: number): string {

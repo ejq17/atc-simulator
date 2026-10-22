@@ -72,6 +72,29 @@ describe('<SetupScreen /> KPGD', () => {
   });
 });
 
+describe('<SetupScreen /> tower hours', () => {
+  const NIGHT = Date.parse('2026-07-01T07:00:00Z'); // 03:00 EDT
+  const NOON = Date.parse('2026-07-01T16:00:00Z'); // 12:00 EDT
+
+  it('shows the tower hours next to the selector and, outside them, that the real tower is closed', () => {
+    render(<SetupScreen nowMs={NIGHT} />);
+    expect(screen.getByTestId('tower-hours')).toHaveTextContent('Tower hours 24 hours');
+    expect(screen.queryByTestId('tower-closed-notice')).toBeNull();
+    fireEvent.change(screen.getByTestId('airport-select'), { target: { value: 'KPGD' } });
+    expect(screen.getByTestId('tower-hours')).toHaveTextContent('Tower hours 0600-2100 local');
+    expect(screen.getByTestId('tower-closed-notice')).toHaveTextContent('Punta Gorda Tower is closed at this hour in reality (0600-2100 local); the simulator staffs it anyway.');
+    fireEvent.change(screen.getByTestId('airport-select'), { target: { value: 'KMHT' } });
+    expect(screen.queryByTestId('tower-closed-notice')).toBeNull();
+  });
+
+  it('shows no closed notice while the tower is open', () => {
+    render(<SetupScreen nowMs={NOON} />);
+    fireEvent.change(screen.getByTestId('airport-select'), { target: { value: 'KPGD' } });
+    expect(screen.getByTestId('tower-hours')).toHaveTextContent('0600-2100 local');
+    expect(screen.queryByTestId('tower-closed-notice')).toBeNull();
+  });
+});
+
 describe('<SetupScreen /> closure options', () => {
   it('offers to close a runway or a taxiway for the session; the recommended runway skips the closed one and the airport changes the lists', () => {
     render(<SetupScreen />);

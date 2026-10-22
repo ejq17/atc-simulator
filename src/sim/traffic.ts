@@ -16,7 +16,7 @@ import type { SimContext } from './context';
 import { mulberry32, rngInt, rngPick, seeded01 } from './rng';
 import { LUAW_LIMIT_SEC } from './towerCommands';
 import { DEFAULT_PILOT_BEHAVIOUR, pilotUnfamiliar } from './pilotBehaviour';
-import { frequencyById, frequencyByMhz, frequencyForPosition, sameFrequency } from '../radio/frequencies';
+import { aircraftPosition, frequencyById, frequencyForPosition, sameFrequency } from '../radio/frequencies';
 import { findNavFix, fixPosition } from './navigation';
 import { findStar } from './star';
 import { assignSquawk } from './ifr';
@@ -470,7 +470,7 @@ function towerVocabularyCalls(ctx: SimContext, ac: Aircraft, rt: ReturnType<type
   // 4. A pilot who did not report the ATIS code and was not given the numbers asks for wind and altimeter.
   if (!rt.haveNumbers && !rt.numbersRequested && ac.pendingRequest && now - ac.pendingRequest.sinceSec >= jitteredInterval(ctx, ac, 'numbers', ctx.pilotBehaviour.numbersRequestAfterSec)
     && (ac.pendingRequest.kind === 'DEPARTURE' || ac.pendingRequest.kind === 'LANDING')
-    && frequencyByMhz(airport, ac.frequencyMhz)?.position === 'TWR' && pilotNeedsNumbers(ac, ctx.pilotBehaviour.noAtisFraction)) {
+    && aircraftPosition(airport, ac) === 'TWR' && pilotNeedsNumbers(ac, ctx.pilotBehaviour.noAtisFraction)) {
     rt.numbersRequested = true;
     rt.requestBeforeNumbers = ac.pendingRequest;
     pilotSay(ctx, ac, requestNumbersCall(ac, env), { request: 'OTHER', numbersRequest: true });
@@ -555,7 +555,8 @@ export function updatePilotRequests(ctx: SimContext): void {
       }
       if (rt.taxiRequestAtSec === undefined || now < rt.taxiRequestAtSec || rt.readbackError?.kind === 'IFR_CLEARANCE') continue; // a faulty clearance readback is corrected first
       const gnd = frequencyForPosition(airport, 'GND');
-      if (gnd && !sameFrequency(ac.frequencyMhz, gnd.mhz)) {
+      if (gnd && sameFrequency(ac.frequencyMhz, gnd.mhz)) ac.frequencyId = gnd.id; // Delivery and Ground share the frequency: the pilot now calls Ground
+      else if (gnd) {
         ac.frequencyMhz = gnd.mhz;
         ac.frequencyId = gnd.id;
         emitEvent(ctx, {
@@ -701,7 +702,7 @@ export function updatePilotRequests(ctx: SimContext): void {
         ac.isDeparture && routeDone && !!g && node.kind === 'holding_position' && node.runwayId === g.runway.id && (!node.protectsRunwayEnd || node.protectsRunwayEnd === g.end.id);
       if (departureHold && ac.phase === 'HOLDING_SHORT' && !rt.calls.has(`hold:${node.id}`)) {
         rt.calls.add(`hold:${node.id}`);
-        const onTower = frequencyByMhz(airport, ac.frequencyMhz)?.position === 'TWR';
+        const onTower = aircraftPosition(airport, ac) === 'TWR';
         // An intersection with too little runway for the type: the pilot does not accept an intersection departure from here.
         const tooShort = holdTooShort(g!, node, ac);
         const at = tooShort ? node.taxiways[0] : undefined;
@@ -733,7 +734,7 @@ export function updatePilotRequests(ctx: SimContext): void {
     // 3c. Runway light request (free play, night or low visibility): an arrival on Tower asks for the edge lights up or down (JO 7110.65 3-4-10 d, 3-4-11).
     // Whether this aircraft asks is a fixed function of its own seed (no shared random numbers are drawn), about one aircraft in eight.
     if (state.scenario.pilotRequests?.lights && !ac.onGround && !ac.isDeparture && ac.assignedRunwayEnd && !rt.calls.has('lights') && !ac.pendingRequest
-      && (ac.phase === 'APPROACH' || ac.phase === 'FINAL') && frequencyByMhz(airport, ac.frequencyMhz)?.position === 'TWR' && now >= rt.firstCallAtSec + 5 && runwayLightsOn(state)) {
+      && (ac.phase === 'APPROACH' || ac.phase === 'FINAL') && aircraftPosition(airport, ac) === 'TWR' && now >= rt.firstCallAtSec + 5 && runwayLightsOn(state)) {
       const g = findRunwayEnd(airport, ac.assignedRunwayEnd);
       const dNm = g ? mToNm(-alongCross(g, ac.pos).along) : 0;
       if (g && dNm <= 9 && dNm > 2) {
@@ -758,7 +759,7 @@ export function updatePilotRequests(ctx: SimContext): void {
         ac.pendingRequest = { kind: 'LANDING', text: 'inbound for landing', sinceSec: now };
         continue;
       }
-      const onApproachFreq = ['APP', 'DEP'].includes(frequencyByMhz(airport, ac.frequencyMhz)?.position ?? '');
+      const onApproachFreq = ['APP', 'DEP'].includes(aircraftPosition(airport, ac) ?? '');
       if (g && ac.phase === 'FINAL' && !rt.landingEnd && !rt.calls.has('final') && rt.calls.has('inbound') && rt.approach && onApproachFreq) {
         // Established on a cleared approach but still with Approach: report and wait for the tower handoff.
         rt.calls.add('final');
@@ -820,7 +821,7 @@ export function updatePilotRequests(ctx: SimContext): void {
           ac.pendingRequest = { kind: 'OTHER', text: 'stopped on runway, unable to exit', sinceSec: now };
         } else {
           const taxiway = ac.route ? airport.taxiwayGraph.nodes[ac.route.nodeIds[ac.route.nodeIds.length - 1]].taxiways[0] : undefined;
-          const onGround = frequencyByMhz(airport, ac.frequencyMhz)?.position === 'GND';
+          const onGround = aircraftPosition(airport, ac) === 'GND';
           const taxiBackEnd = onGround && !ac.flags.training ? wantsTaxiBack(ctx, ac, rt) : undefined;
           pilotSay(ctx, ac, ac.flags.training ? trainingClearCall(ac, env, taxiway) : clearOfRunwayCall(ac, env, g.end.id, taxiway) + (taxiBackEnd ? ` Request taxi back to runway ${spokenRunway(taxiBackEnd)} for departure.` : onGround ? ' Request taxi to parking.' : ''), { request: onGround ? 'TAXI' : 'FREQUENCY_CHANGE' });
           if (taxiBackEnd) ac.pendingRequest = { kind: 'TAXI', request: 'TAXI_BACK', runwayEnd: taxiBackEnd, text: `request taxi back to runway ${taxiBackEnd} for departure`, sinceSec: now };
@@ -837,7 +838,7 @@ export function updatePilotRequests(ctx: SimContext): void {
     // 6. Check-in after a frequency change.
     if (rt.checkInAtSec !== undefined && now >= rt.checkInAtSec) {
       rt.checkInAtSec = undefined;
-      const pos = frequencyByMhz(airport, ac.frequencyMhz)?.position;
+      const pos = aircraftPosition(airport, ac);
       if (!ac.onGround && ac.isDeparture && ac.flightPlan?.flightRules === 'IFR' && (pos === 'DEP' || pos === 'APP')) {
         pilotSay(ctx, ac, departureCheckInCall(ac, env, { targetAltitudeFt: ac.target.altitudeFt }), { checkIn: true });
         ac.pendingRequest = { kind: 'OTHER', text: 'checked in on departure', sinceSec: now };

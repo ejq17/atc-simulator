@@ -54,7 +54,7 @@ RNAV (GPS) 4, 15, 22 and 33 all transcribed, the LUBBR FOUR and PIKKR SEVEN arri
 gates and 10 GA/FBO stands (the ten gates and three south-ramp GA stands are OSM ways, the other seven are synthetic spots inside an OSM apron). NASR runway 09/27 (2636 x 60 ft:
 not available for Part 121 / 380 operations, takeoff not authorised, under 6000 lb only) is **not modelled**. PGD publishes **no DP or SID** (departures use the default initial
 altitude), no hot spot, LAHSO, MVA sectors, holding patterns or fix altitudes in the dataset. **The simulator does not close the tower at 2100 local**: tower hours are
-recorded in the data (`Airport.towerHours`) but not enforced, as at every airport. Traffic: Allegiant (A320, A319, 737 MAX 8) and Sun Country (737-800) per
+recorded in the data (`Airport.towerHours`) but not enforced, as at every airport; the setup screen shows them next to the airport selector and, when the real clock at the airport is outside them, says the real tower is closed at this hour and that the simulator staffs it anyway. Clearance Delivery and Ground share 119.55 (NASR); a pilot's call goes to the position its flight phase needs. Traffic: Allegiant (A320, A319, 737 MAX 8) and Sun Country (737-800) per
 flypgd.com; the aircraft types come from the airlines' fleets, not from the airport page. Live METAR: the NWS station KPGD (`api.weather.gov`, checked 2026-10-21) returns
 observations with an **empty `rawMessage`**, like KMHT, so the sim rebuilds the report from the decoded fields. Career steps and training lessons stay KACY-only.
 

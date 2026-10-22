@@ -25,6 +25,47 @@ export function frequencyByMhz(airport: Airport, mhz: number): RadioFrequency | 
   return airport.frequencies.find((f) => sameFrequency(f.mhz, mhz));
 }
 
+/** Positions (distinct, in airport-data order) that own `mhz`: more than one when positions share a frequency (KACY APP/DEP, KPGD CLNC/GND). */
+export function positionsOnFrequency(airport: Airport, mhz: number): RadioFrequency['position'][] {
+  const out: RadioFrequency['position'][] = [];
+  for (const f of airport.frequencies) if (sameFrequency(f.mhz, mhz) && !out.includes(f.position)) out.push(f.position);
+  return out;
+}
+
+/**
+ * The position an aircraft's radio calls belong to when several positions share its frequency, from its flight phase: an IFR departure
+ * parked without a clearance needs Clearance Delivery; any other aircraft on the ground short of the hold line (landed, taxiing, parked
+ * with a clearance, pushing back) needs Ground; one at the hold line, lined up or on the runway needs Tower. Undefined when the phase
+ * does not decide (airborne traffic: APP and DEP stay interchangeable).
+ */
+export function neededGroundPosition(ac: Pick<Aircraft, 'phase' | 'onGround' | 'isDeparture' | 'flightPlan'>): 'CLNC' | 'GND' | 'TWR' | undefined {
+  if (!ac.onGround) return undefined;
+  switch (ac.phase) {
+    case 'PARKED':
+      return ac.isDeparture && ac.flightPlan?.flightRules === 'IFR' && !ac.flightPlan.ifrClearance ? 'CLNC' : 'GND';
+    case 'PUSHBACK': case 'READY': case 'TAXIING': case 'RUNWAY_EXIT': case 'TAXI_TO_PARKING': case 'ARRIVED':
+      return 'GND';
+    case 'HOLDING_SHORT': case 'LINE_UP_AND_WAIT': case 'CLEARED_FOR_TAKEOFF': case 'TAKEOFF_ROLL': case 'LANDING': case 'ROLLOUT':
+      return 'TWR';
+    default:
+      return undefined;
+  }
+}
+
+/**
+ * The position an aircraft is talking to. One owner of its frequency: that position. Several (shared frequency): the position its phase needs
+ * (`neededGroundPosition`) if one of them owns the frequency, else the one named by the frequency id it was last given, else the first.
+ */
+export function aircraftPosition(airport: Airport, ac: Pick<Aircraft, 'frequencyMhz' | 'frequencyId' | 'phase' | 'onGround' | 'isDeparture' | 'flightPlan'>): RadioFrequency['position'] | undefined {
+  const positions = positionsOnFrequency(airport, ac.frequencyMhz);
+  if (positions.length <= 1) return positions[0];
+  const need = neededGroundPosition(ac);
+  if (need && positions.includes(need)) return need;
+  if (need === 'TWR' && positions.includes('GND')) return 'GND'; // on the runway but tuned to a Ground frequency that Delivery shares
+  const byId = ac.frequencyId ? airport.frequencies.find((f) => f.id.toUpperCase() === ac.frequencyId!.toUpperCase() && sameFrequency(f.mhz, ac.frequencyMhz)) : undefined;
+  return byId?.position ?? positions[0];
+}
+
 /** All aircraft that would hear a transmission on `mhz`. */
 export function listenersOn(aircraft: Iterable<Aircraft>, mhz: number): Aircraft[] {
   const out: Aircraft[] = [];

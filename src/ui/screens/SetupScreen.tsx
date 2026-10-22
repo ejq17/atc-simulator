@@ -5,6 +5,7 @@ import type { ClosureSpec } from '../../sim/types';
 import { closedEndsOf } from '../../sim/airportOps';
 import { DEFAULT_AIRPORT_ICAO, airportOrDefault, listAirports } from '../../airport';
 import { airportCallName } from '../../radio/frequencies';
+import { towerClosedNotice, towerHoursLabel } from '../../game/towerHours';
 import { profileTypes } from '../../game/airportProfile';
 import { SPECIAL_TRAFFIC_KINDS, SPECIAL_TRAFFIC_LABELS, availableSpecialKinds, defaultSpecialTraffic, resolveSpecialTraffic } from '../../game/specialTraffic';
 import type { SpecialTrafficSelection } from '../../game/specialTraffic';
@@ -99,11 +100,15 @@ function SectionTitle({ n, children }: { n: number; children: React.ReactNode })
   );
 }
 
-export function SetupScreen() {
+/** `nowMs`: the real clock used for the tower-hours notice (tests pass a fixed instant). */
+export function SetupScreen({ nowMs }: { nowMs?: number } = {}) {
   const prev = useSimStore((s) => s.startOptions);
   const [icao, setIcao] = useState<string>(prev?.icao ?? DEFAULT_AIRPORT_ICAO);
   const airport = useMemo(() => airportOrDefault(icao), [icao]);
   const callName = airportCallName(airport);
+  const [openedAtMs] = useState(() => nowMs ?? Date.now());
+  const hoursLabel = towerHoursLabel(airport.towerHours);
+  const towerClosed = towerClosedNotice(airport, callName, openedAtMs);
   /** Aircraft types the airport's traffic profile can generate (KACY: C172, A320; KMHT adds B738, BCS3, E175, CRJ9, B752, C208; KPGD: A320, A319, B38M, B738, C172, PA28; the registry also holds the KBOS / KPHL / EGLL types). */
   const offeredTypes = useMemo(() => profileTypes(airport.icao), [airport]);
   /** Special traffic kinds the airport's profile has (KACY: all five; KMHT and KPGD: VFR transitions and vehicles; KPHL: vehicles only, Class B). Only these are offered. */
@@ -311,7 +316,9 @@ export function SetupScreen() {
               <select className={SELECT} value={icao} onChange={(e) => setIcao(e.target.value)} aria-label="Airport" data-testid="airport-select">
                 {listAirports().map((code) => (<option key={code} value={code}>{code} · {airportOrDefault(code).name}</option>))}
               </select>
+              {hoursLabel && <span className="font-sans text-[11px] text-atc-muted" data-testid="tower-hours">Tower hours {hoursLabel}</span>}
             </label>
+            {towerClosed && <p className="mt-2 max-w-xl font-sans text-[12px] leading-relaxed text-atc-amber" role="status" data-testid="tower-closed-notice">{towerClosed}</p>}
           </div>
           <AirportGlyph airport={airport} className="hidden h-28 w-auto shrink-0 opacity-90 md:block" />
         </header>

@@ -29,7 +29,7 @@ import { findRunwayEnd } from './runways';
 import { perfOf } from './context';
 import { findNavFix } from './navigation';
 import { windComponents } from './wind';
-import { frequencyByMhz, facilityCallName } from '../radio/frequencies';
+import { aircraftPosition, facilityCallName } from '../radio/frequencies';
 import { spokenRunway } from '../radio/spoken';
 import { spokenFix } from '../radio/readback';
 import type { PilotRequestCode } from './pilotBehaviour';
@@ -72,7 +72,7 @@ export function betterRunwayEnd(ctx: SimContext, ac: Aircraft): string | undefin
 function offerFor(ctx: SimContext, ac: Aircraft, rt: AircraftRuntime): Offer | undefined {
   const { state } = ctx;
   const airport: Airport = state.airport;
-  const pos = frequencyByMhz(airport, ac.frequencyMhz)?.position;
+  const pos = aircraftPosition(airport, ac);
   const g = findRunwayEnd(airport, ac.assignedRunwayEnd);
   const airborne = !ac.onGround;
   const dThrNm = g ? mToNm(dist(ac.pos, g.end.threshold)) : Infinity;

@@ -26,7 +26,7 @@ import { alongCross, crossingRunways, findRunway, findRunwayEnd } from './runway
 import { seeded01 } from './rng';
 import { runwayExitNodes } from '../airport/graphUtils';
 import { isVehicleType } from './performance';
-import { frequencyByMhz } from '../radio/frequencies';
+import { aircraftPosition } from '../radio/frequencies';
 import { vehicleAtHoldCall, vehicleOffRunwayCall, vehicleTaxiRequestCall } from '../radio/specialCalls';
 import type { VehiclePurpose } from '../radio/specialCalls';
 import { checkInCall, holdingShortCrossingCall } from '../radio/readback';
@@ -94,7 +94,7 @@ export function vehiclePilotCalls(ctx: SimContext, ac: Aircraft, rt: AircraftRun
   const { state } = ctx;
   const now = state.clock.timeSec;
   const airport = state.airport;
-  const pos = frequencyByMhz(airport, ac.frequencyMhz)?.position;
+  const pos = aircraftPosition(airport, ac);
 
   // 1. First call from the parking position (who / where / what).
   if (ac.phase === 'PARKED' && v.stage === 'OUT' && !rt.calls.has('vehReq') && now >= rt.firstCallAtSec) {

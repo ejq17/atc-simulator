@@ -117,12 +117,11 @@ export const kpgdProfile: AirportProfile = {
   frequencies({ freqSrc, callName, approachCallName, mk }: FrequencyCtx): RadioFrequency[] {
     const f: J = freqSrc.summary_by_function;
     const rows: J[] = freqSrc.all_frequencies_serving_airport;
-    // GND is listed before CLNC on purpose: both use 119.55 (NASR CD/P and GND/P) and the engine resolves a frequency to the FIRST position that
-    // owns it (frequencyByMhz), so a landed aircraft on 119.55 is then a Ground aircraft; pilots still call "Clearance Delivery" while their frequency id is CLNC.
+    // CLNC and GND share 119.55 (NASR CD/P and GND/P); the engine routes a call by the position the aircraft's phase needs (radio/frequencies.ts aircraftPosition).
     const out: RadioFrequency[] = [
       mk('ATIS', `${callName} ATIS`, f.ATIS.vhf, 'ATIS', `hours ${f.ATIS.hours as string}; ${f.ATIS.note as string}`),
-      mk('GND', `${callName} Ground`, f.ground.vhf, 'GND', f.ground.note as string),
       mk('CLNC', `${callName} Clearance Delivery`, f.clearance_delivery.vhf, 'CLNC', `${f.clearance_delivery.note as string}. NASR remark: when the tower is closed clearance delivery is 127.05, monitored by Fort Myers approach control.`),
+      mk('GND', `${callName} Ground`, f.ground.vhf, 'GND', f.ground.note as string),
       mk('TWR', `${callName} Tower`, f.tower.vhf, 'TWR', `${f.tower.note as string}; tower hours 0600-2100 (NASR TWR_HRS), CTAF 121.0 when closed (NASR FRQ CTAF row)`),
       mk('APP', `${approachCallName} Approach`, f.approach_departure.vhf, 'APP', `UHF ${f.approach_departure.uhf as string}; ${f.approach_departure.chart_name as string}. Facility ${f.approach_departure.facility as string} (${f.approach_departure.facility_name as string}). ${f.approach_departure.note as string}`),
       mk('DEP', `${approachCallName} Departure`, f.approach_departure.vhf, 'DEP', 'same frequency as approach (NASR use code APCH/P DEP/P)'),

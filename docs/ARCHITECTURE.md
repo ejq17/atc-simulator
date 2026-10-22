@@ -66,8 +66,7 @@ the build from `data/sources/<icao>-*.json` and `<icao>-taxiways.geojson`. Addin
   KMHT's densely digitised OSM entrances need the `simplifyEntryChains` profile option and fillet collapsing to meet it.
 
 * KPGD (third airport) is the first with an excluded NASR runway (`AirportProfile.excludeRunways`: 09/27) and a **shared Clearance Delivery / Ground frequency**
-  (119.55): the engine resolves a frequency to the first position that owns it (`frequencyByMhz`), so the profile lists GND before CLNC; pilots on the IFR-clearance flow
-  still call "Clearance Delivery" through their frequency id. Tower hours (0600-2100) are data only; the simulator does not enforce them. STAR arrivals are generated
+  (119.55); the engine routes a radio call by the position the aircraft needs (`aircraftPosition`, `src/radio/frequencies.ts`), not by the first row that owns the frequency. Tower hours (0600-2100) are not simulated: the setup screen shows them and notes when the real clock is outside them. STAR arrivals are generated
   for any airport whose STARs are transcribed with a runway leg: the entry fixes come from `StarProcedure.simEntryFixes` (data), else `STAR_SIM_ENTRY_FIXES_BY_STAR` in `src/game/ifr.ts` (ROZZE2, ROBUC3, JFUND2), else the first two fixes after the common fix of the runway leg (KPGD: ZEBON, RUNNE, GUSEC); with several STARs on a runway end `starArrival` returns the entries of all of them.
 
 ## Key contracts
