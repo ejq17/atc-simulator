@@ -51,5 +51,5 @@ describe('a correction is not held up by a queued pilot call (CORRECTION_PATIENC
     }
     expect(n).toBeGreaterThan(5);
     expect(worst).toBeLessThanOrEqual(12);
-  });
+  }, 120_000); // 16 seeded 500 s runs with three arrivals: 40-75 s when several suites share the CPU
 });

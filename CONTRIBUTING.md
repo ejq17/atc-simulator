@@ -35,20 +35,22 @@ Please keep typecheck and the unit tests green. The Pages workflow runs them on 
 ## Airport data
 
 Airport datasets are generated, not hand-edited. Source extracts with provenance live in `data/sources/`
-(FAA NASR and d-TPP, OpenStreetMap, AWC). To rebuild one:
+(FAA NASR and d-TPP for the five US airports, the UK AIP for EGLL, OpenStreetMap, AWC). To rebuild one:
 
 ```bash
-npm run build:airport -- KMHT      # or KACY; same as npx tsx scripts/build-airport.ts <ICAO>
+npm run build:airport -- KACY      # also KMHT, KBOS, KPHL, KPGD and EGLL; same as npx tsx scripts/build-airport.ts <ICAO>
+npm run build:airport -- EGLL      # built from the hand-transcribed UK AIP files, not from NASR
 ```
 
 Per-airport settings live in `scripts/airports/<icao>.ts`. Do not type aeronautical values in from memory:
-add them to the source JSON with a provenance note, then rebuild. See `data/sources/README.md`.
+add them to the source JSON with a provenance note, then rebuild. See `data/sources/README.md`; a new airport follows `docs/ADDING-AN-AIRPORT.md`.
+`npx tsx scripts/extract-nasr-airport.ts` produces the facility, frequency and navaid files for a US airport; EGLL has no machine-readable source, so its JSON files are transcribed by hand from the UK AIP (each field names its AIP section).
 
 ## Charts
 
-`npm run fetch-charts` downloads the FAA chart PDFs into `public/charts/` (git-ignored). Do not commit PDFs.
+`npm run fetch-charts` downloads the FAA chart PDFs of the five US airports into `public/charts/` (git-ignored). Do not commit PDFs. EGLL's charts (UK AIP, copyright NATS Limited) are linked, never downloaded or bundled.
 
 ## Licensing
 
-Code is MIT. FAA data is public domain. The OpenStreetMap-derived taxiway and apron layer is
+Code is MIT. FAA data is public domain. The UK AIP data of EGLL is transcribed by hand (charts are linked only, copyright NATS Limited). The OpenStreetMap-derived taxiway and apron layer is
 (c) OpenStreetMap contributors under the ODbL 1.0; keep that attribution if you touch it.

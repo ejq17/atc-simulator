@@ -30,7 +30,7 @@ import type { VoiceBrowser } from './fixtures/voiceBrowser';
 import { startScenario, TAKEOFF_READBACK } from './helpers';
 
 test.describe.configure({ mode: 'serial' });
-test.beforeEach((_fixtures, testInfo) => {
+test.beforeEach(({ browserName: _browserName }, testInfo) => {
   test.skip(testInfo.project.name !== 'chrome-real-mic' || process.env.REAL_MIC !== '1', 'opt-in: set REAL_MIC=1 (plays audio through the speakers)');
 });
 

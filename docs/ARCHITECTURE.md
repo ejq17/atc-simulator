@@ -1,7 +1,8 @@
-# ATC Simulator (KACY, KMHT, KPHL) — Architecture
+# ATC Simulator (KACY, KMHT, KBOS, KPHL, KPGD, EGLL) — Architecture
 
-Single-player, browser-based, local-first ATC simulator for two airports, Atlantic City
-International (KACY, default) and Manchester-Boston Regional (KMHT). This document is deliberately short: it records
+Single-player, browser-based, local-first ATC simulator for six airports: Atlantic City
+International (KACY, default), Manchester-Boston Regional (KMHT), Boston Logan (KBOS), Philadelphia International (KPHL), Punta Gorda (KPGD) and London Heathrow (EGLL,
+built from the UK AIP). This document is deliberately short: it records
 the decisions and contracts that every module must respect. Progress and known
 gaps live in `docs/PROGRESS.md`; data provenance lives in `data/sources/README.md`.
 
@@ -16,7 +17,7 @@ gaps live in `docs/PROGRESS.md`; data provenance lives in `data/sources/README.m
 | Speech-to-text | Provider abstraction: browser Web Speech API (free, default), Local Whisper (transformers.js in a worker, on-device) and Deepgram (streaming, keyed via backend) | Works with zero setup; upgradeable |
 | Command interpretation | Deterministic grammar/entity parser first; optional LLM fallback (`src/commands/llm`, `POST /api/llm/parse`) used only when the grammar is unsure, returns constrained commands that are validated like the grammar's | No LLM may mutate aircraft state; a confident grammar parse is never overridden |
 | Text-to-speech | Browser `speechSynthesis` with per-aircraft voice selection and optional radio filter via WebAudio; optional local neural voices (Kokoro on WebGPU, Piper on WebAssembly, in workers) | Zero cost; no cloud TTS |
-| Weather | Aviation Weather Center API via the local backend proxy with caching; National Weather Service API (`api.weather.gov`) called from the browser when the backend is unreachable and on the static build | AWC does not allow browser CORS; NWS does |
+| Weather | Aviation Weather Center API via the local backend proxy with caching; National Weather Service API (`api.weather.gov`) called from the browser when the backend is unreachable and on the static build (US stations only: EGLL live weather needs the backend) | AWC does not allow browser CORS; NWS does |
 | Backend | Tiny Node `http` server in `server/` (no framework), port 8787, reached through the Vite `/api` proxy | AWC weather proxy, FAA chart PDF proxy, Deepgram token, phrase interpreter; keys never reach the browser |
 | Persistence | `localStorage` for settings, layout and career progress (no IndexedDB); model files in the browser Cache API | No accounts, no paid DB |
 | Tests | Vitest (engine, parser, airport graph), Playwright (gameplay flows) | Required |
@@ -26,14 +27,14 @@ gaps live in `docs/PROGRESS.md`; data provenance lives in `data/sources/README.m
 ```
 src/sim/        types.ts (contracts), api.ts (engine interface), engine.ts, aircraft physics,
                 state machines, runway occupancy, conflicts, pathfinding, scoring hooks
-src/airport/    projection (lat/lon <-> local metres), per-airport dataset loaders (kacy/, kmht/, kphl/) and the registry
-                (`getAirport`, `listAirports`), graph queries
+src/airport/    projection (lat/lon <-> local metres), per-airport dataset loaders (kacy/, kmht/, kbos/, kphl/, kpgd/, egll/; each loads its JSON through a dynamic import) and the registry
+                (`getAirport`, `preloadAirport`, `listAirportOptions`, `listAirports`), graph queries
 src/commands/   normalisation (spoken numbers, phonetics), grammar, entity resolution,
                 callsign matching, confidence, clarification
 src/radio/      frequencies, who-hears-what, transmission queue, readback generation
 src/voice/      push-to-talk, STT providers, TTS providers, radio audio effects
 src/weather/    METAR parsing, simulated weather presets, ATIS generation
-src/charts/     FAA d-TPP chart index and viewer, navaid reference
+src/charts/     chart index and viewer (FAA d-TPP PDFs; EGLL: link-only UK AIP list), navaid reference
 src/game/       scenarios, traffic generation, free play/career/training, scoring, debrief
 src/ui/         React app shell, panels, canvas displays
 src/ui/tower/   3D Tower tab (lazy chunk). Pure, unit-tested: geometry.ts (polygon/ribbon/extrusion meshes, runway markings,
@@ -43,7 +44,7 @@ src/ui/tower/   3D Tower tab (lazy chunk). Pure, unit-tested: geometry.ts (polyg
                 resource); TowerDisplay.tsx is the React shell and reads the store per animation frame like the Surface view
 server/         AWC proxy + cache, FAA chart proxy, optional Deepgram token endpoint, optional phrase interpreter route (server/llm)
 data/sources/   verified FAA/NASR/d-TPP/OSM extracts with provenance (raw/ is git-ignored)
-scripts/        build-airport.ts <ICAO>: one deterministic build for every airport (NASR/d-TPP JSON + OSM GeoJSON ->
+scripts/        build-airport.ts <ICAO>: one deterministic build for every airport (NASR/d-TPP JSON, or the hand-transcribed UK AIP JSON for EGLL, + OSM GeoJSON ->
                 src/airport/<icao>/<icao>.airport.json, build-report.md, debug-graph.svg); airports/<icao>.ts holds only what is
                 airport specific (taxiway identifiers of the diagram, parking-stand rules, frequency naming, MVA, hot spot)
 ```
@@ -54,7 +55,18 @@ An airport is data, not code: a `src/sim/types.ts` `Airport` (runways, taxiway g
 the build from `data/sources/<icao>-*.json` and `<icao>-taxiways.geojson`. Adding one means: extract the NASR rows
 (`scripts/extract-nasr-airport.ts`), fetch the OSM features (`scripts/osm-overpass-to-geojson.ts`), transcribe the plates into
 `<icao>-procedures.json`, write a profile `scripts/airports/<icao>.ts`, build, add a loader in `src/airport/<icao>/` and register it in
-`src/airport/index.ts`. Everything the UI, the engine, the AI controllers and the readbacks say about the airport is derived from that object:
+`src/airport/index.ts` (`docs/ADDING-AN-AIRPORT.md` has the full checklist). Everything the UI, the engine, the AI controllers and the readbacks say about the airport is derived from that object:
+
+* **Data flow.** `data/sources/<icao>-*.json` + `-taxiways.geojson` -> `scripts/build-airport.ts` (profile `scripts/airports/<icao>.ts`) -> `src/airport/<icao>/<icao>.airport.json` -> loader
+  `src/airport/<icao>/index.ts` -> registry `AIRPORTS` in `src/airport/index.ts`. The JSON is **lazy**: `preloadXxx()` fills the loader's cache through `import('./<icao>.airport.json')`, so
+  Rollup emits one chunk per airport and a first visit downloads only the chosen one. The registry keeps the display name beside the loader, so the airport selector (`listAirportOptions()`)
+  needs no data. `getAirport` / `airportOrDefault` stay synchronous and throw until `await preloadAirport(icao)` resolved; the setup screen shows "Loading airport data..." while it does,
+  `startSession` awaits it, and the Vitest setup file `src/test/preloadAirports.ts` preloads every airport so tests stay synchronous.
+* **Charts.** `charts/chartIndex.ts` builds the chart list from `<icao>-procedures.json`. FAA airports bundle the d-TPP PDFs at build time (`scripts/fetch-charts.ts`, loading order bundled file,
+  `/api` proxy, FAA URL). An airport whose procedures `_provenance.link_only` is true (EGLL, UK AIP, copyright NATS Limited) gets `ChartEntry.linkOnly`: `ChartViewer` renders `LinkOnlyCharts`
+  (list plus the official URL, no PDF fetch), the backend never proxies it and `fetch-charts` skips it.
+* **Runway configurations, time zone and units.** `Airport.runwayConfigurations` (KBOS 4, KPHL 2, EGLL 3; absent at KACY, KMHT, KPGD) drive the setup-screen selector, `weather/runwayConfigurations.ts` and the AI;
+  `Airport.timeZone` (KACY and KMHT default to America/New_York, EGLL Europe/London) drives the local-time traffic density, sunrise and the ATIS clock; `Airport.altimeterUnit` 'hPa' (EGLL) switches QNH and metric visibility.
 
 * Facility call names come from the frequency names in the data (`radio/frequencies.ts`: tower "Manchester", approach "Boston"), so a TRACON
   with another city's radio call is spoken correctly; the ATIS, charts panel (`charts/chartIndex.ts`, `navaidData.ts` per ICAO) and live METAR use the airport's ICAO.
@@ -112,7 +124,7 @@ is the real UTC again; past times keep their own epoch (`utcAt`). Free-play traf
 
 WGS84 -> local tangent plane (equirectangular about the ARP) in metres, x east, y
 north. Headings in state are TRUE; controllers/pilots speak MAGNETIC. Magnetic
-variation comes from NASR per airport (KACY 10 W, KMHT 15 W). Altitudes in feet MSL; field elevation from NASR.
+variation comes from NASR per airport (KACY 10 W, KMHT 15 W, KBOS 15 W, KPHL 12 W, KPGD 6 W, EGLL 1.23 E as printed in the AIP). Altitudes in feet MSL; field elevation from NASR.
 
 ## Realism boundaries (documented, not hidden)
 

@@ -1,8 +1,10 @@
 # ATC Simulator (KACY, KMHT, KBOS, KPHL, KPGD and EGLL)
 
-A browser-based, single-player air traffic control simulator for two real airports,
+A browser-based, single-player air traffic control simulator for six real airports,
 chosen on the setup screen: **Atlantic City International (KACY)**, New Jersey (the
-default) and **Manchester-Boston Regional (KMHT)**, New Hampshire. You work Clearance
+default), **Manchester-Boston Regional (KMHT)**, New Hampshire, **Boston Logan (KBOS)**,
+**Philadelphia International (KPHL)**, **Punta Gorda (KPGD)**, Florida, and **London Heathrow
+(EGLL)**, the first airport outside the US (built from the UK AIP, not FAA data). You work Clearance
 Delivery, Ground, Tower and/or Approach/Departure, speak or type clearances in real ATC
 phraseology, and simulated pilots read back, taxi on the real taxiway layout, line up,
 take off, fly approaches and land.
@@ -12,72 +14,133 @@ be used for real-world operations. Nothing here connects to real radio frequenci
 ADS-B, or live traffic.
 
 **Live demo:** https://ejq17.github.io/atc-simulator/ (static GitHub Pages build; no backend). On the demo, **Deepgram is unavailable** (it
-needs the local backend, `npm run server`), **live weather comes straight from the National Weather Service API** (`api.weather.gov` allows browser requests; the Aviation Weather Center feed
-needs the local backend because aviationweather.gov sends no CORS headers; the KMHT 5-minute observations carry no raw METAR, so a METAR-style string is built from the structured fields; if the NWS request fails the session falls back to the simulated presets and the top bar shows **WX SIMULATED**), the **phrase interpreter is unavailable** (it needs the backend), and the **FAA charts are bundled at build time**
-from the public-domain d-TPP files. Speech input defaults to the browser's Web Speech API; **Local Whisper** and the **Local neural** pilot voice also work there (models come from
+needs the local backend, `npm run server`), **live weather for the five US airports comes straight from the National Weather Service API** (`api.weather.gov` allows browser requests; the Aviation Weather Center feed
+needs the local backend because aviationweather.gov sends no CORS headers; the NWS observations for KMHT, KBOS, KPHL and KPGD carry no raw METAR, so a METAR-style string is built from the structured fields; if the NWS request fails the session falls back to the simulated presets and the top bar shows **WX SIMULATED**), **live weather for EGLL is unavailable** (the NWS API has only US stations, so Heathrow needs the local backend; the demo says so and uses simulated weather), the **phrase interpreter is unavailable** (it needs the backend), and the **FAA charts of the five US airports are bundled at build time**
+from the public-domain d-TPP files (the **UK AIP charts of EGLL are copyright NATS Limited: they are linked to the official page, never bundled**). Speech input defaults to the browser's Web Speech API; **Local Whisper** and the **Local neural** pilot voice also work there (models come from
 the Hugging Face CDN, the ONNX runtime from jsDelivr). For everything, run it locally (Quick start below).
 
 ## What is real
 
-Each airport is built from its own verified source files by one script (`scripts/build-airport.ts <ICAO>`); the table
-describes KACY, the KMHT counterparts follow it. Every airport-specific string the sim shows or speaks (facility call names,
-ATIS, charts, navaids, runway ends, parking) comes from that airport's data.
+Each airport is built from its own verified source files by one script (`scripts/build-airport.ts <ICAO>`). Every airport-specific string the sim shows or
+speaks (facility call names, ATIS, charts, navaids, runway ends, parking) comes from that airport's data. The five US airports share the same sources and
+cycle; EGLL has its own. All values carry provenance in `data/sources/README.md`, which also lists what could not be verified ("Not verified" per airport).
+Nothing aeronautical is typed from memory: what could not be sourced is left out and listed there.
 
 | Data | Source | Cycle |
 |---|---|---|
-| Runways (dimensions, thresholds, true/magnetic headings, TDZE, lighting, ILS), field elevation, variation, tower hours, Class C, LAHSO, remarks | FAA NASR 28-day subscription CSVs | effective 2026-10-01 |
-| ATC frequencies (ATIS 125.725, Clearance 127.85, Ground 121.9, Tower 120.3, Approach/Departure 124.6 and 134.25) | FAA NASR `FRQ.csv` | 2026-10-01 |
-| ACY VORTAC 117.15 (operational restricted), ILS 13 I-PVO / ILS 31 I-ACY (both 109.1), nearby VORs, 36 approach fixes | FAA NASR NAV/ILS/FIX | 2026-10-01 |
-| Airport diagram, 13 instrument approach charts, ATLANTIC CITY THREE departure, hot spot, LAHSO pages (viewed in-app from the official PDFs) | FAA d-TPP | cycle 2610, 2026-10-01 to 2026-10-29 |
-| Taxiway and apron geometry, gates | OpenStreetMap, reconciled with the FAA airport diagram (all 12 charted taxiway identifiers A B C D G H J K L M N P present) | snapshot 2026-10-17 |
-| Live weather (METAR) | Aviation Weather Center API via the local backend; the National Weather Service API (`api.weather.gov`) directly from the browser when the backend is unreachable and on the hosted demo | live |
-| Minimum vectoring altitudes (9 sectors) | FAA MVA/MIA digital product, Atlantic City ATCT/TRACON chart ACY_MVA_FUS3 | server date 2025-10-20 |
+| Runways (dimensions, thresholds, true/magnetic headings, TDZE, lighting, ILS), field elevation, variation, tower hours, airspace class, LAHSO, remarks (KACY, KMHT, KBOS, KPHL, KPGD) | FAA NASR 28-day subscription CSVs | effective 2026-10-01 |
+| ATC frequencies | FAA NASR `FRQ.csv` | 2026-10-01 |
+| Navaids, ILS, fixes | FAA NASR NAV/ILS/FIX | 2026-10-01 |
+| Airport diagram, approach charts, departures, arrivals, hot spot and LAHSO pages (viewed in-app from the official PDFs) | FAA d-TPP | cycle 2610, 2026-10-01 to 2026-10-29 |
+| Taxiway and apron geometry, stands | OpenStreetMap, reconciled with the FAA airport diagram (KACY snapshot 2026-10-17; the other US airports 2026-10-22 UTC; EGLL 3 km extract) | see per airport |
+| EGLL: runways, declared distances, ILS/DME, frequencies, STARs, SIDs, ILS plates, hot spots, Class D, stands | UK AIP (NATS eAIP) AIRAC 10/2026, hand-transcribed | effective 2026-10-01, retrieved 2026-10-21 |
+| Live weather (METAR) | Aviation Weather Center API via the local backend (all six airports); the National Weather Service API (`api.weather.gov`) directly from the browser when the backend is unreachable and on the hosted demo (US airports only) | live |
+| KACY minimum vectoring altitudes (9 sectors) | FAA MVA/MIA digital product, Atlantic City ATCT/TRACON chart ACY_MVA_FUS3 | server date 2025-10-20 |
 | LAHSO hold-short points and available landing distances; published fix altitudes and holding patterns | FAA NASR; d-TPP plates (transcribed, with provenance) | 2026-10-01 / cycle 2610 |
+| Aircraft performance (45 type entries) | Textron/Cessna, Airbus, EASA TCDS, EUROCONTROL Aircraft Performance Database, FAA JO 7110.126A; the original KACY/KMHT types are ESTIMATEs | see `data/sources/README.md` |
 | Procedural references in training/debrief | FAA JO 7110.65 paragraph numbers and titles verified against the FAA web edition (`docs/FAA-REFERENCES.md`) | 2026-10-16 |
 
-**KMHT (second airport)**, same sources and cycle (NASR 2026-10-01, d-TPP 2610, OSM snapshot 2026-10-17): runways 06/24 (7651 x 150 ft) and
-17/35 (9250 x 150 ft) with displaced thresholds recorded, ILS on 6 (I-MJE 109.95), 17 (I-MNA 109.1) and 35 (I-MHT 109.1, CAT III), ATIS 119.55,
-Clearance 135.9, Ground 121.9, Tower 121.3 (24 h, Class C), Boston Approach/Departure 124.9 (the Boston Consolidated TRACON), the MHT DME,
-the CON and GDM VOR/DMEs, 41 fixes (26 on the approach plates, 15 on the ROZZE TWO arrival), the 18 d-TPP charts (diagram, 11 approaches of which 7 are transcribed, MANCHESTER ONE and
-PPORT FOUR departures, the ROZZE TWO arrival (transcribed: five transitions, four runway legs, altitude and speed restrictions), minimums pages), 19 taxiway identifiers of the 22 on the diagram, 14 gates and 15 GA/FBO stands (OSM). KMHT
-has **no** LAHSO, hot spot, MVA sectors, plate holding patterns or plate fix altitudes in the dataset: those layers are empty, not invented
-(`data/sources/README.md`, "KACY layers with no KMHT equivalent"). The career steps and training lessons are written around KACY's
-runway ends, taxiways and stands, so at KMHT the setup offers Free play (all five presets, custom traffic, IFR flows).
+Every airport below is described with the same items: sources and cycle, runways, ILS, frequencies, charts, taxiway identifiers, stands, STARs and SIDs, runway
+configurations, live weather, and what is **not** included.
 
-**KBOS (airport with six runways: General Edward Lawrence Logan International, Boston MA, Massport)**, same sources and cycle (NASR 2026-10-01, d-TPP 2610, OSM snapshot 2026-10-22): runways 4L/22R, 4R/22L, 9/27, 14/32, 15L/33R and 15R/33L, ILS 4R, 15R, 22L, 27 and 33L (I-BOS, I-MDC, I-LQN, I-DGU, I-LIP), 19 approach charts, LOGAN FOUR and nine RNAV departures, the ROBUC THREE and JFUND TWO arrivals (transcribed in full, checked against NASR STAR_RTE and the fix coordinates), hot spots HS 1-4 and the four LAHSO distances, 30 of the 31 diagram taxiway identifiers (Y is missing: its OSM ways merge into runway 15L/33R), about 100 gates of Terminals A, B, C and E and the cargo stands (OSM). Runway intersections are found automatically (`RWX-<a>x<b>`) and **runway configurations** (northeast, southwest, northwest and southeast flow, from Massport's Logan 101 deck and the FAA Runway 33L EA, no wind limits published) are chosen by wind on the setup screen. Boston is Class B: VFR transitions are rare (1 per hour, DESIGN VALUE). The traffic mix (JetBlue, Delta, American, United, Spirit, Southwest, Cape Air, international heavies, cargo) uses 2024 carrier shares from a secondary aggregator; aircraft types per carrier and the regional / cargo operators are UNVERIFIED (see `src/game/airportProfile.ts`). Live METAR: the NWS station KBOS (`api.weather.gov`, checked 2026-10-21) returns observations with an **empty `rawMessage`**, like KMHT, so the sim rebuilds the report from the decoded fields. Career steps and training lessons stay KACY-only.
+### KACY (Atlantic City International, NJ; default, Class C)
 
-**KPGD (third airport: Punta Gorda Airport, Florida, Charlotte County Airport Authority)**, same sources and cycle (NASR 2026-10-01, d-TPP 2610, OSM snapshot
-2026-10-22 UTC): runways 04/22 (7193 x 150 ft) and 15/33 (6286 x 150 ft, 271 ft displaced threshold on 15) with the ILS on 4 only (I-PGD 109.75), ATIS 135.675,
-Clearance Delivery and Ground sharing 119.55, Tower 121.0 (contract tower, hours **0600-2100**, Class D with Class E outside those hours per NASR), Fort Myers
-Approach/Departure 127.05 (the Southwest Florida International TRACON), the Lee County VORTAC (RSW) used by the plates, 45 fixes, the 11 d-TPP charts (diagram, ILS or LOC 4,
-RNAV (GPS) 4, 15, 22 and 33 all transcribed, the LUBBR FOUR and PIKKR SEVEN arrivals (the PGD bodies), minimums pages), 12 of the 18 taxiway identifiers on the diagram, 10
-gates and 10 GA/FBO stands (the ten gates and three south-ramp GA stands are OSM ways, the other seven are synthetic spots inside an OSM apron). NASR runway 09/27 (2636 x 60 ft:
-not available for Part 121 / 380 operations, takeoff not authorised, under 6000 lb only) is **not modelled**. PGD publishes **no DP or SID** (departures use the default initial
-altitude), no hot spot, LAHSO, MVA sectors, holding patterns or fix altitudes in the dataset. **The simulator does not close the tower at 2100 local**: tower hours are
-recorded in the data (`Airport.towerHours`) but not enforced, as at every airport; the setup screen shows them next to the airport selector and, when the real clock at the airport is outside them, says the real tower is closed at this hour and that the simulator staffs it anyway. Clearance Delivery and Ground share 119.55 (NASR); a pilot's call goes to the position its flight phase needs. Traffic: Allegiant (A320, A319, 737 MAX 8) and Sun Country (737-800) per
-flypgd.com; the aircraft types come from the airlines' fleets, not from the airport page. Live METAR: the NWS station KPGD (`api.weather.gov`, checked 2026-10-21) returns
-observations with an **empty `rawMessage`**, like KMHT, so the sim rebuilds the report from the decoded fields. Career steps and training lessons stay KACY-only.
+* **Sources and cycle:** NASR 2026-10-01, d-TPP 2610 (volume NE-2), OSM snapshot 2026-10-17, FAA MVA chart.
+* **Runways:** 4/22 (6145 x 150 ft) and 13/31 (10001 x 150 ft); tower 24 h.
+* **ILS:** 13 (I-PVO) and 31 (I-ACY), both 109.1; ACY VORTAC 117.15 (operational restricted) and nearby VORs; 36 approach fixes (50 navaid entries).
+* **Frequencies:** ATIS 125.725, Clearance 127.85, Ground 121.9, Tower 120.3, Approach/Departure 124.6 (south sector) and 134.25 (north sector); 11 entries.
+* **Charts (bundled):** 19 d-TPP PDFs: airport diagram, 13 instrument approaches (all transcribed), ATLANTIC CITY THREE departure, hot spot, LAHSO, two minimums pages.
+* **Taxiway identifiers:** all 12 charted identifiers present (A B C D G H J K L M N P); 32 short OSM apron lanes could not be matched to a charted identifier.
+* **Stands:** 35: 10 OSM airline gates, 4 OSM USCG pads, and 21 synthetic spots inside the real aprons (GA, ANG ramp, cargo, FBO).
+* **STARs and SIDs:** none published (the d-TPP lists none): IFR arrivals begin at the published IAF/IF (CARYL, STEVV, KOPCE, JEDOB) and departures fly the ATLANTIC CITY THREE (radar vectors).
+* **Runway configurations:** none (one best-headwind runway for arrivals and departures).
+* **Live weather:** AWC via the backend, NWS direct as fallback and on the demo.
+* **Also:** 9 MVA sectors, LAHSO hold-short points, one hot spot, published fix altitudes and holding patterns. Career steps and training lessons are written around KACY and are KACY-only.
+* **Not included:** Class C airspace shape, current (2026) magnetic declination (the charted epoch value is used), UNICOM, traffic pattern altitude (not in the downloaded data).
 
-**KPHL (Philadelphia International, Class B)**, same sources and cycle (NASR 2026-10-01, d-TPP 2610, OSM snapshot 2026-10-22 UTC, retrieved 2026-10-21): four runways (8/26 5001 x 150 ft, 9L/27R 9500 x 150, 9R/27L 12000 x 200 with a 1913 ft displaced threshold at 27L, 17/35 6500 x 150), six ILS (9L, 9R, 17, 26, 27L, 27R), the NASR frequency rows serving PHL (Tower 118.5 and 135.1, Ground 121.9, Clearance 118.85, D-ATIS 133.4 / 135.925, Philadelphia Approach 124.35, North and South Departure 124.35 / 119.75; the other 60 NASR rows of the same TRACON that serve Newark, Teterboro and others are not included), all 38 d-TPP charts (22 instrument approaches, 3 visual approaches, the PHILADELPHIA FOUR departure, six STARs of which BOJID FOUR and PAATS FOUR are transcribed, hot-spot and minimums pages), 57 of the 62 diagram taxiway identifiers, about 115 airline gate stands at terminals A-West to F, FedEx, UPS and GA stands (OSM). The two documented runway configurations (west flow: arrivals 27R/27L/26/35, departures 27L/27R/35; east flow: arrivals 9R/9L/17, departures 9L/9R/8/17) come from the PHL Noise Office page and the Part 150 Noise Exposure Maps and are chosen by wind. Traffic mixes the airlines phl.org lists (American hub, American Eagle, Southwest, Frontier, Delta, United, JetBlue, Alaska, Sun Country) and UPS at night; long-haul flights are not generated. Live weather: `https://api.weather.gov/stations/KPHL/observations/latest` returned an observation on 2026-10-21 (rawMessage empty, so the METAR is rebuilt from the decoded fields as for KMHT). No MVA, holding patterns or fix altitudes. Gaps and unverified items: `data/sources/README.md`, "KPHL".
+### KMHT (Manchester-Boston Regional, NH; Class C)
 
-**EGLL (fourth airport and the first outside the US: London Heathrow)**, transcribed by hand from the **UK AIP** (NATS eAIP, AIRAC 10/2026, effective 2026-10-01, retrieved
-2026-10-21) because there is no FAA data: ARP 51 28 39 N 000 27 41 W, elevation 83 ft, variation 1.23 E (the AIP prints the 2027 value), runways 09L/27R (3901 x 50 m) and 09R/27L
-(3658 x 50 m) with declared distances, 09L and 09R landing thresholds displaced 309 / 308 m (the pavement ends are derived from them), four CAT III ILS/DME (I-AA, I-BB, I-LL,
-I-RR), Heathrow Delivery 121.980, Ground 121.705, Tower 118.505, Director 119.730, ATIS 128.080 (AD 2.18), the Class D London CTR (not Class A), 18 RNAV STARs to the four holding fixes
-(OCK, BIG, LAM, BNN; every fix, track, distance and level read from the coding tables), 24 SIDs (route text; initial altitude 6000 ft), 195 stands in Terminals 2 to 5 and the cargo area
-(OSM ways whose number is on the AIP stand charts), 4 transcribed ILS plates with RDH and missed approach, the five hot spots. Runways are used in **segregated mode** (one lands, one
-departs; 27 preferred up to 5 kt tailwind, AD 2.20 para 6; the westerly alternation and the Cranford Agreement come from the operator's published programme, not the AIP). **The UK AIP charts
-are copyright NATS Limited: they are linked to the official URL and never bundled** (the chart viewer shows the links; `npm run fetch-charts` skips EGLL). Weather: METAR Q-group QNH and
-metres are parsed, the ATIS reads QNH and metric visibility; live weather for EGLL needs the local backend (the NWS API has no UK stations; the static build says so). Traffic: airlines
-from heathrow.com (British Airways dominant, then Virgin Atlantic and others; BA and Virgin aircraft types from the operators, the rest ESTIMATEs), no general aviation (light aircraft
-are not permitted, AD 2.20), vehicles yes. Full source list, licence reasoning and unverified items: `data/sources/README.md` (EGLL), UK/FAA differences: `docs/UK-PHRASEOLOGY.md`.
+* **Sources and cycle:** NASR 2026-10-01, d-TPP 2610 (volume NE-1), OSM snapshot 2026-10-17.
+* **Runways:** 6/24 (7651 x 150 ft) and 17/35 (9250 x 150 ft) with displaced thresholds recorded; tower 24 h.
+* **ILS:** 6 (I-MJE 109.95), 17 (I-MNA 109.1) and 35 (I-MHT 109.1, CAT III); the MHT DME and the CON and GDM VOR/DMEs; 41 fixes (26 on the approach plates, 15 on the ROZZE TWO arrival).
+* **Frequencies:** ATIS 119.55, Clearance 135.9, Ground 121.9, Tower 121.3, Boston Approach/Departure 124.9 (the Boston Consolidated TRACON); 10 entries.
+* **Charts (bundled):** 18 d-TPP PDFs: diagram, 11 approaches (7 transcribed), MANCHESTER ONE and PPORT FOUR departures, the ROZZE TWO arrival, two minimums pages.
+* **Taxiway identifiers:** 19 of the 22 on the diagram (A5, C and K2 have no OSM way).
+* **Stands:** 33: 14 OSM gates, 15 OSM GA/FBO stands and 4 synthetic cargo spots.
+* **STARs and SIDs:** ROZZE TWO transcribed in full (five transitions, four runway legs, altitude and speed restrictions, checked against NASR STAR_RTE); PPORT FOUR and MANCHESTER ONE departures charted.
+* **Runway configurations:** none (best-headwind runway).
+* **Live weather:** AWC via the backend; NWS direct returns an **empty `rawMessage`**, so the METAR is rebuilt from the decoded fields.
+* **Not included:** LAHSO, hot spot, MVA sectors, plate holding patterns and plate fix altitudes (empty layers, not invented: `data/sources/README.md`, "KACY layers with no KMHT equivalent"). Career steps and training lessons are KACY-only, so Free play (all five presets, custom traffic, IFR flows) is offered.
 
-**Known differences (EGLL is not UK ATC training).** Every phrase, readback and rule is the FAA one unless listed as implemented in `docs/UK-PHRASEOLOGY.md`. Not implemented: "line up" /
+### KBOS (General Edward Lawrence Logan International, Boston MA; Class B; Massport)
+
+* **Sources and cycle:** NASR 2026-10-01, d-TPP 2610 (volume NE-1), OSM snapshot 2026-10-22; Massport and FAA runway-use documents for the configurations.
+* **Runways:** six: 4L/22R (7864 ft), 4R/22L (10006), 9/27 (7001), 14/32 (5000 x 100), 15L/33R (2557 x 100), 15R/33L (10083); runway intersections are found automatically (`RWX-<a>x<b>`); four LAHSO distances; tower 24 h.
+* **ILS:** 4R (I-BOS, CAT III), 15R (I-MDC), 22L (I-LQN), 27 (I-DGU), 33L (I-LIP, CAT III); 107 fixes.
+* **Frequencies:** 16 entries of the 26 NASR rows: D-ATIS 135.0, Clearance 121.65, Ground 121.75 and 121.9, Tower 128.8 (west) / 132.225 (east), ramp 134.05, the A90 sector rows.
+* **Charts (bundled):** 53 d-TPP PDFs: diagram, 19 approaches (13 transcribed with fixes), LOGAN FOUR and nine RNAV departures (19 pages), four STARs (9 pages), hot spot, LAHSO, three minimums pages.
+* **Taxiway identifiers:** 30 of the 31 on the diagram (Y is missing: its OSM ways merge into runway 15L/33R).
+* **Stands:** 130: 102 OSM airline gates (Terminals A, B, C and E), 20 OSM cargo stands, 8 synthetic GA/FBO spots.
+* **STARs and SIDs:** ROBUC THREE and JFUND TWO transcribed in full (checked against NASR STAR_RTE and the fix coordinates); OOSHN FIVE and WOONS TWO are charted, not transcribed; LOGAN FOUR and the nine RNAV departures are charted (DP maintain altitude is the jet value).
+* **Runway configurations:** four (northeast, southwest, northwest and southeast flow) from Massport's Logan 101 deck and the FAA Runway 33L EA; no wind limits are published, so the setup screen chooses by wind (arrival runways aligned with the wind). A fifth, late-night configuration is documented but not selectable.
+* **Live weather:** AWC via the backend; NWS station KBOS direct (checked 2026-10-21) with an **empty `rawMessage`**, like KMHT.
+* **Traffic:** JetBlue, Delta, American, United, Spirit, Southwest, Cape Air, international heavies and cargo (2024 carrier shares from a secondary aggregator; aircraft types per carrier are UNVERIFIED, `src/game/airportProfile.ts`); VFR transitions 1 per hour (DESIGN VALUE).
+* **Not included:** taxiway Y and two connectors at the 4R threshold (no hold line possible), MVA sectors; the four hot spots HS 1-4 share one marker at the first runway intersection. Career steps and training lessons are KACY-only.
+
+### KPHL (Philadelphia International, PA; Class B)
+
+* **Sources and cycle:** NASR 2026-10-01, d-TPP 2610, OSM snapshot 2026-10-22 UTC (retrieved 2026-10-21), PHL Noise Office page and the Part 150 Noise Exposure Maps for the configurations.
+* **Runways:** 8/26 (5001 x 150 ft), 9L/27R (9500 x 150), 9R/27L (12000 x 200, 1913 ft displaced threshold at 27L), 17/35 (6500 x 150); tower 24 h.
+* **ILS:** six (9L, 9R, 17, 26, 27L, 27R); 84 fixes.
+* **Frequencies:** 20 entries of the 82 NASR rows serving PHL: Tower 118.5 and 135.1, Ground 121.9, Clearance 118.85, D-ATIS 133.4 / 135.925, Approach 124.35, North and South Departure 124.35 / 119.75, the sector rows; the rows of the same TRACON that serve Newark, Teterboro and others are not included.
+* **Charts (bundled):** 38 d-TPP PDFs: diagram, 22 instrument approaches (15 transcribed) and 3 visual approaches, PHILADELPHIA FOUR departure, six STARs, hot spot, two minimums pages.
+* **Taxiway identifiers:** 56 of the 62 on the diagram (A1, K2, K3, P6, S12, S13 are missing).
+* **Stands:** 130: 114 OSM airline gates (terminals A-West to F), 8 OSM cargo (FedEx, UPS), 5 OSM GA, 3 synthetic FBO.
+* **STARs and SIDs:** BOJID FOUR and PAATS FOUR transcribed (checked against NASR STAR_RTE); BUNTS THREE, JIIMS FOUR, SLATT SIX and SPUDS SEVEN are charted only; PHILADELPHIA FOUR departure charted.
+* **Runway configurations:** two (west flow: arrivals 27R/27L/26/35, departures 27L/27R/35; east flow: arrivals 9R/9L/17, departures 9L/9R/8/17), from the PHL Noise Office page and the Part 150 NEM update, chosen by wind.
+* **Live weather:** AWC via the backend; NWS `stations/KPHL/observations/latest` returned an observation on 2026-10-21 with an **empty `rawMessage`**, so the METAR is rebuilt from the decoded fields.
+* **Traffic:** the airlines phl.org lists (American hub, American Eagle, Southwest, Frontier, Delta, United, JetBlue, Alaska, Sun Country) and UPS at night; long-haul and non-US flights are not generated; no VFR transitions (Class B).
+* **Not included:** MVA sectors, plate holding patterns, fix altitudes, LAHSO. Gaps and unverified items: `data/sources/README.md`, "KPHL". Career steps and training lessons are KACY-only.
+
+### KPGD (Punta Gorda Airport, FL; Class D with Class E outside tower hours)
+
+* **Sources and cycle:** NASR 2026-10-01, d-TPP 2610 (volume SE-3), OSM snapshot 2026-10-22 UTC.
+* **Runways:** 4/22 (7193 x 150 ft) and 15/33 (6286 x 150 ft, 271 ft displaced threshold on 15). NASR runway 09/27 (2636 x 60 ft: not available for Part 121 / 380 operations, under 6000 lb only) is not modelled.
+* **ILS:** 4 only (I-PGD 109.75); the Lee County VORTAC (RSW) used by the plates; 45 fixes.
+* **Frequencies:** 10 entries of the 17 NASR rows: ATIS 135.675, Clearance Delivery and Ground sharing 119.55, Tower 121.0, Fort Myers Approach/Departure 127.05 (the Southwest Florida International TRACON). A pilot's call goes to the position its flight phase needs.
+* **Tower hours:** 0600-2100 (contract tower). **The simulator does not close the tower**: the hours are in the data (`Airport.towerHours`) and the setup screen shows them next to the airport selector and, when the real clock at the airport is outside them, says the real tower is closed at this hour and that the simulator staffs it anyway.
+* **Charts (bundled):** 11 d-TPP PDFs: diagram, ILS or LOC 4, RNAV (GPS) 4, 15, 22 and 33 (all transcribed), the LUBBR FOUR and PIKKR SEVEN arrivals (the PGD bodies), two minimums pages.
+* **Taxiway identifiers:** 12 of the 18 on the diagram (A1, A3, A4, G1, G2, G3 are missing from OSM).
+* **Stands:** 20: 10 OSM gates, 3 OSM GA stands, 7 synthetic spots inside an OSM apron.
+* **STARs and SIDs:** LUBBR FOUR and PIKKR SEVEN transcribed; PGD publishes **no DP or SID** (departures use the default initial altitude).
+* **Runway configurations:** none.
+* **Live weather:** AWC via the backend; NWS station KPGD direct (checked 2026-10-21) with an **empty `rawMessage`**, like KMHT.
+* **Traffic:** Allegiant (A320, A319, 737 MAX 8) and Sun Country (737-800) per flypgd.com; the aircraft types come from the airlines' fleets, not from the airport page.
+* **Not included:** hot spot, LAHSO, MVA sectors, holding patterns, fix altitudes. Career steps and training lessons are KACY-only.
+
+### EGLL (London Heathrow; first airport outside the US; Class D London CTR)
+
+* **Sources and cycle:** the **UK AIP** (NATS eAIP, AIRAC 10/2026, effective 2026-10-01, retrieved 2026-10-21), transcribed by hand because there is no FAA data; OSM 3 km extract (ODbL); the operator's runway alternation programme 2026. Full source list, licence reasoning and unverified items: `data/sources/README.md` (EGLL); UK/FAA phraseology differences: `docs/UK-PHRASEOLOGY.md`.
+* **Runways:** ARP 51 28 39 N 000 27 41 W, elevation 83 ft, variation 1.23 E (the AIP prints the 2027 value); 09L/27R (3901 x 50 m) and 09R/27L (3658 x 50 m) with declared distances; the 09L and 09R landing thresholds are displaced 309 / 308 m (the pavement ends are derived from them); tower H24. No runway crossing.
+* **ILS:** four CAT III ILS/DME (I-AA, I-BB, I-LL, I-RR); derived DME fixes feed the ILS procedure.
+* **Frequencies:** 10 entries: Information (ATIS) 128.080, Heathrow Delivery 121.980, Ground 121.705, Tower 118.505, Director 119.730, London Control 134.125 (departures), and others (AD 2.18).
+* **Charts (link only):** 32 entries pointing at the official NATS AIP pages (aerodrome chart with hot spots HS1-HS5, 12 instrument approaches, SID and STAR chart pages). **The UK AIP charts are copyright NATS Limited: they are linked and never bundled, proxied or cached**; the chart viewer shows the links and `npm run fetch-charts` skips EGLL.
+* **Taxiway identifiers:** 41 of the 69 on the AIP aerodrome chart; the suffixed identifiers (A9E, A9W, A10E, A10W) and the "Link nn" stubs are missing (the command parser takes a letter and up to two digits).
+* **Stands:** 195 OSM ways whose number is on the AIP stand charts (Terminals 2 to 5 and the cargo area).
+* **STARs and SIDs:** 18 RNAV STARs to the four holding fixes (OCK, BIG, LAM, BNN) and 24 SIDs, all transcribed (every fix, track, distance and level read from the coding tables; SID initial altitude 6000 ft); 4 ILS plates transcribed with RDH and missed approach (the LOC and RNP plates are listed, not transcribed). The traffic generator does not assign STARs (more than one per runway end): arrivals use the ILS procedure with derived DME fixes.
+* **Runway configurations:** segregated mode (one runway lands, the other departs): W-ALT-27R, W-ALT-27L (westerly) and E-SEG-09L; 27 preferred up to 5 kt tailwind (AD 2.20 para 6); the westerly alternation comes from the operator's programme, not the AIP.
+* **Units:** QNH in hectopascals (METAR Q-group parsed) and visibility in metres, in the ATIS, top bar, weather drawer, readbacks and pilot calls; the airport clock is Europe/London.
+* **Live weather:** through the backend AWC proxy only (the NWS API has no UK stations); the static build says so and uses simulated weather.
+* **Traffic:** airlines from heathrow.com (British Airways dominant, Virgin Atlantic and others; BA and Virgin aircraft types from the operators, the rest ESTIMATEs); no general aviation (light aircraft are not permitted, AD 2.20); vehicles yes.
+* **Not included:** MVA sectors, LAHSO, the helicopter routes and VFR procedures of the London CTR, and the items in "Known differences" below. Career steps and training lessons are KACY-only.
+
+**Known differences (EGLL is not UK ATC training).** Every phrase, readback and rule is the FAA one unless listed as implemented in `docs/UK-PHRASEOLOGY.md`. Implemented: QNH in hectopascals and
+metric visibility end to end, the UK ATIS ending, the Heathrow facility call names (Delivery, Ground, Tower, Director), SID naming with the 6000 ft cap and segregated runway configurations. Not implemented: "line up" /
 "hold position" / "taxi to holding point" / conditional line up wording (FAA "line up and wait", "hold short"), "zero nine left" (the simulator says "nine left"), "stand" for gate, the
 Heathrow start-up call (type, stand, QNH, ATIS), altitude / flight level / transition altitude phraseology, UK wind wording ("surface wind 270 15"), UK ATIS element order, speeds and
 heading-vector phraseology of the Director, time-based separation and RECAT-EU, noise preferential routes and the 250 kt limit, low-visibility procedures and stop bars, the 15:00
 runway swap and weekly alternation (the configuration is chosen by headwind, first listed is 27R landing), runway 09 departures from the northern runway, taxiways with a suffix letter
-(A9E, N4W) and the "Link nn" stubs (they are geometry but unnamed, the command parser takes a letter and up to two digits), the helicopter routes and VFR procedures of the London CTR.
+(A9E, N4W) and the "Link nn" stubs (they are geometry but unnamed), the helicopter routes and VFR procedures of the London CTR.
 
 Behavioural realism is verified too: aircraft performance values carry a source each
 (Textron/Cessna, Airbus, EASA, EUROCONTROL), the 250 ft holding-position distance matches
@@ -87,12 +150,12 @@ holds are flown from the plate text, and 109 radio phrases were audited against 
 reviewed against the governing FAA text with measurements (`docs/BEHAVIOUR-ACCURACY.md`).
 
 Everything approximate or simplified is documented: runway holding positions are derived
-(250 ft from the centreline per the FAA design standard; the FAA data has no hold-line coordinates), most parking
-spots other than the ten OSM gate stands are synthetic positions inside the real aprons,
-aircraft performance is a simplified model (the 11 type entries of `src/sim/performance.ts`: C172, A320, B738, BCS3, E175, CRJ9, B752, C208, H65, F16 and the airport vehicle), and 32 short OSM apron
-lanes could not be matched to a charted identifier. See `data/sources/README.md` and
-`src/airport/kacy/build-report.md`. The OSM-derived layer is © OpenStreetMap
-contributors, ODbL 1.0. FAA data (NASR, d-TPP charts, MVA) is a US government work in the public domain. The simulator code is MIT
+(250 ft from the centreline per the FAA design standard; the FAA data has no hold-line coordinates), parking
+spots that are not OSM ways are synthetic positions inside the real aprons (counts per airport above),
+aircraft performance is a simplified model (the 45 type entries of `src/sim/performance.ts`: C172, A320, B738, BCS3, E175, CRJ9, B752, C208 (ESTIMATEs for the original KACY/KMHT types), 34 types
+added for KBOS, KPHL and EGLL from the EUROCONTROL Aircraft Performance Database and Airbus/EASA documents (A319 to GLEX), the MH-65 helicopter, the F-16 and the airport vehicle). See `data/sources/README.md` and
+`src/airport/<icao>/build-report.md` (one per airport). The OSM-derived layer is © OpenStreetMap
+contributors, ODbL 1.0. FAA data (NASR, d-TPP charts, MVA) is a US government work in the public domain; the UK AIP is © NATS Limited (data transcribed by hand, charts linked only). The simulator code is MIT
 licensed (`LICENSE`); see `CONTRIBUTING.md` to help out.
 
 ## Quick start
@@ -103,9 +166,12 @@ npm run server   # local backend on :8787 (AWC weather proxy, FAA chart proxy, o
 npm run dev      # Vite on http://localhost:5173
 ```
 
-Open the app, pick the airport (KACY by default, KMHT or KPHL), a mode (Free Play, Career,
-Training; the last two are KACY-only), a scenario, weather (**live METAR of the chosen airport** is the
-default; or a simulated preset), runway configuration and controller position, then Start.
+Open the app and pick the airport from the selector (six: KACY by default, KMHT, KBOS, KPHL, KPGD, EGLL). Each airport's data is a separate chunk loaded when it is
+chosen, so the setup screen shows "Loading airport data..." for a moment on the first visit and downloads only that airport. Next to the selector the setup screen shows the
+tower hours and, when the real clock at the airport is outside them (KPGD 0600-2100 local), a notice that the real tower is closed at this hour and the simulator staffs it anyway.
+Then pick a mode (Free Play, Career, Training; the last two are KACY-only), a scenario, weather (**live METAR of the chosen airport** is the
+default; or a simulated preset), the **runway configuration** (a selector with the published configurations and "Auto" at KBOS, KPHL and EGLL; landing and departing
+runway selectors at the other airports) and the controller position, then Start. At EGLL the ATIS and displays use QNH in hectopascals and visibility in metres, and the Charts drawer lists links to the official NATS pages instead of PDFs.
 
 **Wind.** Gusts in the METAR (or in a preset, e.g. *Gusty crosswind*) are flown: each aircraft sees its own seeded gust
 sequence, so finals and takeoff rolls are unsteady and the float in the flare varies (gust model constants are design values,
@@ -115,7 +181,7 @@ gust speed. Where a source exists for a type (only the Cessna 172: 15 kt demonst
 effective crosswind (halfway between steady and gust, a design choice) exceeds it, and goes around only if the gusted
 crosswind exceeds it by 5 kt or more for 2 s on final. Large and turbine-powered aircraft fly a 1,500 ft pattern, arrivals
 use the glidepath angle and threshold crossing height of the cleared approach plate (or the runway's visual glide slope), go-arounds climb to the
-published missed approach altitude, and the displaced thresholds at Manchester (6, 17, 35) are modelled and drawn.
+published missed approach altitude, and displaced thresholds (Manchester 6, 17, 35; Boston 4R, 22L, 22R, 15R; Philadelphia 27L; Punta Gorda 15; Heathrow 09L and 09R) are modelled and drawn.
 
 **Real time by default.** The session clock is the real clock: sim time advances one second per wall-clock second
 (corrected against `performance.now`, so it does not drift), the Zulu time, sunrise/sunset (DAY/NIGHT in the top bar) and
@@ -163,10 +229,10 @@ The Piper voice was trained on LibriTTS-R (CC BY 4.0, Koizumi et al., https://ww
 
 * `GITHUB_PAGES=1` makes `vite.config.ts` use the base path `/atc-simulator/` (override with `VITE_BASE`, e.g. `VITE_BASE=/` for a custom domain)
   and sets `VITE_STATIC_HOSTING=1`, which tells the app there is no backend: it skips `/api` and the localhost backend, shows "needs the local
-  backend (npm run server)" for Deepgram and live weather, and loads charts from the bundled files. The build also writes `dist/404.html`
+  backend (npm run server)" for Deepgram and for live weather at EGLL (the other airports use the NWS API), and loads charts from the bundled files (EGLL charts open the official NATS link). The build also writes `dist/404.html`
   (a copy of `index.html`) so deep links open the app.
-* `npm run fetch-charts` (`scripts/fetch-charts.ts`) downloads every d-TPP PDF the chart viewer references (about 8 MB for KACY and KMHT)
-  into `public/charts/<ICAO>/`. The files are git-ignored and fetched fresh in CI. Chart loading order: bundled file, then the local `/api` proxy
+* `npm run fetch-charts` (`scripts/fetch-charts.ts`) downloads every d-TPP PDF the chart viewer references for KACY, KMHT, KBOS, KPGD and KPHL (about 8 MB for KACY and KMHT; KBOS has 52 PDFs, so the full set is larger)
+  into `public/charts/<ICAO>/`. **EGLL is skipped** (it is `linkOnly`: the UK AIP charts are copyright NATS Limited, so the Charts drawer links to the official NATS pages and nothing is downloaded or bundled). The files are git-ignored and fetched fresh in CI. Chart loading order: bundled file, then the local `/api` proxy
   (not on Pages), then the direct FAA URL. d-TPP cycles last 28 days: after a new cycle the chart index (`data/sources/*-procedures.json`) must be
   refreshed or the bundled charts go out of date.
 * Try the Pages build locally: `GITHUB_PAGES=1 npm run build && npm run fetch-charts && node scripts/serve-pages.mjs` then open
@@ -212,13 +278,13 @@ The e2e test (`e2e/tower.spec.ts`) needs WebGL; headless Chromium uses SwiftShad
 ## Commands
 
 ```bash
-npm test          # vitest: engine, parser, airport data, weather, charts, voice, game, ui
-npm run test:e2e  # playwright (e2e/): gameplay, layout, Tower, landline, a console-clean sweep (both airports x five position choices, every view and drawer, fails on any console error or warning), plus Whisper, Web Speech (real Chrome) and Deepgram-protocol voice tests
+npm test          # vitest: engine, parser, airport data, weather, charts, voice, game, ui (about 3,500 tests, 3536 on 2026-10-22; allow 2 to 3 minutes)
+npm run test:e2e  # playwright (e2e/): gameplay, layout, Tower, landline, a console-clean sweep (all six airports, every view and drawer, five position choices at KACY and KMHT, all positions and Tower at the others, the runway-configuration selector, EGLL QNH ATIS and linked charts; fails on any console error, warning, page error or failed request), plus Whisper, Web Speech (real Chrome) and Deepgram-protocol voice tests
                   # against a production build: npm run build && E2E_PREVIEW=1 E2E_PORT=5190 npx playwright test --project=chromium
 npm run typecheck
 npm run lint
 npm run fetch-charts                    # download the FAA chart PDFs into public/charts (used by the static build)
-npm run build:airport -- KMHT           # regenerate an airport dataset from data/sources (KACY or KMHT); also: npx tsx scripts/build-airport.ts KACY
+npm run build:airport -- KBOS           # regenerate an airport dataset from data/sources (KACY, KMHT, KBOS, KPHL, KPGD or EGLL); also: npx tsx scripts/build-airport.ts KACY
 npx tsx scripts/build-kacy-airport.ts   # same as build-airport.ts KACY (kept)
 ```
 
@@ -304,7 +370,7 @@ See `docs/ARCHITECTURE.md` (module map and contracts) and `docs/PROGRESS.md`
 
 ## Traffic variety (free play)
 
-Besides airline arrivals / departures and GA, free play can add (setup screen, one checkbox per kind): **Coast Guard MH-65 helicopters** (air taxi, hover, takeoff from the helipad, landing at a helipad: JO 7110.65 3-11), **Air National Guard F-16C** (singles and flights of two from the ANG ramp, overhead maneuver arrivals: 3-10-12, 2-1-13), **VFR transitions through the Class C** (squawk, radar contact, release: 7-8, AIM 3-2-4), **flight training** (touch-and-go circuits) and **airport vehicles** (runway and pavement inspections, "proceed" / "hold" instructions, runway occupancy and incursions: 3-7-2, AC 150/5210-20A). KACY offers all five, KMHT only transitions and vehicles. Everything is sourced or marked UNVERIFIED: docs/REALISM-VERIFICATION.md section 9, docs/FAA-REFERENCES.md "Traffic variety". Callsign digits are generated, never real serial numbers or tactical callsigns.
+Besides airline arrivals / departures and GA, free play can add (setup screen, one checkbox per kind): **Coast Guard MH-65 helicopters** (air taxi, hover, takeoff from the helipad, landing at a helipad: JO 7110.65 3-11), **Air National Guard F-16C** (singles and flights of two from the ANG ramp, overhead maneuver arrivals: 3-10-12, 2-1-13), **VFR transitions through the Class C** (squawk, radar contact, release: 7-8, AIM 3-2-4), **flight training** (touch-and-go circuits) and **airport vehicles** (runway and pavement inspections, "proceed" / "hold" instructions, runway occupancy and incursions: 3-7-2, AC 150/5210-20A). KACY offers all five; KMHT and KPGD only transitions and vehicles, KBOS transitions (1 per hour) and vehicles, KPHL and EGLL only vehicles (a kind appears only where the airport has it for a documented reason: `data/sources/README.md` "Traffic variety"). Everything is sourced or marked UNVERIFIED: docs/REALISM-VERIFICATION.md section 9, docs/FAA-REFERENCES.md "Traffic variety". Callsign digits are generated, never real serial numbers or tactical callsigns.
 
 ## Supported ATC instructions
 
@@ -319,7 +385,7 @@ land-and-hold-short (LAHSO) clearances. Tower vocabulary: runway exit instructio
 sequencing ("number two, follow the Skyhawk", extend downwind, turn base now, make short approach, make left three sixty), closed traffic,
 touch-and-go / low approach / option, position reports ("report midfield downwind / base / two mile final"), "squawk VFR / squawk one two zero
 zero", "frequency change approved", wind and altimeter with a clearance, line up and wait with traffic information.
-About 880 tests in `src/commands`. Positions: Clearance Delivery,
+About 880 tests in `src/commands` (881 on 2026-10-22). Positions: Clearance Delivery,
 Ground, Tower, Approach/Departure, or any combination.
 
 **Coordination between positions.** The positions you do not work are run by AI controllers, and the positions talk to each other the way a cab does over the
@@ -332,10 +398,10 @@ crossing or an IFR takeoff without the approval is refused in training and score
 ## Layout
 
 ```
-src/sim        simulation engine        src/airport   verified KACY / KMHT / KPHL datasets + taxiway graphs
+src/sim        simulation engine        src/airport   verified datasets (KACY KMHT KBOS KPHL KPGD EGLL), loaded lazily + taxiway graphs
 src/commands   phraseology parser       src/radio     readbacks, frequencies
 src/voice      PTT, STT, TTS, radio FX  src/weather   METAR, presets, ATIS, runway selection
-src/charts     FAA chart viewer         src/game      scenarios, traffic, training, career, debrief
+src/charts     chart viewer (FAA PDFs, EGLL links)        src/game      scenarios, traffic, training, career, debrief
 src/ui         React app               server/       weather/chart proxy, Deepgram token, phrase interpreter
 data/sources   FAA/OSM/AWC extracts with provenance (raw downloads are git-ignored)
 scripts        build-airport.ts <ICAO> (+ airports/<icao>.ts profiles), extract-nasr-airport.ts, osm-overpass-to-geojson.ts

@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
 import { expect, test } from '@playwright/test';
 import type { ConsoleMessage, Page } from '@playwright/test';
 import { quietVoice } from './helpers';
@@ -25,7 +27,11 @@ const ALLOWED: { pattern: RegExp; why: string }[] = [
   },
 ];
 
-const AIRPORTS = ['KACY', 'KMHT'] as const;
+const AIRPORTS = ['KACY', 'KMHT', 'KBOS', 'KPHL', 'KPGD', 'EGLL'] as const;
+/** Airports that get the whole controller-position matrix; the others run "all positions" and "Tower" only (wall time). */
+const FULL_MATRIX = new Set<string>(['KACY', 'KMHT']);
+/** Airports whose data defines published runway configurations (the setup screen then shows the configuration selector). */
+const WITH_RUNWAY_CONFIGS = ['KBOS', 'KPHL', 'EGLL'] as const;
 const POSITIONS = [
   { value: 'CLNC', name: 'Clearance' },
   { value: 'GND', name: 'Ground' },
@@ -70,8 +76,17 @@ async function simSeconds(page: Page): Promise<number> {
   return h * 3600 + m * 60 + s;
 }
 
+test('the airport list above matches the registry in src/airport/index.ts', () => {
+  const src = readFileSync(path.resolve(import.meta.dirname, '../src/airport/index.ts'), 'utf8');
+  const block = src.slice(src.indexOf('const AIRPORTS'), src.indexOf('function entryFor'));
+  const registered = [...block.matchAll(/^\s{2}([A-Z]{4}):\s*\{/gm)].map((m) => m[1]).sort();
+  expect(registered.length).toBeGreaterThan(0);
+  expect([...AIRPORTS].sort(), 'add the new airport to AIRPORTS in e2e/console-clean.spec.ts').toEqual(registered);
+});
+
 for (const icao of AIRPORTS) {
   for (const pos of POSITIONS) {
+    if (!FULL_MATRIX.has(icao) && pos.value !== 'ALL' && pos.value !== 'TWR') continue;
     test(`${icao} as ${pos.name}: 3 sim minutes, every view and drawer, no console output`, async ({ page }) => {
       test.setTimeout(420_000); // 3 sim minutes is 45 s of wall time at 4x on an idle machine; CPU-starved CI or a busy laptop takes several times that
       await quietVoice(page);
@@ -79,6 +94,20 @@ for (const icao of AIRPORTS) {
 
       await startFreePlay(page, icao, pos.value);
       await page.getByTestId('speed-4').click();
+
+      if (pos.value === 'ALL' && icao === 'EGLL') {
+        // UK airport: QNH in the ATIS and charts only linked to the official NATS AIP, never a bundled PDF.
+        await page.getByTestId('atis-button').first().click();
+        await expect(page.getByTestId('atis-text')).toContainText('QNH');
+        await page.keyboard.press('Escape');
+        await page.getByTestId('open-charts').first().click();
+        await expect(page.getByText('Official UK AIP', { exact: true })).toBeVisible();
+        const official = page.getByRole('link', { name: /Open official chart/ });
+        await expect(official).toBeVisible();
+        expect(await official.getAttribute('href')).toMatch(/^https:\/\/[^/]*nats\.co\.uk\/.*\.pdf$/);
+        await expect(page.locator('iframe, embed, canvas[data-testid*="chart"]')).toHaveCount(0);
+        await page.keyboard.press('Escape');
+      }
 
       // Views: the Surface tab is shown first; visit Radar and Tower (when the layout places them as tabs) and come back.
       for (const view of ['radar', 'tower', 'surface']) {
@@ -110,4 +139,19 @@ for (const icao of AIRPORTS) {
       expect(found, found.map((f) => `${f.kind}: ${f.text}`).join('\n')).toEqual([]);
     });
   }
+}
+
+for (const icao of WITH_RUNWAY_CONFIGS) {
+  test(`${icao}: the setup screen offers the runway-configuration selector`, async ({ page }) => {
+    await quietVoice(page);
+    const found = watch(page);
+    await page.goto('/');
+    await expect(page.getByTestId('setup-screen')).toBeVisible();
+    await page.getByTestId('airport-select').selectOption(icao);
+    await page.getByTestId('mode-free').click();
+    const select = page.getByTestId('runway-configuration');
+    await expect(select).toBeVisible();
+    expect(await select.locator('option').count()).toBeGreaterThan(1); // "Auto" plus at least one published configuration
+    expect(found, found.map((f) => `${f.kind}: ${f.text}`).join('\n')).toEqual([]);
+  });
 }

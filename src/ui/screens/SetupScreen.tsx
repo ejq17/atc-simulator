@@ -334,7 +334,7 @@ function SetupForm({ nowMs, initialIcao }: { nowMs?: number; initialIcao: string
             <div className="font-sans text-[11px] uppercase tracking-[0.34em] text-atc-cyan">{airport.name} · {airport.icao}</div>
             <h1 className="mt-2 font-sans text-[26px] font-bold uppercase leading-none tracking-[0.08em] sm:text-[34px] sm:tracking-[0.12em] text-atc-text">{airport.icao} ATC Simulator</h1>
             <p className="mt-3 max-w-xl font-sans text-[13px] leading-relaxed text-atc-muted">
-              Work Clearance Delivery, Ground, Tower, Departure and Approach at {callName} with real FAA runway, taxiway and procedure data. Speak or type your clearances; pilots read back, taxi, line up and fly.
+              Work Clearance Delivery, Ground, Tower, Departure and Approach at {callName} with real runway, taxiway and procedure data (FAA, or the UK AIP for Heathrow). Speak or type your clearances; pilots read back, taxi, line up and fly.
               Entertainment and learning software, not ATC training.
             </p>
             <label className="mt-4 flex items-center gap-3">

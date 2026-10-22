@@ -59,7 +59,7 @@ export function LinkOnlyCharts({ icao, initialChartId, onChartChange, className 
         <p className="text-[11px] text-atc-muted" data-testid="chart-cycle">{cycle.label}</p>
         {chart.note && <p className="text-[11px] text-atc-amber">{chart.note}</p>}
         <p className="text-xs leading-relaxed text-atc-text">
-          The UK AIP charts are copyright NATS Limited and are not bundled with this site. The link opens the official eAIP chart on the NATS AIS server (nats.aero/ais); the
+          The UK AIP charts are copyright NATS Limited and are not bundled with this site. The link opens the official eAIP chart on the NATS AIS server (aurora.nats.co.uk); the
           path changes with every AIRAC cycle, so after {cycle.effectiveTo} use the AIP page of the NATS AIS website to reach the current edition.
         </p>
         <div className="flex flex-wrap gap-4">

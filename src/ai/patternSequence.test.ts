@@ -23,7 +23,7 @@ describe('landing sequence for the pattern', () => {
     expect(landed).toBe(5);
     expect(h.events.filter((e) => e.kind === 'GO_AROUND').length).toBeLessThanOrEqual(2);
     expect(h.events.filter((e) => (e.kind === 'SEPARATION_VIOLATION' && !/on the ground/.test(e.text)) || e.kind === 'RUNWAY_INCURSION').map((e) => `${e.timeSec} ${e.text}`)).toEqual([]);
-  });
+  }, 120_000); // a 2400 s simulation with five arrivals: far longer than the 30 s default when several suites share the CPU
 
   it('pattern leg is read from heading and position, and the base-turn ETA is never later than the normal one once the aircraft is extended', () => {
     const g = findRunwayEnd(kacy, '22')!;

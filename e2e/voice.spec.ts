@@ -15,7 +15,7 @@ import type { ClipName, VoiceBrowser } from './fixtures/voiceBrowser';
 import { startScenario, TAKEOFF_READBACK } from './helpers';
 
 test.describe.configure({ mode: 'serial' });
-test.beforeEach((_fixtures, testInfo) => {
+test.beforeEach(({ browserName: _browserName }, testInfo) => {
   test.skip(testInfo.project.name !== 'chromium-fake-mic', 'needs the fake-microphone browser launch args');
 });
 

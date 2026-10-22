@@ -31,7 +31,7 @@ describe('<SetupScreen /> airport selector', () => {
     fireEvent.change(screen.getByTestId('airport-select'), { target: { value: 'KMHT' } });
     expect(screen.getByText('KMHT ATC Simulator')).toBeInTheDocument();
     expect(screen.getByText(/Manchester Boston Regional · KMHT/)).toBeInTheDocument();
-    expect(screen.getByText(/at Manchester with real FAA runway/)).toBeInTheDocument();
+    expect(screen.getByText(/at Manchester with real runway, taxiway and procedure data/)).toBeInTheDocument();
     expect(fetchLiveMetar).toHaveBeenLastCalledWith('KMHT');
     expect(screen.getByText('Live KMHT METAR')).toBeInTheDocument();
     expect(screen.getAllByText(/121\.3/).length).toBeGreaterThan(0);

@@ -1,3 +1,25 @@
+# Data sources and provenance
+
+Contents:
+
+**Airports** (each has its own Files, Key facts, Live weather where relevant, and a "Not verified" list):
+
+* [KACY (Atlantic City International, NJ) - verified source data](#kacy-atlantic-city-international-nj---verified-source-data), [Not verified (KACY)](#not-verified-kacy)
+* [KMHT (Manchester-Boston Regional, NH) - verified source data](#kmht-manchester-boston-regional-nh---verified-source-data), [Not verified (KMHT)](#not-verified-kmht)
+* [KBOS (General Edward Lawrence Logan International, Boston MA) - verified source data](#kbos-general-edward-lawrence-logan-international-boston-ma---verified-source-data), [Not verified (KBOS)](#not-verified-kbos)
+* [KPGD (Punta Gorda Airport, FL) - verified source data](#kpgd-punta-gorda-airport-fl---verified-source-data), [Not verified (KPGD)](#not-verified-kpgd)
+* [KPHL (Philadelphia International, PA) - verified source data](#kphl-philadelphia-international-pa---verified-source-data), [Not verified (KPHL)](#not-verified-kphl)
+* [EGLL (London Heathrow) - hand-transcribed from the UK AIP](#egll-london-heathrow---hand-transcribed-from-the-uk-aip), [Not verified (EGLL)](#not-verified-egll)
+
+**Shared sections** (at the end, apply to every airport):
+
+* [Plate geometry: glidepath TCH and missed approach altitudes (added 2026-10-18)](#plate-geometry-glidepath-tch-and-missed-approach-altitudes-added-2026-10-18)
+* [Traffic variety (added 2026-10-18)](#traffic-variety-added-2026-10-18)
+* [Aircraft performance: types added for KBOS, KPHL and EGLL (2026-10-21)](#aircraft-performance-types-added-for-kbos-kphl-and-egll-2026-10-21)
+* [Runway configurations, time zone and non-FAA provenance (facility JSON, optional fields)](#runway-configurations-time-zone-and-non-faa-provenance-facility-json-optional-fields)
+
+Not verified items of the aircraft performance and of the weather API are in the shared sections and in `weather-api.md`.
+
 # KACY (Atlantic City International, NJ) - verified source data
 
 Retrieved **2026-10-16**. All values below were read from the downloaded official files (raw copies in `raw/`) by script or by reading the FAA chart PDFs. Nothing was filled in from memory. Anything not verifiable is listed in "Not verified" at the bottom and marked `UNVERIFIED` inside the JSON.
@@ -82,7 +104,7 @@ OSM taxiway `ref` values (90 taxiway ways: 24 with a ref, 66 with no ref): **A, 
 10. OSM aerodrome/AWC elevations differ from NASR: AWC METAR station `elev` 18, lat/lon 39.452, -74.567 (station location, not ARP); OSM aerodrome `ele` 19.
 11. d-TPP metadata `amdtdate` is blank for several charts; the amendment printed on each plate is recorded in `kacy-procedures.json` as `printed_amendment_on_plate`. High-altitude plates carry "[USAF]" and ident "KACY" instead of "ACY".
 
-## Not verified (do not treat as fact)
+## Not verified (KACY)
 - Current (2026) magnetic declination at KACY.
 - Class C airspace dimensions (shelf altitudes/radii): only the fact that KACY is Class C is in NASR CSV; shape files (`class_airspace_shape_files.zip`) not downloaded.
 - UNICOM frequency; traffic pattern altitude (blank in NASR); Chart Supplement text not consulted (NASR CSV used instead; remarks could differ slightly from the printed Chart Supplement).
@@ -188,36 +210,6 @@ Diagram identifiers (read from the chart text and a render): A A1 A2 A3 A5 B C D
 ## Raw files (`raw/`, not committed)
 `nasr_2026-10-01/x_*_CSV/` (NASR CSVs, shared), `d-TPP_Metafile_2610.xml`, `kmht_dtpp_2610_pdfs/` (18 PDFs), `kmht_dtpp_http_head_checks.tsv`, `overpass_kmht_raw.json`.
 
-## Plate geometry: glidepath TCH and missed approach altitudes (added 2026-10-18)
-
-`kacy-plate-geometry.json` and `kmht-plate-geometry.json` (read by `scripts/build-airport.ts` through `profile.plateGeometryFile`) give every instrument approach a structured `glidepath` (`kind` GS / GP / VDA, `angleDeg`, `tchFt`) and `missedApproach` (`initialClimbFt`, `finalAltitudeFt`, `plateText`) in `InstrumentProcedure`.
-
-* **Method**: the d-TPP 2610 PDF text layer was extracted with pdfjs-dist; the "MISSED APPROACH:" box and the "TCH n" / "GS|GP x.xx" labels were located by page position. The two USAF plates with no text layer (KACY HI-ILS Y OR LOC Y RWY 13, HI-VOR OR TACAN RWY 31) were rendered to images and read visually. All 24 values were compared with the earlier transcriptions in `*-procedures.json` (`plate_notes`, `missed_approach`): all agree. Four KMHT plates that file lists as not transcribed (RNP Z 17, RNP Z 35, ILS 35 CAT II-III, SA CAT I) now have their TCH and missed approach altitudes, read from the plate text layer (new: RNP Z 17 "Climb to 2100 on track 172 deg to YOULL and hold"; RNP Z 35 and the CAT II-III / SA CAT I ILS "Climb to 3000 on track 352 deg to BLUUM and hold" / "Climb to 4000 direct CON VOR/DME and hold").
-* **TCH is the plate's glidepath TCH, not the VGSI TCH.** Several plates print both ("GS 3.00 TCH 58" and "VGSI Angle 3.00 / TCH 71 not coincident"); the first is `glidepath.tchFt`, the second is the NASR `threshold_crossing_height_ft` of the runway end, kept as `RunwayEnd.visualGlidepath` and used for visual approaches. VOR plates print a visual descent angle (VDA 3.05 deg TCH 47 on VOR 4, 3.12 / 52 on VOR 31). The COPTER ILS 13 plate prints HCH 58 (helicopter crossing height).
-* **Fallbacks, labelled**: an instrument approach without a transcribed glidepath flies 3 deg / 50 ft (`glidePathFor(...).source === 'default'`); a missed approach without a published altitude climbs to 2,000 ft (`IFR_MISSED_APPROACH_FT`) with an INFO event.
-* **Not verified**: the plates are a human / extracted transcription, not checked against the FAA digital procedures data; the cycle is 2610 (expires 2026-10-29).
-
-## Traffic variety (added 2026-10-18)
-
-No new geometry file: everything below is read from the datasets already in the repo plus the web sources listed. What exists, and why each kind is (not) generated:
-
-| Kind | Evidence in the data | Used at |
-|---|---|---|
-| Coast Guard helicopters | KACY OSM `aeroway=helipad name=USCG` (4 features) -> parking positions `USCG-1..4` in `src/airport/kacy/kacy.airport.json` (category `military`, `scripts/airports/kacy.ts`). The 2 other OSM helipads are not USCG-tagged and are not used. The NASR private helipad H1 ("PVT - EXPERIMENTAL USE ONLY") is not used. The pads connect to the taxi graph through nodes AP021-AP024 (about 53 m). | KACY only |
-| Air National Guard fighters | `ANG-1..6` (synthetic spots 30 m north of OSM hangars on the ANG ramp) and `ANG-PAD-1/2` (arm / dearm pad spots, not used for departures) in the same file; the README notes above say the ramp polygon is not in the dataset and taxiway G is absent from OSM, so the real nearest taxi nodes of the graph are used. The 177th Fighter Wing's F-16C/D and Atlantic City ANG base: public (af.mil / ang.af.mil, njmilitiamuseum.gov, Wikipedia search results 2026-10-18). Tail-number lists are photo databases, not used. | KACY only |
-| Arresting gear BAK-14 / BAK-12B | `kacy-facility.json` (NASR). No source for the rigged / derigged state or its announcement: **informational only, no gameplay, no ATIS text**. | - |
-| FAA ops 123.4 / ANG ops 140.7 | recorded as "not ATC" frequencies (OTHER); not used. | - |
-| VFR transitions | Class C airspace flag of KACY (NASR, `airspaceClass` C) and KMHT (C); JO 7110.65 7-8, AIM 3-2-4. | KACY, KMHT |
-| Flight training | No dataset or source names a flight school at KACY or KMHT. The pattern-work behaviour is generic (touch-and-go circuits of GA arrivals, JO 7110.65 3-8-2); the share (40 %) is a design value, enabled for KACY only (the task named training at KACY; KMHT has no source and gets none). | KACY |
-| Airport vehicles | Every towered airport has them (AC 150/5210-20A); they park at the `fbo` / `cargo` positions (KACY FBO-1/2, FAA-1/2/3; KMHT FBO-1..3 and CARGO-*). No published vehicle crossing points exist in the data (no `vehicle crossing` feature in OSM, NASR or the diagram notes searched), so vehicle crossings use the ordinary taxiway-runway crossings of the graph. | KACY, KMHT |
-| KMHT USCG / ANG | None found: no helipad or military ramp feature in the KMHT dataset and no unit sourced; KMHT gets neither kind. | - |
-
-Web sources (retrieved 2026-10-18): USCG MH-65E fact sheet (dcms.uscg.mil, via search result text; HTTP 403 to scripts); Coast Guard Aviation Association MH-65C table (search result text); USAF F-16 fact sheets (af.mil and unit sites, via search result text); FAA JO 7110.65BB, AIM, AC 150/5210-20A and JO 7110.126A (fetched). Figures and verdicts: docs/REALISM-VERIFICATION.md section 9; callsign and phrase sources: docs/FAA-REFERENCES.md "Traffic variety".
-
-The COPTER ILS 13 plate (HCH 58) in `kacy-procedures.json` is not flown: helicopters in the simulator are VFR and go straight to their pad.
-
-Callsign digits of generated Coast Guard (`CGD#####`) and Air Guard (`ANG#####`) flights are generated, exactly as the N-numbers of generated GA traffic are; no real serial number is stored anywhere.
-
 # KBOS (General Edward Lawrence Logan International, Boston MA) - verified source data
 
 Added 2026-10-21 in four steps: d-TPP transcription (`kbos-procedures.json`, `kbos-plate-geometry.json`), `npx tsx scripts/extract-nasr-airport.ts BOS KBOS 2026-10-01 2026-10-21` (`kbos-facility.json`, `-frequencies.json`, `-navaids.json`), Overpass + `scripts/osm-overpass-to-geojson.ts` (`kbos-taxiways.geojson`) and the Massport runway-configuration sources (`kbos-runway-configurations.json`, embedded by the extractor as `facility.runway_configurations`). Nothing aeronautical was typed from memory. NASR 2026-10-01 CSVs are the shared `raw/nasr_2026-10-01/`; d-TPP cycle **2610** (volume NE-1).
@@ -270,48 +262,6 @@ No wind sector or tailwind limit is published in any of them, so those fields ar
 * Not transcribed: RNP X 33L fixes, OOSHN FIVE, WOONS TWO, SID legs after the first fixes, holding patterns and fix altitudes, MVA sectors, takeoff-minimums booklet.
 * Usage of each STAR and the current runway-configuration shares; wind limits of every configuration.
 * Raw documents: `raw/kbos_runway_use_docs/`.
-
-## Aircraft performance: types added for KBOS, KPHL and EGLL (2026-10-21)
-
-Types added to `src/sim/performance.ts` and `aircraft-performance.json` (entries `A319 A20N A21N A321 B737 B38M B739 E190 CRJ7 B762 B763 A306 B772 B77W B788 B789 A332 A333 A339 A359 A35K A388 B744 B748 MD11 DH8D BE20 BE9L PC12 C402 C56X CL35 GLF5 GLEX`; the block `_meta_kbos_kphl_egll` lists the source keys). Whether a given airline flies a type at each airport in 2026 is NOT checked here (that is the airport traffic profile's own sourcing): the entries only make the performance model complete.
-
-Downloads (all retrieved 2026-10-21, `User-Agent: atc-simulator-research/1.0`):
-
-| What | URL | HTTP | Raw copy |
-|---|---|---|---|
-| EUROCONTROL Aircraft Performance Database, one page per type (34 types) | `https://learningzone.eurocontrol.int/ilp/customs/ATCPFDB/details.aspx?ICAO=<TYPE>` (`https://contentzone.eurocontrol.int/aircraftperformance/details.aspx?ICAO=<TYPE>` answers 301 to it) | 200 | `raw/realism/eurocontrol_acd_<TYPE>.html` |
-| FAA JO 7110.126A (09/28/2019), Appendix A TBL A-1 (page A1) | `https://www.faa.gov/documentLibrary/media/Order/JO_7110.126A.pdf` | 200 | `raw/realism/faa_JO_7110.126A.pdf` (listing from `pdftotext -layout`, confirmed on the page rendered with `pdftoppm -r 150`) |
-| FAA JO 7110.65 chapter 2 section 4 (2-4-14 super / heavy in the identification, 2-4-20 aircraft types) | `https://www.faa.gov/air_traffic/publications/atpubs/atc_html/chap2_section_4.html` | 200 | `raw/realism/faa_7110_65_chap2_section_4.html` |
-| Airbus A350 Aircraft Characteristics - Airport and Maintenance Planning, Jul 01/26 (A359 take-off and landing distance only) | `https://mediaassets.airbus.com/pm_38_916_916746-gxtwm2qvq4.pdf?fileName=a350-aircraft-characteristics-airport-and-maintenance-planning.pdf` (link from the Airbus "Aircraft Characteristics" page) | 200, 178 MB | not stored; section 3-3-0 (take-off weight vs runway length, ISA) and 3-4-0 (landing field length) read visually |
-
-Read per type from the ACD "performance table": V2, take-off distance, WTC (ICAO L/M/H/J), RECAT-EU, MTOW, initial-climb IAS / ROC, climb-to-FL150 IAS / ROC, cruise TAS and ceiling, descent IAS / ROD, approach IAS / ROD, landing Vat and distance, APC, wing span, length, height, power plant. The ACD page says "All data presented is only indicative and should not be used operationally ... Copyright permission must be sought from EUROCONTROL": the figures are facts used as references with attribution; the raw pages are not committed.
-
-Derivations (each repeated in the type's `_sources`): rotate = V2 - 5 kt; approach = Vat; touchdown = Vat - 5 kt; climb speed / rate = initial climb IAS / ROC; take-off and landing distance = ACD figures at MTOW (ft = m x 3.28084, rounded to 10); cruise 250 kt for jets (14 CFR 91.117(a)); `accelKtPerSec` = VR^2 / (2 x 0.8 x take-off distance) (ground roll 80 % of the distance, the A320 / B738 ratio); `maxSpeedKt` for jets = max(ACD climb IAS, descent IAS) + 30 kt; minimum speed = Vat - 15 kt. Taxi speeds, turn rates, braking and the 2,000 ft/min jet descent rate are DESIGN values (as for A320 / B738). Take-off distances are MTOW-basis: B77W (9,840 ft) fits only the longest ends (KBOS 4R/22L is 10,005 ft: the engine's check needs distance + 50 m, so it is marginal), B744 and B748 (10,830 / 10,470 ft) exceed it.
-
-RECAT (TBL A-1, page A1): A = A388; B = A332 A333 A359 B744 B748 B772 B77W B788 B789; C = A306 B762 B763 MD11; D = A339; E = B752; F = A319 A321 B737 B739 DH8D E190 GLEX GLF5; G = CRJ7; H = C56X; I = C402 PC12 BE20. Derived (type absent from TBL A-1, UNVERIFIED as listings): A20N, A21N, B38M = F (sibling types), A35K = B (the A359 is B), BE9L = I (10,100 lb is within the Category I definition), CL35 = H (40,600 lb is within the Category H definition).
-
-"super" / "heavy" in the callsign: Category A -> "super", B, C, D -> "heavy" (JO 7110.126A Appendix B amends JO 7110.65 2-4-14 / 2-1-20; 2-4-14: "The word heavy must be used as part of the identification in all communications with or about heavy aircraft", example "United Fifty-Eight Heavy"). The ICAO categories H / J in the ACD give the same set (A388 = J).
-
-### Not verified / not added (aircraft performance, 2026-10-21)
-
-- **Not added, no source for the figures**: `E75L` / `E75S` (no ACD page; the existing `E175` entry remains an ESTIMATE; both are RECAT G in TBL A-1), `AT76` (no ACD page; the ACD lists AT43, AT44, AT45, AT72 and AT75 only), `CL60` (ACD page has no take-off or landing distance). `B753`, `B77L`, `C680`, `C550` etc. were not requested.
-- A359 take-off / landing distance: the ACD shows 888 m for both (a data error); the entry uses chart reads of the Airbus A350 AC (about 2,550 m take-off at 268 t, ISA, sea level; about 1,950 m landing field length at maximum landing weight, +/-150 m).
-- The ACD figures are "indicative" and at MTOW / ISA / sea level; none is a certified performance figure. Some look odd and were taken as published: B38M take-off distance 2,500 m, C402 Vat 110 kt (a 2015 Cape Air training flashcard set, seen only as a web-search result, also lists 110 kt "Vref at threshold": a weak source), PC12 climb IAS 130 kt, A388 V2 150 kt. `cruiseSpeedKt` of DH8D / BE20 / BE9L / PC12 / C402 is an ACD climb or approach IAS, not a published cruise IAS.
-- Wing span and height are recorded in `_not_in_type_shape` and in `src/ui/tower/aircraftModel.ts` (Tower view, 2D glyph); there is no stand-size model in the simulator, so the figures are not used for stand fit (parking has categories only).
-- The KMHT types (B738, BCS3, E175, CRJ9, B752, C208) are still the 2026-10-17 ESTIMATEs; the ACD has pages for B738, BCS3, B752, C208 and CRJ9, so they can be cross-checked against it later (the ACD B738 Vat is 147 kt against the 140 kt in the file).
-- Operator presence in 2026 (BA 747-400, UPS / FedEx MD-11 after the November 2025 accident, Q400 operators) is not checked.
-
-## Runway configurations, time zone and non-FAA provenance (facility JSON, optional fields)
-
-Hub airports run published runway configurations (which runways take arrivals, which take departures, in which wind). The facility JSON may carry
-`runway_configurations`: a list in operator-preference order (ties and calm wind use the first usable entry), each `{ id, name, landing: [end ids],
-departing: [end ids], wind_from_deg?, wind_to_deg?, max_tailwind_kt?, notes, source, url?, retrieved?, approximate? }`. End ids are the runway-end
-identifiers ("4R", "27L"); the wind sector is magnetic, wind FROM, clockwise from `wind_from_deg` to `wind_to_deg` (may wrap through north).
-Each entry must cite where the configuration is published (ATIS, airport operator, AIP); an airport with no sourced configuration omits the list and
-the simulator falls back to one best-headwind runway for arrivals and departures. `airport.time_zone` (IANA, "Europe/London") is a sourced constant of
-the profile, not extracted; absent means America/New_York. `airspace.class` gives the airspace class letter. For an airport built from a non-FAA
-source (EGLL: UK AIP) `_provenance.source_name` / `source_url` in the facility JSON, and `source_name` / `source_url` in the procedures JSON
-`_provenance`, replace the default NASR / d-TPP labels in the built provenance entries. The field list is also in `scripts/airports/types.ts`.
 
 # KPGD (Punta Gorda Airport, FL) - verified source data
 
@@ -570,3 +520,81 @@ Overpass query: `[out:json][timeout:180];nwr["aeroway"~"^(runway|taxiway|apron|p
 ## Raw files (`raw/`, not committed)
 
 `egll/` (eAIP pages, text extracts, pdf_http_checks.tsv, terms, runway alternation page and PDF), `egll_aip_pdfs/` (62 chart PDFs), `overpass_egll_raw.json`, `cap413/` (CAP 413 Edition 24 PDF and text).
+
+---
+
+# Shared sections (all airports)
+
+These sections were written next to the airport that prompted them but apply to every airport.
+
+## Plate geometry: glidepath TCH and missed approach altitudes (added 2026-10-18)
+
+`kacy-plate-geometry.json` and `kmht-plate-geometry.json` (read by `scripts/build-airport.ts` through `profile.plateGeometryFile`) give every instrument approach a structured `glidepath` (`kind` GS / GP / VDA, `angleDeg`, `tchFt`) and `missedApproach` (`initialClimbFt`, `finalAltitudeFt`, `plateText`) in `InstrumentProcedure`.
+
+* **Method**: the d-TPP 2610 PDF text layer was extracted with pdfjs-dist; the "MISSED APPROACH:" box and the "TCH n" / "GS|GP x.xx" labels were located by page position. The two USAF plates with no text layer (KACY HI-ILS Y OR LOC Y RWY 13, HI-VOR OR TACAN RWY 31) were rendered to images and read visually. All 24 values were compared with the earlier transcriptions in `*-procedures.json` (`plate_notes`, `missed_approach`): all agree. Four KMHT plates that file lists as not transcribed (RNP Z 17, RNP Z 35, ILS 35 CAT II-III, SA CAT I) now have their TCH and missed approach altitudes, read from the plate text layer (new: RNP Z 17 "Climb to 2100 on track 172 deg to YOULL and hold"; RNP Z 35 and the CAT II-III / SA CAT I ILS "Climb to 3000 on track 352 deg to BLUUM and hold" / "Climb to 4000 direct CON VOR/DME and hold").
+* **TCH is the plate's glidepath TCH, not the VGSI TCH.** Several plates print both ("GS 3.00 TCH 58" and "VGSI Angle 3.00 / TCH 71 not coincident"); the first is `glidepath.tchFt`, the second is the NASR `threshold_crossing_height_ft` of the runway end, kept as `RunwayEnd.visualGlidepath` and used for visual approaches. VOR plates print a visual descent angle (VDA 3.05 deg TCH 47 on VOR 4, 3.12 / 52 on VOR 31). The COPTER ILS 13 plate prints HCH 58 (helicopter crossing height).
+* **Fallbacks, labelled**: an instrument approach without a transcribed glidepath flies 3 deg / 50 ft (`glidePathFor(...).source === 'default'`); a missed approach without a published altitude climbs to 2,000 ft (`IFR_MISSED_APPROACH_FT`) with an INFO event.
+* **Not verified**: the plates are a human / extracted transcription, not checked against the FAA digital procedures data; the cycle is 2610 (expires 2026-10-29).
+
+## Traffic variety (added 2026-10-18)
+
+No new geometry file: everything below is read from the datasets already in the repo plus the web sources listed. What exists, and why each kind is (not) generated:
+
+| Kind | Evidence in the data | Used at |
+|---|---|---|
+| Coast Guard helicopters | KACY OSM `aeroway=helipad name=USCG` (4 features) -> parking positions `USCG-1..4` in `src/airport/kacy/kacy.airport.json` (category `military`, `scripts/airports/kacy.ts`). The 2 other OSM helipads are not USCG-tagged and are not used. The NASR private helipad H1 ("PVT - EXPERIMENTAL USE ONLY") is not used. The pads connect to the taxi graph through nodes AP021-AP024 (about 53 m). | KACY only |
+| Air National Guard fighters | `ANG-1..6` (synthetic spots 30 m north of OSM hangars on the ANG ramp) and `ANG-PAD-1/2` (arm / dearm pad spots, not used for departures) in the same file; the README notes above say the ramp polygon is not in the dataset and taxiway G is absent from OSM, so the real nearest taxi nodes of the graph are used. The 177th Fighter Wing's F-16C/D and Atlantic City ANG base: public (af.mil / ang.af.mil, njmilitiamuseum.gov, Wikipedia search results 2026-10-18). Tail-number lists are photo databases, not used. | KACY only |
+| Arresting gear BAK-14 / BAK-12B | `kacy-facility.json` (NASR). No source for the rigged / derigged state or its announcement: **informational only, no gameplay, no ATIS text**. | - |
+| FAA ops 123.4 / ANG ops 140.7 | recorded as "not ATC" frequencies (OTHER); not used. | - |
+| VFR transitions | Class C airspace flag of KACY (NASR, `airspaceClass` C) and KMHT (C); JO 7110.65 7-8, AIM 3-2-4. | KACY, KMHT |
+| Flight training | No dataset or source names a flight school at KACY or KMHT. The pattern-work behaviour is generic (touch-and-go circuits of GA arrivals, JO 7110.65 3-8-2); the share (40 %) is a design value, enabled for KACY only (the task named training at KACY; KMHT has no source and gets none). | KACY |
+| Airport vehicles | Every towered airport has them (AC 150/5210-20A); they park at the `fbo` / `cargo` positions (KACY FBO-1/2, FAA-1/2/3; KMHT FBO-1..3 and CARGO-*). No published vehicle crossing points exist in the data (no `vehicle crossing` feature in OSM, NASR or the diagram notes searched), so vehicle crossings use the ordinary taxiway-runway crossings of the graph. | KACY, KMHT |
+| KMHT USCG / ANG | None found: no helipad or military ramp feature in the KMHT dataset and no unit sourced; KMHT gets neither kind. | - |
+
+Web sources (retrieved 2026-10-18): USCG MH-65E fact sheet (dcms.uscg.mil, via search result text; HTTP 403 to scripts); Coast Guard Aviation Association MH-65C table (search result text); USAF F-16 fact sheets (af.mil and unit sites, via search result text); FAA JO 7110.65BB, AIM, AC 150/5210-20A and JO 7110.126A (fetched). Figures and verdicts: docs/REALISM-VERIFICATION.md section 9; callsign and phrase sources: docs/FAA-REFERENCES.md "Traffic variety".
+
+The COPTER ILS 13 plate (HCH 58) in `kacy-procedures.json` is not flown: helicopters in the simulator are VFR and go straight to their pad.
+
+Callsign digits of generated Coast Guard (`CGD#####`) and Air Guard (`ANG#####`) flights are generated, exactly as the N-numbers of generated GA traffic are; no real serial number is stored anywhere.
+
+## Aircraft performance: types added for KBOS, KPHL and EGLL (2026-10-21)
+
+Types added to `src/sim/performance.ts` and `aircraft-performance.json` (entries `A319 A20N A21N A321 B737 B38M B739 E190 CRJ7 B762 B763 A306 B772 B77W B788 B789 A332 A333 A339 A359 A35K A388 B744 B748 MD11 DH8D BE20 BE9L PC12 C402 C56X CL35 GLF5 GLEX`; the block `_meta_kbos_kphl_egll` lists the source keys). Whether a given airline flies a type at each airport in 2026 is NOT checked here (that is the airport traffic profile's own sourcing): the entries only make the performance model complete.
+
+Downloads (all retrieved 2026-10-21, `User-Agent: atc-simulator-research/1.0`):
+
+| What | URL | HTTP | Raw copy |
+|---|---|---|---|
+| EUROCONTROL Aircraft Performance Database, one page per type (34 types) | `https://learningzone.eurocontrol.int/ilp/customs/ATCPFDB/details.aspx?ICAO=<TYPE>` (`https://contentzone.eurocontrol.int/aircraftperformance/details.aspx?ICAO=<TYPE>` answers 301 to it) | 200 | `raw/realism/eurocontrol_acd_<TYPE>.html` |
+| FAA JO 7110.126A (09/28/2019), Appendix A TBL A-1 (page A1) | `https://www.faa.gov/documentLibrary/media/Order/JO_7110.126A.pdf` | 200 | `raw/realism/faa_JO_7110.126A.pdf` (listing from `pdftotext -layout`, confirmed on the page rendered with `pdftoppm -r 150`) |
+| FAA JO 7110.65 chapter 2 section 4 (2-4-14 super / heavy in the identification, 2-4-20 aircraft types) | `https://www.faa.gov/air_traffic/publications/atpubs/atc_html/chap2_section_4.html` | 200 | `raw/realism/faa_7110_65_chap2_section_4.html` |
+| Airbus A350 Aircraft Characteristics - Airport and Maintenance Planning, Jul 01/26 (A359 take-off and landing distance only) | `https://mediaassets.airbus.com/pm_38_916_916746-gxtwm2qvq4.pdf?fileName=a350-aircraft-characteristics-airport-and-maintenance-planning.pdf` (link from the Airbus "Aircraft Characteristics" page) | 200, 178 MB | not stored; section 3-3-0 (take-off weight vs runway length, ISA) and 3-4-0 (landing field length) read visually |
+
+Read per type from the ACD "performance table": V2, take-off distance, WTC (ICAO L/M/H/J), RECAT-EU, MTOW, initial-climb IAS / ROC, climb-to-FL150 IAS / ROC, cruise TAS and ceiling, descent IAS / ROD, approach IAS / ROD, landing Vat and distance, APC, wing span, length, height, power plant. The ACD page says "All data presented is only indicative and should not be used operationally ... Copyright permission must be sought from EUROCONTROL": the figures are facts used as references with attribution; the raw pages are not committed.
+
+Derivations (each repeated in the type's `_sources`): rotate = V2 - 5 kt; approach = Vat; touchdown = Vat - 5 kt; climb speed / rate = initial climb IAS / ROC; take-off and landing distance = ACD figures at MTOW (ft = m x 3.28084, rounded to 10); cruise 250 kt for jets (14 CFR 91.117(a)); `accelKtPerSec` = VR^2 / (2 x 0.8 x take-off distance) (ground roll 80 % of the distance, the A320 / B738 ratio); `maxSpeedKt` for jets = max(ACD climb IAS, descent IAS) + 30 kt; minimum speed = Vat - 15 kt. Taxi speeds, turn rates, braking and the 2,000 ft/min jet descent rate are DESIGN values (as for A320 / B738). Take-off distances are MTOW-basis: B77W (9,840 ft) fits only the longest ends (KBOS 4R/22L is 10,005 ft: the engine's check needs distance + 50 m, so it is marginal), B744 and B748 (10,830 / 10,470 ft) exceed it.
+
+RECAT (TBL A-1, page A1): A = A388; B = A332 A333 A359 B744 B748 B772 B77W B788 B789; C = A306 B762 B763 MD11; D = A339; E = B752; F = A319 A321 B737 B739 DH8D E190 GLEX GLF5; G = CRJ7; H = C56X; I = C402 PC12 BE20. Derived (type absent from TBL A-1, UNVERIFIED as listings): A20N, A21N, B38M = F (sibling types), A35K = B (the A359 is B), BE9L = I (10,100 lb is within the Category I definition), CL35 = H (40,600 lb is within the Category H definition).
+
+"super" / "heavy" in the callsign: Category A -> "super", B, C, D -> "heavy" (JO 7110.126A Appendix B amends JO 7110.65 2-4-14 / 2-1-20; 2-4-14: "The word heavy must be used as part of the identification in all communications with or about heavy aircraft", example "United Fifty-Eight Heavy"). The ICAO categories H / J in the ACD give the same set (A388 = J).
+
+### Not verified / not added (aircraft performance, 2026-10-21)
+
+- **Not added, no source for the figures**: `E75L` / `E75S` (no ACD page; the existing `E175` entry remains an ESTIMATE; both are RECAT G in TBL A-1), `AT76` (no ACD page; the ACD lists AT43, AT44, AT45, AT72 and AT75 only), `CL60` (ACD page has no take-off or landing distance). `B753`, `B77L`, `C680`, `C550` etc. were not requested.
+- A359 take-off / landing distance: the ACD shows 888 m for both (a data error); the entry uses chart reads of the Airbus A350 AC (about 2,550 m take-off at 268 t, ISA, sea level; about 1,950 m landing field length at maximum landing weight, +/-150 m).
+- The ACD figures are "indicative" and at MTOW / ISA / sea level; none is a certified performance figure. Some look odd and were taken as published: B38M take-off distance 2,500 m, C402 Vat 110 kt (a 2015 Cape Air training flashcard set, seen only as a web-search result, also lists 110 kt "Vref at threshold": a weak source), PC12 climb IAS 130 kt, A388 V2 150 kt. `cruiseSpeedKt` of DH8D / BE20 / BE9L / PC12 / C402 is an ACD climb or approach IAS, not a published cruise IAS.
+- Wing span and height are recorded in `_not_in_type_shape` and in `src/ui/tower/aircraftModel.ts` (Tower view, 2D glyph); there is no stand-size model in the simulator, so the figures are not used for stand fit (parking has categories only).
+- The KMHT types (B738, BCS3, E175, CRJ9, B752, C208) are still the 2026-10-17 ESTIMATEs; the ACD has pages for B738, BCS3, B752, C208 and CRJ9, so they can be cross-checked against it later (the ACD B738 Vat is 147 kt against the 140 kt in the file).
+- Operator presence in 2026 (BA 747-400, UPS / FedEx MD-11 after the November 2025 accident, Q400 operators) is not checked.
+
+## Runway configurations, time zone and non-FAA provenance (facility JSON, optional fields)
+
+Hub airports run published runway configurations (which runways take arrivals, which take departures, in which wind). The facility JSON may carry
+`runway_configurations`: a list in operator-preference order (ties and calm wind use the first usable entry), each `{ id, name, landing: [end ids],
+departing: [end ids], wind_from_deg?, wind_to_deg?, max_tailwind_kt?, notes, source, url?, retrieved?, approximate? }`. End ids are the runway-end
+identifiers ("4R", "27L"); the wind sector is magnetic, wind FROM, clockwise from `wind_from_deg` to `wind_to_deg` (may wrap through north).
+Each entry must cite where the configuration is published (ATIS, airport operator, AIP); an airport with no sourced configuration omits the list and
+the simulator falls back to one best-headwind runway for arrivals and departures. `airport.time_zone` (IANA, "Europe/London") is a sourced constant of
+the profile, not extracted; absent means America/New_York. `airspace.class` gives the airspace class letter. For an airport built from a non-FAA
+source (EGLL: UK AIP) `_provenance.source_name` / `source_url` in the facility JSON, and `source_name` / `source_url` in the procedures JSON
+`_provenance`, replace the default NASR / d-TPP labels in the built provenance entries. The field list is also in `scripts/airports/types.ts`.

@@ -1,8 +1,11 @@
 # Adding an airport
 
 Every airport is data: a built `Airport` object (`src/sim/types.ts`) produced by `npx tsx scripts/build-airport.ts <ICAO>` from source files in
-`data/sources/` and a per-airport profile in `scripts/airports/`. The two worked examples are KACY and KMHT; `git show --stat 8cccc26` lists every
-file the second airport touched. This page is the checklist and the rules that apply to airports with more than two runways.
+`data/sources/` and a per-airport profile in `scripts/airports/`. Six airports exist and each is a worked example of one case: KACY (the original),
+KMHT (the second airport; `git show --stat 8cccc26` lists every file it touched), KBOS (six runways, runway configurations, `includeTaxilanes`), KPGD (an excluded NASR
+runway, a Clearance Delivery / Ground frequency shared by two positions, tower hours below 24 h), KPHL (a sectorized TRACON, configurations, a 130-stand terminal layout)
+and EGLL (the non-FAA path: UK AIP, hPa, link-only charts, per-runway SIDs; `git show --stat e655967`). This page is the checklist and the rules that apply to airports with
+more than two runways and to non-FAA airports.
 
 Data rule: no aeronautical value is typed from memory. Every runway, frequency, navaid, fix, procedure, heading, altitude, stand name, airline and
 aircraft figure is read from a downloaded official source and carries provenance (source, URL, retrieved date, cycle). What cannot be sourced is
@@ -10,32 +13,39 @@ omitted and listed under "Not verified" in `data/sources/README.md`. Gameplay tu
 
 ## Steps
 
+Two paths exist. **FAA airport** (KACY, KMHT, KBOS, KPHL, KPGD): steps 1-12 as written. **Non-FAA airport** (EGLL): there is no NASR or d-TPP, so steps 1 and 3 become a hand
+transcription of the national AIP into the same file shapes (see "Provenance for non-FAA airports" at the end); the other steps are the same.
+
 1. **d-TPP metafile and procedures JSON.** Find the airport's charts in `data/sources/raw/d-TPP_Metafile_<cycle>.xml`, download every PDF from
    `https://aeronav.faa.gov/d-tpp/<cycle>/<pdf>` (send a User-Agent), HTTP-check each URL, and write `data/sources/<slug>-procedures.json`
    (chart list with URLs, airport diagram taxiway identifiers and charted runway headings, `_provenance`). Non-FAA airports (EGLL, UK AIP): the same
-   file shape with the AIP chart list; set `_provenance.source_name` / `source_url` (see "Provenance" below).
+   file shape with the AIP chart list; set `_provenance.source_name` / `source_url` (see "Provenance" below). If the charts are copyrighted and cannot be redistributed
+   (UK AIP, NATS Limited), set `_provenance.link_only: true` (`egll-procedures.json`): the chart index marks every entry `linkOnly`, the viewer shows the official links instead
+   of a PDF, the backend proxy is not used and `scripts/fetch-charts.ts` skips the airport (its `AIRPORTS` list names only the airports with bundled PDFs).
 2. **Plate transcription.** Extract PDF text with pdfjs-dist, read the plate, record what was read and from which PDF
    (`<slug>-plate-geometry.json`: glidepath angle, TCH, missed approach altitudes; transcribed approaches / STARs inside the procedures JSON).
    Document it in the airport's section of `data/sources/README.md`.
-3. **NASR extraction.** `npx tsx scripts/extract-nasr-airport.ts <FAA_ID> <ICAO>` writes `<slug>-facility.json`, `<slug>-frequencies.json`,
-   `<slug>-navaids.json` from the NASR CSVs in `data/sources/raw/nasr_<cycle>/`. Values are copied verbatim.
-4. **OpenStreetMap.** Overpass query for aeroway features within 2 km of the ARP (query in `data/sources/README.md`; User-Agent required), raw
+3. **NASR extraction.** `npx tsx scripts/extract-nasr-airport.ts <FAA_ID> <ICAO> <cycle-date> <retrieved-date>` writes `<slug>-facility.json`, `<slug>-frequencies.json`,
+   `<slug>-navaids.json` from the NASR CSVs in `data/sources/raw/nasr_<cycle>/`. Values are copied verbatim. Re-running it removes the hand-added facility fields of step 5.
+   **Non-FAA:** write the three files by hand in the same shape from the AIP (AD 2.2 to 2.20), each field naming its AIP section in a `*_source` or note field (`egll-facility.json`).
+4. **OpenStreetMap.** Overpass query for aeroway features within 2 km of the ARP (KBOS and EGLL used 3 km because their aprons are larger) (query in `data/sources/README.md`; User-Agent required), raw
    response under `data/sources/raw/` (git-ignored), then `npx tsx scripts/osm-overpass-to-geojson.ts <raw> data/sources/<slug>-taxiways.geojson <date> <lat> <lon>`.
    ODbL: attribution required, the derived taxiway/apron data is share-alike.
 5. **Facility JSON extras (sourced constants, added by hand next to the NASR fields; see "New fields" below):** `airport.time_zone`,
    `airspace.class`, `runway_configurations`, `_provenance.source_name` / `source_url`.
 6. **Profile.** `scripts/airports/<slug>.ts` implements `AirportProfile` (`scripts/airports/types.ts`): taxiway identifiers from the diagram, parking
-   stands, frequency names, optional MVA, hot spot, notes. `crossing` is optional and only for KACY / KMHT (see below). Register it in `PROFILES` in
+   stands, frequency names, optional MVA, hot spot, notes. `crossing` is optional and only for KACY / KMHT (see below). Options the later airports needed: `excludeRunways` (KPGD 09/27), `includeTaxilanes`, `dropIsolatedLanes`, `excludeOsmWays`
+   (with reasons), `shortStubJunctionM` (KBOS), `simplifyEntryChains` (KMHT), `osmRef` and `relaxedChecks` (EGLL: OSM "Taxiway A" -> "A", no GA ramp). Register it in `PROFILES` in
    `scripts/build-airport.ts`.
 7. **Build.** `npx tsx scripts/build-airport.ts <ICAO>` writes `src/airport/<slug>/<slug>.airport.json`, `build-report.md` and `debug-graph.svg`.
    Read the report: hard errors stop the build, warnings list every simplification.
 8. **Loader.** `src/airport/<slug>/index.ts` (copy `src/airport/kmht/index.ts`; it holds the synchronous `loadXxx()` and the async `preloadXxx()` that fills its cache through `import('./<slug>.airport.json')`, so Rollup emits the dataset as its own lazy chunk; never import the JSON statically). Its `rehydrate` sanity check tests the ICAO and the runway count of
-   that airport (KACY and KMHT check `runways.length !== 2`; a new loader checks its own count or only the ICAO). Never edit the JSON by hand.
+   that airport (each loader checks its own runway count: KACY, KMHT, KPGD and EGLL 2, KPHL 4, KBOS 6). Never edit the JSON by hand.
 9. **Registry.** In `src/airport/index.ts` add one import line (`import { loadXxx, preloadXxx } from './<slug>';`, plus the matching `export`) and one entry in `AIRPORTS`: `XXXX: { name: '<JSON name>', load: loadXxx, preload: preloadXxx },`. The setup-screen selector (`listAirportOptions()`) picks it up without loading any data, and `src/airport/preload.test.ts` checks `name` against the JSON. `getAirport` / `airportOrDefault` stay synchronous but throw until `await preloadAirport('XXXX')` has resolved: the setup screen and `startSession` do this, and the Vitest setup file `src/test/preloadAirports.ts` calls `preloadAllAirports()` so tests need nothing. Do not add a Rollup `codeSplitting` group for `airport.json` in `vite.config.ts` (it would merge the per-airport chunks).
 10. **Shared files, per airport** (each has a KACY and KMHT entry to copy): charts index `src/charts/chartIndex.ts` (`DATASETS`), navaid panel
     `src/charts/navaidData.ts` (`AIRPORTS`), traffic profile `src/game/airportProfile.ts` (airlines, aircraft types, neighbours, special traffic;
     the IFR destinations of `src/game/ifr.ts` then follow the profile), spoken airport names `src/radio/spoken.ts` (`AIRPORT_CITIES`), the command
-    parser's airport names `src/commands/airports.ts`, `scripts/fetch-charts.ts` (`AIRPORTS`), `README.md` and the `data/sources/README.md` section.
+    parser's airport names `src/commands/airports.ts`, `scripts/fetch-charts.ts` (`AIRPORTS`; leave a link-only airport out), the Playwright console sweep `e2e/console-clean.spec.ts` (its `AIRPORTS` list must match the registry: a test fails otherwise), `README.md` (one block per airport with the same items) and the `data/sources/README.md` section (with its own "Not verified" list and an entry in the table of contents at the top).
 11. **Tests.** A dataset test (`src/airport/<slug>/<slug>.test.ts`, copy `kmht.test.ts`), an engine smoke test (departure with a runway crossing if
     the airport has one, arrival), an AI test, a charts test, a scenarios test; the multi-runway behaviour has its own fixture tests (below).
 12. Run `npm run typecheck`, `npm run lint`, `npx vitest run`; before merging changes that touch AI ground / tower behaviour also
