@@ -70,7 +70,7 @@ describe('seeded free-play airport events', () => {
   it('a taxiway closure never cuts a parking position off from the runways in use', () => {
     const ok = closableTaxiways(kacy, { departing: ['31'], landing: ['31'] });
     expect(ok.length).toBeGreaterThan(0);
-    const all = [...new Set(kacy.taxiwayGraph.edges.map((e) => e.taxiway.toUpperCase()).filter((t) => !/^RWY/.test(t)))];
+    const all = [...new Set(kacy.taxiwayGraph.edges.map((e) => e.taxiway.toUpperCase()).filter((t) => !t.startsWith('RWY')))];
     expect(ok.length).toBeLessThan(all.length); // some taxiways are the only way somewhere
     for (let seed = 1; seed <= 40; seed++) {
       for (const e of buildAirportEvents(kmht, seed, { active: { departing: ['35'], landing: ['35'] } })) {
@@ -203,6 +203,6 @@ describe('STAR traffic flow at KMHT', () => {
     const sc = game.buildFreePlay(kmht, { seed: 4, weather: 'clear', aircraftCount: 6, startingScenario: 'busy_arrivals', ifrFlows: true, activeRunways: { departing: ['35'], landing: ['35'] }, airportEvents: false });
     const arrivals = sc.spawns.filter((s) => !s.isDeparture && s.start.kind === 'at_fix' && s.start.star);
     expect(arrivals.length).toBeGreaterThanOrEqual(2);
-    expect(arrivals.map((a) => a.atSec)).toEqual([...arrivals.map((a) => a.atSec)].sort((a, b) => a - b));
+    expect(arrivals.map((a) => a.atSec)).toEqual(Array.from(arrivals, (a) => a.atSec).sort((a, b) => a - b));
   });
 });

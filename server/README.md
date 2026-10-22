@@ -46,7 +46,7 @@ Weather responses carry `X-Cache: HIT|MISS|COALESCED|STALE` and `X-Cache-Age` (s
 
 `POST /api/llm/parse` takes `{ text, context, grammar? }` (`LlmParseRequest`) and answers `{ commands, note?, model, latencyMs, usage? }`.
 It asks Claude (`client.messages.parse` with a JSON-schema `output_config.format`) to map a transmission the rule grammar could not
-read onto the same `kind`s and fields as `src/commands`. Errors: `INVALID_BODY` 400, `METHOD_NOT_ALLOWED` 405, `LLM_NOT_CONFIGURED` 503,
+read onto the same `kind`s and fields as `src/commands`. If the browser disconnects before the answer (timeout, closed page) the upstream request is aborted and nothing is logged as a failure. Errors: `INVALID_BODY` 400, `METHOD_NOT_ALLOWED` 405, `LLM_NOT_CONFIGURED` 503,
 `UPSTREAM_RATE_LIMITED` 429 (with `Retry-After`), `UPSTREAM_TIMEOUT` 504, `UPSTREAM_ERROR` / `LLM_REFUSED` 502.
 
 * What is sent to the Anthropic API: the transmission text (at most 400 characters), the aircraft list (callsign, spoken callsign, type),

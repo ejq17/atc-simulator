@@ -27,7 +27,7 @@ import type { ClipName, VoiceBrowser } from './fixtures/voiceBrowser';
 import { startScenario } from './helpers';
 
 test.describe.configure({ mode: 'serial' });
-test.beforeEach(({}, testInfo) => {
+test.beforeEach((_fixtures, testInfo) => {
   test.skip(testInfo.project.name !== 'chrome-webspeech', 'needs installed Google Chrome with network access');
 });
 
@@ -41,7 +41,7 @@ test.afterEach(async () => {
 
 type Outcome = { kind: 'heard'; text: string; ms: number } | { kind: 'service'; badge: string; status: string };
 
-async function launch(clip: ClipName, headless: boolean, continuous: boolean) {
+async function launch(clip: ClipName, headless: boolean) {
   await vb?.close().catch(() => undefined);
   vb = await launchVoiceBrowser(clip, { channel: 'chrome', headless, profileDir: CHROME_PROFILE });
   const errors: string[] = [];
@@ -93,14 +93,14 @@ const ATTEMPTS = 3;
 async function runClip(clip: ClipName, want: RegExp, continuous: boolean) {
   const headedOnly = process.env.WEBSPEECH_HEADED === '1';
   let headless = !headedOnly;
-  let { page, errors } = await launch(clip, headless, continuous);
+  let { page, errors } = await launch(clip, headless);
   const attempts: string[] = [];
   for (let attempt = 1; attempt <= ATTEMPTS; attempt++) {
     let outcome = await speak(page, clip);
     if (outcome.kind === 'service' && headless) {
       console.log(`[webspeech] headless: ${serviceDown(outcome)}. Retrying once in a headed window.`);
       headless = false;
-      ({ page, errors } = await launch(clip, false, continuous));
+      ({ page, errors } = await launch(clip, false));
       outcome = await speak(page, clip);
     }
     if (outcome.kind === 'service') {

@@ -13,12 +13,12 @@ gaps live in `docs/PROGRESS.md`; data provenance lives in `data/sources/README.m
 | Simulation | Pure TypeScript, no DOM dependency (`src/sim`) | Independently testable, deterministic, replayable |
 | State | Engine owns one authoritative `SimulationState`; React subscribes via a thin zustand store | Avoids aircraft state scattered across components |
 | Rendering | Canvas 2D (surface + radar displays) with requestAnimationFrame interpolation | No heavy dependency; smooth at 60 fps with dozens of aircraft |
-| Speech-to-text | Provider abstraction: browser Web Speech API (free, default) and Deepgram (streaming, keyed via backend) | Works with zero setup; upgradeable |
-| Command interpretation | Deterministic grammar/entity parser; optional LLM fallback must return a constrained `ParsedCommand` | No LLM may mutate aircraft state |
-| Text-to-speech | Browser `speechSynthesis` with per-aircraft voice selection and optional radio filter via WebAudio | Zero cost; provider interface allows cloud TTS later |
-| Weather | Aviation Weather Center API via local backend proxy with caching | AWC does not allow browser CORS |
-| Backend | Tiny Node `http` server in `server/` (no framework) | Only for AWC proxy and provider key exchange; keys never reach the browser |
-| Persistence | IndexedDB/localStorage for settings, career progress, session reports | No accounts, no paid DB |
+| Speech-to-text | Provider abstraction: browser Web Speech API (free, default), Local Whisper (transformers.js in a worker, on-device) and Deepgram (streaming, keyed via backend) | Works with zero setup; upgradeable |
+| Command interpretation | Deterministic grammar/entity parser first; optional LLM fallback (`src/commands/llm`, `POST /api/llm/parse`) used only when the grammar is unsure, returns constrained commands that are validated like the grammar's | No LLM may mutate aircraft state; a confident grammar parse is never overridden |
+| Text-to-speech | Browser `speechSynthesis` with per-aircraft voice selection and optional radio filter via WebAudio; optional local neural voices (Kokoro on WebGPU, Piper on WebAssembly, in workers) | Zero cost; no cloud TTS |
+| Weather | Aviation Weather Center API via the local backend proxy with caching; National Weather Service API (`api.weather.gov`) called from the browser when the backend is unreachable and on the static build | AWC does not allow browser CORS; NWS does |
+| Backend | Tiny Node `http` server in `server/` (no framework), port 8787, reached through the Vite `/api` proxy | AWC weather proxy, FAA chart PDF proxy, Deepgram token, phrase interpreter; keys never reach the browser |
+| Persistence | `localStorage` for settings, layout and career progress (no IndexedDB); model files in the browser Cache API | No accounts, no paid DB |
 | Tests | Vitest (engine, parser, airport graph), Playwright (gameplay flows) | Required |
 
 ## Module map
@@ -41,7 +41,7 @@ src/ui/tower/   3D Tower tab (lazy chunk). Pure, unit-tested: geometry.ts (polyg
                 cameraMath.ts (look-at, drag/zoom/snap/follow, compass), skyMath.ts (sun, sky, fog, cloud deck),
                 towerPosition.ts (cab site). Only towerScene.ts imports three.js (the GPU boundary; owns and disposes every
                 resource); TowerDisplay.tsx is the React shell and reads the store per animation frame like the Surface view
-server/         AWC proxy + cache, optional Deepgram token endpoint
+server/         AWC proxy + cache, FAA chart proxy, optional Deepgram token endpoint, optional phrase interpreter route (server/llm)
 data/sources/   verified FAA/NASR/d-TPP/OSM extracts with provenance (raw/ is git-ignored)
 scripts/        build-airport.ts <ICAO>: one deterministic build for every airport (NASR/d-TPP JSON + OSM GeoJSON ->
                 src/airport/<icao>/<icao>.airport.json, build-report.md, debug-graph.svg); airports/<icao>.ts holds only what is

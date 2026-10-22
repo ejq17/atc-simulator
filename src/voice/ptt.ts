@@ -187,7 +187,7 @@ export function createPushToTalk(options: PushToTalkOptions): PushToTalk {
     },
     attachTarget: attach,
     destroy() {
-      for (const t of [...attached]) detach(t);
+      for (const t of Array.from(attached)) detach(t);
       end();
     },
   };

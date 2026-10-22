@@ -539,7 +539,7 @@ export function updatePilotRequests(ctx: SimContext): void {
     if (ac.onGround && ac.groundSpeedKt < 0.1) rt.stillSince = rt.stillSince ?? now;
     else {
       rt.stillSince = undefined;
-      for (const k of [...rt.calls]) if (k.startsWith('hold:') || k.startsWith('holdX:')) rt.calls.delete(k);
+      for (const k of Array.from(rt.calls)) if (k.startsWith('hold:') || k.startsWith('holdX:')) rt.calls.delete(k);
     }
 
     // 0. IFR departure: Clearance Delivery first; ~15 s after the clearance it tunes Ground and asks for taxi (step 1).

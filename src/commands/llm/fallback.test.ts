@@ -104,6 +104,29 @@ describe('mergeResults', () => {
     const llm = result([cmd({ interpretedBy: 'llm' })]);
     expect(mergeResults(grammar, llm)).toBe(llm);
   });
+  it('keeps a confident grammar command as parsed, even when the model words it differently', () => {
+    const g = result([cmd({ kind: 'HEADING', headingDeg: 90, confidence: 0.95 }), cmd({ kind: 'UNKNOWN', confidence: 0.1 })]);
+    const llm = result([
+      cmd({ kind: 'HEADING', headingDeg: 270, interpretedBy: 'llm', confidence: 0.9 }),
+      cmd({ kind: 'GO_AROUND', interpretedBy: 'llm', confidence: 0.9 }),
+    ]);
+    const m = mergeResults(g, llm);
+    expect(m.commands.map((c) => c.kind)).toEqual(['HEADING', 'GO_AROUND']);
+    expect(m.commands[0].headingDeg).toBe(90);
+    expect(m.commands[0].interpretedBy).toBeUndefined();
+    expect(m.commands[1].interpretedBy).toBe('llm');
+    expect(m.commands.map((c) => c.groupSize)).toEqual([2, 2]);
+  });
+  it('still issues a confident grammar command the model left out', () => {
+    const g = result([cmd({ kind: 'HEADING', headingDeg: 90, confidence: 0.95 }), cmd({ kind: 'ALTITUDE', confidence: 0.3 })]);
+    const llm = result([cmd({ kind: 'GO_AROUND', interpretedBy: 'llm' })]);
+    const m = mergeResults(g, llm);
+    expect(m.commands.map((c) => c.kind).sort()).toEqual(['GO_AROUND', 'HEADING']);
+  });
+  it('uses the model result untouched when the grammar had nothing confident', () => {
+    const llm = result([cmd({ interpretedBy: 'llm' })]);
+    expect(mergeResults(result([cmd({ confidence: 0.3 })]), llm)).toBe(llm);
+  });
   it('keeps the grammar result for null or empty', () => {
     expect(mergeResults(grammar, null)).toBe(grammar);
     expect(mergeResults(grammar, result([]))).toBe(grammar);

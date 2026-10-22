@@ -354,7 +354,7 @@ function blockGroup(ctx: SimContext, group: ScheduledSpeech[]): void {
   const callsigns = acs.map((a) => a.callsign);
   const delays = members.map((m, i) => R.blockRetryMinSec + seeded01(acs[i].seed, `retry:${m.attempt}:${m.id}`) * R.blockRetrySpreadSec);
   const order = delays.map((d, i) => [d, i] as const).sort((a, b) => a[0] - b[0] || a[1] - b[1]);
-  const retryAt: number[] = new Array(members.length).fill(0);
+  const retryAt: number[] = Array.from({ length: members.length }, () => 0);
   const rkey = freqKey(freq);
   let prev = -Infinity;
   for (const [d, i] of order) {

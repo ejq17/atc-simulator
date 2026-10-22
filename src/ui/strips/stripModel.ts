@@ -386,8 +386,8 @@ export function createStripBoard(opts: StripBoardOptions): StripBoard {
         trimFinished(s.bay);
       }
     }
-    for (const id of [...dropped.keys()]) if (!seen.has(id)) dropped.delete(id);
-    for (const id of [...readClearances.keys()]) if (!strips.has(id) && !seen.has(id)) readClearances.delete(id);
+    for (const id of Array.from(dropped.keys())) if (!seen.has(id)) dropped.delete(id);
+    for (const id of Array.from(readClearances.keys())) if (!strips.has(id) && !seen.has(id)) readClearances.delete(id);
     firstUpdate = false;
   }
 

@@ -42,7 +42,7 @@ describe('closures', () => {
     expect(isRunwayClosed(st, '13')).toBe(false);
     run(e, 1);
     run(e, 1);
-    const notams = st.events.filter((x) => /^NOTAM: /.test(x.text));
+    const notams = st.events.filter((x) => x.text.startsWith('NOTAM: '));
     expect(notams.map((x) => x.text)).toEqual([expect.stringMatching(/^NOTAM: Runway 4\/22 closed/), expect.stringMatching(/^NOTAM: Taxiway H closed/)]);
   });
   it('a closure with start and end times is active only in between, and its end is announced', () => {

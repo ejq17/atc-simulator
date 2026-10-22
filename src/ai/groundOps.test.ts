@@ -40,7 +40,7 @@ describe('AI Ground: a hold-short readback that was left out', () => {
   it('asks for the readback ("read back hold instructions", 3-7-2) and the aircraft goes on; the AI is not charged', () => {
     const g = groundTexts(h, 'NKS451');
     expect(g.some((t) => /pushback approved/.test(t))).toBe(true);
-    expect(g.some((t) => /read back hold instructions$/.test(t))).toBe(true);
+    expect(g.some((t) => t.endsWith('read back hold instructions'))).toBe(true);
     expect(h.find('NKS451')!.frequencyMhz).toBe(120.3);
     expect(h.engine.getState().score.communicationErrors).toBe(0);
   });

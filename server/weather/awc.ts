@@ -100,7 +100,7 @@ export async function fetchAwc(
     try {
       const text = await res.text();
       body = text.trim() === '' ? [] : JSON.parse(text);
-    } catch (err) {
+    } catch {
       if (timedOut) throw new AwcError('UPSTREAM_TIMEOUT', `aviationweather.gov did not respond within ${timeoutMs / 1000} s.`);
       throw new AwcError('UPSTREAM_BAD_RESPONSE', 'aviationweather.gov returned a body that is not valid JSON.');
     }

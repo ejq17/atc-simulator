@@ -96,7 +96,28 @@ export function adoptLlmCommands(resp: LlmParseResponse, text: string, ctx: Pars
   return { commands, callsign: commands[0].callsign, rawText: text, normalizedText: norm.text };
 }
 
-/** The interpreter's reading wins when it produced commands; otherwise the grammar's stays (including its clarification path). */
+/** A grammar command the engine would act on: a real instruction at or above the interpreter threshold. */
+const isTrusted = (c: ParsedCommand): boolean => c.kind !== 'UNKNOWN' && c.confidence >= INTERPRETER_BELOW;
+
+/**
+ * Grammar first. The interpreter's reading replaces the grammar's only for what the grammar was unsure about: a command the grammar
+ * parsed with confidence (same kind, same aircraft) is kept as the grammar parsed it, even when the model words it differently, and a
+ * confident grammar command the model left out is still issued. Commands the grammar could not read (UNKNOWN or below the threshold)
+ * come from the model. With no confident grammar command at all, the model's result is used as is. When the model produced nothing
+ * usable, the grammar result stays (including its clarification path).
+ */
 export function mergeResults(grammar: ParseResult, llm: ParseResult | null): ParseResult {
-  return llm && llm.commands.length > 0 ? llm : grammar;
+  if (!llm || llm.commands.length === 0) return grammar;
+  const trusted = grammar.commands.filter(isTrusted);
+  if (trusted.length === 0) return llm;
+  const used = new Set<ParsedCommand>();
+  const merged: ParsedCommand[] = llm.commands.map((c) => {
+    const g = trusted.find((t) => !used.has(t) && t.kind === c.kind && t.callsign === c.callsign);
+    if (!g) return c;
+    used.add(g);
+    return g;
+  });
+  for (const t of trusted) if (!used.has(t)) merged.push(t);
+  const grouped = merged.length > 1 ? merged.map((c) => ({ ...c, groupSize: merged.length })) : merged;
+  return { ...llm, commands: grouped, callsign: grouped[0].callsign };
 }

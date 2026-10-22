@@ -21,7 +21,7 @@
  * to Google (needs internet); it only ever hears the synthetic clip. A denied microphone fails with the System Settings step.
  */
 import { execFile, execFileSync } from 'node:child_process';
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync } from 'node:fs';
 import path from 'node:path';
 import { expect, test } from '@playwright/test';
 import type { Page } from '@playwright/test';
@@ -30,7 +30,7 @@ import type { VoiceBrowser } from './fixtures/voiceBrowser';
 import { startScenario, TAKEOFF_READBACK } from './helpers';
 
 test.describe.configure({ mode: 'serial' });
-test.beforeEach(({}, testInfo) => {
+test.beforeEach((_fixtures, testInfo) => {
   test.skip(testInfo.project.name !== 'chrome-real-mic' || process.env.REAL_MIC !== '1', 'opt-in: set REAL_MIC=1 (plays audio through the speakers)');
 });
 
@@ -40,7 +40,6 @@ const PLAYER = path.join(ROOT, '.cache/play-on-device');
 const SPEAKERS = 'MacBook Air Speakers'; // CoreAudio name match; override with REAL_MIC_SPEAKERS
 const SPEAKER_NAME = process.env.REAL_MIC_SPEAKERS ?? SPEAKERS;
 const TARGET_VOLUME = 0.6;
-const LOCAL_LABEL = 'Local Whisper (on-device, no cloud)';
 
 let vb: VoiceBrowser | null = null;
 let saved: { volume: string; muted: string } | null = null;

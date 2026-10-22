@@ -1,7 +1,7 @@
 /**
  * Browser client for live METARs, two sources tried in order:
  *
- * 1. The local backend (`npm run server`, `server/index.ts`, http://localhost:8787 or VITE_API_BASE), which proxies and
+ * 1. The local backend (`npm run server`, `server/index.ts`, reached as same-origin `/api` through the Vite dev/preview proxy to :8787, or VITE_API_BASE), which proxies and
  *    caches the Aviation Weather Center (AWC). aviationweather.gov sends no CORS headers (checked with curl, 2026-10-17),
  *    so the browser never calls AWC directly. Skipped on the static GitHub Pages build, which has no backend.
  * 2. The National Weather Service API (`https://api.weather.gov/stations/<ICAO>/observations/latest`), which does send
@@ -79,7 +79,10 @@ function defaultBaseUrl(): string {
     const env = (import.meta as unknown as { env?: Record<string, string | undefined> }).env;
     if (env?.VITE_API_BASE) return env.VITE_API_BASE.replace(/\/$/, '');
   } catch { /* not in a Vite context */ }
-  return 'http://localhost:8787';
+  // Same origin: `vite dev` and `vite preview` both proxy `/api` to the backend on :8787 (vite.config.ts), exactly as the chart,
+  // Deepgram and phrase-interpreter requests do. A direct http://localhost:8787 request is cross-origin and the backend only
+  // allows the 5173 dev origin, so it failed with a CORS console error on any other port (e.g. `vite preview`).
+  return '';
 }
 
 // ---- shared request helper ---------------------------------------------------------------------------------------
@@ -109,7 +112,7 @@ async function timedFetch(url: string, accept: string, options: FetchLiveMetarOp
 async function fetchFromBackend(id: string, options: FetchLiveMetarOptions): Promise<LiveMetar> {
   const base = (options.baseUrl ?? defaultBaseUrl()).replace(/\/$/, '');
   const url = `${base}/api/weather/metar?ids=${encodeURIComponent(id)}`;
-  const res = await timedFetch(url, 'application/json', options, `the local weather backend at ${base}`, ` ${BACKEND_HINT}`);
+  const res = await timedFetch(url, 'application/json', options, `the local weather backend${base ? ` at ${base}` : ''}`, ` ${BACKEND_HINT}`);
 
   if (!res.ok) {
     let detail = '';

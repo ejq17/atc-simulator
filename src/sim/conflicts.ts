@@ -989,7 +989,7 @@ export function detectConflicts(ctx: SimContext): void {
     else if (alert.kind === 'RUNWAY_CONFLICT') emitEvent(ctx, { ...base, kind: 'CONFLICT', data: { alertKind: 'RUNWAY_CONFLICT', runwayId: alert.runwayId, alertId: alert.id } });
     else emitEvent(ctx, { ...base, kind: 'SEPARATION_VIOLATION', data: { alertKind: alert.kind, alertId: alert.id } });
   }
-  for (const key of [...ctx.dynamicAlerts.keys()]) if (!seen.has(key)) ctx.dynamicAlerts.delete(key);
+  for (const key of Array.from(ctx.dynamicAlerts.keys())) if (!seen.has(key)) ctx.dynamicAlerts.delete(key);
 
   refreshConflicts(ctx);
 }

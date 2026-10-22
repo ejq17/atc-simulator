@@ -15,7 +15,7 @@ describe('NOAA sunrise / sunset', () => {
     // summer solstice: sunrise ~05:32 EDT (09:32Z), sunset ~20:31 EDT (00:31Z next day)
     const jun = sunriseSunsetUtc(ACY, at('2026-06-21T15:00:00Z'))!;
     expect(Math.abs(hm(jun.sunriseMs) - (9 * 60 + 32))).toBeLessThan(8);
-    expect(Math.abs(hm(jun.sunsetMs) - (0 * 60 + 31))).toBeLessThan(8);
+    expect(Math.abs(hm(jun.sunsetMs) - 31)).toBeLessThan(8);
     // winter solstice: sunrise ~07:12 EST (12:12Z), sunset ~16:38 EST (21:38Z)
     const dec = sunriseSunsetUtc(ACY, at('2026-12-21T15:00:00Z'))!;
     expect(Math.abs(hm(dec.sunriseMs) - (12 * 60 + 12))).toBeLessThan(8);

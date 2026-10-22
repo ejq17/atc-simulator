@@ -155,6 +155,12 @@ export function createLlmParseHandler(deps: LlmParseDeps = {}): (req: IncomingMe
     const thinkingOff = (deps.thinking ?? env.ATC_LLM_THINKING)?.trim().toLowerCase() === 'off' && /haiku/i.test(model);
     const started = now();
 
+    // The browser aborts its request (8 s timeout, page closed, session ended): stop the upstream call too instead of paying for
+    // an answer nobody will read.
+    const upstream = new AbortController();
+    const onClose = () => { if (!res.writableEnded) upstream.abort(); };
+    res.once('close', onClose);
+
     let message: any;
     try {
       message = await client.messages.parse({
@@ -167,8 +173,9 @@ export function createLlmParseHandler(deps: LlmParseDeps = {}): (req: IncomingMe
           effort,
           format: { type: 'json_schema', schema: LLM_RESPONSE_SCHEMA, parse: parseWireResponse },
         },
-      });
+      }, { signal: upstream.signal });
     } catch (err) {
+      if (upstream.signal.aborted) return; // the caller is gone; nothing to answer and nothing to log as an upstream failure
       if (err instanceof Anthropic.RateLimitError) {
         const retry = err.headers?.get?.('retry-after') ?? '30';
         return sendError(res, 429, 'UPSTREAM_RATE_LIMITED', 'The language model is rate limited; try again shortly.', { 'Retry-After': retry });
@@ -180,6 +187,8 @@ export function createLlmParseHandler(deps: LlmParseDeps = {}): (req: IncomingMe
       }
       if (err instanceof Anthropic.AnthropicError) return sendError(res, 502, 'LLM_REFUSED', 'The model returned no usable structured output.');
       throw err;
+    } finally {
+      res.off('close', onClose);
     }
 
     const latencyMs = Math.max(0, Math.round(now() - started));

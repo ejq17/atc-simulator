@@ -143,7 +143,7 @@ export function updateRunwayOccupancy(ctx: SimContext): void {
       }
     }
     // Authorisation is consumed once the aircraft has used and then left the runway surface.
-    for (const rid of [...rt.enteredRunways]) {
+    for (const rid of Array.from(rt.enteredRunways)) {
       if (!now.includes(rid)) {
         rt.enteredRunways.delete(rid);
         const idx = ac.runwayAuthorizations.indexOf(rid);

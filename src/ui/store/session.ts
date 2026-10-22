@@ -398,15 +398,23 @@ export function startSession(p: SessionParams): Session {
       engine.logEvent({ kind: 'INFO', text: `Phrase interpreter unavailable (${reason}); using the standard parse.`, severity: 'info', speaker: 'SYSTEM' });
       return parsed;
     };
-    void interpreter.parse({
+    // `Promise.resolve().then` so a synchronous throw from the parser is handled like a rejection.
+    void Promise.resolve().then(() => interpreter.parse({
       text: text.trim(),
       context: ctx,
       grammar: parsed.commands.length > 0 ? { commands: parsed.commands.map((c) => ({ kind: c.kind, callsign: c.callsign, confidence: c.confidence, issues: c.issues })) } : undefined,
-    }).then((resp) => {
-      const adopted = adoptLlmCommands(resp, text.trim(), ctx);
-      if (!adopted) engine.logEvent({ kind: 'INFO', text: `Phrase interpreter found no usable instruction${resp.note ? ` (${resp.note})` : ''}; using the standard parse.`, severity: 'info', speaker: 'SYSTEM' });
-      return { merged: mergeResults(parsed, adopted), ms: performance.now() - t0 };
+    })).then((resp) => {
+      if (disposed) return { merged: parsed, ms: 0 };
+      try {
+        const adopted = adoptLlmCommands(resp, text.trim(), ctx);
+        if (!adopted) engine.logEvent({ kind: 'INFO', text: `Phrase interpreter found no usable instruction${resp.note ? ` (${resp.note})` : ''}; using the standard parse.`, severity: 'info', speaker: 'SYSTEM' });
+        return { merged: mergeResults(parsed, adopted), ms: performance.now() - t0 };
+      } catch (err) {
+        // A malformed model answer must never cost the player the transmission: fall back to what the grammar read.
+        return { merged: grammarFallback(`unusable answer: ${err instanceof Error ? err.message : String(err)}`), ms: performance.now() - t0 };
+      }
     }, (err: unknown) => {
+      if (disposed) return { merged: parsed, ms: 0 };
       let reason = err instanceof Error ? err.message : String(err);
       if (err instanceof LlmParseError) {
         if (err.code === 'LLM_NOT_CONFIGURED') { interpreterOff = true; reason = 'phrase interpreter not configured on the local backend'; }
@@ -415,9 +423,9 @@ export function startSession(p: SessionParams): Session {
       }
       return { merged: grammarFallback(reason), ms: performance.now() - t0 };
     }).then(({ merged, ms }) => {
-      if (disposed) return;
+      if (disposed) return; // the session ended while the request was in flight: nothing to execute, nobody to answer
       finishRadio(transmit({ engine, text, source, controller, parsed: merged, transmissionId, interpreterNote: `phrase interpreter, ${(ms / 1000).toFixed(1)} s` }));
-    }).catch((err: unknown) => hooks.onNotice('error', `Transmission failed after the phrase interpreter: ${err instanceof Error ? err.message : String(err)}`));
+    }).catch((err: unknown) => { if (!disposed) hooks.onNotice('error', `Transmission failed after the phrase interpreter: ${err instanceof Error ? err.message : String(err)}`); });
     const provisional: TransmitResult = { transmissionId, text: text.trim(), source, commands: [], results: [], summary: 'empty', message: 'Interpreting…' };
     hooks.onTransmitResult(provisional);
     return provisional;

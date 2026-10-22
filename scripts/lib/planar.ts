@@ -304,7 +304,7 @@ export class Planar {
   collapseFillets(maxLenM: number, reachM: number): PWay[] {
     const dropped: PWay[] = [];
     const lenOf = (w: PWay): number => w.nodes.slice(1).reduce((s, n, i) => s + dist(this.pos[w.nodes[i]], this.pos[n]), 0);
-    for (const w of [...this.ways]) {
+    for (const w of Array.from(this.ways)) {
       if (w.kind !== 'taxiway' || w.ref || w.origRef) continue;
       const a = w.nodes[0];
       const b = w.nodes[w.nodes.length - 1];

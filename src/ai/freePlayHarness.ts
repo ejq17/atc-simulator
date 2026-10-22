@@ -129,7 +129,7 @@ export function runFreePlaySoak(seed: number, realism: Realism, simHours: number
           if (now - since >= STUB_PAIR_SEC && !pairs.has(key)) pairs.set(key, `${key} from t=${Math.round(since)} lander ${l.phase} f=${l.frequencyId ?? '-'} dep ${d.phase} f=${d.frequencyId ?? '-'} pos=(${Math.round(d.pos.x)},${Math.round(d.pos.y)}) toHold=${d.route?.nodeIds[d.route.nodeIds.length - 1] ?? '-'}`);
         }
       }
-      for (const k of [...pairSince.keys()]) if (!nowPairs.has(k)) pairSince.delete(k);
+      for (const k of Array.from(pairSince.keys())) if (!nowPairs.has(k)) pairSince.delete(k);
     }
     for (const a of Object.values(s.aircraft)) {
       if (a.isDeparture && a.onGround) {

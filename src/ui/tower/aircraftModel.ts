@@ -121,7 +121,7 @@ export function familyOf(type: string): ModelFamily {
   if (perf.category === 'light' || perf.lengthM < 14) return /^(PA|SR|DA|BE|M2|CH|RV)/.test(type) ? 'gaLow' : 'gaHigh';
   if (/^(DH8|AT7)/.test(type)) return 'turboprop';
   if (perf.category === 'heavy') return perf.lengthM > 68 && /^(B74|A38)/.test(type) ? 'widebodyQuad' : 'widebody';
-  if (/^CRJ/.test(type)) return 'regionalJet';
+  if (type.startsWith('CRJ')) return 'regionalJet';
   return perf.lengthM < 22 && !/^(A3|B7|E1|E7)/.test(type) ? 'bizjet' : 'narrowbody';
 }
 

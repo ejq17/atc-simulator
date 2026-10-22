@@ -28,7 +28,7 @@ import type { VoiceBrowser } from './fixtures/voiceBrowser';
 import { sendCommand, startScenario, TAKEOFF_READBACK } from './helpers';
 
 test.describe.configure({ mode: 'serial' });
-test.beforeEach(({}, testInfo) => {
+test.beforeEach((_fixtures, testInfo) => {
   test.skip(testInfo.project.name !== 'chromium-deepgram-mock', 'needs the fake-microphone browser and the Deepgram mock');
 });
 

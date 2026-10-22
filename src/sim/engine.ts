@@ -127,7 +127,7 @@ export function createEngine(opts: EngineOptionsExt): SimulationEngine & Simulat
   let accumulator = 0;
 
   const notify = () => {
-    for (const l of [...listeners]) {
+    for (const l of Array.from(listeners)) {
       try {
         l(state);
       } catch (e) {

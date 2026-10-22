@@ -226,7 +226,7 @@ function exitVerdict(v: AgentView, r: CoordRequest, ac: Aircraft): ExitVerdict {
   if (ac.phase !== 'FINAL' && ac.phase !== 'LANDING' && ac.phase !== 'ROLLOUT') return { answer: 'standby', reason: 'not on final yet' };
   const check = checkExitRequest(v.state, ac, g, { taxiway: r.point, side: r.exitSide }, r.holdShortRunwayId ?? landingHoldShort(ac));
   if (check.ok) return { answer: 'approve', taxiway: r.point ?? undefined, side: r.exitSide };
-  const why = /^no exit/.test(check.reason ?? '') ? 'no such exit ahead of the aircraft' : /too far|too fast|cannot slow/.test(check.reason ?? '') ? 'too fast for that exit' : check.reason ?? 'cannot';
+  const why = (check.reason ?? '').startsWith('no exit') ? 'no such exit ahead of the aircraft' : /too far|too fast|cannot slow/.test(check.reason ?? '') ? 'too fast for that exit' : check.reason ?? 'cannot';
   return { answer: 'deny', reason: `${why}${check.taxiway ? `, will exit at ${spokenTaxiway(check.taxiway)}` : ''}` };
 }
 

@@ -133,6 +133,39 @@ describe('session phrase interpreter fallback', () => {
     expect(executed().some((c) => c.interpretedBy === 'llm')).toBe(false);
   });
 
+  it('a malformed model answer falls back to the grammar result instead of losing the transmission', async () => {
+    const { parser } = fake(() => Promise.resolve({ commands: [{ kind: 'TAKEOFF', callsign: 12345 }], model: 'fake', latencyMs: 1 } as unknown as LlmParseResponse));
+    const { engine, results } = build(parser);
+    session!.submit(VAGUE, 'typed');
+    await flush();
+    expect(results).toHaveLength(2);
+    expect(results[1].message).not.toBe('Interpreting…');
+    expect(events(engine).some((t) => /Phrase interpreter unavailable \(unusable answer/.test(t))).toBe(true);
+  });
+
+  it('a parser that throws synchronously is handled like a rejection', async () => {
+    const parser: LlmParser = { parse: () => { throw new Error('sync boom'); } };
+    const { engine, results } = build(parser);
+    expect(() => session!.submit(VAGUE, 'typed')).not.toThrow();
+    await flush();
+    expect(results).toHaveLength(2);
+    expect(events(engine).some((t) => /sync boom/.test(t))).toBe(true);
+  });
+
+  it('a session disposed while the request is in flight executes nothing', async () => {
+    let release!: (r: LlmParseResponse) => void;
+    const { parser } = fake(() => new Promise<LlmParseResponse>((r) => { release = r; }));
+    const { heard, results } = build(parser);
+    const spokenBefore = heard.length;
+    session!.submit(VAGUE, 'typed');
+    await flush(); // the request is now in flight
+    session!.dispose();
+    release({ commands: [TAKEOFF_13], model: 'fake', latencyMs: 1 });
+    await flush();
+    expect(results).toHaveLength(1); // only the provisional result
+    expect(heard.length).toBe(spokenBefore);
+  });
+
   it('with the setting off the interpreter is never called', async () => {
     voiceSettings.update({ interpreterEnabled: false });
     const { parser, calls } = fake(() => ok([TAKEOFF_13]));

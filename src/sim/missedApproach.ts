@@ -191,7 +191,7 @@ export function publishedHoldFor(airport: Airport, fix: string, preferProcedureI
     }
   }
   if (!hold && !radial) return undefined;
-  const out: PublishedHold = { ...(hold ?? {}) };
+  const out: PublishedHold = { ...hold };
   if (radial && out.inboundCourseMag === undefined) out.inboundCourseMag = radial.inboundMag;
   return { hold: out, inboundSource: radial?.source, source: source || 'procedure' };
 }

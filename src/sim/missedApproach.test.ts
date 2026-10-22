@@ -194,7 +194,7 @@ describe('published missed approach (fixture)', () => {
     const warn = e.getState().events.find((x) => /published missed approach .* could not be interpreted/.test(x.text));
     expect(warn).toBeDefined();
     expect(warn!.severity).toBe('warning');
-    expect(pilotTexts(e).some((t) => /going around runway one three, no landing clearance\.$/.test(t))).toBe(true);
+    expect(pilotTexts(e).some((t) => t.endsWith('going around runway one three, no landing clearance.'))).toBe(true);
     expect(runUntil(e, () => ac.pendingRequest?.text === 'request vectors for another approach', 120)).toBe(true);
   });
 

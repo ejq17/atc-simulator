@@ -129,7 +129,7 @@ describe('AI answers pilot requests', () => {
     answered(h, 'N723EJ', 'RUNWAY_CHANGE');
     expect(h.atc('TWR').some((e) => /unable, runway/.test(e.text))).toBe(true);
     h.run(8);
-    expect(h.pilotTexts('N723EJ').some((t) => /^Roger/.test(t))).toBe(true);
+    expect(h.pilotTexts('N723EJ').some((t) => t.startsWith('Roger'))).toBe(true);
   });
 
   it('short approach and the option in the pattern', () => {

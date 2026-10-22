@@ -12,8 +12,8 @@ be used for real-world operations. Nothing here connects to real radio frequenci
 ADS-B, or live traffic.
 
 **Live demo:** https://ejq17.github.io/atc-simulator/ (static GitHub Pages build; no backend). On the demo, **Deepgram is unavailable** (it
-needs the local backend, `npm run server`), **live weather is unavailable** (aviationweather.gov sends no CORS headers, so a browser page
-cannot read it; sessions use the simulated presets and the top bar shows **WX SIMULATED**), and the **FAA charts are bundled at build time**
+needs the local backend, `npm run server`), **live weather comes straight from the National Weather Service API** (`api.weather.gov` allows browser requests; the Aviation Weather Center feed
+needs the local backend because aviationweather.gov sends no CORS headers; the KMHT 5-minute observations carry no raw METAR, so a METAR-style string is built from the structured fields; if the NWS request fails the session falls back to the simulated presets and the top bar shows **WX SIMULATED**), the **phrase interpreter is unavailable** (it needs the backend), and the **FAA charts are bundled at build time**
 from the public-domain d-TPP files. Speech input defaults to the browser's Web Speech API; **Local Whisper** and the **Local neural** pilot voice also work there (models come from
 the Hugging Face CDN, the ONNX runtime from jsDelivr). For everything, run it locally (Quick start below).
 
@@ -30,7 +30,7 @@ ATIS, charts, navaids, runway ends, parking) comes from that airport's data.
 | ACY VORTAC 117.15 (operational restricted), ILS 13 I-PVO / ILS 31 I-ACY (both 109.1), nearby VORs, 36 approach fixes | FAA NASR NAV/ILS/FIX | 2026-10-01 |
 | Airport diagram, 13 instrument approach charts, ATLANTIC CITY THREE departure, hot spot, LAHSO pages (viewed in-app from the official PDFs) | FAA d-TPP | cycle 2610, 2026-10-01 to 2026-10-29 |
 | Taxiway and apron geometry, gates | OpenStreetMap, reconciled with the FAA airport diagram (all 12 charted taxiway identifiers A B C D G H J K L M N P present) | snapshot 2026-10-17 |
-| Live weather (METAR/TAF) | Aviation Weather Center API via the local backend | live |
+| Live weather (METAR) | Aviation Weather Center API via the local backend; the National Weather Service API (`api.weather.gov`) directly from the browser when the backend is unreachable and on the hosted demo | live |
 | Minimum vectoring altitudes (9 sectors) | FAA MVA/MIA digital product, Atlantic City ATCT/TRACON chart ACY_MVA_FUS3 | server date 2025-10-20 |
 | LAHSO hold-short points and available landing distances; published fix altitudes and holding patterns | FAA NASR; d-TPP plates (transcribed, with provenance) | 2026-10-01 / cycle 2610 |
 | Procedural references in training/debrief | FAA JO 7110.65 paragraph numbers and titles verified against the FAA web edition (`docs/FAA-REFERENCES.md`) | 2026-10-16 |
@@ -54,7 +54,7 @@ reviewed against the governing FAA text with measurements (`docs/BEHAVIOUR-ACCUR
 Everything approximate or simplified is documented: runway holding positions are derived
 (250 ft from the centreline per the FAA design standard; the FAA data has no hold-line coordinates), most parking
 spots other than the ten OSM gate stands are synthetic positions inside the real aprons,
-aircraft performance is a simplified model (C172 and A320 only), and 32 short OSM apron
+aircraft performance is a simplified model (the 11 type entries of `src/sim/performance.ts`: C172, A320, B738, BCS3, E175, CRJ9, B752, C208, H65, F16 and the airport vehicle), and 32 short OSM apron
 lanes could not be matched to a charted identifier. See `data/sources/README.md` and
 `src/airport/kacy/build-report.md`. The OSM-derived layer is © OpenStreetMap
 contributors, ODbL 1.0. FAA data (NASR, d-TPP charts, MVA) is a US government work in the public domain. The simulator code is MIT
@@ -64,7 +64,7 @@ licensed (`LICENSE`); see `CONTRIBUTING.md` to help out.
 
 ```bash
 npm install
-npm run server   # local backend on :8787 (AWC weather proxy, FAA chart proxy, optional Deepgram token)
+npm run server   # local backend on :8787 (AWC weather proxy, FAA chart proxy, optional Deepgram token and phrase interpreter; `tsx watch`, restarts on file changes)
 npm run dev      # Vite on http://localhost:5173
 ```
 
@@ -102,10 +102,15 @@ to lock back to the wall clock. To start a session on the old sim clock instead,
 * Charts, Navaids, ATIS, Weather & Runways and Settings open from the top bar.
 
 Speech recognition providers, all three exercised end to end in automation: **Local Whisper**
-(on-device via transformers.js, no cloud, ~40 MB model downloaded once), the browser **Web
+(on-device via transformers.js, no cloud, 40 to 250 MB model on the CPU depending on the size you pick, downloaded once), the browser **Web
 Speech API** (zero setup; Chrome sends audio to Google; pause a beat after keying), or **Deepgram** streaming (set `DEEPGRAM_API_KEY` in `.env`,
 see `.env.example`; about $0.0048 per audio minute at the time of writing). The key never
 reaches the browser: the backend mints short-lived tokens. No recordings are stored.
+**Phrase interpreter** (optional, off without a key): when the rule grammar is unsure about a transmission (no command, an unknown one, or confidence under 0.6), the
+transmission text (never audio) plus the aircraft list and the airport's runway ends, taxiways, frequencies, fixes and arrivals can be sent through the local backend to the
+Anthropic API (`ANTHROPIC_API_KEY` in `.env`; model `ATC_LLM_MODEL`, default `claude-opus-5-5`). The grammar stays first: a command it read with confidence is never replaced, the
+model's answer is validated against the active aircraft and airport data, and on any failure (no key, backend down, timeout, bad answer) the grammar result is used.
+Clear instructions never leave the browser; Settings > Phrase interpreter turns it off. Details: `src/commands/README.md`, `server/README.md`.
 Pilot voices: **Browser voices** (default, instant, clean) or **Local neural** (Settings > Pilot voice engine; machines with WebGPU see a one-time offer to enable it).
 The neural voice runs in your browser tab, no cloud and no key: **Kokoro-82M** (`kokoro-js`, Apache-2.0) on WebGPU, or **Piper** (VITS, voice `en_US-libritts_r-medium`)
 on WebAssembly when there is no WebGPU. One-time model download from the Hugging Face CDN: **326 MB on WebGPU, 79 MB on the CPU**, then kept in the browser's Cache API
@@ -173,7 +178,8 @@ The e2e test (`e2e/tower.spec.ts`) needs WebGL; headless Chromium uses SwiftShad
 
 ```bash
 npm test          # vitest: engine, parser, airport data, weather, charts, voice, game, ui
-npm run test:e2e  # playwright: 24 browser flows incl. Whisper, Web Speech (real Chrome) and Deepgram-protocol voice tests
+npm run test:e2e  # playwright (e2e/): gameplay, layout, Tower, landline, a console-clean sweep (both airports x five position choices, every view and drawer, fails on any console error or warning), plus Whisper, Web Speech (real Chrome) and Deepgram-protocol voice tests
+                  # against a production build: npm run build && E2E_PREVIEW=1 E2E_PORT=5190 npx playwright test --project=chromium
 npm run typecheck
 npm run lint
 npm run fetch-charts                    # download the FAA chart PDFs into public/charts (used by the static build)
@@ -278,7 +284,7 @@ land-and-hold-short (LAHSO) clearances. Tower vocabulary: runway exit instructio
 sequencing ("number two, follow the Skyhawk", extend downwind, turn base now, make short approach, make left three sixty), closed traffic,
 touch-and-go / low approach / option, position reports ("report midfield downwind / base / two mile final"), "squawk VFR / squawk one two zero
 zero", "frequency change approved", wind and altimeter with a clearance, line up and wait with traffic information.
-660+ parser tests in `src/commands`. Positions: Clearance Delivery,
+About 880 tests in `src/commands`. Positions: Clearance Delivery,
 Ground, Tower, Approach/Departure, or any combination.
 
 **Coordination between positions.** The positions you do not work are run by AI controllers, and the positions talk to each other the way a cab does over the
@@ -295,7 +301,7 @@ src/sim        simulation engine        src/airport   verified KACY / KMHT datas
 src/commands   phraseology parser       src/radio     readbacks, frequencies
 src/voice      PTT, STT, TTS, radio FX  src/weather   METAR, presets, ATIS, runway selection
 src/charts     FAA chart viewer         src/game      scenarios, traffic, training, career, debrief
-src/ui         React app               server/       weather/chart proxy, Deepgram token
+src/ui         React app               server/       weather/chart proxy, Deepgram token, phrase interpreter
 data/sources   FAA/OSM/AWC extracts with provenance (raw downloads are git-ignored)
 scripts        build-airport.ts <ICAO> (+ airports/<icao>.ts profiles), extract-nasr-airport.ts, osm-overpass-to-geojson.ts
 ```

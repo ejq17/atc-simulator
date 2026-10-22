@@ -33,6 +33,12 @@ describe('fetchLiveMetar', () => {
     expect((f as unknown as ReturnType<typeof vi.fn>).mock.calls[0][0]).toBe('http://x:1/api/weather/metar?ids=KACY');
   });
 
+  it('defaults to a same-origin /api URL (the dev and preview servers proxy it; a direct :8787 request is blocked by CORS off port 5173)', async () => {
+    const f = respond(KACY_JSON);
+    await fetchLiveMetar('KACY', { fetchImpl: f });
+    expect((f as unknown as ReturnType<typeof vi.fn>).mock.calls[0][0]).toBe('/api/weather/metar?ids=KACY');
+  });
+
   it('BACKEND_UNREACHABLE with a message telling the user to run the backend', async () => {
     const f = vi.fn(async () => { throw new TypeError('fetch failed'); }) as unknown as typeof fetch;
     const err = await fetchLiveMetar('KACY', { fetchImpl: f, nwsFallback: false }).catch((e) => e);

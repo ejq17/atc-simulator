@@ -1,3 +1,4 @@
+import { EventEmitter } from 'node:events';
 import { Readable } from 'node:stream';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import Anthropic from '@anthropic-ai/sdk';
@@ -18,11 +19,11 @@ function mkReq(method: string, body?: unknown): IncomingMessage {
 }
 function mkRes() {
   const headers: Record<string, string> = {};
-  const res = {
-    statusCode: 0, body: '',
+  const res = Object.assign(new EventEmitter(), {
+    statusCode: 0, body: '', writableEnded: false,
     setHeader(k: string, v: string) { headers[k.toLowerCase()] = v; },
-    end(b: string) { res.body = b; },
-  };
+    end(b: string) { res.body = b; res.writableEnded = true; },
+  });
   return { res: res as unknown as ServerResponse & { body: string }, headers, json: () => JSON.parse(res.body) };
 }
 
@@ -53,6 +54,39 @@ describe('validateRequest', () => {
 });
 
 describe('createLlmParseHandler', () => {
+  it('aborts the upstream request when the browser disconnects, and writes nothing', async () => {
+    let signal: AbortSignal | undefined;
+    const handler = createLlmParseHandler({
+      client: {
+        messages: {
+          parse: (_p: unknown, opts?: { signal?: AbortSignal }) => new Promise((_, reject) => {
+            signal = opts?.signal;
+            signal?.addEventListener('abort', () => reject(new Anthropic.APIUserAbortError()));
+          }),
+        },
+      },
+      env: {}, log: () => { throw new Error('an aborted request must not be logged as an upstream failure'); },
+    });
+    const out = mkRes();
+    const done = handler(mkReq('POST', goodBody), out.res);
+    await new Promise((r) => setTimeout(r, 10));
+    expect(signal?.aborted).toBe(false);
+    out.res.emit('close');
+    await done;
+    expect(signal?.aborted).toBe(true);
+    expect(out.res.body).toBe('');
+  });
+
+  it('does not abort a request whose response was already sent', async () => {
+    let signal: AbortSignal | undefined;
+    const out = mkRes();
+    const handler = createLlmParseHandler({ client: { messages: { parse: async (_p: unknown, opts?: { signal?: AbortSignal }) => { signal = opts?.signal; return okMessage([]); } } }, env: {}, log: () => {} });
+    await handler(mkReq('POST', goodBody), out.res);
+    out.res.emit('close'); // normal end of the connection after the response
+    expect(signal?.aborted).toBe(false);
+    expect(out.res.statusCode).toBe(200);
+  });
+
   it('405 for other methods', async () => {
     const r = await run(withClient(() => okMessage([])), 'GET');
     expect(r.status).toBe(405);

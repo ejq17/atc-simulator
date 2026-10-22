@@ -92,7 +92,7 @@ describe('ROZZE TWO transcription', () => {
     expect(prof.get('CRIBB')).toMatchObject({ minAltitudeFt: 13000, maxAltitudeFt: 16000 });
   });
   it('the end of each runway leg is an initial approach fix of the expected approach plate, and the join fixes are on that plate', () => {
-    const iap = (end: string) => ap.procedures.find((p) => p.type === 'IAP' && p.runwayEnd === end && /^ILS/.test(p.name));
+    const iap = (end: string) => ap.procedures.find((p) => p.type === 'IAP' && p.runwayEnd === end && p.name.startsWith('ILS'));
     expect(iap('6')!.fixes).toContain('TEETO');
     expect(iap('17')!.fixes).toEqual(expect.arrayContaining(['PURBL', 'LYLAC', 'BLSSM', 'BLUUM']));
     expect(iap('35')!.fixes).toEqual(expect.arrayContaining(['SHOWZ', 'IHOBB', 'ELEEE', 'YOULL']));
