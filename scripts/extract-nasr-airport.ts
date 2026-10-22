@@ -238,7 +238,7 @@ const facility = {
   tower: {
     facility_type: atcBase?.FACILITY_TYPE ?? null,
     operator_code: atcBase?.TWR_OPERATOR_CODE ?? null,
-    operator_meaning: atcBase?.TWR_OPERATOR_CODE === 'F' ? 'F = FAA (NASR code)' : atcBase?.TWR_OPERATOR_CODE ?? null,
+    operator_meaning: atcBase?.TWR_OPERATOR_CODE === 'F' ? 'F = FAA (NASR code)' : atcBase?.TWR_OPERATOR_CODE === 'FCT' ? 'FCT = FAA contract tower (NASR code)' : atcBase?.TWR_OPERATOR_CODE ?? null,
     tower_call: atcBase?.TWR_CALL ?? null,
     tower_hours: atcBase?.TWR_HRS ?? null,
     tower_hours_note: `NASR TWR_HRS = ${atcBase?.TWR_HRS} (hours/day).`,
@@ -254,7 +254,7 @@ const facility = {
     class_b: cls.some((c) => c.CLASS_B_AIRSPACE === 'Y'),
     class_d: cls.some((c) => c.CLASS_D_AIRSPACE === 'Y'),
     class_e_surface: cls.some((c) => c.CLASS_E_AIRSPACE === 'Y'),
-    hours: null,
+    hours: str(cls[0]?.AIRSPACE_HRS),
     note: `NASR CLS_ARSP: ${FAA_ID} CLASS_C_AIRSPACE = ${cls[0]?.CLASS_C_AIRSPACE ?? 'n/a'}. Vertical/lateral limits are NOT in the CSV rows; class_airspace_shape_files.zip was not downloaded - shelf dimensions UNVERIFIED.`,
   },
   runways,
@@ -290,16 +290,16 @@ const frqRow = (r: Row): J => ({
 });
 const vhfUse = (use: string, facilityType?: string): J[] => frq.filter((r) => r.FREQ_USE === use && (!facilityType || r.FACILITY_TYPE === facilityType) && Number(r.FREQ) < 225);
 const uhfUse = (use: string, facilityType?: string): string | undefined => frq.find((r) => r.FREQ_USE === use && (!facilityType || r.FACILITY_TYPE === facilityType) && Number(r.FREQ) >= 225)?.FREQ;
-const one = (use: string, facilityType?: string): J => {
-  const v = vhfUse(use, facilityType);
+const one = (use: string, facilityType?: string, ownFacilityOnly = false): J => {
+  const v = vhfUse(use, facilityType).filter((r) => !ownFacilityOnly || r.FACILITY === FAA_ID);
   if (v.length !== 1) throw new Error(`expected exactly one VHF ${use} row, found ${v.length}`);
   return v[0];
 };
 const atis = one('ATIS', 'ATCT');
-const cd = one('CD/P');
-const gnd = one('GND/P');
-const lcl = one('LCL/P');
-const appRows = frq.filter((r) => r.FREQ_USE === 'APCH/P DEP/P');
+const cd = one('CD/P', undefined, true);
+const gnd = one('GND/P', undefined, true);
+const lcl = one('LCL/P', undefined, true);
+const appRows = frq.filter((r) => r.FREQ_USE.startsWith('APCH/P DEP/P')); // 'APCH/P DEP/P' and 'APCH/P DEP/P IC' (PGD lists its UHF row with the IC suffix)
 const appVhf = appRows.find((r) => Number(r.FREQ) < 225)!;
 const appUhf = appRows.find((r) => Number(r.FREQ) >= 225);
 const classC = frq.filter((r) => r.FREQ_USE === 'CLASS C');
@@ -328,7 +328,7 @@ const frequencies = {
     controlling_artcc: `${apt.RESP_ARTCC_ID} (${apt.ARTCC_NAME})`,
   },
   summary_by_function: {
-    ATIS: { vhf: atis.FREQ, uhf: uhfUse('ATIS', 'ATCT') ?? null, hours: atis.TOWER_HRS, phone: atcAtis[0]?.ATIS_PHONE_NO, note: 'FRQ use code ATIS (facility type ATCT); phone from ATC_ATIS.csv. The ASOS row on the same frequency is the automated weather source.' },
+    ATIS: { vhf: atis.FREQ, uhf: uhfUse('ATIS', 'ATCT') ?? null, hours: atcAtis[0]?.ATIS_HRS || atis.TOWER_HRS, phone: atcAtis[0]?.ATIS_PHONE_NO || null, note: 'FRQ use code ATIS (facility type ATCT); phone from ATC_ATIS.csv. The ASOS row on the same frequency is the automated weather source.' },
     clearance_delivery: { vhf: cd.FREQ, uhf: uhfUse('CD/P') ?? null, note: `FRQ CD/P; the airport diagram prints CLNC DEL ${proc.airport_diagram.printed_frequencies?.CLNC_DEL}` },
     ground: { vhf: gnd.FREQ, uhf: uhfUse('GND/P') ?? null, note: `FRQ GND/P; the airport diagram prints GND CON ${proc.airport_diagram.printed_frequencies?.GND_CON}` },
     tower: { vhf: lcl.FREQ, uhf: uhfUse('LCL/P', 'ATCT') ?? null, note: `FRQ LCL/P; the airport diagram prints ${proc.airport_diagram.printed_frequencies?.TOWER}` },
@@ -474,7 +474,7 @@ const navaids = {
     sources: [`FAA NASR 28-day subscription, cycle effective ${CYCLE}; NAV_CSV, ILS_CSV, FIX_CSV zips (https://nfdc.faa.gov/webContent/28DaySub/extra/01_Oct_2026_<NAME>_CSV.zip)`, `FAA d-TPP cycle ${proc._provenance.cycle} approach plate PDFs for roles/minima`],
     ...provenanceBase,
     method: `Extracted by scripts/extract-nasr-airport.ts ${FAA_ID} ${ICAO}. ILS rows with ARPT_ID == ${FAA_ID}; navaids named in ${icaoLower}-procedures.json navaids_referenced; fixes = every 5-letter fix named in fixes_and_roles of an instrument approach and every fix of a STAR transcription (stars[].star) in that file (each also checked against NASR FIX_BASE and, in charted_on, FIX_CHRT).`,
-    raw: `raw/nasr_${CYCLE}/, raw/kmht_dtpp_2610_pdfs/`,
+    raw: `raw/nasr_${CYCLE}/, raw/${icaoLower}_dtpp_2610_pdfs/`,
   },
   primary_navaid: { ...navObj(primaryRow), tacan_dme_channel: primaryRow.CHAN, location_note: proc.primary_navaid_note },
   ils_localizers: {

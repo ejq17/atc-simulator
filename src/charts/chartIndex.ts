@@ -1,5 +1,5 @@
 /**
- * Typed index of the official FAA d-TPP charts per airport (KACY, KMHT).
+ * Typed index of the official FAA d-TPP charts per airport (KACY, KMHT, KPGD).
  *
  * Built at import time from `data/sources/<icao>-procedures.json` (verified d-TPP
  * cycle 2610, every PDF URL checked HTTP 200 by the research pass). Nothing is
@@ -9,6 +9,7 @@
  */
 import rawProcedures from '../../data/sources/kacy-procedures.json';
 import rawKmhtProcedures from '../../data/sources/kmht-procedures.json';
+import rawKpgdProcedures from '../../data/sources/kpgd-procedures.json';
 
 export type ChartCategory = 'DIAGRAM' | 'IAP' | 'DP' | 'STAR' | 'HOT_SPOT' | 'LAHSO' | 'MINIMUMS';
 
@@ -84,6 +85,7 @@ interface ProceduresFile {
 const DATASETS: Record<string, ProceduresFile> = {
   KACY: rawProcedures as unknown as ProceduresFile,
   KMHT: rawKmhtProcedures as unknown as ProceduresFile,
+  KPGD: rawKpgdProcedures as unknown as ProceduresFile,
 };
 const DEFAULT_ICAO = 'KACY';
 

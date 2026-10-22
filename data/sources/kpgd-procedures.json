@@ -1,0 +1,874 @@
+{
+ "_provenance": {
+  "source": "FAA d-TPP metadata XML https://aeronav.faa.gov/d-tpp/2610/xml_data/d-TPP_Metafile.xml (saved raw/d-TPP_Metafile_2610.xml; records of airport_name apt_ident=\"PGD\", icao_ident=\"KPGD\", alnum 6178); PDFs https://aeronav.faa.gov/d-tpp/2610/<pdf_name>; cycle page https://www.faa.gov/air_traffic/flight_info/aeronav/digital_products/dtpp/",
+  "retrieved": "2026-10-21",
+  "cycle": "2610",
+  "effective_from": "2026-10-01 0901Z",
+  "effective_to": "2026-10-29 0901Z",
+  "volume": "SE-3 (printed on charts as \"SE-3, 01 OCT 2026 to 29 OCT 2026\")",
+  "airport": {
+   "icao": "KPGD",
+   "faa": "PGD",
+   "name": "PUNTA GORDA",
+   "dtpp_alnum": "6178",
+   "city": "PUNTA GORDA",
+   "state": "FL"
+  },
+  "next_cycle": "2611 effective 2026-10-29",
+  "http_checks": "raw/kpgd_dtpp_http_head_checks.tsv (HEAD request per URL, with Content-Length, UTC time): all 11 URLs returned 200 application/pdf; each PDF was also downloaded (GET), starts with %PDF and has the HEAD Content-Length as its size",
+  "records_in_metadata": "11 PDF records for PGD: TAKEOFF MINIMUMS (SE3TO.PDF), ALTERNATE MINIMUMS (SE3ALT.PDF), LUBBR FOUR (RNAV) and CONT.1, PIKKR SEVEN (RNAV), ILS OR LOC RWY 04, RNAV (GPS) RWY 04 / 15 / 22 / 33, AIRPORT DIAGRAM. No DP, SID, hot spot, LAHSO or COPTER record, no RNP or special-authorization approach."
+ },
+ "primary_navaid_id": "RSW",
+ "primary_navaid_note": "There is NO navaid at PGD in NASR (no NAV_BASE row named for the airport; the ILS DME is the airport's own DME source). The ILS 4 plate and the 4 and 33 RNAV plates use the LEE COUNTY VORTAC (RSW, 114.15, chan 88Y, 26.52988669 N 81.7757685 W, NASR status OPERATIONAL RESTRICTED, variation 2W epoch 1985) about 24 NM south-southwest of the airport as IAF / feeder and for the plate distances (computed from the NASR coordinates, not an FAA-published figure).",
+ "navaids_referenced": [
+  "RSW"
+ ],
+ "ils_note": "One ILS exists: runway 4 (I-PGD 109.75, ILS/DME channel 34Y, GS 333.05, category I, NASR ILS_BASE system type LD, status OPERATIONAL IFR, remarks 'ILS CLASSIFICATION CODE IA' and 'ILS UNMON WHEN ATCT CLSD'). Runways 22, 15 and 33 have no ILS or LOC (RNAV (GPS) only); runway 9/27 has no approach. NASR lists no marker beacons.",
+ "navaid_unverified": [
+  "Fix roles are human-read from the plate images; verify against the PDFs before safety-critical use.",
+  "The LEE COUNTY VORTAC (RSW) is 'OPERATIONAL RESTRICTED' in NAV_BASE with variation 2W (epoch 1985).",
+  "VIOLA, PINTS and ROGAN are reporting points (NASR FIX_USE RP) on the plates; their 'feeder route' roles are read from the plan view arrows and were checked numerically against the NASR coordinates (distance and track to ZEPIG / OWGAF / BRUSK / SACRA)."
+ ],
+ "ils_plate_data": {
+  "4": {
+   "plate_ident": "I-PGD",
+   "plate_minima": "ILS or LOC RWY 4 (Amdt 1 05SEP24): S-ILS 4 DA 256 ft, HAT 232 (300-3/4), all categories. GS 3.00 deg, TCH 50 (plate). S-LOC 4: Cat A-B MDA 480 HAT 456 (500-1); Cat C-D 480-1 3/8 (500-1 3/8); with ISOXE fix (DME required) MDA 380 HAT 356 (400-1).",
+   "tdze_plate_ft": 24,
+   "source": "d-TPP cycle 2610 PDF 06178IL4.PDF read visually (DA values are NOT in NASR)"
+  }
+ },
+ "airport_diagram": {
+  "chart_name": "AIRPORT DIAGRAM",
+  "pdf_name": "06178AD.PDF",
+  "printed_header": "AL-6178 (FAA); chart id 26190; SE-3 01 OCT 2026 to 29 OCT 2026",
+  "printed_variation_epoch": "JANUARY 2020",
+  "printed_annual_rate_of_change": "0.1 deg W",
+  "printed_frequencies": {
+   "ATIS": "135.675",
+   "CLNC_DEL": "119.55 (127.05 when tower closed)",
+   "GND_CON": "119.55",
+   "TOWER": "PUNTA GORDA TOWER 121.0 (CTAF)",
+   "APPROACH": "FORT MYERS APP CON 127.05 306.2 (as printed on the approach plates; the diagram prints 127.05 for CLNC DEL when the tower is closed)"
+  },
+  "charted_runway_headings_mag": {
+   "4": 35,
+   "22": 215,
+   "15": 155,
+   "33": 335,
+   "9": 95,
+   "27": 275
+  },
+  "charted_runway_headings_note": "Magnetic runway headings printed on the diagram (035, 215, 155, 335, 095, 275 deg) and as APP CRS on the approach plates (035, 215, 155, 335); each equals the NASR true alignment plus the 6 W variation (29+6, 209+6, 149+6, 329+6, 89+6, 269+6). The diagram prints runway dimensions 7193 X 150 (4/22), 6286 X 150 (15/33) and 2636 X 60 (9/27), the field elevation 26 and runway end elevations 19 (15 end), 23 (33 and 4 ends), 25 (22 end), 22 (27 end); PCR notes 'RWY 04-22 PCR 570 F/B/X/T S-45, D-95, 2D-150, 2D/2D2-420; RWY 09-27 PCR 100 F/C/X/T; RWY 15-33 PCR 660 F/A/X/T S-45, D-80, 2D-140'; a 200 X 200 blast pad near the runway 15 end; 'Not for Part 121/Part 380 Air Carrier Use or Foreign Air Carrier Equivalent: RWY 09-27.'",
+  "taxiway_identifiers": [
+   "A",
+   "A1",
+   "A2",
+   "A3",
+   "A4",
+   "B",
+   "C",
+   "D",
+   "E",
+   "E1",
+   "E2",
+   "E3",
+   "F",
+   "G",
+   "G1",
+   "G2",
+   "G3",
+   "H"
+  ],
+  "taxiway_identifiers_note": "Read visually from 250 dpi renders of the diagram (the PDF has no text layer for the chart body: only the booklet-edge lines are text): A runs along the west side of runway 4/22 from A1 at the runway 22 end to A4 at the runway 4 end (A1, A2, A3, A4 are its connectors); B connects the north apron to A1; C leads from A across runway 15/33 to D; D runs on the terminal side of runway 15/33 with F to the tower; E, E1, E2, E3 and G1, G2, G3 serve runway 9/27 and the FBO apron; G joins A to G3; H connects the runway 33 end to A4. The diagram prints no Y, Z or other identifiers and no hot spot.",
+  "labels_not_taxiways": "North Ramp, South Ramp, Terminal, FBO, 600 Hangars, 200 Hangars, Fire Station, TWR, Blast Pad 200 X 200, runway end labels.",
+  "hot_spots": "none printed (the diagram prints only 'CAUTION: BE ALERT TO RUNWAY CROSSING CLEARANCES. READBACK OF ALL RUNWAY HOLDING INSTRUCTIONS IS REQUIRED.')",
+  "pdf": {
+   "url": "https://aeronav.faa.gov/d-tpp/2610/06178AD.PDF",
+   "http_status": 200,
+   "content_type": "application/pdf",
+   "verified_by": "curl -I (HEAD) and curl GET on 2026-10-21 (UTC dates in the TSV; User-Agent atc-simulator-research/1.0); the file begins with %PDF and its size equals the HEAD Content-Length; downloaded to raw/kpgd_dtpp_2610_pdfs/06178AD.PDF",
+   "bytes": 170716,
+   "local_file": "raw/kpgd_dtpp_2610_pdfs/06178AD.PDF"
+  }
+ },
+ "instrument_approaches": [
+  {
+   "chart_name": "ILS OR LOC RWY 04",
+   "chart_code": "IAP",
+   "pdf_name": "06178IL4.PDF",
+   "amdt_dtpp_metadata": "1",
+   "amdt_date_dtpp_metadata": null,
+   "printed_amendment_on_plate": "Amdt 1 05SEP24",
+   "runway": "4",
+   "approach_type": "ILS or LOC (localizer/DME based; DME or radar required for the ISOXE fix minimums)",
+   "final_approach_course_mag_deg": 35,
+   "tdze_ft_plate": 24,
+   "pdf": {
+    "url": "https://aeronav.faa.gov/d-tpp/2610/06178IL4.PDF",
+    "http_status": 200,
+    "content_type": "application/pdf",
+    "verified_by": "curl -I (HEAD) and curl GET on 2026-10-21 (UTC dates in the TSV; User-Agent atc-simulator-research/1.0); the file begins with %PDF and its size equals the HEAD Content-Length; downloaded to raw/kpgd_dtpp_2610_pdfs/06178IL4.PDF",
+    "bytes": 308608,
+    "local_file": "raw/kpgd_dtpp_2610_pdfs/06178IL4.PDF"
+   },
+   "procuid": "35660",
+   "faa_nfd_id": null,
+   "copter": "",
+   "fixes_and_roles": [
+    {
+     "fix": "RSW (LEE COUNTY VORTAC 114.15, chan 88Y)",
+     "role": "IAF (feeder: 2000 NoPT, 312 deg, 21.7 NM to ZEPIG; radial feed; plate: procedure NA for arrivals on RSW VORTAC airway radials 328 CW 354)"
+    },
+    {
+     "fix": "ZEPIG (I-PGD 11.4; RSW 21.7)",
+     "role": "IF/IAF (one-minute holding pattern, courses 215/035, 6000-2000)"
+    },
+    {
+     "fix": "CISTS (I-PGD 6.2)",
+     "role": "FAF (INT; ILS glideslope intercept 1600); FAF to MAP 4.8 NM"
+    },
+    {
+     "fix": "ISOXE (I-PGD 2.6)",
+     "role": "LOC step-down fix (ISOXE FIX MINIMUMS, DME required)"
+    },
+    {
+     "fix": "RW04",
+     "role": "MAP (runway threshold, I-PGD 1.4)"
+    },
+    {
+     "fix": "DOGLE",
+     "role": "missed approach waypoint"
+    },
+    {
+     "fix": "JOCKS",
+     "role": "missed approach hold"
+    },
+    {
+     "fix": "VIOLA (RSW 39.1)",
+     "role": "feeder route fix: 2000, 132 deg, 17.5 NM to ZEPIG (not labelled IAF on the plate)"
+    }
+   ],
+   "minima_summary": "S-ILS 4 DA 256 HAT 232 (300-3/4), all categories; S-LOC 4 Cat A-B MDA 480 HAT 456 (500-1), Cat C-D 480-1 3/8 HAT 456 (500-1 3/8); with ISOXE fix (DME required) S-LOC 4 MDA 380 HAT 356 (400-1), all categories; Circling A 480-1 (454; 500-1), B 580-1 (554; 600-1), C 600-1 1/2 (574; 600-1 1/2), D 740-2 1/4 (714; 800-2 1/4); with ISOXE fix circling A 460-1 (434; 500-1), B 580-1, C 600-1 1/2, D 740-2 1/4. FAF to MAP 4.8 NM (plate time table: 60 kt 4:48, 90 kt 3:12, 120 kt 2:24, 150 kt 1:55, 180 kt 1:36)",
+   "missed_approach": "Climb to 2000 direct DOGLE and on track 087 deg to JOCKS and hold.",
+   "missed_approach_verbatim": "Climb to 2000 direct DOGLE and on track 087° to JOCKS and hold.",
+   "holding": "ZEPIG one-minute holding pattern (215/035, 6000 / 2000 as depicted in the plan view); JOCKS missed approach hold (4 NM pattern, tracks 293 / 113 depicted)",
+   "plate_notes": "LOC/DME I-PGD 109.75, chan 34(Y); APP CRS 035; GS 3.00 TCH 50; Rwy Ldg 7193, TDZE 24, Apt Elev 26; RNP APCH - GPS (DOGLE missed approach waypoint); REIL rwys 4, 15, 22, 33; HIRL rwy 4-22; MIRL rwy 15-33; MSA RSW 30 NM 2600; frequencies printed on the plate: ATIS 135.675, Fort Myers App Con 127.05 306.2, Punta Gorda Tower 121.0 (CTAF), Gnd Con 119.55, UNICOM 122.975. Plate DME values (CISTS 6.2, ISOXE 2.6, ZEPIG 11.4) were recomputed from the NASR ILS_DME antenna and FIX_BASE coordinates: 6.2 / 2.6 / 11.4 NM.",
+   "fix_order_note": "fixes_and_roles are listed in simulator route order: the primary transition first (IAF..FAF..MAP, missed approach waypoint and hold), then the second transition and feeder fixes. The plate flows the same fixes; the order is not a chart claim.",
+   "data_provenance": "Chart name/PDF/amendment from d-TPP metadata XML; fixes, roles, minima, missed approach read visually from the rendered PDF plate (pdftoppm at 150 dpi; pdfjs-dist text layer used to confirm numbers) - transcription, spot-check before safety use.",
+   "localizer": "I-PGD 109.75 (LOC/DME chan 34(Y))",
+   "glidepath_note": "GS 3.00, TCH 50"
+  },
+  {
+   "chart_name": "RNAV (GPS) RWY 04",
+   "chart_code": "IAP",
+   "pdf_name": "06178R4.PDF",
+   "amdt_dtpp_metadata": "3",
+   "amdt_date_dtpp_metadata": "09/05/2024",
+   "printed_amendment_on_plate": "Amdt 3 05SEP24",
+   "runway": "4",
+   "approach_type": "RNAV (GPS) (WAAS LPV, LNAV/VNAV, LNAV; RNP APCH - GPS)",
+   "final_approach_course_mag_deg": 35,
+   "tdze_ft_plate": 24,
+   "pdf": {
+    "url": "https://aeronav.faa.gov/d-tpp/2610/06178R4.PDF",
+    "http_status": 200,
+    "content_type": "application/pdf",
+    "verified_by": "curl -I (HEAD) and curl GET on 2026-10-21 (UTC dates in the TSV; User-Agent atc-simulator-research/1.0); the file begins with %PDF and its size equals the HEAD Content-Length; downloaded to raw/kpgd_dtpp_2610_pdfs/06178R4.PDF",
+    "bytes": 269141,
+    "local_file": "raw/kpgd_dtpp_2610_pdfs/06178R4.PDF"
+   },
+   "procuid": "23938",
+   "faa_nfd_id": null,
+   "copter": "",
+   "fixes_and_roles": [
+    {
+     "fix": "ZEGIS",
+     "role": "IAF (2000 NoPT, 080 deg, 6 NM to BULOW)"
+    },
+    {
+     "fix": "BULOW",
+     "role": "IF/IAF (4 NM holding pattern 215/035, 6000-2000)"
+    },
+    {
+     "fix": "CISTS",
+     "role": "FAF (GP 3.00 intercept 1600)"
+    },
+    {
+     "fix": "YENCU (1.9 NM to RW04)",
+     "role": "LNAV step-down fix"
+    },
+    {
+     "fix": "RW04",
+     "role": "MAP"
+    },
+    {
+     "fix": "DOGLE",
+     "role": "missed approach waypoint"
+    },
+    {
+     "fix": "JOCKS",
+     "role": "missed approach hold"
+    },
+    {
+     "fix": "CUPAV",
+     "role": "IAF (second transition: 2000 NoPT, 350 deg, 6 NM to BULOW; listed after the primary route)"
+    }
+   ],
+   "minima_summary": "LPV DA 256 HAT 232 (300-3/4); LNAV/VNAV DA 393 HAT 369 (400-1); LNAV MDA A-B 440 HAT 416 (500-1), C-D 440-1 1/8 HAT 416 (500-1 1/8); Circling A 480-1 (454; 500-1), B 580-1 (554; 600-1), C 600-1 1/2 (574; 600-1 1/2), D 740-2 1/4 (714; 800-2 1/4). Profile distances: BULOW-CISTS 6 NM, CISTS-YENCU 2.9 NM, then 0.8 NM and 1.2 NM to RW04 (YENCU is 1.9 NM from RW04)",
+   "missed_approach": "Climb to 2000 direct DOGLE and on track 087 deg to JOCKS and hold.",
+   "missed_approach_verbatim": "Climb to 2000 direct DOGLE and on track 087° to JOCKS and hold.",
+   "holding": "BULOW 4 NM holding pattern (215/035, 6000-2000); JOCKS missed approach hold depicted in the MISSED APCH FIX inset",
+   "plate_notes": "WAAS CH 48807 W04A; APP CRS 035; GP 3.00 TCH 50; Rwy Ldg 7193, TDZE 24, Apt Elev 26; for uncompensated Baro-VNAV systems LNAV/VNAV NA below 3 C or above 54 C; procedure NA for arrival on RSW VORTAC airway radials 312 CW 016; MSA RW04 25 NM 2600; Fort Myers App Con 127.05 306.2 etc. as on the airport diagram.",
+   "fix_order_note": "fixes_and_roles are listed in simulator route order: the primary transition first (IAF..FAF..MAP, missed approach waypoint and hold), then the second transition and feeder fixes. The plate flows the same fixes; the order is not a chart claim.",
+   "data_provenance": "Chart name/PDF/amendment from d-TPP metadata XML; fixes, roles, minima, missed approach read visually from the rendered PDF plate (pdftoppm at 150 dpi; pdfjs-dist text layer used to confirm numbers) - transcription, spot-check before safety use."
+  },
+  {
+   "chart_name": "RNAV (GPS) RWY 15",
+   "chart_code": "IAP",
+   "pdf_name": "06178R15.PDF",
+   "amdt_dtpp_metadata": "2",
+   "amdt_date_dtpp_metadata": "12/31/2020",
+   "printed_amendment_on_plate": "Amdt 2 31DEC20",
+   "runway": "15",
+   "approach_type": "RNAV (GPS) (WAAS LPV, LNAV/VNAV, LNAV; RNP APCH)",
+   "final_approach_course_mag_deg": 155,
+   "tdze_ft_plate": 22,
+   "pdf": {
+    "url": "https://aeronav.faa.gov/d-tpp/2610/06178R15.PDF",
+    "http_status": 200,
+    "content_type": "application/pdf",
+    "verified_by": "curl -I (HEAD) and curl GET on 2026-10-21 (UTC dates in the TSV; User-Agent atc-simulator-research/1.0); the file begins with %PDF and its size equals the HEAD Content-Length; downloaded to raw/kpgd_dtpp_2610_pdfs/06178R15.PDF",
+    "bytes": 276363,
+    "local_file": "raw/kpgd_dtpp_2610_pdfs/06178R15.PDF"
+   },
+   "procuid": "23941",
+   "faa_nfd_id": null,
+   "copter": "",
+   "fixes_and_roles": [
+    {
+     "fix": "SACRA",
+     "role": "IAF (2000 NoPT, 244 deg, 6.6 NM to APZUL)"
+    },
+    {
+     "fix": "APZUL",
+     "role": "IF/IAF (4 NM holding pattern 335/155, 6000-2000)"
+    },
+    {
+     "fix": "UBIDY",
+     "role": "FAF (GP 3.00 intercept 1600)"
+    },
+    {
+     "fix": "VICHY (1.6 NM to RW15)",
+     "role": "LNAV step-down fix (580*, LNAV only; also marked 1.1 NM to RW15)"
+    },
+    {
+     "fix": "RW15",
+     "role": "MAP"
+    },
+    {
+     "fix": "DODIK",
+     "role": "missed approach waypoint"
+    },
+    {
+     "fix": "OWGAF",
+     "role": "missed approach hold"
+    },
+    {
+     "fix": "BRUSK",
+     "role": "IAF (second transition: 2000 NoPT, 065 deg, 6.7 NM to APZUL; listed after the primary route)"
+    },
+    {
+     "fix": "ROGAN",
+     "role": "feeder route fix: 2000, 225 deg, 8.8 NM to SACRA (procedure NA for arrivals at ROGAN on V7 north bound and V97 northwest bound; not labelled IAF)"
+    },
+    {
+     "fix": "PINTS",
+     "role": "feeder route fix: 2000, 349 deg, 13.6 NM to BRUSK (procedure NA for arrivals at PINTS on V579 southeast bound; not labelled IAF)"
+    }
+   ],
+   "minima_summary": "LPV DA 272 HAT 250 (300-3/4); LNAV/VNAV DA 320 HAT 298 (300-7/8); LNAV MDA A-B 420 HAT 398 (400-1), C-D 420-1 1/8 HAT 398 (400-1 1/8); Circling A 480-1 (454; 500-1), B 580-1 (554; 600-1), C 600-1 1/2 (574; 600-1 1/2), D 740-2 1/4 (714; 800-2 1/4). Distances: APZUL-UBIDY 6 NM, UBIDY-VICHY 3.2 NM, VICHY to threshold 1.6 NM",
+   "missed_approach": "Climb to 2500 direct DODIK and on track 203 deg to OWGAF and hold.",
+   "missed_approach_verbatim": "Climb to 2500 direct DODIK and track 203° to OWGAF and hold.",
+   "holding": "APZUL 4 NM holding pattern (335/155, 6000-2000); OWGAF missed approach hold depicted in the MISSED APCH FIX inset (064 / 244)",
+   "plate_notes": "WAAS CH 86307 W15A; APP CRS 155; GP 3.00 TCH 47; Rwy Ldg 6015 (displaced threshold 271 ft per NASR), TDZE 22, Apt Elev 26; for uncompensated Baro-VNAV systems LNAV/VNAV NA below 2 C or above 54 C; RNP APCH.; MSA RW15 25 NM 2600.",
+   "fix_order_note": "fixes_and_roles are listed in simulator route order: the primary transition first (IAF..FAF..MAP, missed approach waypoint and hold), then the second transition and feeder fixes. The plate flows the same fixes; the order is not a chart claim.",
+   "data_provenance": "Chart name/PDF/amendment from d-TPP metadata XML; fixes, roles, minima, missed approach read visually from the rendered PDF plate (pdftoppm at 150 dpi; pdfjs-dist text layer used to confirm numbers) - transcription, spot-check before safety use."
+  },
+  {
+   "chart_name": "RNAV (GPS) RWY 22",
+   "chart_code": "IAP",
+   "pdf_name": "06178R22.PDF",
+   "amdt_dtpp_metadata": "2A",
+   "amdt_date_dtpp_metadata": "01/30/2020",
+   "printed_amendment_on_plate": "Amdt 2A 30JAN20",
+   "runway": "22",
+   "approach_type": "RNAV (GPS) (WAAS LPV, LNAV/VNAV, LNAV; RNP APCH)",
+   "final_approach_course_mag_deg": 215,
+   "tdze_ft_plate": 26,
+   "pdf": {
+    "url": "https://aeronav.faa.gov/d-tpp/2610/06178R22.PDF",
+    "http_status": 200,
+    "content_type": "application/pdf",
+    "verified_by": "curl -I (HEAD) and curl GET on 2026-10-21 (UTC dates in the TSV; User-Agent atc-simulator-research/1.0); the file begins with %PDF and its size equals the HEAD Content-Length; downloaded to raw/kpgd_dtpp_2610_pdfs/06178R22.PDF",
+    "bytes": 264454,
+    "local_file": "raw/kpgd_dtpp_2610_pdfs/06178R22.PDF"
+   },
+   "procuid": "23940",
+   "faa_nfd_id": null,
+   "copter": "",
+   "fixes_and_roles": [
+    {
+     "fix": "ROGAN",
+     "role": "IAF (2000 NoPT, 183 deg, 9.9 NM to AIRVA; procedure NA for arrivals at ROGAN on V7 northbound)"
+    },
+    {
+     "fix": "AIRVA",
+     "role": "IF (2000)"
+    },
+    {
+     "fix": "DOGLE",
+     "role": "FAF (GP 3.00 intercept 1600)"
+    },
+    {
+     "fix": "EGOTE (1.5 NM to RW22)",
+     "role": "LNAV step-down fix (540*, LNAV only)"
+    },
+    {
+     "fix": "RW22",
+     "role": "MAP"
+    },
+    {
+     "fix": "BULOW",
+     "role": "missed approach hold (waypoint and hold: MISSED APCH FIX inset 035 / 215)"
+    },
+    {
+     "fix": "QUNCY",
+     "role": "IAF (second transition: 2000, 289 deg, 13.4 NM to AIRVA; procedure NA for arrivals at QUNCY on V521 southbound; listed after the primary route)"
+    }
+   ],
+   "minima_summary": "LPV DA 226 HAT 200 (200-3/4); LNAV/VNAV DA 310 HAT 284 (300-1); LNAV MDA A-B 420 HAT 394 (400-1), C-D 420-1 1/8 HAT 394 (400-1 1/8); Circling A 480-1 (454; 500-1), B 580-1 (554; 600-1), C 600-1 1/2 (574; 600-1 1/2), D 740-2 1/4 (714; 800-2 1/4). Distances: AIRVA-DOGLE 6 NM, DOGLE-EGOTE 3.3 NM, EGOTE to threshold 1.5 NM",
+   "missed_approach": "Climb to 2000 direct BULOW and hold.",
+   "missed_approach_verbatim": "Climb to 2000 direct BULOW and hold.",
+   "holding": "BULOW holding (4 NM pattern 215/035, MISSED APCH FIX inset)",
+   "plate_notes": "WAAS CH 45905 W22A; APP CRS 215; GP 3.00 TCH 40 (VGSI Angle 3.00 / TCH 31 not coincident); Rwy Ldg 7193, TDZE 26, Apt Elev 26; Baro-VNAV NA when using Page Fld altimeter setting; for uncompensated Baro-VNAV systems LNAV/VNAV NA below 1 C or above 54 C; when the local altimeter setting is not received use Page Fld and increase LPV DA to 276, LNAV/VNAV DA to 360 and all MDAs 60 ft, increase LNAV Cats C and D visibility 1/4 SM and Circling Cats C and D visibility 1/4 SM; MSA RW22 25 NM 2600.",
+   "fix_order_note": "fixes_and_roles are listed in simulator route order: the primary transition first (IAF..FAF..MAP, missed approach waypoint and hold), then the second transition and feeder fixes. The plate flows the same fixes; the order is not a chart claim.",
+   "data_provenance": "Chart name/PDF/amendment from d-TPP metadata XML; fixes, roles, minima, missed approach read visually from the rendered PDF plate (pdftoppm at 150 dpi; pdfjs-dist text layer used to confirm numbers) - transcription, spot-check before safety use."
+  },
+  {
+   "chart_name": "RNAV (GPS) RWY 33",
+   "chart_code": "IAP",
+   "pdf_name": "06178R33.PDF",
+   "amdt_dtpp_metadata": "2",
+   "amdt_date_dtpp_metadata": "12/31/2020",
+   "printed_amendment_on_plate": "Amdt 2 31DEC20",
+   "runway": "33",
+   "approach_type": "RNAV (GPS) (WAAS LPV, LNAV/VNAV, LNAV; RNP APCH)",
+   "final_approach_course_mag_deg": 335,
+   "tdze_ft_plate": 23,
+   "pdf": {
+    "url": "https://aeronav.faa.gov/d-tpp/2610/06178R33.PDF",
+    "http_status": 200,
+    "content_type": "application/pdf",
+    "verified_by": "curl -I (HEAD) and curl GET on 2026-10-21 (UTC dates in the TSV; User-Agent atc-simulator-research/1.0); the file begins with %PDF and its size equals the HEAD Content-Length; downloaded to raw/kpgd_dtpp_2610_pdfs/06178R33.PDF",
+    "bytes": 261149,
+    "local_file": "raw/kpgd_dtpp_2610_pdfs/06178R33.PDF"
+   },
+   "procuid": "23939",
+   "faa_nfd_id": null,
+   "copter": "",
+   "fixes_and_roles": [
+    {
+     "fix": "OWGAF",
+     "role": "IAF (2500, 064 deg, 6.6 NM to PETSE)"
+    },
+    {
+     "fix": "PETSE",
+     "role": "IF (2500)"
+    },
+    {
+     "fix": "DODIK",
+     "role": "FAF (GP 3.00 intercept 1600)"
+    },
+    {
+     "fix": "FARBI (1.5 NM to RW33)",
+     "role": "LNAV step-down fix (560*, LNAV only; also marked 1 NM to RW33)"
+    },
+    {
+     "fix": "RW33",
+     "role": "MAP"
+    },
+    {
+     "fix": "APZUL",
+     "role": "missed approach hold (MISSED APCH FIX inset 155 / 335)"
+    },
+    {
+     "fix": "RSW (LEE COUNTY VORTAC 114.15)",
+     "role": "IAF (second transition: 2500, 342 deg, 14.7 NM to PETSE; procedure NA for arrival on RSW VORTAC airway radials 312 CW 051; listed after the primary route)"
+    },
+    {
+     "fix": "VIOLA (RSW 39.1)",
+     "role": "feeder route fix: 2500 to OWGAF, 136 deg, 23.8 NM (procedure NA for arrivals at VIOLA on V579 northwest bound; not labelled IAF)"
+    }
+   ],
+   "minima_summary": "LPV DA 273 HAT 250 (300-3/4); LNAV/VNAV DA 288 HAT 265 (300-7/8); LNAV MDA 400 HAT 377 (400-1), all categories; Circling A 480-1 (454; 500-1), B 580-1 (554; 600-1), C 600-1 1/2 (574; 600-1 1/2), D 740-2 1/4 (714; 800-2 1/4). Distances: PETSE-DODIK 6 NM, DODIK-FARBI 3.3 NM, FARBI to threshold 1.5 NM",
+   "missed_approach": "Climb to 2000 direct APZUL and hold.",
+   "missed_approach_verbatim": "Climb to 2000 direct APZUL and hold.",
+   "holding": "APZUL missed approach hold (MISSED APCH FIX inset 155 / 335, 4 NM)",
+   "plate_notes": "WAAS CH 93507 W33A; APP CRS 335; GP 3.00 TCH 48; Rwy Ldg 6015, TDZE 23, Apt Elev 26; for uncompensated Baro-VNAV systems LNAV/VNAV NA below 2 C or above 54 C; RNP APCH.; MSA RW33 25 NM 2600.",
+   "fix_order_note": "fixes_and_roles are listed in simulator route order: the primary transition first (IAF..FAF..MAP, missed approach waypoint and hold), then the second transition and feeder fixes. The plate flows the same fixes; the order is not a chart claim.",
+   "data_provenance": "Chart name/PDF/amendment from d-TPP metadata XML; fixes, roles, minima, missed approach read visually from the rendered PDF plate (pdftoppm at 150 dpi; pdfjs-dist text layer used to confirm numbers) - transcription, spot-check before safety use."
+  }
+ ],
+ "departure_procedures": [],
+ "obstacle_departure_procedures": {
+  "chart_name": "TAKEOFF MINIMUMS AND (OBSTACLE) DEPARTURE PROCEDURES (Southeast 3 booklet page 35 of SE3TO.PDF)",
+  "pdf_name": "SE3TO.PDF",
+  "pdf": {
+   "url": "https://aeronav.faa.gov/d-tpp/2610/SE3TO.PDF",
+   "http_status": 200,
+   "content_type": "application/pdf",
+   "verified_by": "curl -I (HEAD) and curl GET on 2026-10-21 (UTC dates in the TSV; User-Agent atc-simulator-research/1.0); the file begins with %PDF and its size equals the HEAD Content-Length; downloaded to raw/kpgd_dtpp_2610_pdfs/SE3TO.PDF",
+   "bytes": 397570,
+   "local_file": "raw/kpgd_dtpp_2610_pdfs/SE3TO.PDF"
+  },
+  "kpgd_entry_version": "AMDT 4 31DEC20 (20366) (FAA)",
+  "content": "TAKEOFF MINIMUMS: Rwys 9, 27, NA - airport authority request. TAKEOFF OBSTACLE NOTES: Rwy 4, lighting 39' from DER, 115' left of centerline, 3' AGL/27' MSL. Tree 1560' from DER, 885' right of centerline, 76' MSL. Rwy 15, vegetation 172' from DER, 286' left of centerline, 33' MSL. Tree 377' from DER, 353' left of centerline, 48' MSL. Trees beginning 1416' from DER, 558' left of centerline, up to 76' MSL. Trees beginning 1851' from DER, 520' right of centerline, up to 104' MSL. Tree 2378' from DER, 43' left of centerline, 83' MSL. Rwy 22, sign 34' from DER, 242' left of centerline, 3' AGL/25' MSL. Lighting 40' from DER, 113' right of centerline, 3' AGL/25' MSL. Rwy 33, sign 22' from DER, 248' right of centerline, 4' AGL/20' MSL. Sign 34' from DER, 253' left of centerline, 3' AGL/21' MSL. Tree 938' from DER, 750' left of centerline, 50' MSL.",
+  "note": "Text layer of SE3TO.PDF (pdfjs-dist), page 35 of the Southeast 3 booklet, read verbatim. There is no DEPARTURE PROCEDURE paragraph for PGD: standard takeoff minimums apply on runways 4, 15, 22 and 33 and no departure route or climb gradient is published. Takeoff on runways 9 and 27 is not authorised (airport authority request)."
+ },
+ "stars": [
+  {
+   "chart_name": "LUBBR FOUR (RNAV)",
+   "pdf_name": "00640LUBBR.PDF",
+   "type": "STAR (RNAV 1, jet and turboprop aircraft only)",
+   "faa_id": "LUBBR.LUBBR4",
+   "pdf": {
+    "url": "https://aeronav.faa.gov/d-tpp/2610/00640LUBBR.PDF",
+    "http_status": 200,
+    "content_type": "application/pdf",
+    "verified_by": "curl -I (HEAD) and curl GET on 2026-10-21 (UTC dates in the TSV; User-Agent atc-simulator-research/1.0); the file begins with %PDF and its size equals the HEAD Content-Length; downloaded to raw/kpgd_dtpp_2610_pdfs/00640LUBBR.PDF",
+    "bytes": 170604,
+    "local_file": "raw/kpgd_dtpp_2610_pdfs/00640LUBBR.PDF"
+   },
+   "note": "Metadata chart name 'LUBBR FOUR (RNAV)' (bvsection Z, page 58). Serves SRQ, LAL, FA54, VNC and PGD; only the PGD body is transcribed (see star.notes).",
+   "star": {
+    "ident": "LUBBR4",
+    "faa_id": "LUBBR.LUBBR4",
+    "spoken_name": "LUBBR FOUR",
+    "printed_on_chart": "LUBBR FOUR ARRIVAL (RNAV); (LUBBR.LUBBR4) 19MAR26; AL-640 (FAA); chart id 26078; SE-3, 01 OCT 2026 to 29 OCT 2026; Sarasota/Bradenton, Florida (the chart serves SRQ, LAL, FA54, VNC and PGD)",
+    "provenance": "FAA d-TPP cycle 2610 PDFs 00640LUBBR.PDF (chart) and 00640LUBBR_C.PDF (arrival route description), rendered and read visually, numbers confirmed against the pdfjs-dist text layer (human transcription, spot-check before safety use); cross-checked against NASR 2026-10-01 STAR_BASE (SERVED_ARPT 'FA54 LAL PGD SRQ VNC'), STAR_APT (body LUBBR-ROSTY serves PGD, RWY_END_ID ALL) and STAR_RTE and the FIX_BASE coordinates",
+    "notes": [
+     "RADAR required.",
+     "RNAV 1 - DME/DME/IRU or GPS.",
+     "Jet and turboprop aircraft only.",
+     "Do not file KRVUR and SSPAZ transitions - to be assigned by ATC.",
+     "Chart is for several airports: only the PGD body (LUBBR-ROSTY, 'Landing FA54/VNC/PGD') is transcribed; the SRQ (runways 14 and 32 via RUTAE / MURDO) and LAL (ZEPHR) bodies are not.",
+     "Tampa Approach Control 119.65 353.575 (FA54/PGD) as printed on the chart; PGD ATIS 135.675."
+    ],
+    "transitions": [
+     {
+      "name": "KRVUR",
+      "fixes": [
+       "KRVUR",
+       "WNWUD",
+       "SSPAZ",
+       "BATTN",
+       "LUBBR"
+      ]
+     },
+     {
+      "name": "KYYUU",
+      "fixes": [
+       "KYYUU",
+       "WNWUD",
+       "SSPAZ",
+       "BATTN",
+       "LUBBR"
+      ]
+     },
+     {
+      "name": "SSPAZ",
+      "fixes": [
+       "SSPAZ",
+       "BATTN",
+       "LUBBR"
+      ]
+     }
+    ],
+    "runways": [
+     {
+      "runway_end": "4",
+      "fixes": [
+       "LUBBR",
+       "ZEBON",
+       "RUNNE",
+       "BREKR",
+       "WUDDY",
+       "LYFIE",
+       "ROSTY"
+      ],
+      "narrative": "Landing PGD: From LUBBR on track 178 to ZEBON, then on track 172 to RUNNE, then on track 177 to BREKR, then on track 213 to WUDDY, then on track 226 to LYFIE, then on track 173 to cross ROSTY at or above 3000 and at 210K, then on heading 150. Expect RADAR vectors to final approach course.",
+      "expect": "radar vectors to final approach course",
+      "then_heading_mag_deg": 150,
+      "join_approach_fixes": []
+     },
+     {
+      "runway_end": "22",
+      "fixes": [
+       "LUBBR",
+       "ZEBON",
+       "RUNNE",
+       "BREKR",
+       "WUDDY",
+       "LYFIE",
+       "ROSTY"
+      ],
+      "narrative": "Landing PGD: From LUBBR on track 178 to ZEBON, then on track 172 to RUNNE, then on track 177 to BREKR, then on track 213 to WUDDY, then on track 226 to LYFIE, then on track 173 to cross ROSTY at or above 3000 and at 210K, then on heading 150. Expect RADAR vectors to final approach course.",
+      "expect": "radar vectors to final approach course",
+      "then_heading_mag_deg": 150,
+      "join_approach_fixes": []
+     },
+     {
+      "runway_end": "15",
+      "fixes": [
+       "LUBBR",
+       "ZEBON",
+       "RUNNE",
+       "BREKR",
+       "WUDDY",
+       "LYFIE",
+       "ROSTY"
+      ],
+      "narrative": "Landing PGD: From LUBBR on track 178 to ZEBON, then on track 172 to RUNNE, then on track 177 to BREKR, then on track 213 to WUDDY, then on track 226 to LYFIE, then on track 173 to cross ROSTY at or above 3000 and at 210K, then on heading 150. Expect RADAR vectors to final approach course.",
+      "expect": "radar vectors to final approach course",
+      "then_heading_mag_deg": 150,
+      "join_approach_fixes": []
+     },
+     {
+      "runway_end": "33",
+      "fixes": [
+       "LUBBR",
+       "ZEBON",
+       "RUNNE",
+       "BREKR",
+       "WUDDY",
+       "LYFIE",
+       "ROSTY"
+      ],
+      "narrative": "Landing PGD: From LUBBR on track 178 to ZEBON, then on track 172 to RUNNE, then on track 177 to BREKR, then on track 213 to WUDDY, then on track 226 to LYFIE, then on track 173 to cross ROSTY at or above 3000 and at 210K, then on heading 150. Expect RADAR vectors to final approach course.",
+      "expect": "radar vectors to final approach course",
+      "then_heading_mag_deg": 150,
+      "join_approach_fixes": []
+     }
+    ],
+    "restrictions": [
+     {
+      "fix": "ROSTY",
+      "at_or_above_ft": 3000,
+      "speed_kt": 210,
+      "chart": "narrative: cross ROSTY at or above 3000 and at 210K (box 'Ldg FA54/VNC/PGD: 3000 210K', 3000 underlined)"
+     }
+    ],
+    "restriction_notes": "The chart serves several airports and prints no runway: the PGD body ends at ROSTY with 'then on heading 150' and radar vectors to final, identical for every landing runway of PGD (NASR STAR_APT RWY_END_ID 'ALL'). The simulator therefore gives runways 4, 22, 15 and 33 the same leg (copied, not a per-runway chart claim); runway 9/27 is not modelled. The 3000 values printed along the transition legs (KRVUR-WNWUD, KYYUU-WNWUD, WNWUD-SSPAZ, SSPAZ-BATTN, BATTN-LUBBR) are read as minimum en route altitudes (kept as mea_ft), not crossing restrictions; the leg altitudes of the other legs are not printed.",
+    "legs": [
+     {
+      "from": "KRVUR",
+      "to": "WNWUD",
+      "track_mag_deg": 139,
+      "distance_nm": 50,
+      "mea_ft": 3000
+     },
+     {
+      "from": "KYYUU",
+      "to": "WNWUD",
+      "track_mag_deg": 191,
+      "distance_nm": 29,
+      "mea_ft": 3000
+     },
+     {
+      "from": "WNWUD",
+      "to": "SSPAZ",
+      "track_mag_deg": 179,
+      "distance_nm": 34,
+      "mea_ft": 3000
+     },
+     {
+      "from": "SSPAZ",
+      "to": "BATTN",
+      "track_mag_deg": 179,
+      "distance_nm": 25,
+      "mea_ft": 3000
+     },
+     {
+      "from": "BATTN",
+      "to": "LUBBR",
+      "track_mag_deg": 184,
+      "distance_nm": 29,
+      "mea_ft": 3000
+     },
+     {
+      "from": "LUBBR",
+      "to": "ZEBON",
+      "track_mag_deg": 178,
+      "distance_nm": 12
+     },
+     {
+      "from": "ZEBON",
+      "to": "RUNNE",
+      "track_mag_deg": 172,
+      "distance_nm": 12
+     },
+     {
+      "from": "RUNNE",
+      "to": "BREKR",
+      "track_mag_deg": 177,
+      "distance_nm": 11
+     },
+     {
+      "from": "BREKR",
+      "to": "WUDDY",
+      "track_mag_deg": 213,
+      "distance_nm": 24
+     },
+     {
+      "from": "WUDDY",
+      "to": "LYFIE",
+      "track_mag_deg": 226,
+      "distance_nm": 13
+     },
+     {
+      "from": "LYFIE",
+      "to": "ROSTY",
+      "track_mag_deg": 173,
+      "distance_nm": 26
+     }
+    ],
+    "verification": "NASR 2026-10-01 STAR_RTE.csv lists exactly these three transitions (KRVUR, KYYUU, SSPAZ, each ending at LUBBR) and the body LUBBR-ROSTY (LUBBR ZEBON RUNNE BREKR WUDDY LYFIE ROSTY, ARPT_RWY_ASSOC 'FA54, PGD, VNC'); every printed distance agrees with the great-circle distance between the NASR FIX_BASE coordinates within 1 NM and every printed magnetic track within 2 degrees of true + 6 W (checked by src/airport/kpgd/stars.test.ts).",
+    "not_transcribed": "The SRQ (RUTAE, MURDO) and LAL (ZEPHR) bodies; the hold at LUBBR (8 NM, 004 depicted); restrictions after ROSTY (none printed)."
+   }
+  },
+  {
+   "chart_name": "LUBBR FOUR (RNAV), CONT.1",
+   "pdf_name": "00640LUBBR_C.PDF",
+   "type": "STAR continuation page",
+   "faa_id": "LUBBR.LUBBR4",
+   "pdf": {
+    "url": "https://aeronav.faa.gov/d-tpp/2610/00640LUBBR_C.PDF",
+    "http_status": 200,
+    "content_type": "application/pdf",
+    "verified_by": "curl -I (HEAD) and curl GET on 2026-10-21 (UTC dates in the TSV; User-Agent atc-simulator-research/1.0); the file begins with %PDF and its size equals the HEAD Content-Length; downloaded to raw/kpgd_dtpp_2610_pdfs/00640LUBBR_C.PDF",
+    "bytes": 266892,
+    "local_file": "raw/kpgd_dtpp_2610_pdfs/00640LUBBR_C.PDF"
+   },
+   "note": "Second page of LUBBR FOUR: the ARRIVAL ROUTE DESCRIPTION (the PGD paragraph 'LANDING PGD' ends 'then on heading 150. Expect RADAR vectors to final approach course.')."
+  },
+  {
+   "chart_name": "PIKKR SEVEN (RNAV)",
+   "pdf_name": "06020PIKKR.PDF",
+   "type": "STAR (RNAV 1, jet and turboprop aircraft only)",
+   "faa_id": "PIKKR.PIKKR7",
+   "pdf": {
+    "url": "https://aeronav.faa.gov/d-tpp/2610/06020PIKKR.PDF",
+    "http_status": 200,
+    "content_type": "application/pdf",
+    "verified_by": "curl -I (HEAD) and curl GET on 2026-10-21 (UTC dates in the TSV; User-Agent atc-simulator-research/1.0); the file begins with %PDF and its size equals the HEAD Content-Length; downloaded to raw/kpgd_dtpp_2610_pdfs/06020PIKKR.PDF",
+    "bytes": 212546,
+    "local_file": "raw/kpgd_dtpp_2610_pdfs/06020PIKKR.PDF"
+   },
+   "note": "Metadata chart name 'PIKKR SEVEN (RNAV)' (bvsection Z, page 76). Serves APF, MKY, FA54 and PGD; only the PGD body is transcribed (see star.notes). Single page.",
+   "star": {
+    "ident": "PIKKR7",
+    "faa_id": "PIKKR.PIKKR7",
+    "spoken_name": "PIKKR SEVEN",
+    "printed_on_chart": "PIKKR SEVEN ARRIVAL (RNAV); (PIKKR.PIKKR7) 02DEC21; AL-6020 (FAA); chart id 25051; SE-3, 01 OCT 2026 to 29 OCT 2026; Naples, Florida (serves APF, MKY, FA54 and PGD)",
+    "provenance": "FAA d-TPP cycle 2610 PDF 06020PIKKR.PDF (the chart page carries the arrival route description), rendered and read visually, numbers confirmed against the pdfjs-dist text layer (human transcription, spot-check before safety use); cross-checked against NASR 2026-10-01 STAR_BASE (SERVED_ARPT 'APF FA54 MKY PGD'), STAR_APT (body PIKKR-GUSEC serves PGD, RWY_END_ID ALL), STAR_RTE and the FIX_BASE coordinates",
+    "notes": [
+     "RADAR required.",
+     "RNAV 1 - DME/DME/IRU or GPS. REMIS to CODGR - GPS.",
+     "Jet and turboprops only.",
+     "CODGR transition ATC assigned only.",
+     "Chart serves several airports: only the PGD body (PIKKR-GUSEC, 'Landing KPGD/FA54') is transcribed; the KAPF/KMKY body (ZEILR, ISAJY) is not.",
+     "Fort Myers App Con 127.05 306.2 (5000 below), 134.425 306.2 (6000 above); PGD ATIS 135.675 as printed on the chart."
+    ],
+    "transitions": [
+     {
+      "name": "CODGR",
+      "fixes": [
+       "CODGR",
+       "BAGGS",
+       "PIKKR"
+      ]
+     },
+     {
+      "name": "PLYER",
+      "fixes": [
+       "PLYER",
+       "OBESE",
+       "WHITL",
+       "RILEE",
+       "CODGR",
+       "BAGGS",
+       "PIKKR"
+      ]
+     },
+     {
+      "name": "REMIS",
+      "fixes": [
+       "REMIS",
+       "CODGR",
+       "BAGGS",
+       "PIKKR"
+      ]
+     }
+    ],
+    "runways": [
+     {
+      "runway_end": "4",
+      "fixes": [
+       "PIKKR",
+       "GUSEC"
+      ],
+      "narrative": "Landing KPGD/FA54: From PIKKR on track 118 to GUSEC, then on heading 118 or as assigned by ATC. Expect RADAR vectors to final approach course.",
+      "expect": "radar vectors to final approach course",
+      "then_heading_mag_deg": 118,
+      "join_approach_fixes": []
+     },
+     {
+      "runway_end": "22",
+      "fixes": [
+       "PIKKR",
+       "GUSEC"
+      ],
+      "narrative": "Landing KPGD/FA54: From PIKKR on track 118 to GUSEC, then on heading 118 or as assigned by ATC. Expect RADAR vectors to final approach course.",
+      "expect": "radar vectors to final approach course",
+      "then_heading_mag_deg": 118,
+      "join_approach_fixes": []
+     },
+     {
+      "runway_end": "15",
+      "fixes": [
+       "PIKKR",
+       "GUSEC"
+      ],
+      "narrative": "Landing KPGD/FA54: From PIKKR on track 118 to GUSEC, then on heading 118 or as assigned by ATC. Expect RADAR vectors to final approach course.",
+      "expect": "radar vectors to final approach course",
+      "then_heading_mag_deg": 118,
+      "join_approach_fixes": []
+     },
+     {
+      "runway_end": "33",
+      "fixes": [
+       "PIKKR",
+       "GUSEC"
+      ],
+      "narrative": "Landing KPGD/FA54: From PIKKR on track 118 to GUSEC, then on heading 118 or as assigned by ATC. Expect RADAR vectors to final approach course.",
+      "expect": "radar vectors to final approach course",
+      "then_heading_mag_deg": 118,
+      "join_approach_fixes": []
+     }
+    ],
+    "restrictions": [],
+    "restriction_notes": "No crossing restriction is printed for the PGD body or the common legs; the chart prints minimum en route altitudes along the legs as '*1200' (GNSS MEA) with a maximum authorized altitude (FL180; 11000 between BAGGS and PIKKR), kept as mea_ft / noted here, not used as restrictions. The chart prints no runway for PGD: the same GUSEC leg is given to runways 4, 22, 15 and 33 (NASR STAR_APT RWY_END_ID 'ALL'); runway 9/27 is not modelled. Charted tracks are 3 degrees less than true + 6 W on every leg (chart variation about 3 W; distances agree).",
+    "legs": [
+     {
+      "from": "REMIS",
+      "to": "CODGR",
+      "track_mag_deg": 107,
+      "distance_nm": 105,
+      "mea_ft": 1200
+     },
+     {
+      "from": "PLYER",
+      "to": "OBESE",
+      "track_mag_deg": 185,
+      "distance_nm": 23,
+      "mea_ft": 1200
+     },
+     {
+      "from": "OBESE",
+      "to": "WHITL",
+      "track_mag_deg": 185,
+      "distance_nm": 17,
+      "mea_ft": 1200
+     },
+     {
+      "from": "WHITL",
+      "to": "RILEE",
+      "track_mag_deg": 186,
+      "distance_nm": 8,
+      "mea_ft": 1200
+     },
+     {
+      "from": "RILEE",
+      "to": "CODGR",
+      "track_mag_deg": 182,
+      "distance_nm": 42,
+      "mea_ft": 1200
+     },
+     {
+      "from": "CODGR",
+      "to": "BAGGS",
+      "track_mag_deg": 127,
+      "distance_nm": 33,
+      "mea_ft": 1200
+     },
+     {
+      "from": "BAGGS",
+      "to": "PIKKR",
+      "track_mag_deg": 148,
+      "distance_nm": 14,
+      "mea_ft": 1200
+     },
+     {
+      "from": "PIKKR",
+      "to": "GUSEC",
+      "track_mag_deg": 118,
+      "distance_nm": 10
+     }
+    ],
+    "verification": "NASR 2026-10-01 STAR_RTE.csv lists exactly these transitions (CODGR, PLYER, REMIS, all ending at PIKKR) and the body PIKKR-GUSEC; printed distances agree with the great-circle distances between the NASR FIX_BASE coordinates within 1 NM and printed tracks with true + 3 W within 2 degrees (src/airport/kpgd/stars.test.ts).",
+    "not_transcribed": "The KAPF/KMKY body (ZEILR, ISAJY); the holding patterns at OBESE, WHITL and CODGR; the FL180 / 11000 maximum altitudes as structured data."
+   }
+  }
+ ],
+ "stars_note": "Two STARs list PGD as a served airport (NASR STAR_BASE SERVED_ARPT; the d-TPP metadata files them under PGD): LUBBR FOUR (RNAV; PGD body LUBBR-ROSTY, ends 'then on heading 150', radar vectors) and PIKKR SEVEN (RNAV; PGD body PIKKR-GUSEC, ends 'then on heading 118', radar vectors). Both are transcribed for the PGD bodies only. The charts give no runway for PGD, so the one leg is copied to runways 4, 22, 15 and 33 in the dataset.",
+ "sids": [],
+ "sids_note": "No SID and no DP: the d-TPP metadata has no DP record for PGD and NASR DP_CSV (x_DP_CSV) has no row for PGD. The simulator therefore uses its default initial altitude (DEFAULT_INITIAL_ALTITUDE_FT in src/sim/ifr.ts) for departures: there is no published initial altitude to read.",
+ "supporting_charts": {
+  "takeoff_minimums_pdf": [
+   {
+    "chart_name": "TAKEOFF MINIMUMS",
+    "pdf_name": "SE3TO.PDF",
+    "pdf": {
+     "url": "https://aeronav.faa.gov/d-tpp/2610/SE3TO.PDF",
+     "http_status": 200,
+     "content_type": "application/pdf",
+     "verified_by": "curl -I (HEAD) and curl GET on 2026-10-21 (UTC dates in the TSV; User-Agent atc-simulator-research/1.0); the file begins with %PDF and its size equals the HEAD Content-Length; downloaded to raw/kpgd_dtpp_2610_pdfs/SE3TO.PDF",
+     "bytes": 397570,
+     "local_file": "raw/kpgd_dtpp_2610_pdfs/SE3TO.PDF"
+    }
+   },
+   {
+    "chart_name": "ALTERNATE MINIMUMS",
+    "pdf_name": "SE3ALT.PDF",
+    "pdf": {
+     "url": "https://aeronav.faa.gov/d-tpp/2610/SE3ALT.PDF",
+     "http_status": 200,
+     "content_type": "application/pdf",
+     "verified_by": "curl -I (HEAD) and curl GET on 2026-10-21 (UTC dates in the TSV; User-Agent atc-simulator-research/1.0); the file begins with %PDF and its size equals the HEAD Content-Length; downloaded to raw/kpgd_dtpp_2610_pdfs/SE3ALT.PDF",
+     "bytes": 154703,
+     "local_file": "raw/kpgd_dtpp_2610_pdfs/SE3ALT.PDF"
+    }
+   }
+  ],
+  "lahso": [],
+  "hot_spot": [],
+  "alternate_minimums": "PUNTA GORDA (PGD) (SE3ALT.PDF page 5): ILS or LOC Rwy 4 (notes 1, 2); RNAV (GPS) Rwys 4, 15, 22, 33 (note 3). NA when local weather not available. 1: NA when control tower closed. 2: LOC Cat D 800-2 1/4. 3: Cat D 800-2 1/4. (No standard alternate minimums line is printed: the entries use the footnotes only.)"
+ },
+ "not_included": [
+  "No RNP, special-authorization or helicopter approach exists for PGD in the d-TPP metadata.",
+  "Holding patterns and fix altitudes of the plates are NOT transcribed as structured data for KPGD (data/sources/kpgd-holding-patterns.json / kpgd-fix-altitudes.json do not exist): every KPGD IAP has empty holdingPatterns and fixAltitudes.",
+  "No MVA sectors: the FAA MVA chart for the Fort Myers approach control was not downloaded, so mvaSectors is empty.",
+  "The ALTERNATE MINIMUMS page lists weather minima for dispatch only; not used."
+ ],
+ "readback_note": "The airport diagram prints \"CAUTION: BE ALERT TO RUNWAY CROSSING CLEARANCES. READBACK OF ALL RUNWAY HOLDING INSTRUCTIONS IS REQUIRED.\""
+}

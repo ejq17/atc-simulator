@@ -118,6 +118,8 @@ export interface AirportProfile {
   mva?(helpers: { loc(lat: number, lon: number): P; pr(p: P): Vec2 }): MvaResult;
   /** Hot spot (from the d-TPP hot-spot text) - only when the source file has `supporting_charts.hot_spot_text`. */
   hotSpotProvenanceNote?: string;
+  /** NASR runway ids left out of the built airport (KPGD 09/27: not available to Part 121 operations, takeoffs not authorised, restricted to aircraft under 6000 lb). Documented in the airport's README section. */
+  excludeRunways?: readonly string[];
   /**
    * Id / name / notes of the crossing of runways[0] and runways[1]. Optional: only the first two airports (KACY, KMHT) set it so
    * their built ids stay stable. Every runway-runway intersection of any airport is found automatically and gets the id

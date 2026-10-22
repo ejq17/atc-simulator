@@ -32,6 +32,7 @@ import type { Decision, DiagramLabel } from './lib/inference.ts';
 import { renderDebugSvg } from './lib/svg.ts';
 import { kacyProfile } from './airports/kacy.ts';
 import { kmhtProfile } from './airports/kmht.ts';
+import { kpgdProfile } from './airports/kpgd.ts';
 import type { AirportProfile, ApronRec, BuildingRec, ParkingCtx, ParkRec } from './airports/types.ts';
 import type {
   KacyAirport,
@@ -49,7 +50,7 @@ const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(HERE, '..');
 const SRC = path.join(ROOT, 'data/sources');
 
-const PROFILES: Record<string, AirportProfile> = { KACY: kacyProfile, KMHT: kmhtProfile };
+const PROFILES: Record<string, AirportProfile> = { KACY: kacyProfile, KMHT: kmhtProfile, KPGD: kpgdProfile };
 const requested = (process.argv[2] ?? '').toUpperCase();
 const profile = PROFILES[requested] ?? PROFILES[`K${requested}`];
 if (!profile) {
@@ -181,6 +182,7 @@ const ilsByEnd: Record<string, J> = facility.ils_by_runway_end;
 const ilsSystems: J[] = navIls.systems;
 
 for (const src of facility.runways as J[]) {
+  if (profile.excludeRunways?.includes(src.id as string)) continue; // e.g. KPGD 09/27 (profile documents why)
   if (src.id === 'H1') continue; // private experimental helipad; not a runway for this sim
   const ends: KacyRunwayEnd[] = (src.ends as J[]).map((e: J): KacyRunwayEnd => {
     const id = endId(e.id);

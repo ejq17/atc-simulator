@@ -180,7 +180,47 @@ const KMHT: AirportTrafficProfile = {
   },
 };
 
-const PROFILES: Readonly<Record<string, AirportTrafficProfile>> = { KACY, KMHT };
+// ---------------------------------------------------------------------------
+// KPGD: Punta Gorda Airport (Allegiant base)
+// ---------------------------------------------------------------------------
+
+/**
+ * Sources (retrieved 2026-10-21): flypgd.com home page ("Sun Country and Allegiant provide low-cost, nonstop air service to more than 50
+ * destinations"), flypgd.com/airlines/ (Allegiant destination list; Sun Country seasonal Minneapolis-St. Paul December to April) and
+ * flypgd.com/destinations-map/ (50 airport codes). The airport pages name no aircraft types: the types come from the airlines' fleets
+ * (Wikipedia, retrieved 2026-10-21: Allegiant A319-100 28, A320-200 79, 737 MAX 16; Sun Country 737-800 43, 737-900ER 3) and are UNVERIFIED
+ * per route. The 737 MAX 200 is flown as B38M, the 737-800 / -900ER as B738. Weights are a gameplay mix (DESIGN VALUE): Allegiant dominates.
+ * The destinations are a subset of the 50 codes with spoken names (src/radio/spoken.ts); which are served in a given season is not checked.
+ */
+const KPGD_DESTINATIONS: readonly RouteDestination[] = [dest('KABE', 32000, 34000, 36000), dest('KACY', 28000, 30000, 32000), dest('KALB', 32000, 34000, 36000), dest('KAVL', 28000, 30000, 32000), dest('KBNA', 30000, 32000, 34000), dest('KCVG', 32000, 34000, 36000), dest('KPVD', 34000, 36000, 38000), dest('KPIT', 32000, 34000, 36000), dest('KSDF', 30000, 32000, 34000), dest('KMDW', 34000, 36000, 38000), dest('KMCI', 34000, 36000, 38000), dest('KGRR', 34000, 36000, 38000), dest('KROC', 34000, 36000, 38000), dest('KSYR', 34000, 36000, 38000), dest('KTTN', 32000, 34000, 36000), dest('KIAD', 30000, 32000, 34000), dest('KPSM', 34000, 36000, 38000), dest('KLEX', 30000, 32000, 34000), dest('KCAK', 32000, 34000, 36000), dest('KTYS', 28000, 30000, 32000), dest('KMDT', 32000, 34000, 36000)];
+
+const KPGD: AirportTrafficProfile = {
+  icao: 'KPGD',
+  airlines: [
+    { icao3: 'AAY', telephony: 'Allegiant', types: ['A320', 'A319', 'B38M'], weight: 92, flightNumbers: [100, 1999], destinations: KPGD_DESTINATIONS },
+    { icao3: 'SCX', telephony: 'Sun Country', types: ['B738'], weight: 8, flightNumbers: [100, 999], destinations: [dest('KMSP', 34000, 36000, 38000)] },
+  ],
+  // Reference coordinates: NASR APT_BASE ARP of each airport (2026-10-01).
+  neighbours: {
+    KFMY: { name: 'Page Field', lat: 26.587, lon: -81.863, spoken: 'Page Field' },
+    KVNC: { name: 'Venice', lat: 27.071, lon: -82.44, spoken: 'Venice' },
+    KSRQ: { name: 'Sarasota', lat: 27.395, lon: -82.554, spoken: 'Sarasota' },
+    KAPF: { name: 'Naples', lat: 26.152, lon: -81.776, spoken: 'Naples' },
+    KIMM: { name: 'Immokalee', lat: 26.434, lon: -81.4, spoken: 'Immokalee' },
+    KLAL: { name: 'Lakeland', lat: 27.988, lon: -82.019, spoken: 'Lakeland' },
+  },
+  gaRemote: ['KFMY', 'KVNC', 'KSRQ', 'KAPF', 'KIMM', 'KLAL'],
+  gaTypes: [['C172', 0.75], ['PA28', 0.25]],
+  referenceJet: 'A320',
+  // Class D (NASR CLS_ARSP): VFR transitions (JO 7110.65 7-6) and vehicles. No flight-training share: no source names a flight school at PGD
+  // (flypgd.com only mentions Charlotte Technical College's aviation training facility, not flight operations).
+  special: {
+    transition: { perHour: 3 },
+    vehicles: { perHour: 3 },
+  },
+};
+
+const PROFILES: Readonly<Record<string, AirportTrafficProfile>> = { KACY, KMHT, KPGD };
 
 /** The traffic profile of an airport (unknown ICAO: KACY's). */
 export function profileFor(icao: string | undefined): AirportTrafficProfile {

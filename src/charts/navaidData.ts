@@ -6,6 +6,7 @@
  */
 import rawNavaids from '../../data/sources/kacy-navaids.json';
 import rawKmhtNavaids from '../../data/sources/kmht-navaids.json';
+import rawKpgdNavaids from '../../data/sources/kpgd-navaids.json';
 
 export interface Vortac {
   id: string;
@@ -129,6 +130,7 @@ export const PRIMARY_NEARBY_IDS = ['VCN', 'SIE', 'CYN'] as const;
 const AIRPORTS: Record<string, { raw: RawNav; faaId: string; noIlsNote: string; keyFixIds?: readonly string[]; primaryNearby: readonly string[] }> = {
   KACY: { raw: rawNavaids as unknown as RawNav, faaId: 'ACY', noIlsNote: 'RNAV (GPS) and VOR approaches only.', keyFixIds: KEY_FIX_IDS, primaryNearby: PRIMARY_NEARBY_IDS },
   KMHT: { raw: rawKmhtNavaids as unknown as RawNav, faaId: 'MHT', noIlsNote: 'RNAV (GPS) approaches only (see the approach charts).', primaryNearby: ['CON', 'GDM'] },
+  KPGD: { raw: rawKpgdNavaids as unknown as RawNav, faaId: 'PGD', noIlsNote: 'ILS runway 4 only; RNAV (GPS) approaches to runways 4, 15, 22 and 33.', primaryNearby: ['RSW'] },
 };
 
 const toRad = (d: number) => (d * Math.PI) / 180;

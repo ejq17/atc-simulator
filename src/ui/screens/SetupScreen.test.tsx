@@ -17,11 +17,11 @@ afterEach(() => {
 });
 
 describe('<SetupScreen /> airport selector', () => {
-  it('defaults to KACY and offers KMHT', () => {
+  it('defaults to KACY and offers KMHT and KPGD', () => {
     render(<SetupScreen />);
     const select = screen.getByTestId('airport-select') as HTMLSelectElement;
     expect(select.value).toBe('KACY');
-    expect([...select.options].map((o) => o.value)).toEqual(['KACY', 'KMHT']);
+    expect([...select.options].map((o) => o.value)).toEqual(['KACY', 'KMHT', 'KPGD']);
     expect(screen.getByText('KACY ATC Simulator')).toBeInTheDocument();
     expect(fetchLiveMetar).toHaveBeenCalledWith('KACY');
   });
@@ -40,6 +40,18 @@ describe('<SetupScreen /> airport selector', () => {
     expect(screen.getByTestId('no-scenarios')).toHaveTextContent(/written around KACY.*not offered at KMHT/);
     fireEvent.click(screen.getByTestId('mode-training'));
     expect(screen.getByTestId('no-scenarios')).toHaveTextContent(/training lessons are written around KACY/);
+  });
+});
+
+describe('<SetupScreen /> KPGD', () => {
+  it('switching to KPGD re-labels the screen, fetches the KPGD METAR and lists the Punta Gorda tower frequency', () => {
+    render(<SetupScreen />);
+    fireEvent.change(screen.getByTestId('airport-select'), { target: { value: 'KPGD' } });
+    expect(screen.getByText('KPGD ATC Simulator')).toBeInTheDocument();
+    expect(fetchLiveMetar).toHaveBeenLastCalledWith('KPGD');
+    expect(screen.getByText('Live KPGD METAR')).toBeInTheDocument();
+    expect(screen.getAllByText(/121\.0/).length).toBeGreaterThan(0);
+    expect(screen.queryAllByText(/Atlantic City/).filter((el) => el.tagName !== 'OPTION')).toEqual([]);
   });
 });
 

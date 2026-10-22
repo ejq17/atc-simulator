@@ -1,0 +1,567 @@
+{
+ "_provenance": {
+  "source": "FAA NASR 28-day subscription, cycle effective 2026-10-01 (next 2026-10-29), CSV per-file zips from https://nfdc.faa.gov/webContent/28DaySub/extra/01_Oct_2026_<NAME>_CSV.zip; page https://www.faa.gov/air_traffic/flight_info/aeronav/aero_data/NASR_Subscription/2026-10-01/",
+  "files": [
+   "APT_BASE.csv",
+   "APT_RWY.csv",
+   "APT_RWY_END.csv",
+   "APT_RMK.csv",
+   "APT_CON.csv",
+   "APT_ARS.csv",
+   "ATC_BASE.csv",
+   "ATC_ATIS.csv",
+   "ATC_SVC.csv",
+   "ATC_RMK.csv",
+   "CLS_ARSP.csv",
+   "ILS_BASE.csv",
+   "ILS_GS.csv",
+   "ILS_DME.csv",
+   "ILS_MKR.csv",
+   "ILS_RMK.csv"
+  ],
+  "retrieved": "2026-10-21",
+  "faa_cycle_effective": "2026-10-01",
+  "faa_cycle_next": "2026-10-29",
+  "arpt_id": "PGD",
+  "icao": "KPGD",
+  "site_no": "03455.",
+  "method": "Extracted by scripts/extract-nasr-airport.ts PGD KPGD: rows with ARPT_ID/FACILITY_ID == PGD copied verbatim, only numeric conversion applied. Blank NASR fields are reported as null/none-recorded, never filled in. Charted magnetic runway headings are read from the airport diagram (see airport_diagram.charted_runway_headings_mag in kpgd-procedures.json).",
+  "raw_dir": "raw/nasr_2026-10-01/"
+ },
+ "airport": {
+  "name": "PUNTA GORDA",
+  "icao": "KPGD",
+  "faa_id": "PGD",
+  "city": "PUNTA GORDA",
+  "state": "FL",
+  "county": "CHARLOTTE",
+  "faa_region": "ASO",
+  "ownership": {
+   "type_code": "PU",
+   "type_meaning": "PU = publicly owned (NASR code)",
+   "owner": "CHARLOTTE COUNTY ARPT AUTH",
+   "contacts": [
+    {
+     "title": "MANAGER",
+     "name": "JAMES W PARISH",
+     "address": "28000 A-1 AIRPORT RD, PUNTA GORDA, FL, 33982",
+     "phone": "941-639-1101"
+    },
+    {
+     "title": "OWNER",
+     "name": "CHARLOTTE COUNTY ARPT AUTH",
+     "address": "28000 A-1 AIRPORT RD, PUNTA GORDA, FL, 33982",
+     "phone": "941-639-1101"
+    }
+   ]
+  },
+  "facility_use": "PU",
+  "status": "O",
+  "activation_date": "1944/02",
+  "far139_type": "I B",
+  "far139_carrier_service": "S",
+  "arp": {
+   "lat": 26.9185925,
+   "lon": -81.99088611,
+   "lat_dms": "26-55-6.933N",
+   "lon_dms": "81-59-27.19W",
+   "source": "3RD PARTY SURVEY",
+   "source_date": "2020/09/15"
+  },
+  "field_elevation_ft": 25.5,
+  "elevation_source": "3RD PARTY SURVEY",
+  "elevation_source_date": "2020/09/15",
+  "magnetic_variation": {
+   "deg": 6,
+   "hemisphere": "W",
+   "epoch_year": "2020",
+   "note": "NASR airport variation is 6W, epoch 2020. The airport diagram prints \"VAR 6° W, JANUARY 2020, annual rate of change 0.1 deg W\". Charted magnetic runway headings = true + 6. Current WMM declination for 2026 is NOT verified here."
+  },
+  "artcc": {
+   "id": "ZMA",
+   "name": "MIAMI"
+  },
+  "fss": {
+   "id": "PIE",
+   "name": "SAINT PETERSBURG"
+  },
+  "tower_type": "ATCT",
+  "beacon": {
+   "schedule": "SS-SR",
+   "lens": "WG"
+  },
+  "wind_indicator": "Y-L",
+  "fuel": "100LL,A,A+",
+  "customs": null,
+  "landing_fee": "N",
+  "military_landing_rights": "Y",
+  "acreage": 1934,
+  "chart_name": "MIAMI",
+  "distance_city_to_airport_nm": 3,
+  "direction_city_to_airport": "SE",
+  "last_inspection": "2026/02/27",
+  "traffic_pattern_altitude_ft": null,
+  "traffic_pattern_altitude_note": "TPA blank in NASR for PGD - UNVERIFIED",
+  "time_zone": "America/New_York",
+  "time_zone_note": "Sourced constant: Punta Gorda (Charlotte County, FL) is in the US Eastern time zone (UTC-5 / UTC-4 daylight time). Not a NASR field."
+ },
+ "tower": {
+  "facility_type": "ATCT",
+  "operator_code": "FCT",
+  "operator_meaning": "FCT = FAA contract tower (NASR code)",
+  "tower_call": "PUNTA GORDA",
+  "tower_hours": "0600-2100",
+  "tower_hours_note": "NASR TWR_HRS = 0600-2100 (hours/day).",
+  "approach_radio_call": "FORT MYERS",
+  "departure_radio_call": "FORT MYERS",
+  "approach_provider": "RSW",
+  "services": [],
+  "atis": [
+   {
+    "atis_no": "1",
+    "hours": "24",
+    "phone": ""
+   }
+  ],
+  "note": "ATC_BASE: ATCT, tower radio call \"PUNTA GORDA\", primary approach/departure provider RSW (\"FORT MYERS\"). ATC remarks: \"APCH/DEP SVC PRVDD BY MIAMI ARTCC ON FREQS 134.75/322.5 (FORT MYERS RCAG) WHEN FORT MYERS APCH CTL CLSD.\" \"WHEN ATCT CLSD CLNC DEL 127.05  MONITORED BY FORT MYERS APCH CTL.\""
+ },
+ "airspace": {
+  "class_c": false,
+  "class_b": false,
+  "class_d": true,
+  "class_e_surface": true,
+  "hours": "CLASS D SVC 0600-2100; OTHER TIMES CLASS E",
+  "note": "NASR CLS_ARSP: PGD CLASS_C_AIRSPACE = . Vertical/lateral limits are NOT in the CSV rows; class_airspace_shape_files.zip was not downloaded - shelf dimensions UNVERIFIED.",
+  "class": "D",
+  "class_note": "NASR CLS_ARSP: CLASS_D_AIRSPACE Y, AIRSPACE_HRS \"CLASS D SVC 0600-2100; OTHER TIMES CLASS E\". The simulator does not switch to Class E outside tower hours."
+ },
+ "runways": [
+  {
+   "id": "04/22",
+   "length_ft": 7193,
+   "width_ft": 150,
+   "surface": "ASPH",
+   "condition": "FAIR",
+   "treatment": "GRVD",
+   "pavement_classification": "PCR",
+   "pcr_number": "570",
+   "pavement_code": "F/B/X/T",
+   "edge_lights": "HIGH",
+   "weight_bearing_klbs": {
+    "single": 45,
+    "dual": 95,
+    "dual_tandem": 150,
+    "double_dual_tandem": 420
+   },
+   "length_source": "3RD PARTY SURVEY",
+   "length_source_date": "2020/09/15",
+   "ends": [
+    {
+     "id": "04",
+     "true_alignment_deg": 29,
+     "charted_magnetic_heading_deg": 35,
+     "charted_magnetic_heading_source": "airport diagram 06178AD.PDF (runway end heading printed on the chart)",
+     "threshold": {
+      "lat": 26.91018111,
+      "lon": -81.99214583,
+      "lat_dms": "26-54-36.652N",
+      "lon_dms": "81-59-31.725W",
+      "elev_ft": 23.2,
+      "position_source": "3RD PARTY SURVEY",
+      "position_date": "2020/09/15",
+      "note": "NASR RWY_END_LAT/LONG = the physical runway end (pavement end). The simulator uses it as the runway-end node; a displaced landing threshold, where one exists, is listed in displaced_threshold."
+     },
+     "displaced_threshold": {
+      "present": false,
+      "length_ft": null,
+      "note": "NASR DISPLACED_THR_* fields are blank for this runway end (none recorded)."
+     },
+     "tdz_elev_ft": 23.5,
+     "threshold_crossing_height_ft": 50,
+     "visual_glide_path_angle_deg": 3,
+     "vgsi": "P4L",
+     "approach_lighting": "NONE recorded in NASR",
+     "tdz_lights": null,
+     "centerline_lights": null,
+     "reil": "REIL",
+     "ils_type_nasr": "ILS/DME",
+     "marking": {
+      "type": "PIR",
+      "condition": "GOOD"
+     },
+     "declared_distances_ft": {
+      "tora": null,
+      "toda": null,
+      "asda": null,
+      "lda": null
+     },
+     "lahso": null,
+     "right_hand_traffic": "N",
+     "controlling_obstruction": null
+    },
+    {
+     "id": "22",
+     "true_alignment_deg": 209,
+     "charted_magnetic_heading_deg": 215,
+     "charted_magnetic_heading_source": "airport diagram 06178AD.PDF (runway end heading printed on the chart)",
+     "threshold": {
+      "lat": 26.92745786,
+      "lon": -81.98138719,
+      "lat_dms": "26-55-38.8483N",
+      "lon_dms": "81-58-52.9939W",
+      "elev_ft": 25.4,
+      "position_source": "3RD PARTY SURVEY",
+      "position_date": "2020/09/15",
+      "note": "NASR RWY_END_LAT/LONG = the physical runway end (pavement end). The simulator uses it as the runway-end node; a displaced landing threshold, where one exists, is listed in displaced_threshold."
+     },
+     "displaced_threshold": {
+      "present": false,
+      "length_ft": null,
+      "note": "NASR DISPLACED_THR_* fields are blank for this runway end (none recorded)."
+     },
+     "tdz_elev_ft": 25.5,
+     "threshold_crossing_height_ft": 31,
+     "visual_glide_path_angle_deg": 3,
+     "vgsi": "P4L",
+     "approach_lighting": "NONE recorded in NASR",
+     "tdz_lights": null,
+     "centerline_lights": null,
+     "reil": "REIL",
+     "ils_type_nasr": "NONE recorded in NASR",
+     "marking": {
+      "type": "NPI",
+      "condition": "GOOD"
+     },
+     "declared_distances_ft": {
+      "tora": null,
+      "toda": null,
+      "asda": null,
+      "lda": null
+     },
+     "lahso": null,
+     "right_hand_traffic": "N",
+     "controlling_obstruction": {
+      "type": "TREES",
+      "height_ft": 31,
+      "slope": "50",
+      "dist_from_thr_ft": 1770,
+      "offset_ft": 390,
+      "offset_side": "R"
+     }
+    }
+   ],
+   "type": "RUNWAY"
+  },
+  {
+   "id": "09/27",
+   "length_ft": 2636,
+   "width_ft": 60,
+   "surface": "ASPH",
+   "condition": "GOOD",
+   "treatment": "NONE",
+   "pavement_classification": "PCR",
+   "pcr_number": "100",
+   "pavement_code": "F/C/X/T",
+   "edge_lights": null,
+   "weight_bearing_klbs": {
+    "single": null,
+    "dual": null,
+    "dual_tandem": null,
+    "double_dual_tandem": null
+   },
+   "length_source": "3RD PARTY SURVEY",
+   "length_source_date": "2020/09/15",
+   "ends": [
+    {
+     "id": "09",
+     "true_alignment_deg": 89,
+     "charted_magnetic_heading_deg": 95,
+     "charted_magnetic_heading_source": "airport diagram 06178AD.PDF (runway end heading printed on the chart)",
+     "threshold": {
+      "lat": 26.92350875,
+      "lon": -81.99815797,
+      "lat_dms": "26-55-24.6315N",
+      "lon_dms": "81-59-53.3687W",
+      "elev_ft": 19.1,
+      "position_source": "3RD PARTY SURVEY",
+      "position_date": "2020/09/15",
+      "note": "NASR RWY_END_LAT/LONG = the physical runway end (pavement end). The simulator uses it as the runway-end node; a displaced landing threshold, where one exists, is listed in displaced_threshold."
+     },
+     "displaced_threshold": {
+      "present": false,
+      "length_ft": null,
+      "note": "NASR DISPLACED_THR_* fields are blank for this runway end (none recorded)."
+     },
+     "tdz_elev_ft": 22.2,
+     "threshold_crossing_height_ft": null,
+     "visual_glide_path_angle_deg": null,
+     "vgsi": null,
+     "approach_lighting": "NONE recorded in NASR",
+     "tdz_lights": null,
+     "centerline_lights": null,
+     "reil": null,
+     "ils_type_nasr": "NONE recorded in NASR",
+     "marking": {
+      "type": "BSC",
+      "condition": "GOOD"
+     },
+     "declared_distances_ft": {
+      "tora": 2635,
+      "toda": 2635,
+      "asda": 2635,
+      "lda": 2635
+     },
+     "lahso": null,
+     "right_hand_traffic": "N",
+     "controlling_obstruction": {
+      "type": "TREES",
+      "height_ft": 40,
+      "slope": "50",
+      "dist_from_thr_ft": 2210,
+      "offset_ft": 250,
+      "offset_side": "L"
+     }
+    },
+    {
+     "id": "27",
+     "true_alignment_deg": 269,
+     "charted_magnetic_heading_deg": 275,
+     "charted_magnetic_heading_source": "airport diagram 06178AD.PDF (runway end heading printed on the chart)",
+     "threshold": {
+      "lat": 26.92361327,
+      "lon": -81.99006905,
+      "lat_dms": "26-55-25.0078N",
+      "lon_dms": "81-59-24.2486W",
+      "elev_ft": 22.1,
+      "position_source": "3RD PARTY SURVEY",
+      "position_date": "2020/09/15",
+      "note": "NASR RWY_END_LAT/LONG = the physical runway end (pavement end). The simulator uses it as the runway-end node; a displaced landing threshold, where one exists, is listed in displaced_threshold."
+     },
+     "displaced_threshold": {
+      "present": false,
+      "length_ft": null,
+      "note": "NASR DISPLACED_THR_* fields are blank for this runway end (none recorded)."
+     },
+     "tdz_elev_ft": 22.2,
+     "threshold_crossing_height_ft": null,
+     "visual_glide_path_angle_deg": null,
+     "vgsi": null,
+     "approach_lighting": "NONE recorded in NASR",
+     "tdz_lights": null,
+     "centerline_lights": null,
+     "reil": null,
+     "ils_type_nasr": "NONE recorded in NASR",
+     "marking": {
+      "type": "BSC",
+      "condition": "GOOD"
+     },
+     "declared_distances_ft": {
+      "tora": 2635,
+      "toda": 2635,
+      "asda": 2635,
+      "lda": 2635
+     },
+     "lahso": null,
+     "right_hand_traffic": "N",
+     "controlling_obstruction": null
+    }
+   ],
+   "type": "RUNWAY"
+  },
+  {
+   "id": "15/33",
+   "length_ft": 6286,
+   "width_ft": 150,
+   "surface": "ASPH",
+   "condition": "EXCELLENT",
+   "treatment": "GRVD",
+   "pavement_classification": "PCR",
+   "pcr_number": "660",
+   "pavement_code": "F/A/X/T",
+   "edge_lights": "MED",
+   "weight_bearing_klbs": {
+    "single": 45,
+    "dual": 80,
+    "dual_tandem": 140,
+    "double_dual_tandem": null
+   },
+   "length_source": "3RD PARTY SURVEY",
+   "length_source_date": "2020/09/15",
+   "ends": [
+    {
+     "id": "15",
+     "true_alignment_deg": 149,
+     "charted_magnetic_heading_deg": 155,
+     "charted_magnetic_heading_source": "airport diagram 06178AD.PDF (runway end heading printed on the chart)",
+     "threshold": {
+      "lat": 26.92367338,
+      "lon": -81.9991883,
+      "lat_dms": "26-55-25.2242N",
+      "lon_dms": "81-59-57.0779W",
+      "elev_ft": 18.5,
+      "position_source": "3RD PARTY SURVEY",
+      "position_date": "2020/09/15",
+      "note": "NASR RWY_END_LAT/LONG = the physical runway end (pavement end). The simulator uses it as the runway-end node; a displaced landing threshold, where one exists, is listed in displaced_threshold."
+     },
+     "displaced_threshold": {
+      "present": true,
+      "length_ft": 271,
+      "lat": 26.92303325,
+      "lon": -81.99876377,
+      "elev_ft": 19.4,
+      "note": "NASR DISPLACED_THR_LEN: landing threshold displaced from the pavement end (the displaced area is usable for takeoff, taxi and landing rollout). Not modelled by the simulator beyond this record."
+     },
+     "tdz_elev_ft": 21.6,
+     "threshold_crossing_height_ft": 47,
+     "visual_glide_path_angle_deg": 3,
+     "vgsi": "P4L",
+     "approach_lighting": "NONE recorded in NASR",
+     "tdz_lights": null,
+     "centerline_lights": null,
+     "reil": "REIL",
+     "ils_type_nasr": "NONE recorded in NASR",
+     "marking": {
+      "type": "NPI",
+      "condition": "GOOD"
+     },
+     "declared_distances_ft": {
+      "tora": 6286,
+      "toda": 6286,
+      "asda": 6286,
+      "lda": 6015
+     },
+     "lahso": null,
+     "right_hand_traffic": "N",
+     "controlling_obstruction": {
+      "type": "ROAD",
+      "height_ft": 15,
+      "slope": "17",
+      "dist_from_thr_ft": 460,
+      "offset_ft": 500,
+      "offset_side": "R"
+     }
+    },
+    {
+     "id": "33",
+     "true_alignment_deg": 329,
+     "charted_magnetic_heading_deg": 335,
+     "charted_magnetic_heading_source": "airport diagram 06178AD.PDF (runway end heading printed on the chart)",
+     "threshold": {
+      "lat": 26.90882461,
+      "lon": -81.98930466,
+      "lat_dms": "26-54-31.7686N",
+      "lon_dms": "81-59-21.4968W",
+      "elev_ft": 23,
+      "position_source": "3RD PARTY SURVEY",
+      "position_date": "2020/09/15",
+      "note": "NASR RWY_END_LAT/LONG = the physical runway end (pavement end). The simulator uses it as the runway-end node; a displaced landing threshold, where one exists, is listed in displaced_threshold."
+     },
+     "displaced_threshold": {
+      "present": false,
+      "length_ft": null,
+      "note": "NASR DISPLACED_THR_* fields are blank for this runway end (none recorded)."
+     },
+     "tdz_elev_ft": 23.5,
+     "threshold_crossing_height_ft": 48,
+     "visual_glide_path_angle_deg": 3,
+     "vgsi": "P4L",
+     "approach_lighting": "NONE recorded in NASR",
+     "tdz_lights": null,
+     "centerline_lights": null,
+     "reil": "REIL",
+     "ils_type_nasr": "NONE recorded in NASR",
+     "marking": {
+      "type": "NPI",
+      "condition": "GOOD"
+     },
+     "declared_distances_ft": {
+      "tora": 6166,
+      "toda": 6166,
+      "asda": 6015,
+      "lda": 6015
+     },
+     "lahso": null,
+     "right_hand_traffic": "N",
+     "controlling_obstruction": {
+      "type": "TREES",
+      "height_ft": 54,
+      "slope": "40",
+      "dist_from_thr_ft": 2375,
+      "offset_ft": 60,
+      "offset_side": "R"
+     }
+    }
+   ],
+   "type": "RUNWAY"
+  }
+ ],
+ "lights_and_aids": {
+  "arresting_gear": []
+ },
+ "ils_by_runway_end": {
+  "4": {
+   "loc_ident": "PGD",
+   "category": "I",
+   "loc_freq_mhz": 109.75,
+   "approach_bearing_mag": 35.16,
+   "glideslope_angle": 3,
+   "gs_freq_mhz": 333.05
+  }
+ },
+ "remarks": [
+  {
+   "legacy_element": "A110-6",
+   "applies_to": "GENERAL_REMARK",
+   "seq": "6",
+   "text": "FOR CD WHEN ATCT CLSD CTC FT MYERS APCH AT 239-416-1026, WHEN APCH CLSD CTC MIAMI ARTCC AT 305-716-1731."
+  },
+  {
+   "legacy_element": "A110-7",
+   "applies_to": "GENERAL_REMARK",
+   "seq": "7",
+   "text": "NO ROTOR-WING FUELING AT SELF SERVE"
+  },
+  {
+   "legacy_element": "A110-8",
+   "applies_to": "GENERAL_REMARK",
+   "seq": "8",
+   "text": "24 HR PPR FOR ACFT EQUIPPED WITH WEATHER MODIFICATION OR GEOENGINEERING EQPT 941-815-7629."
+  },
+  {
+   "legacy_element": "A81-APT",
+   "applies_to": "LGT_SKED",
+   "seq": "1",
+   "text": "ACTVT REIL RWY 04, 15, 22 & 33; PAPI RWY 04, 15, 22 & 33 - CTAF. HIRL RWY 04/22; MIRL RWY 15/33 PRESET ON LOW INTST; TO INCR INTST - CTAF."
+  },
+  {
+   "legacy_element": "A16",
+   "applies_to": "PHONE_NO",
+   "seq": "1",
+   "text": "941-639-1101 EXT123."
+  },
+  {
+   "legacy_element": "A70-100LL",
+   "applies_to": "FUEL_TYPE",
+   "seq": "1",
+   "text": "FUEL 24 HR CREDIT CARD SVC AVBL."
+  },
+  {
+   "legacy_element": "A30-09/27",
+   "applies_to": "RWY_ID",
+   "seq": "1",
+   "text": "RWY 09/27 NOT AVBL FOR PART 121/PART 380 OPS WITH SKED PAX CARRYING OPS MORE THAN 9 PAX SEATS AND NON-SKED PAX CARRYING OPS MORE THAN 30 PAX SEATS. RSTRD TO ACFT LESS THAN 6000 LBS."
+  },
+  {
+   "legacy_element": "A57-15",
+   "applies_to": "OBSTN_CLNC_SLOPE",
+   "seq": "1",
+   "text": "RWY 15 APCH SLP 48:1 TO DTHR."
+  }
+ ],
+ "unverified": [
+  "Traffic pattern altitude (TPA blank in NASR)",
+  "Current (2026) magnetic declination; NASR/diagram epoch is stale",
+  "Class C airspace vertical/lateral dimensions (shape files not downloaded)",
+  "Operating hours of airport-owned customer services other than as given in remarks"
+ ]
+}

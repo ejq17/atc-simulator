@@ -44,6 +44,18 @@ has **no** LAHSO, hot spot, MVA sectors, plate holding patterns or plate fix alt
 (`data/sources/README.md`, "KACY layers with no KMHT equivalent"). The career steps and training lessons are written around KACY's
 runway ends, taxiways and stands, so at KMHT the setup offers Free play (all five presets, custom traffic, IFR flows).
 
+**KPGD (third airport: Punta Gorda Airport, Florida, Charlotte County Airport Authority)**, same sources and cycle (NASR 2026-10-01, d-TPP 2610, OSM snapshot
+2026-10-22 UTC): runways 04/22 (7193 x 150 ft) and 15/33 (6286 x 150 ft, 271 ft displaced threshold on 15) with the ILS on 4 only (I-PGD 109.75), ATIS 135.675,
+Clearance Delivery and Ground sharing 119.55, Tower 121.0 (contract tower, hours **0600-2100**, Class D with Class E outside those hours per NASR), Fort Myers
+Approach/Departure 127.05 (the Southwest Florida International TRACON), the Lee County VORTAC (RSW) used by the plates, 45 fixes, the 11 d-TPP charts (diagram, ILS or LOC 4,
+RNAV (GPS) 4, 15, 22 and 33 all transcribed, the LUBBR FOUR and PIKKR SEVEN arrivals (the PGD bodies), minimums pages), 12 of the 18 taxiway identifiers on the diagram, 10
+gates and 10 GA/FBO stands (the ten gates and three south-ramp GA stands are OSM ways, the other seven are synthetic spots inside an OSM apron). NASR runway 09/27 (2636 x 60 ft:
+not available for Part 121 / 380 operations, takeoff not authorised, under 6000 lb only) is **not modelled**. PGD publishes **no DP or SID** (departures use the default initial
+altitude), no hot spot, LAHSO, MVA sectors, holding patterns or fix altitudes in the dataset. **The simulator does not close the tower at 2100 local**: tower hours are
+recorded in the data (`Airport.towerHours`) but not enforced, as at every airport. Traffic: Allegiant (A320, A319, 737 MAX 8) and Sun Country (737-800) per
+flypgd.com; the aircraft types come from the airlines' fleets, not from the airport page. Live METAR: the NWS station KPGD (`api.weather.gov`, checked 2026-10-21) returns
+observations with an **empty `rawMessage`**, like KMHT, so the sim rebuilds the report from the decoded fields. Career steps and training lessons stay KACY-only.
+
 Behavioural realism is verified too: aircraft performance values carry a source each
 (Textron/Cessna, Airbus, EASA, EUROCONTROL), the 250 ft holding-position distance matches
 FAA AC 150/5300-13B, separation rules cite FAA JO 7110.65, published missed approaches and

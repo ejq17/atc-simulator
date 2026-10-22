@@ -1,0 +1,318 @@
+{
+ "_provenance": {
+  "source": "FAA NASR 28-day subscription, cycle effective 2026-10-01; https://nfdc.faa.gov/webContent/28DaySub/extra/01_Oct_2026_FRQ_CSV.zip (FRQ.csv)",
+  "also_used": [
+   "ATC_BASE.csv",
+   "ATC_ATIS.csv (ATIS phone)",
+   "ATC_RMK.csv",
+   "FAA d-TPP KPGD airport diagram 06178AD.PDF cycle 2610 (cross-check of the printed frequencies)",
+   "FAA d-TPP departure procedure charts (departure facility name)"
+  ],
+  "retrieved": "2026-10-21",
+  "faa_cycle_effective": "2026-10-01",
+  "faa_cycle_next": "2026-10-29",
+  "method": "All rows in FRQ.csv where FACILITY==PGD or SERVICED_FACILITY==PGD, copied verbatim (scripts/extract-nasr-airport.ts). No values from memory.",
+  "raw": "raw/nasr_2026-10-01/x_FRQ_CSV/FRQ.csv"
+ },
+ "facility": {
+  "id": "PGD",
+  "name": "PUNTA GORDA",
+  "type": "ATCT",
+  "tower_hours": "0600-2100",
+  "radio_call": "PUNTA GORDA",
+  "approach_radio_call": "FORT MYERS",
+  "departure_radio_call": "FORT MYERS",
+  "approach_provider": "RSW",
+  "approach_provider_name": "SOUTHWEST FLORIDA INTL",
+  "controlling_artcc": "ZMA (MIAMI)"
+ },
+ "summary_by_function": {
+  "ATIS": {
+   "vhf": "135.675",
+   "uhf": null,
+   "hours": "24",
+   "phone": null,
+   "note": "FRQ use code ATIS (facility type ATCT); phone from ATC_ATIS.csv. The ASOS row on the same frequency is the automated weather source."
+  },
+  "clearance_delivery": {
+   "vhf": "119.55",
+   "uhf": null,
+   "note": "FRQ CD/P; the airport diagram prints CLNC DEL 119.55 (127.05 when tower closed)"
+  },
+  "ground": {
+   "vhf": "119.55",
+   "uhf": null,
+   "note": "FRQ GND/P; the airport diagram prints GND CON 119.55"
+  },
+  "tower": {
+   "vhf": "121.0",
+   "uhf": null,
+   "note": "FRQ LCL/P; the airport diagram prints PUNTA GORDA TOWER 121.0 (CTAF)"
+  },
+  "approach_departure": {
+   "vhf": "127.05",
+   "uhf": "306.2",
+   "sectorization": null,
+   "chart_name": "FORT MYERS APP CON 127.05 306.2 (as printed on the approach plates; the diagram prints 127.05 for CLNC DEL when the tower is closed)",
+   "facility": "RSW",
+   "facility_name": "SOUTHWEST FLORIDA INTL",
+   "radio_call": "FORT MYERS",
+   "note": "FRQ APCH/P DEP/P (SOUTHWEST FLORIDA INTL, serving PGD); no sectorization bearings are published for this row. Approach and departure share this frequency."
+  },
+  "class_c_sector_frequencies": [],
+  "emergency": {
+   "vhf": null,
+   "uhf": null
+  },
+  "unicom": {
+   "vhf": "122.975",
+   "note": "FRQ use code UNICOM"
+  }
+ },
+ "all_frequencies_serving_airport": [
+  {
+   "freq_mhz": "134.75",
+   "use_code": "FORT MYERS RCAG",
+   "sectorization": "LOW",
+   "remark": "APCH/DEP SVC PRVDD BY MIAMI ARTCC ON FREQS 134.75/322.5 (FORT MYERS RCAG) WHEN FORT MYERS APCH CTL CLSD.",
+   "facility": "FORT MYERS",
+   "facility_name": "FORT MYERS",
+   "facility_type": "RCAG",
+   "serviced_facility": "PGD",
+   "serviced_site_type": "AIRPORT",
+   "radio_call": "PUNTA GORDA",
+   "approach_radio_call": "FORT MYERS",
+   "band": "VHF"
+  },
+  {
+   "freq_mhz": "322.5",
+   "use_code": "FORT MYERS RCAG",
+   "sectorization": "LOW",
+   "remark": "APCH/DEP SVC PRVDD BY MIAMI ARTCC ON FREQS 134.75/322.5 (FORT MYERS RCAG) WHEN FORT MYERS APCH CTL CLSD.",
+   "facility": "FORT MYERS",
+   "facility_name": "FORT MYERS",
+   "facility_type": "RCAG",
+   "serviced_facility": "PGD",
+   "serviced_site_type": "AIRPORT",
+   "radio_call": "PUNTA GORDA",
+   "approach_radio_call": "FORT MYERS",
+   "band": "UHF"
+  },
+  {
+   "freq_mhz": "119.55",
+   "use_code": "CD/P",
+   "sectorization": null,
+   "remark": null,
+   "facility": "PGD",
+   "facility_name": "PUNTA GORDA",
+   "facility_type": "ATCT",
+   "serviced_facility": "PGD",
+   "serviced_site_type": "AIRPORT",
+   "radio_call": "PUNTA GORDA",
+   "approach_radio_call": "FORT MYERS",
+   "band": "VHF"
+  },
+  {
+   "freq_mhz": "119.55",
+   "use_code": "GND/P",
+   "sectorization": null,
+   "remark": null,
+   "facility": "PGD",
+   "facility_name": "PUNTA GORDA",
+   "facility_type": "ATCT",
+   "serviced_facility": "PGD",
+   "serviced_site_type": "AIRPORT",
+   "radio_call": "PUNTA GORDA",
+   "approach_radio_call": "FORT MYERS",
+   "band": "VHF"
+  },
+  {
+   "freq_mhz": "121.0",
+   "use_code": "CTAF",
+   "sectorization": null,
+   "remark": "ACTVT REIL RWY 04, 15, 22 & 33; PAPI RWY 04, 15, 22 & 33 - CTAF. HIRL RWY 04/22; MIRL RWY 15/33 PRESET ON LOW INTST; TO INCR INTST - CTAF.",
+   "facility": "PGD",
+   "facility_name": "PUNTA GORDA",
+   "facility_type": "ATCT",
+   "serviced_facility": "PGD",
+   "serviced_site_type": "AIRPORT",
+   "radio_call": null,
+   "approach_radio_call": null,
+   "band": "VHF"
+  },
+  {
+   "freq_mhz": "121.0",
+   "use_code": "LCL/P",
+   "sectorization": null,
+   "remark": null,
+   "facility": "PGD",
+   "facility_name": "PUNTA GORDA",
+   "facility_type": "ATCT",
+   "serviced_facility": "PGD",
+   "serviced_site_type": "AIRPORT",
+   "radio_call": "PUNTA GORDA",
+   "approach_radio_call": "FORT MYERS",
+   "band": "VHF"
+  },
+  {
+   "freq_mhz": "122.975",
+   "use_code": "UNICOM",
+   "sectorization": null,
+   "remark": null,
+   "facility": "PGD",
+   "facility_name": "PUNTA GORDA",
+   "facility_type": "ATCT",
+   "serviced_facility": "PGD",
+   "serviced_site_type": "AIRPORT",
+   "radio_call": null,
+   "approach_radio_call": null,
+   "band": "VHF"
+  },
+  {
+   "freq_mhz": "135.675",
+   "use_code": "ATIS",
+   "sectorization": null,
+   "remark": null,
+   "facility": "PGD",
+   "facility_name": "PUNTA GORDA",
+   "facility_type": "ATCT",
+   "serviced_facility": "PGD",
+   "serviced_site_type": "AIRPORT",
+   "radio_call": "PUNTA GORDA",
+   "approach_radio_call": "FORT MYERS",
+   "band": "VHF"
+  },
+  {
+   "freq_mhz": "135.675",
+   "use_code": "PGD ASOS",
+   "sectorization": null,
+   "remark": null,
+   "facility": "PGD",
+   "facility_name": null,
+   "facility_type": "ASOS_AWOS",
+   "serviced_facility": "PGD",
+   "serviced_site_type": "ASOS",
+   "radio_call": null,
+   "approach_radio_call": null,
+   "band": "VHF"
+  },
+  {
+   "freq_mhz": "127.05",
+   "use_code": "APCH/P DEP/P",
+   "sectorization": null,
+   "remark": null,
+   "facility": "RSW",
+   "facility_name": "SOUTHWEST FLORIDA INTL",
+   "facility_type": "ATCT-TRACON",
+   "serviced_facility": "PGD",
+   "serviced_site_type": "AIRPORT",
+   "radio_call": "PUNTA GORDA",
+   "approach_radio_call": "FORT MYERS",
+   "band": "VHF"
+  },
+  {
+   "freq_mhz": "127.05",
+   "use_code": "CD/P",
+   "sectorization": "WHEN TWR CLSD",
+   "remark": null,
+   "facility": "RSW",
+   "facility_name": "SOUTHWEST FLORIDA INTL",
+   "facility_type": "ATCT-TRACON",
+   "serviced_facility": "PGD",
+   "serviced_site_type": "AIRPORT",
+   "radio_call": "PUNTA GORDA",
+   "approach_radio_call": "FORT MYERS",
+   "band": "VHF"
+  },
+  {
+   "freq_mhz": "127.05",
+   "use_code": "PIKKR STAR",
+   "sectorization": "5000 FT & BLO",
+   "remark": null,
+   "facility": "RSW",
+   "facility_name": "SOUTHWEST FLORIDA INTL",
+   "facility_type": "ATCT-TRACON",
+   "serviced_facility": "PGD",
+   "serviced_site_type": "AIRPORT",
+   "radio_call": "PUNTA GORDA",
+   "approach_radio_call": "FORT MYERS",
+   "band": "VHF"
+  },
+  {
+   "freq_mhz": "134.425",
+   "use_code": "PIKKR STAR",
+   "sectorization": "6000 FT & ABV",
+   "remark": null,
+   "facility": "RSW",
+   "facility_name": "SOUTHWEST FLORIDA INTL",
+   "facility_type": "ATCT-TRACON",
+   "serviced_facility": "PGD",
+   "serviced_site_type": "AIRPORT",
+   "radio_call": "PUNTA GORDA",
+   "approach_radio_call": "FORT MYERS",
+   "band": "VHF"
+  },
+  {
+   "freq_mhz": "306.2",
+   "use_code": "APCH/P DEP/P IC",
+   "sectorization": null,
+   "remark": null,
+   "facility": "RSW",
+   "facility_name": "SOUTHWEST FLORIDA INTL",
+   "facility_type": "ATCT-TRACON",
+   "serviced_facility": "PGD",
+   "serviced_site_type": "AIRPORT",
+   "radio_call": "PUNTA GORDA",
+   "approach_radio_call": "FORT MYERS",
+   "band": "UHF"
+  },
+  {
+   "freq_mhz": "306.2",
+   "use_code": "PIKKR STAR",
+   "sectorization": null,
+   "remark": null,
+   "facility": "RSW",
+   "facility_name": "SOUTHWEST FLORIDA INTL",
+   "facility_type": "ATCT-TRACON",
+   "serviced_facility": "PGD",
+   "serviced_site_type": "AIRPORT",
+   "radio_call": "PUNTA GORDA",
+   "approach_radio_call": "FORT MYERS",
+   "band": "UHF"
+  },
+  {
+   "freq_mhz": "119.65",
+   "use_code": "LUBBR STAR",
+   "sectorization": null,
+   "remark": null,
+   "facility": "TPA",
+   "facility_name": "TAMPA INTL",
+   "facility_type": "ATCT-TRACON",
+   "serviced_facility": "PGD",
+   "serviced_site_type": "AIRPORT",
+   "radio_call": "PUNTA GORDA",
+   "approach_radio_call": "FORT MYERS",
+   "band": "VHF"
+  },
+  {
+   "freq_mhz": "353.575",
+   "use_code": "LUBBR STAR",
+   "sectorization": null,
+   "remark": null,
+   "facility": "TPA",
+   "facility_name": "TAMPA INTL",
+   "facility_type": "ATCT-TRACON",
+   "serviced_facility": "PGD",
+   "serviced_site_type": "AIRPORT",
+   "radio_call": "PUNTA GORDA",
+   "approach_radio_call": "FORT MYERS",
+   "band": "UHF"
+  }
+ ],
+ "notes": [
+  ">=225 MHz are UHF (military) frequencies; the sim ignores UHF.",
+  "NASR ATC remark 1: APCH/DEP SVC PRVDD BY MIAMI ARTCC ON FREQS 134.75/322.5 (FORT MYERS RCAG) WHEN FORT MYERS APCH CTL CLSD.",
+  "NASR ATC remark 2: WHEN ATCT CLSD CLNC DEL 127.05  MONITORED BY FORT MYERS APCH CTL.",
+  "The approach/departure facility (RSW SOUTHWEST FLORIDA INTL) is a separate TRACON; its radio call is \"FORT MYERS\" while the tower call is \"PUNTA GORDA\"."
+ ]
+}

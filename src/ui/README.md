@@ -201,7 +201,7 @@ state (~10 Hz and after each command).
 
 ## Special traffic setup
 
-* **Setup** (free play, under "Aircraft types"): a "Special traffic" group with one checkbox per kind (`special-helicopter`, `special-military`, `special-transition`, `special-training`, `special-vehicles`), only the kinds `availableSpecialKinds(icao)` returns (KACY all five, KMHT VFR transitions and vehicles). Labels and hints come from `SPECIAL_TRAFFIC_LABELS`; the initial state is the previous setup's `freePlay.specialTraffic`, else `defaultSpecialTraffic(icao)`, and it resets to the new airport's defaults when the airport changes. The selection goes out as `FreePlayOptions.specialTraffic` (`resolveSpecialTraffic`, so a kind the airport lacks is always off).
+* **Setup** (free play, under "Aircraft types"): a "Special traffic" group with one checkbox per kind (`special-helicopter`, `special-military`, `special-transition`, `special-training`, `special-vehicles`), only the kinds `availableSpecialKinds(icao)` returns (KACY all five, KMHT and KPGD VFR transitions and vehicles). Labels and hints come from `SPECIAL_TRAFFIC_LABELS`; the initial state is the previous setup's `freePlay.specialTraffic`, else `defaultSpecialTraffic(icao)`, and it resets to the new airport's defaults when the airport changes. The selection goes out as `FreePlayOptions.specialTraffic` (`resolveSpecialTraffic`, so a kind the airport lacks is always off).
 * **Tower view models, radar and surface symbols**: see the Displays section below and `tower/README.md`.
 
 ## Airport state in the UI (`lib/airportStatus.ts`, `components/AirportNotices.tsx`, `display/closureMarks.ts`)

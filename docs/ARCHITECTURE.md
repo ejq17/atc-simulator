@@ -65,6 +65,11 @@ the build from `data/sources/<icao>-*.json` and `<icao>-taxiways.geojson`. Addin
 * Graph contract the build guarantees: every holding position is adjacent to its runway node (the engine's rollout exit and entry rely on it);
   KMHT's densely digitised OSM entrances need the `simplifyEntryChains` profile option and fillet collapsing to meet it.
 
+* KPGD (third airport) is the first with an excluded NASR runway (`AirportProfile.excludeRunways`: 09/27) and a **shared Clearance Delivery / Ground frequency**
+  (119.55): the engine resolves a frequency to the first position that owns it (`frequencyByMhz`), so the profile lists GND before CLNC; pilots on the IFR-clearance flow
+  still call "Clearance Delivery" through their frequency id. Tower hours (0600-2100) are data only; the simulator does not enforce them. STAR arrivals are generated
+  only for KMHT (`STAR_SIM_ENTRY_FIXES` in `src/game/ifr.ts` names the ROZZE TWO entry fixes): the KPGD LUBBR FOUR / PIKKR SEVEN charts are transcribed and can be assigned by command.
+
 ## Key contracts
 
 * `src/sim/types.ts` — all entity models. Changing a type is a cross-team change: announce it in `docs/PROGRESS.md`.

@@ -1,0 +1,85 @@
+{
+ "_provenance": {
+  "source": "FAA d-TPP cycle 2610 instrument approach plates for KPGD (the PDFs listed in kpgd-procedures.json)",
+  "retrieved": "2026-10-21",
+  "method": "Glidepath angle / TCH and the missed approach climb altitude were read from each rendered plate (pdftoppm 150 dpi) and confirmed against the pdfjs-dist text layer (GS/GP and TCH labels, MISSED APPROACH box). Every value equals the figure transcribed in kpgd-procedures.json. HUMAN TRANSCRIPTION - verify against the PDFs before any real use.",
+  "terms": "TCH = threshold crossing height above the runway threshold of the plate's glidepath (GS = ILS glideslope, GP = RNAV glidepath, VDA = visual descent angle of a non-precision approach). It is NOT the VGSI TCH printed in the '(VGSI Angle x/TCH y)' note, which belongs to the visual glide slope indicator (NASR threshold_crossing_height_ft in the facility file). KPGD runway 22: the plate prints GP 3.00 TCH 40 and a separate 'VGSI Angle 3.00/TCH 31' (NASR threshold_crossing_height_ft 31); the plate value 40 is used here."
+ },
+ "procedures": [
+  {
+   "chart_name": "ILS OR LOC RWY 04",
+   "pdf_name": "06178IL4.PDF",
+   "glidepath": {
+    "kind": "GS",
+    "angle_deg": 3.0,
+    "tch_ft": 50
+   },
+   "missed_approach": {
+    "initial_climb_altitude_ft": null,
+    "final_altitude_ft": 2000,
+    "plate_text": "MISSED APPROACH: Climb to 2000 direct DOGLE and on track 087° to JOCKS and hold."
+   },
+   "read_by": "rendered plate image and pdf text layer (pdfjs-dist) of the d-TPP 2610 PDF"
+  },
+  {
+   "chart_name": "RNAV (GPS) RWY 04",
+   "pdf_name": "06178R4.PDF",
+   "glidepath": {
+    "kind": "GP",
+    "angle_deg": 3.0,
+    "tch_ft": 50
+   },
+   "missed_approach": {
+    "initial_climb_altitude_ft": null,
+    "final_altitude_ft": 2000,
+    "plate_text": "MISSED APPROACH: Climb to 2000 direct DOGLE and on track 087° to JOCKS and hold."
+   },
+   "read_by": "rendered plate image and pdf text layer (pdfjs-dist) of the d-TPP 2610 PDF"
+  },
+  {
+   "chart_name": "RNAV (GPS) RWY 15",
+   "pdf_name": "06178R15.PDF",
+   "glidepath": {
+    "kind": "GP",
+    "angle_deg": 3.0,
+    "tch_ft": 47
+   },
+   "missed_approach": {
+    "initial_climb_altitude_ft": null,
+    "final_altitude_ft": 2500,
+    "plate_text": "MISSED APPROACH: Climb to 2500 direct DODIK and track 203° to OWGAF and hold."
+   },
+   "read_by": "rendered plate image and pdf text layer (pdfjs-dist) of the d-TPP 2610 PDF"
+  },
+  {
+   "chart_name": "RNAV (GPS) RWY 22",
+   "pdf_name": "06178R22.PDF",
+   "glidepath": {
+    "kind": "GP",
+    "angle_deg": 3.0,
+    "tch_ft": 40
+   },
+   "missed_approach": {
+    "initial_climb_altitude_ft": null,
+    "final_altitude_ft": 2000,
+    "plate_text": "MISSED APPROACH: Climb to 2000 direct BULOW and hold."
+   },
+   "read_by": "rendered plate image and pdf text layer (pdfjs-dist) of the d-TPP 2610 PDF"
+  },
+  {
+   "chart_name": "RNAV (GPS) RWY 33",
+   "pdf_name": "06178R33.PDF",
+   "glidepath": {
+    "kind": "GP",
+    "angle_deg": 3.0,
+    "tch_ft": 48
+   },
+   "missed_approach": {
+    "initial_climb_altitude_ft": null,
+    "final_altitude_ft": 2000,
+    "plate_text": "MISSED APPROACH: Climb to 2000 direct APZUL and hold."
+   },
+   "read_by": "rendered plate image and pdf text layer (pdfjs-dist) of the d-TPP 2610 PDF"
+  }
+ ]
+}
