@@ -1,4 +1,4 @@
-# ATC Simulator (KACY and KMHT)
+# ATC Simulator (KACY, KMHT and KPHL)
 
 A browser-based, single-player air traffic control simulator for two real airports,
 chosen on the setup screen: **Atlantic City International (KACY)**, New Jersey (the
@@ -58,6 +58,8 @@ recorded in the data (`Airport.towerHours`) but not enforced, as at every airpor
 flypgd.com; the aircraft types come from the airlines' fleets, not from the airport page. Live METAR: the NWS station KPGD (`api.weather.gov`, checked 2026-10-21) returns
 observations with an **empty `rawMessage`**, like KMHT, so the sim rebuilds the report from the decoded fields. Career steps and training lessons stay KACY-only.
 
+**KPHL (Philadelphia International, Class B)**, same sources and cycle (NASR 2026-10-01, d-TPP 2610, OSM snapshot 2026-10-22 UTC, retrieved 2026-10-21): four runways (8/26 5001 x 150 ft, 9L/27R 9500 x 150, 9R/27L 12000 x 200 with a 1913 ft displaced threshold at 27L, 17/35 6500 x 150), six ILS (9L, 9R, 17, 26, 27L, 27R), the NASR frequency rows serving PHL (Tower 118.5 and 135.1, Ground 121.9, Clearance 118.85, D-ATIS 133.4 / 135.925, Philadelphia Approach 124.35, North and South Departure 124.35 / 119.75; the other 60 NASR rows of the same TRACON that serve Newark, Teterboro and others are not included), all 38 d-TPP charts (22 instrument approaches, 3 visual approaches, the PHILADELPHIA FOUR departure, six STARs of which BOJID FOUR and PAATS FOUR are transcribed, hot-spot and minimums pages), 57 of the 62 diagram taxiway identifiers, about 115 airline gate stands at terminals A-West to F, FedEx, UPS and GA stands (OSM). The two documented runway configurations (west flow: arrivals 27R/27L/26/35, departures 27L/27R/35; east flow: arrivals 9R/9L/17, departures 9L/9R/8/17) come from the PHL Noise Office page and the Part 150 Noise Exposure Maps and are chosen by wind. Traffic mixes the airlines phl.org lists (American hub, American Eagle, Southwest, Frontier, Delta, United, JetBlue, Alaska, Sun Country) and UPS at night; long-haul flights are not generated. Live weather: `https://api.weather.gov/stations/KPHL/observations/latest` returned an observation on 2026-10-21 (rawMessage empty, so the METAR is rebuilt from the decoded fields as for KMHT). No MVA, holding patterns or fix altitudes. Gaps and unverified items: `data/sources/README.md`, "KPHL".
+
 Behavioural realism is verified too: aircraft performance values carry a source each
 (Textron/Cessna, Airbus, EASA, EUROCONTROL), the 250 ft holding-position distance matches
 FAA AC 150/5300-13B, separation rules cite FAA JO 7110.65, published missed approaches and
@@ -82,7 +84,7 @@ npm run server   # local backend on :8787 (AWC weather proxy, FAA chart proxy, o
 npm run dev      # Vite on http://localhost:5173
 ```
 
-Open the app, pick the airport (KACY by default, or KMHT), a mode (Free Play, Career,
+Open the app, pick the airport (KACY by default, KMHT or KPHL), a mode (Free Play, Career,
 Training; the last two are KACY-only), a scenario, weather (**live METAR of the chosen airport** is the
 default; or a simulated preset), runway configuration and controller position, then Start.
 
@@ -311,7 +313,7 @@ crossing or an IFR takeoff without the approval is refused in training and score
 ## Layout
 
 ```
-src/sim        simulation engine        src/airport   verified KACY / KMHT datasets + taxiway graphs
+src/sim        simulation engine        src/airport   verified KACY / KMHT / KPHL datasets + taxiway graphs
 src/commands   phraseology parser       src/radio     readbacks, frequencies
 src/voice      PTT, STT, TTS, radio FX  src/weather   METAR, presets, ATIS, runway selection
 src/charts     FAA chart viewer         src/game      scenarios, traffic, training, career, debrief

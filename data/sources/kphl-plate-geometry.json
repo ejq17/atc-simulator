@@ -1,0 +1,340 @@
+{
+ "_provenance": {
+  "source": "FAA d-TPP cycle 2610 instrument approach plates for KPHL (the PDFs listed in kphl-procedures.json)",
+  "retrieved": "2026-10-21",
+  "method": "Glidepath angle / TCH and the missed approach climb altitudes were read from each plate (rendered and read visually for the 15 transcribed approaches; text layer, pdfjs-dist, for the special-authorization, CAT II/III and RNP plates). HUMAN TRANSCRIPTION - verify against the PDFs before any real use.",
+  "terms": "TCH = threshold crossing height of the plate's glidepath (GS = ILS glideslope, GP = RNAV glidepath). It is NOT the VGSI TCH printed in the '(VGSI Angle x/TCH y)' note (NASR threshold_crossing_height_ft). The ILS 26 glideslope is 3.15 deg and the RNAV 35 glidepath 3.14 deg as printed."
+ },
+ "procedures": [
+  {
+   "chart_name": "ILS OR LOC RWY 09L",
+   "pdf_name": "00320IL9L.PDF",
+   "glidepath": {
+    "kind": "GS",
+    "angle_deg": 3.0,
+    "tch_ft": 53
+   },
+   "missed_approach": {
+    "initial_climb_altitude_ft": 1500,
+    "final_altitude_ft": 3000,
+    "plate_text": "MISSED APPROACH: Climb to 1500 then climbing right turn to 3000 direct OOD VORTAC and hold."
+   },
+   "read_by": "rendered plate read visually and cross-checked with the pdfjs-dist text layer"
+  },
+  {
+   "chart_name": "ILS OR LOC RWY 26",
+   "pdf_name": "00320IL26.PDF",
+   "glidepath": {
+    "kind": "GS",
+    "angle_deg": 3.15,
+    "tch_ft": 50
+   },
+   "missed_approach": {
+    "initial_climb_altitude_ft": 800,
+    "final_altitude_ft": 3000,
+    "plate_text": "MISSED APPROACH: Climb to 800 then climbing right turn to 3000 direct PTW VORTAC and hold."
+   },
+   "read_by": "rendered plate read visually and cross-checked with the pdfjs-dist text layer"
+  },
+  {
+   "chart_name": "ILS OR LOC RWY 27L",
+   "pdf_name": "00320IL27L.PDF",
+   "glidepath": {
+    "kind": "GS",
+    "angle_deg": 3.0,
+    "tch_ft": 57
+   },
+   "missed_approach": {
+    "initial_climb_altitude_ft": 1500,
+    "final_altitude_ft": 3000,
+    "plate_text": "MISSED APPROACH: Climb to 1500 then climbing left turn to 3000 direct OOD VORTAC and hold."
+   },
+   "read_by": "rendered plate read visually and cross-checked with the pdfjs-dist text layer"
+  },
+  {
+   "chart_name": "ILS OR LOC RWY 27R",
+   "pdf_name": "00320IL27R.PDF",
+   "glidepath": {
+    "kind": "GS",
+    "angle_deg": 3.0,
+    "tch_ft": 52
+   },
+   "missed_approach": {
+    "initial_climb_altitude_ft": 1500,
+    "final_altitude_ft": 3000,
+    "plate_text": "MISSED APPROACH: Climb to 1500 then climbing right turn to 3000 on MXE VORTAC R-115 to MXE VORTAC and hold."
+   },
+   "read_by": "rendered plate read visually and cross-checked with the pdfjs-dist text layer"
+  },
+  {
+   "chart_name": "ILS Z OR LOC RWY 17",
+   "pdf_name": "00320IZL17.PDF",
+   "glidepath": {
+    "kind": "GS",
+    "angle_deg": 3.0,
+    "tch_ft": 50
+   },
+   "missed_approach": {
+    "initial_climb_altitude_ft": 2000,
+    "final_altitude_ft": 3000,
+    "plate_text": "MISSED APPROACH: Climb to 2000 then climbing right turn to 3000 direct OOD VORTAC and hold."
+   },
+   "read_by": "rendered plate read visually and cross-checked with the pdfjs-dist text layer"
+  },
+  {
+   "chart_name": "ILS Z OR LOC Z RWY 09R",
+   "pdf_name": "00320IZLZ9R.PDF",
+   "glidepath": {
+    "kind": "GS",
+    "angle_deg": 3.0,
+    "tch_ft": 58
+   },
+   "missed_approach": {
+    "initial_climb_altitude_ft": 1500,
+    "final_altitude_ft": 3000,
+    "plate_text": "MISSED APPROACH: Climb to 1500 then climbing right turn to 3000 direct OOD VORTAC and hold."
+   },
+   "read_by": "rendered plate read visually and cross-checked with the pdfjs-dist text layer"
+  },
+  {
+   "chart_name": "ILS V RWY 09R (CONVERGING)",
+   "pdf_name": "00320IV9RCON.PDF",
+   "glidepath": {
+    "kind": "GS",
+    "angle_deg": 3.0,
+    "tch_ft": 58
+   },
+   "missed_approach": {
+    "initial_climb_altitude_ft": 900,
+    "final_altitude_ft": 3000,
+    "plate_text": "MISSED APPROACH: Climb to 900 then climbing right turn to 3000 direct OOD VORTAC and hold."
+   },
+   "read_by": "rendered plate read visually and cross-checked with the pdfjs-dist text layer"
+  },
+  {
+   "chart_name": "ILS V RWY 17 (CONVERGING)",
+   "pdf_name": "00320IV17CON.PDF",
+   "glidepath": {
+    "kind": "GS",
+    "angle_deg": 3.0,
+    "tch_ft": 50
+   },
+   "missed_approach": {
+    "initial_climb_altitude_ft": 880,
+    "final_altitude_ft": 3500,
+    "plate_text": "MISSED APPROACH: Climb to 880 then climbing left turn to 3500 direct ARD VOR/DME and hold."
+   },
+   "read_by": "rendered plate read visually and cross-checked with the pdfjs-dist text layer"
+  },
+  {
+   "chart_name": "ILS Z RWY 09R (SA CAT I)",
+   "pdf_name": "00320IZ9RSAC1.PDF",
+   "glidepath": {
+    "kind": "GS",
+    "angle_deg": 3.0,
+    "tch_ft": 58
+   },
+   "missed_approach": {
+    "initial_climb_altitude_ft": 1500,
+    "final_altitude_ft": 3000,
+    "plate_text": "MISSED APPROACH: Climb to 1500 then climbing right turn to 3000 direct OOD VORTAC and hold."
+   },
+   "read_by": "pdfjs-dist text layer of the d-TPP 2610 PDF (GS/GP and TCH labels and the MISSED APPROACH box located by page position)"
+  },
+  {
+   "chart_name": "ILS RWY 27R (SA CAT I - II)",
+   "pdf_name": "00320I27RSAC1_2.PDF",
+   "glidepath": {
+    "kind": "GS",
+    "angle_deg": 3.0,
+    "tch_ft": 52
+   },
+   "missed_approach": {
+    "initial_climb_altitude_ft": 1500,
+    "final_altitude_ft": 3000,
+    "plate_text": "MISSED APPROACH: Climb to 1500 then climbing right turn to 3000 on MXE VORTAC R-115 to MXE VORTAC and hold."
+   },
+   "read_by": "pdfjs-dist text layer of the d-TPP 2610 PDF (GS/GP and TCH labels and the MISSED APPROACH box located by page position)"
+  },
+  {
+   "chart_name": "ILS Z RWY 09R (CAT II - III)",
+   "pdf_name": "00320IZ9RC2_3.PDF",
+   "glidepath": {
+    "kind": "GS",
+    "angle_deg": 3.0,
+    "tch_ft": 58
+   },
+   "missed_approach": {
+    "initial_climb_altitude_ft": 1500,
+    "final_altitude_ft": 3000,
+    "plate_text": "MISSED APPROACH: Climb to 1500 then climbing right turn to 3000 direct OOD VORTAC and hold."
+   },
+   "read_by": "pdfjs-dist text layer of the d-TPP 2610 PDF (GS/GP and TCH labels and the MISSED APPROACH box located by page position)"
+  },
+  {
+   "chart_name": "ILS RWY 09L (SA CAT II)",
+   "pdf_name": "00320I9LSAC2.PDF",
+   "glidepath": {
+    "kind": "GS",
+    "angle_deg": 3.0,
+    "tch_ft": 53
+   },
+   "missed_approach": {
+    "initial_climb_altitude_ft": 1500,
+    "final_altitude_ft": 3000,
+    "plate_text": "MISSED APPROACH: Climb to 1500 then climbing right turn to 3000 direct OOD VORTAC and hold."
+   },
+   "read_by": "pdfjs-dist text layer of the d-TPP 2610 PDF (GS/GP and TCH labels and the MISSED APPROACH box located by page position)"
+  },
+  {
+   "chart_name": "ILS RWY 27L (SA CAT II)",
+   "pdf_name": "00320I27LSAC2.PDF",
+   "glidepath": {
+    "kind": "GS",
+    "angle_deg": 3.0,
+    "tch_ft": 57
+   },
+   "missed_approach": {
+    "initial_climb_altitude_ft": 1500,
+    "final_altitude_ft": 3000,
+    "plate_text": "MISSED APPROACH: Climb to 1500 then climbing left turn to 3000 direct OOD VORTAC and hold."
+   },
+   "read_by": "pdfjs-dist text layer of the d-TPP 2610 PDF (GS/GP and TCH labels and the MISSED APPROACH box located by page position)"
+  },
+  {
+   "chart_name": "RNAV (RNP) Z RWY 09L",
+   "pdf_name": "00320RRZ9L.PDF",
+   "glidepath": {
+    "kind": "GP",
+    "angle_deg": 3.0,
+    "tch_ft": 58
+   },
+   "missed_approach": {
+    "initial_climb_altitude_ft": null,
+    "final_altitude_ft": 3000,
+    "plate_text": "MISSED APPROACH: Climb to 3000 on track 087 deg to CUBUT and on track 173 deg to FIDAX and on track 259 deg to OOD VORTAC and hold."
+   },
+   "read_by": "pdfjs-dist text layer of the d-TPP 2610 PDF (GS/GP and TCH labels and the MISSED APPROACH box located by page position)"
+  },
+  {
+   "chart_name": "RNAV (RNP) Z RWY 09R",
+   "pdf_name": "00320RRZ9R.PDF",
+   "glidepath": {
+    "kind": "GP",
+    "angle_deg": 3.0,
+    "tch_ft": 58
+   },
+   "missed_approach": {
+    "initial_climb_altitude_ft": null,
+    "final_altitude_ft": 3000,
+    "plate_text": "MISSED APPROACH: Climb to 3000 on track 087 deg to ASGEW and on track 169 deg to CIPOK, and on track 259 deg to OOD VORTAC and hold."
+   },
+   "read_by": "pdfjs-dist text layer of the d-TPP 2610 PDF (GS/GP and TCH labels and the MISSED APPROACH box located by page position)"
+  },
+  {
+   "chart_name": "RNAV (GPS) RWY 17",
+   "pdf_name": "00320R17.PDF",
+   "glidepath": {
+    "kind": "GP",
+    "angle_deg": 3.0,
+    "tch_ft": 50
+   },
+   "missed_approach": {
+    "initial_climb_altitude_ft": null,
+    "final_altitude_ft": 3000,
+    "plate_text": "MISSED APPROACH: Climb to 3000 direct JEPUG and hold."
+   },
+   "read_by": "rendered plate read visually and cross-checked with the pdfjs-dist text layer"
+  },
+  {
+   "chart_name": "RNAV (GPS) RWY 26",
+   "pdf_name": "00320R26.PDF",
+   "glidepath": {
+    "kind": "GP",
+    "angle_deg": 3.0,
+    "tch_ft": 50
+   },
+   "missed_approach": {
+    "initial_climb_altitude_ft": 800,
+    "final_altitude_ft": 3000,
+    "plate_text": "MISSED APPROACH: Climb to 800 then climbing right turn to 3000 direct FROSE and hold."
+   },
+   "read_by": "rendered plate read visually and cross-checked with the pdfjs-dist text layer"
+  },
+  {
+   "chart_name": "RNAV (GPS) RWY 27L",
+   "pdf_name": "00320R27L.PDF",
+   "glidepath": {
+    "kind": "GP",
+    "angle_deg": 3.0,
+    "tch_ft": 57
+   },
+   "missed_approach": {
+    "initial_climb_altitude_ft": 500,
+    "final_altitude_ft": 3000,
+    "plate_text": "MISSED APPROACH: Climb to 500 then climbing left turn to 3000 direct WUDRR and hold."
+   },
+   "read_by": "rendered plate read visually and cross-checked with the pdfjs-dist text layer"
+  },
+  {
+   "chart_name": "RNAV (GPS) RWY 27R",
+   "pdf_name": "00320R27R.PDF",
+   "glidepath": {
+    "kind": "GP",
+    "angle_deg": 3.0,
+    "tch_ft": 53
+   },
+   "missed_approach": {
+    "initial_climb_altitude_ft": null,
+    "final_altitude_ft": 3000,
+    "plate_text": "MISSED APPROACH: Climb to 3000 direct LANDI and on track 294 deg to MXE VORTAC and hold."
+   },
+   "read_by": "rendered plate read visually and cross-checked with the pdfjs-dist text layer"
+  },
+  {
+   "chart_name": "RNAV (GPS) RWY 35",
+   "pdf_name": "00320R35.PDF",
+   "glidepath": {
+    "kind": "GP",
+    "angle_deg": 3.14,
+    "tch_ft": 55
+   },
+   "missed_approach": {
+    "initial_climb_altitude_ft": null,
+    "final_altitude_ft": 3000,
+    "plate_text": "MISSED APPROACH: Climb to 3000 direct WERDI and on track 333 deg to MUDNE and hold."
+   },
+   "read_by": "rendered plate read visually and cross-checked with the pdfjs-dist text layer"
+  },
+  {
+   "chart_name": "RNAV (GPS) Y RWY 09L",
+   "pdf_name": "00320RY9L.PDF",
+   "glidepath": {
+    "kind": "GP",
+    "angle_deg": 3.0,
+    "tch_ft": 53
+   },
+   "missed_approach": {
+    "initial_climb_altitude_ft": 1500,
+    "final_altitude_ft": 3000,
+    "plate_text": "MISSED APPROACH: Climb to 1500, then climbing right turn to 3000 direct OOD VORTAC and hold."
+   },
+   "read_by": "rendered plate read visually and cross-checked with the pdfjs-dist text layer"
+  },
+  {
+   "chart_name": "RNAV (GPS) Y RWY 09R",
+   "pdf_name": "00320RY9R.PDF",
+   "glidepath": {
+    "kind": "GP",
+    "angle_deg": 3.0,
+    "tch_ft": 58
+   },
+   "missed_approach": {
+    "initial_climb_altitude_ft": 1500,
+    "final_altitude_ft": 3000,
+    "plate_text": "MISSED APPROACH: Climb to 1500 then climbing right turn to 3000 direct OOD VORTAC and hold."
+   },
+   "read_by": "rendered plate read visually and cross-checked with the pdfjs-dist text layer"
+  }
+ ]
+}

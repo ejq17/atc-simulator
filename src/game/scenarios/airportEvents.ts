@@ -76,11 +76,17 @@ function computeClosableTaxiways(airport: Airport, active: { departing: string[]
       if (!g) continue;
       const holds = runwayHoldCandidates(airport, g).filter((h) => !h.taxiways.some((x) => avoid.has(x.toUpperCase())));
       if (!holds.length) { ok = false; break; }
-      for (const p of airport.parking) {
-        const dm = shortestDistances(graph, p.nodeId, { allowedRunwayIds: runwayIds, avoidTaxiways: avoid });
-        if (!holds.some((h) => dm.has(h.id))) { ok = false; break; }
+      // Every stand must reach some hold of this runway end. The taxi graph is undirected, so one search from a hold gives every stand it reaches;
+      // further holds are searched only for the stands still unreached (one search per taxiway and end instead of one per stand: KPHL, 130 stands
+      // and 3,600 nodes, took 70 s with a search per stand).
+      const pending = new Set(airport.parking.map((p) => p.nodeId));
+      if (pending.has('')) { ok = false; break; }
+      for (const h of holds) {
+        if (!pending.size) break;
+        const dm = shortestDistances(graph, h.id, { allowedRunwayIds: runwayIds, avoidTaxiways: avoid });
+        for (const id of pending) if (dm.has(id)) pending.delete(id);
       }
-      if (!ok) break;
+      if (pending.size) { ok = false; break; }
     }
     if (ok) out.push(t);
   }

@@ -383,3 +383,86 @@ Sources retrieved 2026-10-21: flypgd.com home page ("Sun Country and Allegiant p
 
 ## Raw files (`raw/`, not committed)
 `nasr_2026-10-01/`, `d-TPP_Metafile_2610.xml`, `kpgd_dtpp_2610_pdfs/` (11 PDFs), `kpgd_dtpp_http_head_checks.tsv`, `overpass_kpgd_raw.json`.
+
+# KPHL (Philadelphia International, PA) - verified source data
+
+Added 2026-10-21 the same way as KMHT: `scripts/extract-nasr-airport.ts PHL KPHL 2026-10-01 2026-10-21` (NASR rows), `scripts/osm-overpass-to-geojson.ts` (OSM), a transcription of the d-TPP plates, then `npx tsx scripts/build-airport.ts KPHL`. Nothing was typed from memory; every value was read from the downloaded files. NASR cycle 2026-10-01 (CSV zips of 2026-10-16, shared `raw/nasr_2026-10-01/`), d-TPP cycle **2610** (volume **NE-4**), all checks and downloads on **2026-10-21** (HTTP check times are UTC, 2026-10-22T01:13Z).
+
+## Files
+
+| File | What | Source (URL) | Retrieved | License |
+|---|---|---|---|---|
+| `kphl-facility.json` | ARP, elevation, variation, 4 runways / 8 ends (thresholds, displaced threshold 27L, TDZE, lighting, VGSI, declared distances), tower hours, Class B flag, 6 ILS summary, remarks; plus `airport.time_zone` and `runway_configurations` from `kphl-facility-extras.json` | NASR `01_Oct_2026_{APT,ATC,CLS_ARSP,ILS}_CSV.zip` (`https://nfdc.faa.gov/webContent/28DaySub/extra/`); charted magnetic headings from the diagram | 2026-10-21 | US Government work |
+| `kphl-frequencies.json` | The 82 FRQ.csv rows with SERVICED_FACILITY = PHL (the PHL TRACON's rows for Newark, Teterboro, Trenton... are excluded), summarised by function, sectors kept | NASR `FRQ_CSV.zip`, `ATC_CSV.zip` | 2026-10-21 | same |
+| `kphl-navaids.json` | 6 ILS systems (LOC/GS/DME), OOD, MXE, DQO, PTW, CYN, ARD, RBV and the STAR VORs (HAR, LRP, ETX, LVZ, PSB, JST, CFB, DNY, GVE), 84 fixes with NASR coordinates and plate roles | NASR `NAV/ILS/FIX_CSV.zip`; roles from the plates | 2026-10-21 | same |
+| `kphl-procedures.json` | All 38 d-TPP records with URL and HTTP check (`raw/kphl_dtpp_http_head_checks.tsv`, 38 x 200 application/pdf, User-Agent atc-simulator-research/1.0); transcription of the diagram, 15 approaches, PHILADELPHIA FOUR, BOJID FOUR, PAATS FOUR, hot spots | `https://aeronav.faa.gov/d-tpp/2610/<pdf>`, metadata `https://aeronav.faa.gov/d-tpp/2610/xml_data/d-TPP_Metafile.xml` | 2026-10-21 | same |
+| `kphl-plate-geometry.json` | Glidepath angle / TCH and missed approach altitudes for the 22 instrument approaches | the plates (visual read for 15, pdfjs-dist text layer for 7) | 2026-10-21 | same |
+| `kphl-facility-extras.json` | Hand-added sourced constants: runway configurations (west / east flow) with quotes, the documented night preferential use (not used), time zone | PHL Noise Office `https://phl.org/Noise-Office`; Noise Exposure Maps Update 2010 `https://www.phl.org/drupalbin/media/2010%20Noise%20Exposure%20Maps%20Report_Part1.pdf` | 2026-10-21 | public documents of the airport |
+| `kphl-taxiways.geojson` | 936 OSM aeroway features within 2500 m of the ARP (325 taxiways, 183 parking_position lines, 127 gates, 34 taxilanes, 21 aprons, 22 terminals, 8 hangars, 5 runway ways ...) | Overpass `https://overpass-api.de/api/interpreter` (OSM base 2026-10-22T01:42:36Z), raw `raw/overpass_kphl_raw.json` | 2026-10-21 | **ODbL 1.0, (c) OpenStreetMap contributors** |
+
+OSM query (radius 2500 m): `[out:json][timeout:180]; nwr["aeroway"~"^(runway|taxiway|apron|parking_position|holding_position|helipad|terminal|gate|taxilane|aerodrome|hangar|stopway|navigationaid|windsock)$"](around:2500,39.87208388,-75.24066305); out geom;`.
+
+## Key facts (NASR 2026-10-01 unless noted)
+
+**Airport:** PHILADELPHIA INTL, PHL / KPHL, Philadelphia PA, FAR 139, ATCT-TRACON FAA 24 h (radio call "PHILADELPHIA"), **Class B** (CLS_ARSP). ARP **39.87208388 N, 75.24066305 W**, elevation 35.9 ft, variation **12 W (epoch 2020; the diagram prints VAR 12 W, JANUARY 2020, annual change 0.0)**.
+
+| Runway | Size (ft) | Ends (true / charted mag) | Notes |
+|---|---|---|---|
+| 8/26 | 5001 x 150 | 8: 75 / 088, 26: 256 / 268 | ILS 26 I-LLH 111.55 (offset localizer, GS 3.15); no approach to 8 |
+| 9L/27R | 9500 x 150 | 9L 75 / 087, 27R 255 / 267 | ILS I-VII 108.95 (9L), I-PDP 108.95 (27R); 27R LDA 8864 |
+| 9R/27L | 12000 x 200 | 9R 75 / 087, 27L 255 / 267 | ILS I-PHL 109.3 (CAT IIIB, ALSF-2), I-GLC 109.3; **27L displaced threshold 1913 ft**, LDA 9912 |
+| 17/35 | 6500 x 150 | 17: 159 / 171, 35: 339 / 351 | ILS Z 17 I-MYY 108.75 (OPERATIONAL RESTRICTED); 35 RNAV (GPS) only |
+
+Frequencies (MHz): D-ATIS arr 133.4 / dep 135.925; Clearance 118.85; Ground 121.9 (GND/S 121.65); Tower 118.5 (8/26, 9L/27R, 17/35) and 135.1 (9R/27L); Approach 124.35 (APCH/P DEP/P initial contact); departure sectors DEP/P 119.75 (090-269, SOUTH DEP CON) and 124.35 (270-089, NORTH DEP CON); altitude-stratified approach sectors 123.8, 126.85, 127.35, 128.4, 133.875; Final 125.4; PRM 120.425 (27L), 123.6 (26); UNICOM 122.95. The simulator works ATIS, CLNC, GND, TWR, APP and the two DEP sectors; the rest are listed as non-position frequencies. The diagram, the plates and the DP chart print the same values (checked).
+
+**Primary navaid:** there is none at the field (the PHL VOT 109.8 is a test signal): OOD VORTAC (WOODSTOWN, 112.8, 75X, NJ) is used because most KPHL plates hold the missed approach there.
+
+## Plate transcription (what was read, from which PDF)
+
+All 38 PDFs in `raw/kphl_dtpp_2610_pdfs/`, text layers (pdfjs-dist) in `raw/kphl_dtpp_2610_txt/` (the text layer of the plan views is fragmented, so the charts were rendered with pdftoppm at 240 dpi - the airport diagram at 450 dpi and rotated - and **read visually**; the text layer cross-checked numbers):
+
+* **Airport diagram `00320AD.PDF`**: 62 taxiway identifiers (A A1 A2 A3 B D D1 D2 D4 E E1-E5 F G H J J1 K K1-K8 L M N P P2-P6 Q R S S1-S8 S11-S13 SS SS1 SS3 T TA U V W Y Z), charted headings, frequencies, pavement strength (PCR), lighting, caution note, hot spots HS 1 (Twy S7/Y at 9R-27L) and HS 2 (Twy K/D at 35 and 27R) circled; circled A4/A5/A symbols and P symbols are not taxiways (see `scripts/data/kphl-diagram-comparison.md`).
+* **ILS / LOC**: `00320IL9L` (Amdt 5 24MAR22), `IL26` (4E), `IL27L` (16), `IL27R` (10J), `IZL17` (ILS Z 9A), `IZLZ9R` (ILS Z 9R, 10), `IV9RCON`, `IV17CON` (converging, simultaneous): fixes in route order with roles (IAF / IF / FAF / step-down / missed approach hold), minima summary, missed approach verbatim, plate notes, GS and TCH. **RNAV (GPS)**: `R17`, `R26`, `R27L`, `R27R`, `R35`, `RY9L` (Y), `RY9R` (Y). Special-authorization / CAT II-III (`IZ9RSAC1`, `I27RSAC1_2`, `IZ9RC2_3`, `I9LSAC2`, `I27LSAC2`) and RNP Z 9L / 9R are listed with TCH and missed approach text only; the three visual approaches (FREEDOM, LIBERTY, RIVER) are listed in `visual_approaches`.
+* **PHILADELPHIA FOUR (`00320PHILADELPHIA` + `_C`)**: radar-vector departure, "Climb on heading assigned by ATC"; 27L/R 2200L-0600L climbing left turn heading 245; takeoff minimums (also `NE4TO.PDF`, entry AMDT 11 25FEB21); "TOP ALTITUDE: ASSIGNED BY ATC" (no maintain altitude is stated, so none is stored: the simulator's default initial altitude of 2000 ft is a design value); NORTH DEP CON 124.35 / SOUTH DEP CON 119.75 by first fix.
+* **STARs**: see below. **`NE4HOTSPOT.PDF`**: HS 1 and HS 2 text.
+
+### BOJID FOUR and PAATS FOUR (`stars[].star`, shape of ROZZE TWO)
+
+Chosen because they are the two RNAV STARs that together cover every runway: **PAATS FOUR** (south / southwest: transitions BBDOL, GORDONSVILLE, HYTRA; the only RNAV STAR with JIIMS FOUR that serves 9L, 9R, 17, 26, 27L, 27R and 35) and **BOJID FOUR** (west / Harrisburg corridor: Johnstown and Philipsburg transitions; 9L/R and 27L/R). **No official statistic of STAR usage was found** (phl.org Noise Office, FAA documents and web searches 2026-10-21); a flight-simulation forum post calls BOJID the "probably the most used arrival" (anecdote, not a source), so "most used" is NOT established. Not transcribed: BUNTS THREE, JIIMS FOUR, SLATT SIX, SPUDS SEVEN (listed with URL).
+
+* Each runway route is stored from the common fix (ESSSO for PAATS, HAR for BOJID) through the published runway body; the chart ends "then on track/heading N, expect RADAR vectors to final approach course"; `then_heading_mag_deg` is NOT set so that the simulator continues over the plate's join fixes (`join_approach_fixes`: the IF / first fixes of the ILS or RNAV plate, e.g. 27R MRTIN JALTO, 9L QWEST OBEKE ANNET, 35 JEPUG HARLU) as for KMHT's runway legs that have an approach.
+* **Neither chart prints any altitude or speed crossing restriction** (only MEAs along the legs, the 210K hold speed, and "Expect 8000" at BUNTS), so `restrictions` is empty.
+* Verification: every printed leg distance and magnetic track agrees with the NASR fix coordinates (variation 12 W) within 1.5 NM / 3 degrees (`src/airport/kphl/stars.test.ts`, which also reads NASR `STAR_RTE.csv` when the download is present: the runway bodies ESSSO-ERNYY / ESSSO-MKORD / ESSSO-TEBEE, HAR-FERUS / HAR-WHEYY and all five transitions match).
+* Simulator entry fixes (`sim_entry_fixes` in the STAR data, read by `starArrival`; DESIGN VALUE, distances from the ARP): **PAATS FOUR: CANNY (about 49 NM) and HEDGE (about 61 NM)**, both on every transition; **BOJID FOUR: TRAGG (about 40 NM) and LRP (about 60 NM)**; spawn altitude 10000-12000 ft (no published window). The entry fixes are data, so `src/game/ifr.ts` needed no KPHL edit.
+
+## Runway configurations (new facility field `runway_configurations`)
+
+From `kphl-facility-extras.json` (quotes inside): west flow (arrivals 27R, 27L, 26, 35; departures 27L, 27R, 35; about 70 percent of operations per the Noise Office, 81 percent of the time in 2008) and east flow (arrivals 9R, 9L, 17; departures 9L, 9R, 8, 17), Noise Exposure Maps Update 2010 sections 2.5.2 and 3.3 and phl.org. 2008 utilisation (Table 3-3): 27L 34.7, 27R 30.1, 35 10.3, 9R 8.3, 9L 8.2, 26 5.6, 17 1.2, 8 1.6 percent of operations; 27R primary jet arrival runway, 27L primary jet departure runway, 26 and 35 for propeller and regional aircraft. Night preferential use (midnight to 6 am; NEM: 11 pm to 6 am) is documented but kept out of `runway_configurations` because the selection by wind has no time of day. **No wind limits or sectors are published, so none are stored** (the simulator selects by arrival headwind). The FAA Capacity Enhancement Program EIS / runway 17-35 documents were not downloaded; the NEM figures are 2008-2009 data.
+
+## Changes to `scripts/extract-nasr-airport.ts`
+
+Runway end keys keep the L/R suffix ("09L" -> "9L"); frequency rows are selected by SERVICED_FACILITY (a TRACON serving many airports); D-ATIS rows (ARR/DEP) are the ATIS; several LCL/P rows (second tower), GND/S, PRM, FINAL APCH, sectorized APCH/P and DEP/P, STAR frequencies and CLASS B rows are summarised in `summary_by_function`; `airspace.class` "B"; optional `<slug>-facility-extras.json` merged (time zone, runway configurations). KMHT output is unchanged except for one `"sectorization"` omission rule and two note wordings (not regenerated).
+
+## Taxiways, parking and the build
+
+57 of the 62 diagram identifiers are in the graph (K2, K3, P6, S12, S13 are not in OSM; A1 is mapped as an isolated loop and excluded: `profile.excludeOsmWays`; the resulting single entry on the east half of 8/26 is a documented `profile.knownGaps` item); OSM-only refs S9, S10 and "8" are geometry without identifier. One runway-runway crossing (9L/27R x 17/35, `RWX-9L-27Rx17-35`, hot spot HS 2). 59 derived holds (OSM has no holding_position nodes). Parking: 114 airline stands (terminals A West/East, B-F, OSM `parking_position` lines inside the terminal apron polygons within 100 m of the mapped network), 8 cargo stands (FedEx 1-5, UPS 3), 5 GA stands (North Apron), 3 FBO spots (synthetic, inside the OSM "Atlantic Aviation" apron); 29 airline gates and some cargo stands exceed the 150 m connector limit (flagged, because OSM has no taxilane network on the terminal aprons). Comparison and decisions: `scripts/data/kphl-diagram-comparison.md`, `src/airport/kphl/build-report.md`.
+
+## Traffic (airportProfile.ts)
+
+Airlines: those phl.org lists on `https://www.phl.org/about/airlines` (copy `raw/kphl_traffic/phl_airlines.html`): Aer Lingus, Aeromexico, Air Canada, Alaska, Allegiant, American, American Eagle, British Airways, Delta, Frontier, JetBlue, Lufthansa / Eurowings Discover, Qatar, Southwest, Sun Country, United. Routes: the Wikipedia PHL airlines-and-destinations table (2026-10-21). Fleets: Wikipedia fleet tables (American, Frontier, UPS Airlines, American Eagle); Delta, United, JetBlue, Alaska, Sun Country and Southwest are A320 / B738 **stand-ins** (not looked up). UPS: Wikipedia "regional cargo hub" / East Coast Region Air Hub; the destination (Louisville) is an ESTIMATE. FedEx is not listed for PHL: no flights (OSM maps FedEx stands). Not generated: all non-US airlines and long-haul widebody flights (no parser-known destination; types for those airlines' PHL routes not sourced), Allegiant (no destination in the parser), VFR Class B transitions (the engine models Class C service), military / Coast Guard (no unit sourced). Neighbours: NASR coordinates of KPNE, KLOM, KILG, KTTN, KVAY, KMIV, KMQS, KOQN, KDYL, KPTW. Weights are design values. Aircraft types of the KPHL airlines come from the 34-type performance model.
+
+## Not verified (KPHL)
+
+* Plate transcriptions are human readings of rendered PDFs (fix roles, DA / MDA / RVR, missed approach, the order of fixes in the simulator route); the RNAV 17 plate prints TDZE 10 where the ILS 17 plate prints 11.
+* Which STAR is most used (see above); the OSM-only way "8" and the lone digit near taxiway H on the diagram; NASR variation epoch 2020; Class B dimensions (shape files not downloaded); traffic pattern altitude (blank in NASR).
+* Runway configuration percentages are 2008 (and a 2013 forecast); current numbers and wind criteria were not found.
+* Airline fleets of Delta, United, JetBlue, Alaska, Sun Country, Southwest; UPS route; all weights.
+* OSM positional accuracy; taxiway identifiers inferred by continuity (200 ways, listed in the build report).
+
+## Live weather
+
+`curl https://api.weather.gov/stations/KPHL/observations/latest` returned 200 with an observation (2026-10-22T01:55Z: wind 340 at 7 kt, visibility 10 SM, 13 C, pressure 1019.3 hPa) and an empty `rawMessage`; the app builds the METAR from the decoded fields exactly as for KMHT (CORS is open on api.weather.gov; AWC is not).
+
+## Raw files (`raw/`, not committed)
+
+`kphl_dtpp_2610_pdfs/` (38 PDFs), `kphl_dtpp_2610_txt/`, `kphl_dtpp_http_head_checks.tsv`, `overpass_kphl_raw.json`, `kphl_runway_config/` (noise_office.html, nem2010_part1.pdf and its text, FAA ROA), `kphl_traffic/` (phl.org airlines and cargo pages).

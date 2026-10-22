@@ -6,13 +6,14 @@ import type { Airport } from '../sim/types';
 import { loadKacy } from './kacy';
 import { loadKmht } from './kmht';
 import { loadKbos } from './kbos';
+import { loadKpgd } from './kpgd';
+import { loadKphl } from './kphl';
 
 export { loadKacy } from './kacy';
 export { loadKmht } from './kmht';
 export { loadKbos } from './kbos';
-import { loadKpgd } from './kpgd';
-
 export { loadKpgd } from './kpgd';
+export { loadKphl } from './kphl';
 export { createProjection, trueToMagnetic, magneticToTrue, normalizeDeg, bearingDeg, angleDiffDeg } from './projection';
 export type { Projection } from './projection';
 export {
@@ -50,6 +51,7 @@ const AIRPORTS: Record<string, () => Airport> = {
   KACY: loadKacy,
   KMHT: loadKmht,
   KBOS: loadKbos,
+  KPHL: loadKphl,
   KPGD: loadKpgd,
 };
 

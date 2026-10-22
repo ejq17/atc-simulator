@@ -1,0 +1,2175 @@
+{
+ "_provenance": {
+  "source": "FAA d-TPP metadata XML https://aeronav.faa.gov/d-tpp/2610/xml_data/d-TPP_Metafile.xml (saved as raw/d-TPP_Metafile_2610.xml) and PDFs https://aeronav.faa.gov/d-tpp/2610/<pdf>; page https://www.faa.gov/air_traffic/flight_info/aeronav/digital_products/dtpp/",
+  "retrieved": "2026-10-21",
+  "cycle": "2610",
+  "effective_from": "2026-10-01 0901Z",
+  "effective_to": "2026-10-29 0901Z",
+  "volume": "NE-4 (printed on charts as \"NE-4, 01 OCT 2026 to 29 OCT 2026\")",
+  "airport": {
+   "icao": "KPHL",
+   "faa": "PHL",
+   "name": "PHILADELPHIA INTL",
+   "dtpp_alnum": "320",
+   "city": "PHILADELPHIA",
+   "state": "PA"
+  },
+  "next_cycle": "2611 effective 2026-10-29",
+  "http_checks": "raw/kphl_dtpp_http_head_checks.tsv (HEAD request per URL with Content-Length, User-Agent atc-simulator-research/1.0, UTC times; 38 rows, all 200 application/pdf)",
+  "transcription_method": "All 38 d-TPP records of PHL were downloaded to raw/kphl_dtpp_2610_pdfs/, their text layers extracted with pdfjs-dist (raw/kphl_dtpp_2610_txt/) and every chart marked 'transcribed' below was rendered (pdftoppm 240 dpi, the airport diagram 450 dpi) and read visually. Per transcription: the airport diagram 00320AD.PDF (taxiway identifiers, charted headings, frequencies, hot spots, pavement strength); ILS/LOC and RNAV (GPS) plates 00320IL9L, IL26, IL27L, IL27R, IZL17, IZLZ9R, IV9RCON, IV17CON, R17, R26, R27L, R27R, R35, RY9L, RY9R (fixes and roles, minima, missed approach, plate notes); 00320PHILADELPHIA(_C) (DP); 00320BOJID and 00320PAATS(_C) (STARs); NE4HOTSPOT.PDF (hot-spot text). Special-authorization, CAT II/III, RNP and visual charts are listed with TCH/missed approach from the text layer only."
+ },
+ "primary_navaid_id": "OOD",
+ "primary_navaid_note": "KPHL has no VOR/DME of its own: the only on-field NASR navaid is PHL VOT 109.8 (VOR test facility, 39.86528 N 75.23365 W), which is not a navigation aid. OOD (WOODSTOWN VORTAC 112.8, chan 75X, 39.63607752 N 75.30305627 W, NJ, OPERATIONAL RESTRICTED) is the VORTAC named as the missed approach hold of most KPHL ILS/RNAV plates and is used as the primary navaid.",
+ "navaids_referenced": [
+  "OOD",
+  "MXE",
+  "DQO",
+  "PTW",
+  "CYN",
+  "ARD",
+  "RBV",
+  "HAR",
+  "LRP",
+  "ETX",
+  "LVZ",
+  "PSB",
+  "JST",
+  "CFB",
+  "DNY",
+  "GVE"
+ ],
+ "ils_note": "Six ILS/LOC systems with DME at KPHL (NASR ILS_BASE): runway 9L I-VII 108.95 (CAT I), 9R I-PHL 109.3 (CAT IIIB), 17 I-MYY 108.75 (CAT I, OPERATIONAL RESTRICTED), 26 I-LLH 111.55 (CAT I, localizer offset), 27L I-GLC 109.3 (CAT I), 27R I-PDP 108.95 (CAT I). Runway 35 and runway 8 have no ILS or LOC. The plates call 9L/27R I-VII/I-PDP and 9R/27L I-PHL/I-GLC; each pair shares a frequency (interlocked at opposite ends of one runway).",
+ "navaid_unverified": [
+  "Some approach intersections (QWEST, OBEKE, ANNET, LANDI, MRTIN, HADNI...) are ILS DME fixes; their NASR coordinates are used as published and were not compared with the plate geometry beyond the printed distances."
+ ],
+ "ils_plate_data": {
+  "9L": {
+   "plate_ident": "I-VII",
+   "plate_minima": "ILS or LOC RWY 9L (Amdt 5 24MAR22): S-ILS 9L DA 213 RVR 2400 HAT 200 (200-1/2)",
+   "tdze_plate_ft": 13,
+   "source": "d-TPP cycle 2610 PDF 00320IL9L.PDF read visually (DA/DH values are NOT in NASR)"
+  },
+  "9R": {
+   "plate_ident": "I-PHL",
+   "plate_minima": "ILS Z or LOC Z RWY 9R (Amdt 10 08DEC16): S-ILS 9R DA 221 RVR 1800 HAT 200 (200-1/2)",
+   "tdze_plate_ft": 21,
+   "source": "d-TPP cycle 2610 PDF 00320IZLZ9R.PDF read visually (DA/DH values are NOT in NASR); CAT II/III chart 00320IZ9RC2_3.PDF not transcribed"
+  },
+  "17": {
+   "plate_ident": "I-MYY",
+   "plate_minima": "ILS Z or LOC RWY 17 (Amdt 9A 02OCT25): S-ILS 17 DA 261 RVR 4000 HAT 250 (300-3/4)",
+   "tdze_plate_ft": 11,
+   "source": "d-TPP cycle 2610 PDF 00320IZL17.PDF read visually (DA/DH values are NOT in NASR)"
+  },
+  "26": {
+   "plate_ident": "I-LLH",
+   "plate_minima": "ILS or LOC RWY 26 (Amdt 4E 02OCT25): S-ILS 26 DA 299 RVR 4000 HAT 263 (300-3/4), Cat D NA",
+   "tdze_plate_ft": 36,
+   "source": "d-TPP cycle 2610 PDF 00320IL26.PDF read visually (DA/DH values are NOT in NASR)"
+  },
+  "27L": {
+   "plate_ident": "I-GLC",
+   "plate_minima": "ILS or LOC RWY 27L (Amdt 16 25JAN24): S-ILS 27L DA 210 RVR 2400 HAT 200 (200-1/2)",
+   "tdze_plate_ft": 10,
+   "source": "d-TPP cycle 2610 PDF 00320IL27L.PDF read visually (DA/DH values are NOT in NASR)"
+  },
+  "27R": {
+   "plate_ident": "I-PDP",
+   "plate_minima": "ILS or LOC RWY 27R (Amdt 10J 02OCT25): S-ILS 27R DA 211 RVR 2400 HAT 200 (200-1/2)",
+   "tdze_plate_ft": 11,
+   "source": "d-TPP cycle 2610 PDF 00320IL27R.PDF read visually (DA/DH values are NOT in NASR)"
+  }
+ },
+ "airport_diagram": {
+  "chart_name": "AIRPORT DIAGRAM",
+  "pdf_name": "00320AD.PDF",
+  "printed_header": "AL-320 (FAA); chart id 26246; NE-4 01 OCT 2026 to 29 OCT 2026",
+  "printed_variation_epoch": "JANUARY 2020",
+  "printed_annual_rate_of_change": "0.0 deg E",
+  "printed_frequencies": {
+   "ATIS": "D-ATIS ARR 133.4, DEP 135.925",
+   "CLNC_DEL": "118.85 348.6 (CPDLC, PDC)",
+   "GND_CON": "121.9 348.6",
+   "TOWER": "PHILADELPHIA TOWER 118.5 327.05 (RWYS 09L-27R, 08-26 and 17-35); 135.1 327.05 (RWY 09R-27L)",
+   "APPROACH": "PHILADELPHIA APP CON 124.35 319.15",
+   "APPROACH_note": "as printed on the approach plates (not on the diagram); the PAATS and JIIMS STAR plates print PHILADELPHIA APP CON 133.875 317.55, the BOJID, BUNTS, SLATT and SPUDS plates 128.4 272.575 and PHILADELPHIA FINAL CONTROL 125.4"
+  },
+  "charted_runway_headings_mag": {
+   "8": 88,
+   "26": 268,
+   "9L": 87,
+   "27R": 267,
+   "9R": 87,
+   "27L": 267,
+   "17": 171,
+   "35": 351
+  },
+  "charted_runway_headings_note": "Magnetic headings printed on the diagram along the runways (088/268, 087/267 twice, 171/351 deg).",
+  "runway_dimensions_printed": {
+   "08-26": "5001 x 150",
+   "09L-27R": "9500 x 150",
+   "09R-27L": "12000 x 200",
+   "17-35": "6500 x 150"
+  },
+  "pavement_strength_printed": {
+   "RWY 08-26": "PCR 317 F/B/X/T S-83, D-135, 2D-226",
+   "RWY 09L-27R": "PCR 702 F/B/W/T S-120, D-250, 2D-542, 2D/2D2-1059",
+   "RWY 09R-27L": "PCR 839 F/C/W/T S-120, D-250, 2D-550, 2D/2D2-1048",
+   "RWY 17-35": "PCR 554 F/C/W/T S-120, D-203, 2D-302, 2D/2D2-803"
+  },
+  "lighting_printed": "HIRL all rwys; REIL Rwys 9L and 35; TDZL/RCLS Rwy 9R",
+  "taxiway_identifiers": [
+   "A",
+   "A1",
+   "A2",
+   "A3",
+   "B",
+   "D",
+   "D1",
+   "D2",
+   "D4",
+   "E",
+   "E1",
+   "E2",
+   "E3",
+   "E4",
+   "E5",
+   "F",
+   "G",
+   "H",
+   "J",
+   "J1",
+   "K",
+   "K1",
+   "K2",
+   "K3",
+   "K4",
+   "K5",
+   "K6",
+   "K7",
+   "K8",
+   "L",
+   "M",
+   "N",
+   "P",
+   "P2",
+   "P3",
+   "P4",
+   "P5",
+   "P6",
+   "Q",
+   "R",
+   "S",
+   "S1",
+   "S2",
+   "S3",
+   "S4",
+   "S5",
+   "S6",
+   "S7",
+   "S8",
+   "S11",
+   "S12",
+   "S13",
+   "SS",
+   "SS1",
+   "SS3",
+   "T",
+   "TA",
+   "U",
+   "V",
+   "W",
+   "Y",
+   "Z"
+  ],
+  "taxiway_identifiers_note": "Labels read visually from a 450 dpi render of 00320AD.PDF (the page is printed rotated 90 degrees; the pdfjs-dist / pdftotext layer splits rotated labels into single characters, so it was used only as a cross-check). The circled A4 / A5 / A symbols with a dot are not taxiway labels (they sit on the runway extended centrelines far beyond the pavement ends); the circled P symbols are PAPI/VGSI symbols. Not read with confidence: a lone '9' near taxiway H north of the 17/35 x 27R intersection (not a letter label, not used); SS2 and S9/S10 are not printed.",
+  "inset_printed": "SEE INSET: the west apron / deicing area is drawn as an inset with numbered spots 1N 1C 1S 2N 2C 2S 3N 3C 3S 4N 4C 4S and taxiways Z and K.",
+  "hot_spots_printed": {
+   "HS 1": "circle around the intersection of taxiways S7 / Y with runway 09R-27L (west end)",
+   "HS 2": "circle around the intersection of taxiways K / D with runways 17-35 and 09L-27R (east end)"
+  },
+  "note_text": "CAUTION: BE ALERT TO RUNWAY CROSSING CLEARANCES. READBACK OF ALL RUNWAY HOLDING INSTRUCTIONS IS REQUIRED. ASDE-X in use. Operate transponders with altitude reporting mode and ADS-B (if equipped) enabled on all airport surfaces.",
+  "areas_named_on_diagram": [
+   "TERMINAL (concourses A-WEST, A-EAST, B, C, D, E, F)",
+   "NORTH APRON",
+   "SOUTH APRON",
+   "FBO TERMINAL",
+   "CARGO CITY",
+   "CARGO APRON (west)",
+   "WEST APRON",
+   "DEICING APRON",
+   "FIRE STATION",
+   "TWR"
+  ],
+  "field_elevation_printed_ft": 36,
+  "runway_end_elevations_printed_ft": {
+   "8": 8,
+   "26": 36,
+   "9L": 13,
+   "27R": 11,
+   "9R": 20,
+   "27L": 10,
+   "17": 8,
+   "35": 13
+  },
+  "pdf": {
+   "url": "https://aeronav.faa.gov/d-tpp/2610/00320AD.PDF",
+   "http_status": 200,
+   "content_type": "application/pdf",
+   "verified_by": "curl -I (HEAD) and curl GET on 2026-10-21 (UTC 2026-10-22T01:13:55Z, User-Agent atc-simulator-research/1.0); the file begins with %PDF and its size equals the HEAD Content-Length",
+   "bytes": 282366,
+   "local_file": "raw/kphl_dtpp_2610_pdfs/00320AD.PDF"
+  },
+  "data_provenance": "Chart name/PDF from d-TPP metadata XML; content read visually from the rendered PDF (pdfjs-dist text layer cross-check)."
+ },
+ "instrument_approaches": [
+  {
+   "chart_name": "ILS OR LOC RWY 09L",
+   "chart_code": "IAP",
+   "pdf_name": "00320IL9L.PDF",
+   "amdt_dtpp_metadata": "5",
+   "amdt_date_dtpp_metadata": null,
+   "printed_amendment_on_plate": "Amdt 5 24MAR22",
+   "runway": "9L",
+   "approach_type": "ILS or LOC (localizer-based; LANDI fix minimums need dual VOR receivers or DME)",
+   "final_approach_course_mag_deg": 87,
+   "tdze_ft_plate": 13,
+   "pdf": {
+    "url": "https://aeronav.faa.gov/d-tpp/2610/00320IL9L.PDF",
+    "http_status": 200,
+    "content_type": "application/pdf",
+    "verified_by": "curl -I (HEAD) and curl GET on 2026-10-21 (UTC 2026-10-22T01:13:41Z, User-Agent atc-simulator-research/1.0); the file begins with %PDF and its size equals the HEAD Content-Length",
+    "bytes": 301201,
+    "local_file": "raw/kphl_dtpp_2610_pdfs/00320IL9L.PDF"
+   },
+   "procuid": "1597",
+   "faa_nfd_id": null,
+   "copter": "",
+   "localizer": "I-VII 108.95 Chan 26(Y)",
+   "fixes_and_roles": [
+    {
+     "fix": "MXE (MODENA VORTAC 113.2)",
+     "role": "IAF (track 151 deg, 8.4 NM, 4000, to QWEST)"
+    },
+    {
+     "fix": "QWEST (I-VII 16.2)",
+     "role": "IF"
+    },
+    {
+     "fix": "OBEKE (I-VII 12.4)",
+     "role": "fix on the localizer course"
+    },
+    {
+     "fix": "ANNET (I-VII 8.1)",
+     "role": "FAF (ILS glideslope intercept 2100)"
+    },
+    {
+     "fix": "LANDI (I-VII 3.9)",
+     "role": "LOC step-down fix (LANDI FIX MINIMUMS); VDP at I-VII 2.9"
+    },
+    {
+     "fix": "OOD (WOODSTOWN VORTAC 112.8)",
+     "role": "missed approach hold"
+    },
+    {
+     "fix": "DQO (DUPONT VORTAC 114.0)",
+     "role": "IAF (second transition, listed after the primary route; track 026 deg, 8.1 NM, 4000, to QWEST)"
+    }
+   ],
+   "minima_summary": "S-ILS 9L DA 213 RVR 2400 HAT 200 (200-1/2) (RVR 1800 with FD/AP/HUD to DA); S-LOC 9L MDA 760 (HAT 747) A RVR 2400 (800-1/2), B RVR 4000 (800-3/4), C-D 1 3/4; LANDI fix S-LOC MDA 440 (HAT 427) A-B RVR 2400 (500-1/2), C-D RVR 4000 (500-3/4); Circling MDA 760 A-D 1 / 1 1/4 / 2 / 2 1/4 (HAA 724); circling with LANDI 540-1 / 600-1 / 620-1 1/2 / 720-2 1/4",
+   "missed_approach": "Climb to 1500 then climbing right turn to 3000 direct OOD VORTAC and hold.",
+   "missed_approach_verbatim": "MISSED APPROACH: Climb to 1500 then climbing right turn to 3000 direct OOD VORTAC and hold.",
+   "holding": "OOD VORTAC hold (missed approach); alternate missed approach fix DQO hold (inbound 068 deg R-068)",
+   "plate_notes": "LOC/DME I-VII 108.95 Chan 26(Y); GS 3.00 deg; TCH 53; MALSR; for inop ALS increase S-LOC 9L Cat C/D visibility to 2 SM; MSA OOD 25 NM 2600; FAF to MAP 6.4 NM (time 120 kt 3:12); TDZE 13, airport elev 36; Rwy Ldg 9500; HIRL all runways, REIL 9L and 35, TDZ/CL Rwy 9R.",
+   "fix_order_note": "fixes_and_roles are listed in simulator route order: the primary transition first (IAF..FAF..MAP/missed approach hold), then any second transition. The plate flows the same fixes; the order is not a chart claim.",
+   "data_provenance": "Chart name/PDF/amendment from d-TPP metadata XML; fixes, roles, minima, missed approach read visually from the rendered PDF plate (240 dpi render, pdfjs-dist text layer used only to cross-check numbers; human transcription - spot-check before safety use)."
+  },
+  {
+   "chart_name": "ILS OR LOC RWY 26",
+   "chart_code": "IAP",
+   "pdf_name": "00320IL26.PDF",
+   "amdt_dtpp_metadata": "4E",
+   "amdt_date_dtpp_metadata": "10/02/2025",
+   "printed_amendment_on_plate": "Amdt 4E 02OCT25",
+   "runway": "26",
+   "approach_type": "ILS or LOC (localizer-based, DME or radar required; LOC offset 2.59 deg, course 265)",
+   "final_approach_course_mag_deg": 265,
+   "tdze_ft_plate": 36,
+   "pdf": {
+    "url": "https://aeronav.faa.gov/d-tpp/2610/00320IL26.PDF",
+    "http_status": 200,
+    "content_type": "application/pdf",
+    "verified_by": "curl -I (HEAD) and curl GET on 2026-10-21 (UTC 2026-10-22T01:13:41Z, User-Agent atc-simulator-research/1.0); the file begins with %PDF and its size equals the HEAD Content-Length",
+    "bytes": 265997,
+    "local_file": "raw/kphl_dtpp_2610_pdfs/00320IL26.PDF"
+   },
+   "procuid": "14790",
+   "faa_nfd_id": null,
+   "copter": "",
+   "localizer": "I-LLH 111.55 Chan 52(Y)",
+   "fixes_and_roles": [
+    {
+     "fix": "HOLEY (I-LLH 19.2)",
+     "role": "IAF (2000 to FOSOM, 266 deg heading (1 NM) then 265 deg (9.8 NM))"
+    },
+    {
+     "fix": "FOSOM (I-LLH 8.4, RADAR)",
+     "role": "IF"
+    },
+    {
+     "fix": "ESKOE (I-LLH 6.4, RADAR)",
+     "role": "FAF (ILS glideslope intercept 2000)"
+    },
+    {
+     "fix": "CFLFX (I-LLH 0.6)",
+     "role": "depicted in parentheses (not required); LOC VDP at I-LLH 2.5"
+    },
+    {
+     "fix": "PTW (POTTSTOWN VORTAC 116.5)",
+     "role": "missed approach hold"
+    }
+   ],
+   "minima_summary": "S-ILS 26 DA 299 RVR 4000 HAT 263 (300-3/4) Cat A-C, Cat D NA; S-LOC 26 MDA 700 (HAT 664) A-B RVR 4000 (700-3/4), C 1 1/2, D NA; Circling A-B 700-1 (664), C 700-1 7/8, D NA",
+   "missed_approach": "Climb to 800 then climbing right turn to 3000 direct PTW VORTAC and hold.",
+   "missed_approach_verbatim": "MISSED APPROACH: Climb to 800 then climbing right turn to 3000 direct PTW VORTAC and hold.",
+   "holding": "PTW VORTAC hold (missed approach)",
+   "plate_notes": "LOC/DME I-LLH 111.55 Chan 52(Y), LOC offset 2.59 deg; GS 3.15 deg; TCH 50; MALSR; for inop ALS increase S-ILS all Cats visibility to RVR 4500 and S-LOC Cats A-B to RVR 5500 and Cat C to 1 7/8 SM; Rwy 26 helicopter visibility reduction below RVR 4000 NA; Procedure NA for arrivals at HOLEY on V123-157-213 northeast bound; FAF to MAP 5.7 NM; TDZE 36; Rwy Ldg 5001.",
+   "fix_order_note": "fixes_and_roles are listed in simulator route order: the primary transition first (IAF..FAF..MAP/missed approach hold), then any second transition. The plate flows the same fixes; the order is not a chart claim.",
+   "data_provenance": "Chart name/PDF/amendment from d-TPP metadata XML; fixes, roles, minima, missed approach read visually from the rendered PDF plate (240 dpi render, pdfjs-dist text layer used only to cross-check numbers; human transcription - spot-check before safety use)."
+  },
+  {
+   "chart_name": "ILS OR LOC RWY 27L",
+   "chart_code": "IAP",
+   "pdf_name": "00320IL27L.PDF",
+   "amdt_dtpp_metadata": "16",
+   "amdt_date_dtpp_metadata": "01/25/2024",
+   "printed_amendment_on_plate": "Amdt 16 25JAN24",
+   "runway": "27L",
+   "approach_type": "ILS or LOC (localizer-based, DME or radar required)",
+   "final_approach_course_mag_deg": 267,
+   "tdze_ft_plate": 10,
+   "pdf": {
+    "url": "https://aeronav.faa.gov/d-tpp/2610/00320IL27L.PDF",
+    "http_status": 200,
+    "content_type": "application/pdf",
+    "verified_by": "curl -I (HEAD) and curl GET on 2026-10-21 (UTC 2026-10-22T01:13:42Z, User-Agent atc-simulator-research/1.0); the file begins with %PDF and its size equals the HEAD Content-Length",
+    "bytes": 277337,
+    "local_file": "raw/kphl_dtpp_2610_pdfs/00320IL27L.PDF"
+   },
+   "procuid": "1587",
+   "faa_nfd_id": null,
+   "copter": "",
+   "localizer": "I-GLC 109.3 Chan 30",
+   "fixes_and_roles": [
+    {
+     "fix": "CYN (COYLE VORTAC 113.4)",
+     "role": "IAF (track 293 deg, 26.7 NM, 3000, to FESTI)"
+    },
+    {
+     "fix": "FESTI (I-GLC 11.2, RADAR)",
+     "role": "IF"
+    },
+    {
+     "fix": "TORNE (I-GLC 8.7, RADAR)",
+     "role": "FAF (ILS glideslope intercept 3000)"
+    },
+    {
+     "fix": "GLOUS (I-GLC 5.8, RADAR)",
+     "role": "fix on the localizer course (2060)"
+    },
+    {
+     "fix": "XIVOY (I-GLC 0.2)",
+     "role": "fix near the runway threshold (VDP at I-GLC 1)"
+    },
+    {
+     "fix": "OOD (WOODSTOWN VORTAC 112.8)",
+     "role": "missed approach hold"
+    }
+   ],
+   "minima_summary": "S-ILS 27L DA 210 RVR 2400 HAT 200 (200-1/2) (RVR 1800 with FD/AP/HUD to DA); S-LOC 27L MDA 560 (HAT 550) A-B RVR 2400 (600-1/2), C-D 1 1/4 (RVR 6000); Circling MDA A 560-1 (HAA 524), B 600-1, C 620-1 5/8, D 720-2 1/4",
+   "missed_approach": "Climb to 1500 then climbing left turn to 3000 direct OOD VORTAC and hold.",
+   "missed_approach_verbatim": "MISSED APPROACH: Climb to 1500 then climbing left turn to 3000 direct OOD VORTAC and hold.",
+   "holding": "OOD VORTAC hold (missed approach); alternate missed approach fix MXE hold (inbound 054 deg R-234)",
+   "plate_notes": "LOC/DME I-GLC 109.3 Chan 30; GS 3.00 deg; TCH 57; VGSI and ILS glidepath not coincident (VGSI angle 3.00 / TCH 73); MALSR; DME or RADAR required; procedure NA for arrivals on CYN VORTAC airway radials 246 CW 274; FAF to MAP 8.5 NM (120 kt 4:15); TDZE 10; Rwy Ldg 9912.",
+   "fix_order_note": "fixes_and_roles are listed in simulator route order: the primary transition first (IAF..FAF..MAP/missed approach hold), then any second transition. The plate flows the same fixes; the order is not a chart claim.",
+   "data_provenance": "Chart name/PDF/amendment from d-TPP metadata XML; fixes, roles, minima, missed approach read visually from the rendered PDF plate (240 dpi render, pdfjs-dist text layer used only to cross-check numbers; human transcription - spot-check before safety use)."
+  },
+  {
+   "chart_name": "ILS OR LOC RWY 27R",
+   "chart_code": "IAP",
+   "pdf_name": "00320IL27R.PDF",
+   "amdt_dtpp_metadata": "10J",
+   "amdt_date_dtpp_metadata": "10/02/2025",
+   "printed_amendment_on_plate": "Amdt 10J 02OCT25",
+   "runway": "27R",
+   "approach_type": "ILS or LOC (localizer-based; DME required)",
+   "final_approach_course_mag_deg": 268,
+   "tdze_ft_plate": 11,
+   "pdf": {
+    "url": "https://aeronav.faa.gov/d-tpp/2610/00320IL27R.PDF",
+    "http_status": 200,
+    "content_type": "application/pdf",
+    "verified_by": "curl -I (HEAD) and curl GET on 2026-10-21 (UTC 2026-10-22T01:13:43Z, User-Agent atc-simulator-research/1.0); the file begins with %PDF and its size equals the HEAD Content-Length",
+    "bytes": 302527,
+    "local_file": "raw/kphl_dtpp_2610_pdfs/00320IL27R.PDF"
+   },
+   "procuid": "1584",
+   "faa_nfd_id": null,
+   "copter": "",
+   "localizer": "I-PDP 108.95 Chan 26(Y)",
+   "fixes_and_roles": [
+    {
+     "fix": "ENZEW (RBV 23.1)",
+     "role": "IAF (track 268 deg, 5.5 NM, 3000, to MRTIN); procedure NA for arrivals at ENZEW on V123-157-213 northeast bound"
+    },
+    {
+     "fix": "MRTIN (I-PDP 11.3)",
+     "role": "IF"
+    },
+    {
+     "fix": "JALTO (I-PDP 6.1)",
+     "role": "FAF (ILS glideslope intercept 2100)"
+    },
+    {
+     "fix": "HADNI (I-PDP 2)",
+     "role": "LOC step-down fix (LOC only, 740)"
+    },
+    {
+     "fix": "MXE (MODENA VORTAC 113.2)",
+     "role": "missed approach hold (on MXE R-115)"
+    },
+    {
+     "fix": "MENGE (ARD 15)",
+     "role": "IAF (second transition, listed after the primary route; track 200 deg, 5.1 NM, 3000, to MRTIN); procedure NA for arrivals at MENGE on V479 northbound"
+    }
+   ],
+   "minima_summary": "S-ILS 27R DA 211 RVR 2400 HAT 200 (200-1/2) (RVR 1800 with FD/AP/HUD to DA); S-LOC 27R MDA 500 (HAT 489) A-B RVR 2400 (500-1/2), C-D RVR 5000 (500-1); Sidestep 27L MDA 500 (HAT 491) A-B 1, C-D 1 3/8; Circling MDA A 540-1 (HAA 504), B 600-1, C 620-1 1/2, D 720-2 1/4",
+   "missed_approach": "Climb to 1500 then climbing right turn to 3000 on MXE VORTAC R-115 to MXE VORTAC and hold.",
+   "missed_approach_verbatim": "MISSED APPROACH: Climb to 1500 then climbing right turn to 3000 on MXE VORTAC R-115 to MXE VORTAC and hold.",
+   "holding": "MXE VORTAC hold (missed approach; 054/234 deg); alternate missed approach fix PTW hold (R-152, inbound 332 deg)",
+   "plate_notes": "LOC/DME I-PDP 108.95 Chan 26(Y); GS 3.00 deg; TCH 52; VGSI and ILS glidepath not coincident (VGSI angle 3.00 / TCH 81); 27R and 27L MALSR; DME required; for inop ALS increase S-LOC 27R Cat C/D visibility to 1 3/8 SM; MSA OOD 25 NM 2600; TDZE 27R 11, 27L 10; Rwy Ldg 27R 8864, 27L 9912.",
+   "fix_order_note": "fixes_and_roles are listed in simulator route order: the primary transition first (IAF..FAF..MAP/missed approach hold), then any second transition. The plate flows the same fixes; the order is not a chart claim.",
+   "data_provenance": "Chart name/PDF/amendment from d-TPP metadata XML; fixes, roles, minima, missed approach read visually from the rendered PDF plate (240 dpi render, pdfjs-dist text layer used only to cross-check numbers; human transcription - spot-check before safety use)."
+  },
+  {
+   "chart_name": "ILS Z OR LOC RWY 17",
+   "chart_code": "IAP",
+   "pdf_name": "00320IZL17.PDF",
+   "amdt_dtpp_metadata": "9A",
+   "amdt_date_dtpp_metadata": "10/02/2025",
+   "printed_amendment_on_plate": "Amdt 9A 02OCT25",
+   "runway": "17",
+   "approach_type": "ILS or LOC (localizer-based, DME or radar required)",
+   "final_approach_course_mag_deg": 171,
+   "tdze_ft_plate": 11,
+   "pdf": {
+    "url": "https://aeronav.faa.gov/d-tpp/2610/00320IZL17.PDF",
+    "http_status": 200,
+    "content_type": "application/pdf",
+    "verified_by": "curl -I (HEAD) and curl GET on 2026-10-21 (UTC 2026-10-22T01:13:43Z, User-Agent atc-simulator-research/1.0); the file begins with %PDF and its size equals the HEAD Content-Length",
+    "bytes": 306941,
+    "local_file": "raw/kphl_dtpp_2610_pdfs/00320IZL17.PDF"
+   },
+   "procuid": "1586",
+   "faa_nfd_id": null,
+   "copter": "",
+   "localizer": "I-MYY 108.75 Chan 24(Y)",
+   "fixes_and_roles": [
+    {
+     "fix": "PTW (POTTSTOWN VORTAC 116.5)",
+     "role": "IAF (track 137 deg, 13 NM, 3000, to COWAD); procedure NA for arrival on PTW airway radials 095 CW 188"
+    },
+    {
+     "fix": "COWAD (I-MYY 14.2, PTW 13, RADAR)",
+     "role": "IF"
+    },
+    {
+     "fix": "HYILL (I-MYY 7.3)",
+     "role": "FAF (ILS glideslope intercept 2000)"
+    },
+    {
+     "fix": "HOOCH (I-MYY 3.4)",
+     "role": "LOC step-down fix (HOOCH FIX MINIMUMS); VDP at I-MYY 2.5"
+    },
+    {
+     "fix": "OOD (WOODSTOWN VORTAC 112.8)",
+     "role": "missed approach hold (WOODSTOWN; inbound 032 deg, R-212)"
+    }
+   ],
+   "minima_summary": "S-ILS 17 DA 261 RVR 4000 HAT 250 (300-3/4); S-LOC 17 MDA 760 (HAT 749) A RVR 4000 (800-3/4), B RVR 5500 (800-1), C-D 1 7/8; HOOCH fix S-LOC MDA 480 (HAT 469) A-B RVR 4000 (500-3/4), C-D 1 1/4; Circling MDA A 760-1 (HAA 724), B 760-1 1/4, C 760-2, D 760-2 1/4; circling with HOOCH 540-1 / 600-1 / 620-1 1/2 / 720-2 1/4; circling NA to Rwy 8",
+   "missed_approach": "Climb to 2000 then climbing right turn to 3000 direct OOD VORTAC and hold.",
+   "missed_approach_verbatim": "MISSED APPROACH: Climb to 2000 then climbing right turn to 3000 direct OOD VORTAC and hold.",
+   "holding": "OOD VORTAC hold (missed approach; 032/212 deg)",
+   "plate_notes": "LOC/DME I-MYY 108.75 Chan 24(Y); GS 3.00 deg; TCH 50; MALSF; inop table does not apply to S-ILS 17 all Cats; Rwy 17 helicopter visibility reduction below RVR 4000 NA; DME or RADAR required; FAF to MAP 6.1 NM (120 kt 3:03); TDZE 11; Rwy Ldg 6500. NASR lists the I-MYY ILS as OPERATIONAL RESTRICTED.",
+   "fix_order_note": "fixes_and_roles are listed in simulator route order: the primary transition first (IAF..FAF..MAP/missed approach hold), then any second transition. The plate flows the same fixes; the order is not a chart claim.",
+   "data_provenance": "Chart name/PDF/amendment from d-TPP metadata XML; fixes, roles, minima, missed approach read visually from the rendered PDF plate (240 dpi render, pdfjs-dist text layer used only to cross-check numbers; human transcription - spot-check before safety use)."
+  },
+  {
+   "chart_name": "ILS Z OR LOC Z RWY 09R",
+   "chart_code": "IAP",
+   "pdf_name": "00320IZLZ9R.PDF",
+   "amdt_dtpp_metadata": "10",
+   "amdt_date_dtpp_metadata": null,
+   "printed_amendment_on_plate": "Amdt 10 08DEC16",
+   "runway": "9R",
+   "approach_type": "ILS or LOC (localizer-based; ILS Z, DME or radar not required for entry)",
+   "final_approach_course_mag_deg": 87,
+   "tdze_ft_plate": 21,
+   "pdf": {
+    "url": "https://aeronav.faa.gov/d-tpp/2610/00320IZLZ9R.PDF",
+    "http_status": 200,
+    "content_type": "application/pdf",
+    "verified_by": "curl -I (HEAD) and curl GET on 2026-10-21 (UTC 2026-10-22T01:13:44Z, User-Agent atc-simulator-research/1.0); the file begins with %PDF and its size equals the HEAD Content-Length",
+    "bytes": 285281,
+    "local_file": "raw/kphl_dtpp_2610_pdfs/00320IZLZ9R.PDF"
+   },
+   "procuid": "1585",
+   "faa_nfd_id": null,
+   "copter": "",
+   "localizer": "I-PHL 109.3 Chan 30",
+   "fixes_and_roles": [
+    {
+     "fix": "MXE (MODENA VORTAC 113.2)",
+     "role": "IAF (track 152 deg, 8.6 NM, 4000, to BWINE); procedure NA for arrivals on MXE VORTAC airway radials 129 CW 177"
+    },
+    {
+     "fix": "BWINE (I-PHL 15.7)",
+     "role": "IF"
+    },
+    {
+     "fix": "ASOCI (I-PHL 11.8)",
+     "role": "fix on the localizer course"
+    },
+    {
+     "fix": "KELEE (I-PHL 7.6)",
+     "role": "FAF (ILS glideslope intercept 1800)"
+    },
+    {
+     "fix": "BALDN (I-PHL 4.3)",
+     "role": "LOC step-down fix (BALDN FIX MINIMUMS); VDP at I-PHL 3.5"
+    },
+    {
+     "fix": "OOD (WOODSTOWN VORTAC 112.8)",
+     "role": "missed approach hold"
+    }
+   ],
+   "minima_summary": "S-ILS 9R DA 221 RVR 1800 HAT 200 (200-1/2); S-LOC 9R MDA 740 (HAT 719) A-B RVR 2400 (800-1/2), C-D 1 5/8; BALDN fix S-LOC MDA 580 (HAT 559) A-B RVR 2400 (600-1/2), C-D RVR 6000 (600-1 1/4); Circling MDA A 740-1 (HAA 704), B 740-1, C 740-2, D 740-2 1/4; circling with BALDN 580-1 / 640-1 / 640-1 3/4 / 720-2 1/4",
+   "missed_approach": "Climb to 1500 then climbing right turn to 3000 direct OOD VORTAC and hold.",
+   "missed_approach_verbatim": "MISSED APPROACH: Climb to 1500 then climbing right turn to 3000 direct OOD VORTAC and hold.",
+   "holding": "OOD VORTAC hold (missed approach; 032/212 deg); alternate missed approach fix DQO hold",
+   "plate_notes": "LOC/DME I-PHL 109.3 Chan 30; GS 3.00 deg; TCH 58; ALSF-2; IM marker; FAF to MAP 5.4 NM (120 kt 2:42); TDZE 21; Rwy Ldg 12000; NASR lists I-PHL as CAT IIIB.",
+   "fix_order_note": "fixes_and_roles are listed in simulator route order: the primary transition first (IAF..FAF..MAP/missed approach hold), then any second transition. The plate flows the same fixes; the order is not a chart claim.",
+   "data_provenance": "Chart name/PDF/amendment from d-TPP metadata XML; fixes, roles, minima, missed approach read visually from the rendered PDF plate (240 dpi render, pdfjs-dist text layer used only to cross-check numbers; human transcription - spot-check before safety use)."
+  },
+  {
+   "chart_name": "ILS V RWY 09R (CONVERGING)",
+   "chart_code": "IAP",
+   "pdf_name": "00320IV9RCON.PDF",
+   "amdt_dtpp_metadata": "7A",
+   "amdt_date_dtpp_metadata": null,
+   "printed_amendment_on_plate": "Amdt 7A 02OCT25",
+   "runway": "9R",
+   "approach_type": "ILS (converging, simultaneous approach authorized, RADAR required)",
+   "final_approach_course_mag_deg": 87,
+   "tdze_ft_plate": 21,
+   "pdf": {
+    "url": "https://aeronav.faa.gov/d-tpp/2610/00320IV9RCON.PDF",
+    "http_status": 200,
+    "content_type": "application/pdf",
+    "verified_by": "curl -I (HEAD) and curl GET on 2026-10-21 (UTC 2026-10-22T01:13:47Z, User-Agent atc-simulator-research/1.0); the file begins with %PDF and its size equals the HEAD Content-Length",
+    "bytes": 255500,
+    "local_file": "raw/kphl_dtpp_2610_pdfs/00320IV9RCON.PDF"
+   },
+   "procuid": "1590",
+   "faa_nfd_id": null,
+   "copter": "",
+   "localizer": "I-PHL 109.3 Chan 30",
+   "fixes_and_roles": [
+    {
+     "fix": "MXE (MODENA VORTAC 113.2)",
+     "role": "IAF (track 152 deg, 8.6 NM, 4000, to BWINE)"
+    },
+    {
+     "fix": "BWINE (MXE 8.6, I-PHL 15.7)",
+     "role": "IF"
+    },
+    {
+     "fix": "ASOCI (I-PHL 11.8)",
+     "role": "fix on the localizer course"
+    },
+    {
+     "fix": "KELEE (I-PHL 7.6)",
+     "role": "FAF (ILS glideslope intercept 1800)"
+    },
+    {
+     "fix": "OOD (WOODSTOWN VORTAC 112.8)",
+     "role": "missed approach hold"
+    }
+   ],
+   "minima_summary": "S-ILS 9R DA 688 HAT 667 (700-1 1/2) all Cats",
+   "missed_approach": "Climb to 900 then climbing right turn to 3000 direct OOD VORTAC and hold.",
+   "missed_approach_verbatim": "MISSED APPROACH: Climb to 900 then climbing right turn to 3000 direct OOD VORTAC and hold.",
+   "holding": "OOD VORTAC hold (missed approach)",
+   "plate_notes": "LOC/DME I-PHL 109.3 Chan 30; GS 3.00 deg; TCH 58; VGSI angle 3.00 / TCH 72 not coincident; ALSF-2; RADAR required; simultaneous approach authorized; for inop ALS increase S-ILS 9R all Cats visibility to 1 7/8 SM.",
+   "fix_order_note": "fixes_and_roles are listed in simulator route order: the primary transition first (IAF..FAF..MAP/missed approach hold), then any second transition. The plate flows the same fixes; the order is not a chart claim.",
+   "data_provenance": "Chart name/PDF/amendment from d-TPP metadata XML; fixes, roles, minima, missed approach read visually from the rendered PDF plate (240 dpi render, pdfjs-dist text layer used only to cross-check numbers; human transcription - spot-check before safety use)."
+  },
+  {
+   "chart_name": "ILS V RWY 17 (CONVERGING)",
+   "chart_code": "IAP",
+   "pdf_name": "00320IV17CON.PDF",
+   "amdt_dtpp_metadata": "8A",
+   "amdt_date_dtpp_metadata": "10/02/2025",
+   "printed_amendment_on_plate": "Amdt 8A 02OCT25",
+   "runway": "17",
+   "approach_type": "ILS (converging, simultaneous approach authorized, RADAR required)",
+   "final_approach_course_mag_deg": 171,
+   "tdze_ft_plate": 11,
+   "pdf": {
+    "url": "https://aeronav.faa.gov/d-tpp/2610/00320IV17CON.PDF",
+    "http_status": 200,
+    "content_type": "application/pdf",
+    "verified_by": "curl -I (HEAD) and curl GET on 2026-10-21 (UTC 2026-10-22T01:13:48Z, User-Agent atc-simulator-research/1.0); the file begins with %PDF and its size equals the HEAD Content-Length",
+    "bytes": 236310,
+    "local_file": "raw/kphl_dtpp_2610_pdfs/00320IV17CON.PDF"
+   },
+   "procuid": "1593",
+   "faa_nfd_id": null,
+   "copter": "",
+   "localizer": "I-MYY 108.75 Chan 24(Y)",
+   "fixes_and_roles": [
+    {
+     "fix": "PTW (POTTSTOWN VORTAC 116.5)",
+     "role": "IAF (track 137 deg, 13 NM, 3000, to COWAD)"
+    },
+    {
+     "fix": "COWAD (I-MYY 14.2, PTW 13, RADAR)",
+     "role": "IF"
+    },
+    {
+     "fix": "HYILL (I-MYY 7.3)",
+     "role": "FAF (ILS glideslope intercept 2000)"
+    },
+    {
+     "fix": "ARD (YARDLEY VOR/DME 108.2)",
+     "role": "missed approach hold (inbound 109 deg, R-109)"
+    }
+   ],
+   "minima_summary": "S-ILS 17 DA 664 HAT 653 (700-1 5/8) all Cats",
+   "missed_approach": "Climb to 880 then climbing left turn to 3500 direct ARD VOR/DME and hold.",
+   "missed_approach_verbatim": "MISSED APPROACH: Climb to 880 then climbing left turn to 3500 direct ARD VOR/DME and hold.",
+   "holding": "ARD VOR/DME hold (missed approach)",
+   "plate_notes": "LOC/DME I-MYY 108.75 Chan 24(Y); GS 3.00 deg; TCH 50; MALSF; RADAR required; simultaneous approach authorized; Rwy 17 helicopter visibility reduction below 3/4 SM NA; alternate missed approach fix RBV hold.",
+   "fix_order_note": "fixes_and_roles are listed in simulator route order: the primary transition first (IAF..FAF..MAP/missed approach hold), then any second transition. The plate flows the same fixes; the order is not a chart claim.",
+   "data_provenance": "Chart name/PDF/amendment from d-TPP metadata XML; fixes, roles, minima, missed approach read visually from the rendered PDF plate (240 dpi render, pdfjs-dist text layer used only to cross-check numbers; human transcription - spot-check before safety use)."
+  },
+  {
+   "chart_name": "ILS Z RWY 09R (SA CAT I)",
+   "chart_code": "IAP",
+   "pdf_name": "00320IZ9RSAC1.PDF",
+   "amdt_dtpp_metadata": "10",
+   "amdt_date_dtpp_metadata": null,
+   "printed_amendment_on_plate": "Amdt 10 08DEC16",
+   "runway": "9R",
+   "approach_type": "ILS, SA CAT I (special authorization: specific OPSPEC, MSPEC or LOA approval and use of HUD to DH)",
+   "final_approach_course_mag_deg": 87,
+   "tdze_ft_plate": 21,
+   "pdf": {
+    "url": "https://aeronav.faa.gov/d-tpp/2610/00320IZ9RSAC1.PDF",
+    "http_status": 200,
+    "content_type": "application/pdf",
+    "verified_by": "curl -I (HEAD) and curl GET on 2026-10-21 (UTC 2026-10-22T01:13:45Z, User-Agent atc-simulator-research/1.0); the file begins with %PDF and its size equals the HEAD Content-Length",
+    "bytes": 248302,
+    "local_file": "raw/kphl_dtpp_2610_pdfs/00320IZ9RSAC1.PDF"
+   },
+   "procuid": "37022",
+   "faa_nfd_id": null,
+   "copter": "",
+   "fixes_and_roles": [],
+   "minima_summary": "-",
+   "missed_approach": "Climb to 1500 then climbing right turn to 3000 direct OOD VORTAC and hold.",
+   "missed_approach_verbatim": "MISSED APPROACH: Climb to 1500 then climbing right turn to 3000 direct OOD VORTAC and hold.",
+   "holding": "-",
+   "plate_notes": "Special aircrew/authorization chart; GS 3.00 deg TCH 58; not flown by the simulator; not transcribed.",
+   "fix_order_note": "-",
+   "data_provenance": "Chart name/PDF/amendment from d-TPP metadata XML; missed approach, TCH and glidepath read from the pdfjs-dist text layer (see kphl-plate-geometry.json); fixes and minima are NOT transcribed (UNVERIFIED / left empty)."
+  },
+  {
+   "chart_name": "ILS RWY 27R (SA CAT I - II)",
+   "chart_code": "IAP",
+   "pdf_name": "00320I27RSAC1_2.PDF",
+   "amdt_dtpp_metadata": "10J",
+   "amdt_date_dtpp_metadata": "10/02/2025",
+   "printed_amendment_on_plate": "Amdt 10J 02OCT25",
+   "runway": "27R",
+   "approach_type": "ILS, SA CAT I and II (special authorization)",
+   "final_approach_course_mag_deg": 268,
+   "tdze_ft_plate": 11,
+   "pdf": {
+    "url": "https://aeronav.faa.gov/d-tpp/2610/00320I27RSAC1_2.PDF",
+    "http_status": 200,
+    "content_type": "application/pdf",
+    "verified_by": "curl -I (HEAD) and curl GET on 2026-10-21 (UTC 2026-10-22T01:13:45Z, User-Agent atc-simulator-research/1.0); the file begins with %PDF and its size equals the HEAD Content-Length",
+    "bytes": 286285,
+    "local_file": "raw/kphl_dtpp_2610_pdfs/00320I27RSAC1_2.PDF"
+   },
+   "procuid": "25443",
+   "faa_nfd_id": null,
+   "copter": "",
+   "fixes_and_roles": [],
+   "minima_summary": "SA CAT I RA 157 (150) DA 161; SA CAT II RA 102 (100) DA 111 (text layer)",
+   "missed_approach": "Climb to 1500 then climbing right turn to 3000 on MXE VORTAC R-115 to MXE VORTAC and hold.",
+   "missed_approach_verbatim": "MISSED APPROACH: Climb to 1500 then climbing right turn to 3000 on MXE VORTAC R-115 to MXE VORTAC and hold.",
+   "holding": "-",
+   "plate_notes": "Special aircrew/authorization chart; GS 3.00 deg TCH 52; not flown by the simulator.",
+   "fix_order_note": "-",
+   "data_provenance": "Chart name/PDF/amendment from d-TPP metadata XML; missed approach, TCH and glidepath read from the pdfjs-dist text layer (see kphl-plate-geometry.json); fixes and minima are NOT transcribed (UNVERIFIED / left empty)."
+  },
+  {
+   "chart_name": "ILS Z RWY 09R (CAT II - III)",
+   "chart_code": "IAP",
+   "pdf_name": "00320IZ9RC2_3.PDF",
+   "amdt_dtpp_metadata": "10",
+   "amdt_date_dtpp_metadata": null,
+   "printed_amendment_on_plate": "Amdt 10 08DEC16",
+   "runway": "9R",
+   "approach_type": "ILS CAT II and III",
+   "final_approach_course_mag_deg": 87,
+   "tdze_ft_plate": 21,
+   "pdf": {
+    "url": "https://aeronav.faa.gov/d-tpp/2610/00320IZ9RC2_3.PDF",
+    "http_status": 200,
+    "content_type": "application/pdf",
+    "verified_by": "curl -I (HEAD) and curl GET on 2026-10-21 (UTC 2026-10-22T01:13:46Z, User-Agent atc-simulator-research/1.0); the file begins with %PDF and its size equals the HEAD Content-Length",
+    "bytes": 244749,
+    "local_file": "raw/kphl_dtpp_2610_pdfs/00320IZ9RC2_3.PDF"
+   },
+   "procuid": "13682",
+   "faa_nfd_id": null,
+   "copter": "",
+   "fixes_and_roles": [],
+   "minima_summary": "-",
+   "missed_approach": "Climb to 1500 then climbing right turn to 3000 direct OOD VORTAC and hold.",
+   "missed_approach_verbatim": "MISSED APPROACH: Climb to 1500 then climbing right turn to 3000 direct OOD VORTAC and hold.",
+   "holding": "-",
+   "plate_notes": "CAT II/III chart; GS 3.00 deg TCH 58; not transcribed.",
+   "fix_order_note": "-",
+   "data_provenance": "Chart name/PDF/amendment from d-TPP metadata XML; missed approach, TCH and glidepath read from the pdfjs-dist text layer (see kphl-plate-geometry.json); fixes and minima are NOT transcribed (UNVERIFIED / left empty)."
+  },
+  {
+   "chart_name": "ILS RWY 09L (SA CAT II)",
+   "chart_code": "IAP",
+   "pdf_name": "00320I9LSAC2.PDF",
+   "amdt_dtpp_metadata": "5",
+   "amdt_date_dtpp_metadata": null,
+   "printed_amendment_on_plate": "Amdt 5 24MAR22",
+   "runway": "9L",
+   "approach_type": "ILS, SA CAT II (special authorization)",
+   "final_approach_course_mag_deg": 87,
+   "tdze_ft_plate": 13,
+   "pdf": {
+    "url": "https://aeronav.faa.gov/d-tpp/2610/00320I9LSAC2.PDF",
+    "http_status": 200,
+    "content_type": "application/pdf",
+    "verified_by": "curl -I (HEAD) and curl GET on 2026-10-21 (UTC 2026-10-22T01:13:46Z, User-Agent atc-simulator-research/1.0); the file begins with %PDF and its size equals the HEAD Content-Length",
+    "bytes": 243343,
+    "local_file": "raw/kphl_dtpp_2610_pdfs/00320I9LSAC2.PDF"
+   },
+   "procuid": "40704",
+   "faa_nfd_id": null,
+   "copter": "",
+   "fixes_and_roles": [],
+   "minima_summary": "-",
+   "missed_approach": "Climb to 1500 then climbing right turn to 3000 direct OOD VORTAC and hold.",
+   "missed_approach_verbatim": "MISSED APPROACH: Climb to 1500 then climbing right turn to 3000 direct OOD VORTAC and hold.",
+   "holding": "-",
+   "plate_notes": "Special aircrew/authorization chart; GS 3.00 deg TCH 53; not transcribed.",
+   "fix_order_note": "-",
+   "data_provenance": "Chart name/PDF/amendment from d-TPP metadata XML; missed approach, TCH and glidepath read from the pdfjs-dist text layer (see kphl-plate-geometry.json); fixes and minima are NOT transcribed (UNVERIFIED / left empty)."
+  },
+  {
+   "chart_name": "ILS RWY 27L (SA CAT II)",
+   "chart_code": "IAP",
+   "pdf_name": "00320I27LSAC2.PDF",
+   "amdt_dtpp_metadata": "16",
+   "amdt_date_dtpp_metadata": "01/25/2024",
+   "printed_amendment_on_plate": "Amdt 16 25JAN24",
+   "runway": "27L",
+   "approach_type": "ILS, SA CAT II (special authorization)",
+   "final_approach_course_mag_deg": 267,
+   "tdze_ft_plate": 10,
+   "pdf": {
+    "url": "https://aeronav.faa.gov/d-tpp/2610/00320I27LSAC2.PDF",
+    "http_status": 200,
+    "content_type": "application/pdf",
+    "verified_by": "curl -I (HEAD) and curl GET on 2026-10-21 (UTC 2026-10-22T01:13:47Z, User-Agent atc-simulator-research/1.0); the file begins with %PDF and its size equals the HEAD Content-Length",
+    "bytes": 239630,
+    "local_file": "raw/kphl_dtpp_2610_pdfs/00320I27LSAC2.PDF"
+   },
+   "procuid": "40617",
+   "faa_nfd_id": null,
+   "copter": "",
+   "fixes_and_roles": [],
+   "minima_summary": "SA CAT II RA 100 (100) DA 110 (text layer)",
+   "missed_approach": "Climb to 1500 then climbing left turn to 3000 direct OOD VORTAC and hold.",
+   "missed_approach_verbatim": "MISSED APPROACH: Climb to 1500 then climbing left turn to 3000 direct OOD VORTAC and hold.",
+   "holding": "-",
+   "plate_notes": "Special aircrew/authorization chart; GS 3.00 deg TCH 57; not transcribed.",
+   "fix_order_note": "-",
+   "data_provenance": "Chart name/PDF/amendment from d-TPP metadata XML; missed approach, TCH and glidepath read from the pdfjs-dist text layer (see kphl-plate-geometry.json); fixes and minima are NOT transcribed (UNVERIFIED / left empty)."
+  },
+  {
+   "chart_name": "RNAV (RNP) Z RWY 09L",
+   "chart_code": "IAP",
+   "pdf_name": "00320RRZ9L.PDF",
+   "amdt_dtpp_metadata": "0E",
+   "amdt_date_dtpp_metadata": "09/05/2024",
+   "printed_amendment_on_plate": "Amdt 0E 05SEP24",
+   "runway": "9L",
+   "approach_type": "RNAV (RNP), authorization required",
+   "final_approach_course_mag_deg": 87,
+   "tdze_ft_plate": 13,
+   "pdf": {
+    "url": "https://aeronav.faa.gov/d-tpp/2610/00320RRZ9L.PDF",
+    "http_status": 200,
+    "content_type": "application/pdf",
+    "verified_by": "curl -I (HEAD) and curl GET on 2026-10-21 (UTC 2026-10-22T01:13:49Z, User-Agent atc-simulator-research/1.0); the file begins with %PDF and its size equals the HEAD Content-Length",
+    "bytes": 238649,
+    "local_file": "raw/kphl_dtpp_2610_pdfs/00320RRZ9L.PDF"
+   },
+   "procuid": "25709",
+   "faa_nfd_id": null,
+   "copter": "",
+   "fixes_and_roles": [],
+   "minima_summary": "-",
+   "missed_approach": "Climb to 3000 on track 087 deg to CUBUT and on track 173 deg to FIDAX and on track 259 deg to OOD VORTAC and hold.",
+   "missed_approach_verbatim": "MISSED APPROACH: Climb to 3000 on track 087 deg to CUBUT and on track 173 deg to FIDAX and on track 259 deg to OOD VORTAC and hold.",
+   "holding": "-",
+   "plate_notes": "AUTHORIZATION REQUIRED on the plate; GP 3.00 deg TCH 58; not transcribed.",
+   "fix_order_note": "-",
+   "data_provenance": "Chart name/PDF/amendment from d-TPP metadata XML; missed approach, TCH and glidepath read from the pdfjs-dist text layer (see kphl-plate-geometry.json); fixes and minima are NOT transcribed (UNVERIFIED / left empty)."
+  },
+  {
+   "chart_name": "RNAV (RNP) Z RWY 09R",
+   "chart_code": "IAP",
+   "pdf_name": "00320RRZ9R.PDF",
+   "amdt_dtpp_metadata": "0F",
+   "amdt_date_dtpp_metadata": "09/05/2024",
+   "printed_amendment_on_plate": "Amdt 0F 05SEP24",
+   "runway": "9R",
+   "approach_type": "RNAV (RNP), authorization required",
+   "final_approach_course_mag_deg": 87,
+   "tdze_ft_plate": 21,
+   "pdf": {
+    "url": "https://aeronav.faa.gov/d-tpp/2610/00320RRZ9R.PDF",
+    "http_status": 200,
+    "content_type": "application/pdf",
+    "verified_by": "curl -I (HEAD) and curl GET on 2026-10-21 (UTC 2026-10-22T01:13:49Z, User-Agent atc-simulator-research/1.0); the file begins with %PDF and its size equals the HEAD Content-Length",
+    "bytes": 247200,
+    "local_file": "raw/kphl_dtpp_2610_pdfs/00320RRZ9R.PDF"
+   },
+   "procuid": "25708",
+   "faa_nfd_id": null,
+   "copter": "",
+   "fixes_and_roles": [],
+   "minima_summary": "-",
+   "missed_approach": "Climb to 3000 on track 087 deg to ASGEW and on track 169 deg to CIPOK, and on track 259 deg to OOD VORTAC and hold.",
+   "missed_approach_verbatim": "MISSED APPROACH: Climb to 3000 on track 087 deg to ASGEW and on track 169 deg to CIPOK, and on track 259 deg to OOD VORTAC and hold.",
+   "holding": "-",
+   "plate_notes": "AUTHORIZATION REQUIRED on the plate; GP 3.00 deg TCH 58; VGSI angle 3.00 / TCH 72 not coincident; not transcribed.",
+   "fix_order_note": "-",
+   "data_provenance": "Chart name/PDF/amendment from d-TPP metadata XML; missed approach, TCH and glidepath read from the pdfjs-dist text layer (see kphl-plate-geometry.json); fixes and minima are NOT transcribed (UNVERIFIED / left empty)."
+  },
+  {
+   "chart_name": "RNAV (GPS) RWY 17",
+   "chart_code": "IAP",
+   "pdf_name": "00320R17.PDF",
+   "amdt_dtpp_metadata": "3E",
+   "amdt_date_dtpp_metadata": "10/02/2025",
+   "printed_amendment_on_plate": "Amdt 3E 02OCT25",
+   "runway": "17",
+   "approach_type": "RNAV (GPS)",
+   "final_approach_course_mag_deg": 171,
+   "tdze_ft_plate": 10,
+   "pdf": {
+    "url": "https://aeronav.faa.gov/d-tpp/2610/00320R17.PDF",
+    "http_status": 200,
+    "content_type": "application/pdf",
+    "verified_by": "curl -I (HEAD) and curl GET on 2026-10-21 (UTC 2026-10-22T01:13:50Z, User-Agent atc-simulator-research/1.0); the file begins with %PDF and its size equals the HEAD Content-Length",
+    "bytes": 244542,
+    "local_file": "raw/kphl_dtpp_2610_pdfs/00320R17.PDF"
+   },
+   "procuid": "18043",
+   "faa_nfd_id": null,
+   "copter": "",
+   "fixes_and_roles": [
+    {
+     "fix": "PTW (POTTSTOWN VORTAC 116.5)",
+     "role": "IAF (track 140 deg, 13 NM, 3000, to COWAD); procedure NA for arrival on PTW airway radials 059 CW 205"
+    },
+    {
+     "fix": "COWAD",
+     "role": "IF (3000)"
+    },
+    {
+     "fix": "HYILL",
+     "role": "FAF (GP intercept 2000)"
+    },
+    {
+     "fix": "WENTO (2.3 NM to RW17)",
+     "role": "LNAV step-down fix (780)"
+    },
+    {
+     "fix": "RW17",
+     "role": "MAP"
+    },
+    {
+     "fix": "JEPUG",
+     "role": "missed approach hold (4 NM, 150/330 deg)"
+    },
+    {
+     "fix": "ARD (YARDLEY VOR/DME)",
+     "role": "IAF (second transition, listed after the primary route; track 256 deg, 22 NM, 3000, to COWAD); procedure NA for arrival on ARD airway radials 200 CW 304"
+    }
+   ],
+   "minima_summary": "LPV DA 260 RVR 5000 HAT 250 (300-1); LNAV/VNAV DA 322 RVR 5000 HAT 311 (300-1); LNAV MDA A-B 480 RVR 5000 HAT 470 (500-1), C-D 480 (500-1 1/4); Circling MDA A 540-1 (HAA 504), B 600-1, C 620-1 1/2, D 720-2 1/4",
+   "missed_approach": "Climb to 3000 direct JEPUG and hold.",
+   "missed_approach_verbatim": "MISSED APPROACH: Climb to 3000 direct JEPUG and hold.",
+   "holding": "JEPUG 4 NM hold (missed approach; inbound 150 deg)",
+   "plate_notes": "WAAS CH 86222 W17A; GP 3.00 deg TCH 50; RNP APCH - GPS; MALSF; inop table does not apply to LPV and LNAV/VNAV all Cats and LNAV Cats A/B; for uncompensated Baro-VNAV systems LNAV/VNAV NA below -12 C or above 54 C; Rwy 17 helicopter visibility reduction below RVR 4000 NA; TDZE printed 10 (the ILS 17 plate prints 11); Rwy Ldg 6500.",
+   "fix_order_note": "fixes_and_roles are listed in simulator route order: the primary transition first (IAF..FAF..MAP/missed approach hold), then any second transition. The plate flows the same fixes; the order is not a chart claim.",
+   "data_provenance": "Chart name/PDF/amendment from d-TPP metadata XML; fixes, roles, minima, missed approach read visually from the rendered PDF plate (240 dpi render, pdfjs-dist text layer used only to cross-check numbers; human transcription - spot-check before safety use)."
+  },
+  {
+   "chart_name": "RNAV (GPS) RWY 26",
+   "chart_code": "IAP",
+   "pdf_name": "00320R26.PDF",
+   "amdt_dtpp_metadata": "1E",
+   "amdt_date_dtpp_metadata": "10/02/2025",
+   "printed_amendment_on_plate": "Amdt 1E 02OCT25",
+   "runway": "26",
+   "approach_type": "RNAV (GPS), simultaneous approach authorized (LNAV NA during simultaneous operations)",
+   "final_approach_course_mag_deg": 268,
+   "tdze_ft_plate": 36,
+   "pdf": {
+    "url": "https://aeronav.faa.gov/d-tpp/2610/00320R26.PDF",
+    "http_status": 200,
+    "content_type": "application/pdf",
+    "verified_by": "curl -I (HEAD) and curl GET on 2026-10-21 (UTC 2026-10-22T01:13:50Z, User-Agent atc-simulator-research/1.0); the file begins with %PDF and its size equals the HEAD Content-Length",
+    "bytes": 293018,
+    "local_file": "raw/kphl_dtpp_2610_pdfs/00320R26.PDF"
+   },
+   "procuid": "18034",
+   "faa_nfd_id": null,
+   "copter": "",
+   "fixes_and_roles": [
+    {
+     "fix": "MENGE",
+     "role": "IAF (track 190 deg, 4.5 NM, 3300, to FERIN); procedure NA for arrivals at MENGE on V479 northbound"
+    },
+    {
+     "fix": "FERIN",
+     "role": "IF (3300)"
+    },
+    {
+     "fix": "KANKE",
+     "role": "FAF (GP intercept 2000)"
+    },
+    {
+     "fix": "ZOKAR (3 NM to RW26)",
+     "role": "LNAV step-down fix (1040)"
+    },
+    {
+     "fix": "RW26",
+     "role": "MAP"
+    },
+    {
+     "fix": "FROSE",
+     "role": "missed approach hold (4 NM, 059/239 deg)"
+    },
+    {
+     "fix": "ENZEW",
+     "role": "IAF (second transition, listed after the primary route; track 272 deg, 4.4 NM, 3300, to FERIN); procedure NA for arrivals at ENZEW via V123-157-213 northeast bound"
+    },
+    {
+     "fix": "CIBOP",
+     "role": "fix on the track 338 deg, 5.1 NM, 3300 route from ALBEK to FERIN"
+    },
+    {
+     "fix": "ALBEK",
+     "role": "IAF (track 017 deg, 5 NM, 3300, to CIBOP); procedure NA for arrivals at ALBEK on V312 westbound"
+    }
+   ],
+   "minima_summary": "LPV DA 513 RVR 6000 HAT 477 (500-1 1/4); LNAV/VNAV DA 573-1 3/8 HAT 537 (600-1 3/8); LNAV MDA A-B 540 RVR 4000 HAT 504 (600-3/4), C-D 540-1; Circling MDA 540-1 (HAA 504) / 600-1 / 620-1 1/2 / 720-2 1/4",
+   "missed_approach": "Climb to 800 then climbing right turn to 3000 direct FROSE and hold.",
+   "missed_approach_verbatim": "MISSED APPROACH: Climb to 800 then climbing right turn to 3000 direct FROSE and hold.",
+   "holding": "FROSE 4 NM hold (missed approach; inbound 239 deg)",
+   "plate_notes": "WAAS CH 78117 W26A; GP 3.00 deg TCH 50; RNP APCH - GPS; MALSR; simultaneous approach authorized, FD or AP providing RNAV track guidance required during simultaneous operations; Rwy 26 helicopter visibility reduction below RVR 4000 NA; TDZE 36; Rwy Ldg 5001.",
+   "fix_order_note": "fixes_and_roles are listed in simulator route order: the primary transition first (IAF..FAF..MAP/missed approach hold), then any second transition. The plate flows the same fixes; the order is not a chart claim.",
+   "data_provenance": "Chart name/PDF/amendment from d-TPP metadata XML; fixes, roles, minima, missed approach read visually from the rendered PDF plate (240 dpi render, pdfjs-dist text layer used only to cross-check numbers; human transcription - spot-check before safety use)."
+  },
+  {
+   "chart_name": "RNAV (GPS) RWY 27L",
+   "chart_code": "IAP",
+   "pdf_name": "00320R27L.PDF",
+   "amdt_dtpp_metadata": "4A",
+   "amdt_date_dtpp_metadata": "10/02/2025",
+   "printed_amendment_on_plate": "Amdt 4A 02OCT25",
+   "runway": "27L",
+   "approach_type": "RNAV (GPS)",
+   "final_approach_course_mag_deg": 268,
+   "tdze_ft_plate": 10,
+   "pdf": {
+    "url": "https://aeronav.faa.gov/d-tpp/2610/00320R27L.PDF",
+    "http_status": 200,
+    "content_type": "application/pdf",
+    "verified_by": "curl -I (HEAD) and curl GET on 2026-10-21 (UTC 2026-10-22T01:13:51Z, User-Agent atc-simulator-research/1.0); the file begins with %PDF and its size equals the HEAD Content-Length",
+    "bytes": 261628,
+    "local_file": "raw/kphl_dtpp_2610_pdfs/00320R27L.PDF"
+   },
+   "procuid": "18035",
+   "faa_nfd_id": null,
+   "copter": "",
+   "fixes_and_roles": [
+    {
+     "fix": "CHPMN (210K max)",
+     "role": "IAF (track 075 deg, 8.0 NM, 5000, to HEDDA)"
+    },
+    {
+     "fix": "HEDDA",
+     "role": "fix on the track 075 deg route (5.5 NM to WIWON, 5000)"
+    },
+    {
+     "fix": "WIWON",
+     "role": "fix on the track 075 deg route (3 NM to FLYNN, 5000)"
+    },
+    {
+     "fix": "FLYNN",
+     "role": "track 356 deg, 4.2 NM, 5000, to PUURL"
+    },
+    {
+     "fix": "PUURL",
+     "role": "track 308 deg, 3.3 NM, 5000, to HILBY"
+    },
+    {
+     "fix": "HILBY",
+     "role": "IF (5000)"
+    },
+    {
+     "fix": "ORANE",
+     "role": "fix on the final course (4600)"
+    },
+    {
+     "fix": "FESTI",
+     "role": "fix on the final course (3700)"
+    },
+    {
+     "fix": "TORNE",
+     "role": "FAF (GP intercept 3000)"
+    },
+    {
+     "fix": "GLOUS (6.3 NM to RW27L)",
+     "role": "fix on the final course (2060)"
+    },
+    {
+     "fix": "RW27L",
+     "role": "MAP"
+    },
+    {
+     "fix": "WUDRR",
+     "role": "missed approach hold (4 NM, 003/183 deg)"
+    }
+   ],
+   "minima_summary": "LPV DA 210 RVR 2400 HAT 200 (200-1/2) (RVR 1800 with FD/AP/HUD to DA); LNAV/VNAV DA 422 RVR 4000 HAT 412 (400-3/4); LNAV MDA A-B 540 RVR 2400 HAT 530 (600-1/2), C-D RVR 5500 (600-1); Circling MDA 540-1 (HAA 504) / 600-1 / 620-1 1/2 / 720-2 1/4",
+   "missed_approach": "Climb to 500 then climbing left turn to 3000 direct WUDRR and hold.",
+   "missed_approach_verbatim": "MISSED APPROACH: Climb to 500 then climbing left turn to 3000 direct WUDRR and hold.",
+   "holding": "WUDRR 4 NM hold (missed approach; inbound 183 deg)",
+   "plate_notes": "WAAS CH 97322 W27A; GP 3.00 deg TCH 57; VGSI angle 3.00 / TCH 73 not coincident; RNP APCH - GPS; MALSR; for uncompensated Baro-VNAV systems LNAV/VNAV NA below -11 C or above 54 C; for inop ALS increase LNAV/VNAV all Cats visibility to RVR 6000; TDZE 10; Rwy Ldg 9912.",
+   "fix_order_note": "fixes_and_roles are listed in simulator route order: the primary transition first (IAF..FAF..MAP/missed approach hold), then any second transition. The plate flows the same fixes; the order is not a chart claim.",
+   "data_provenance": "Chart name/PDF/amendment from d-TPP metadata XML; fixes, roles, minima, missed approach read visually from the rendered PDF plate (240 dpi render, pdfjs-dist text layer used only to cross-check numbers; human transcription - spot-check before safety use)."
+  },
+  {
+   "chart_name": "RNAV (GPS) RWY 27R",
+   "chart_code": "IAP",
+   "pdf_name": "00320R27R.PDF",
+   "amdt_dtpp_metadata": "1D",
+   "amdt_date_dtpp_metadata": "10/02/2025",
+   "printed_amendment_on_plate": "Amdt 1D 02OCT25",
+   "runway": "27R",
+   "approach_type": "RNAV (GPS)",
+   "final_approach_course_mag_deg": 268,
+   "tdze_ft_plate": 11,
+   "pdf": {
+    "url": "https://aeronav.faa.gov/d-tpp/2610/00320R27R.PDF",
+    "http_status": 200,
+    "content_type": "application/pdf",
+    "verified_by": "curl -I (HEAD) and curl GET on 2026-10-21 (UTC 2026-10-22T01:13:51Z, User-Agent atc-simulator-research/1.0); the file begins with %PDF and its size equals the HEAD Content-Length",
+    "bytes": 244373,
+    "local_file": "raw/kphl_dtpp_2610_pdfs/00320R27R.PDF"
+   },
+   "procuid": "18036",
+   "faa_nfd_id": null,
+   "copter": "",
+   "fixes_and_roles": [
+    {
+     "fix": "ENZEW",
+     "role": "IAF (track 269 deg, 2.8 NM, 3500 (3000 when authorized by ATC), to DUCVA)"
+    },
+    {
+     "fix": "DUCVA",
+     "role": "IF (3500; # 3000 when authorized by ATC)"
+    },
+    {
+     "fix": "MRTIN",
+     "role": "fix on the final course (3000; 5.1 NM to JALTO)"
+    },
+    {
+     "fix": "JALTO",
+     "role": "FAF (GP intercept 2100)"
+    },
+    {
+     "fix": "RW27R",
+     "role": "MAP (2 NM to RW27R mark on the profile)"
+    },
+    {
+     "fix": "LANDI",
+     "role": "missed approach waypoint (track 294 deg to MXE)"
+    },
+    {
+     "fix": "MXE (MODENA VORTAC 113.2)",
+     "role": "missed approach hold (4 NM, 057/237 deg)"
+    }
+   ],
+   "minima_summary": "LPV DA 267 RVR 2400 HAT 256 (300-1/2); LNAV/VNAV DA 520 RVR 6000 HAT 509 (500-1 1/4); LNAV MDA A-B 720 RVR 2400 HAT 709 (700-1/2), C 720-1 1/2, D 720-1 3/4; Circling MDA 720-1 (HAA 684) / 720-2 / 720-2 1/4",
+   "missed_approach": "Climb to 3000 direct LANDI and on track 294 deg to MXE VORTAC and hold.",
+   "missed_approach_verbatim": "MISSED APPROACH: Climb to 3000 direct LANDI and on track 294 deg to MXE VORTAC and hold.",
+   "holding": "MXE VORTAC hold (missed approach; 057/237 deg)",
+   "plate_notes": "WAAS CH 90122 W27B; GP 3.00 deg TCH 53; VGSI and RNAV glidepath not coincident (VGSI angle 3.00 / TCH 81); RNP APCH - GPS; MALSR; for uncompensated Baro-VNAV systems LNAV/VNAV NA below -12 C or above 54 C; for inop ALS increase LNAV/VNAV all Cats visibility to 1 3/8 SM and LNAV Cat C/D to 2 SM; TDZE 11; Rwy Ldg 8864.",
+   "fix_order_note": "fixes_and_roles are listed in simulator route order: the primary transition first (IAF..FAF..MAP/missed approach hold), then any second transition. The plate flows the same fixes; the order is not a chart claim.",
+   "data_provenance": "Chart name/PDF/amendment from d-TPP metadata XML; fixes, roles, minima, missed approach read visually from the rendered PDF plate (240 dpi render, pdfjs-dist text layer used only to cross-check numbers; human transcription - spot-check before safety use)."
+  },
+  {
+   "chart_name": "RNAV (GPS) RWY 35",
+   "chart_code": "IAP",
+   "pdf_name": "00320R35.PDF",
+   "amdt_dtpp_metadata": "5A",
+   "amdt_date_dtpp_metadata": "10/02/2025",
+   "printed_amendment_on_plate": "Amdt 5A 02OCT25",
+   "runway": "35",
+   "approach_type": "RNAV (GPS) (LP/LNAV only)",
+   "final_approach_course_mag_deg": 351,
+   "tdze_ft_plate": 13,
+   "pdf": {
+    "url": "https://aeronav.faa.gov/d-tpp/2610/00320R35.PDF",
+    "http_status": 200,
+    "content_type": "application/pdf",
+    "verified_by": "curl -I (HEAD) and curl GET on 2026-10-21 (UTC 2026-10-22T01:13:52Z, User-Agent atc-simulator-research/1.0); the file begins with %PDF and its size equals the HEAD Content-Length",
+    "bytes": 234838,
+    "local_file": "raw/kphl_dtpp_2610_pdfs/00320R35.PDF"
+   },
+   "procuid": "18037",
+   "faa_nfd_id": null,
+   "copter": "",
+   "fixes_and_roles": [
+    {
+     "fix": "BDAWK",
+     "role": "IAF (track 351 deg, 5 NM, 3000, to JEPUG)"
+    },
+    {
+     "fix": "JEPUG",
+     "role": "IF (3000)"
+    },
+    {
+     "fix": "HARLU",
+     "role": "FAF (GP intercept 2000; 6.1 NM from JEPUG)"
+    },
+    {
+     "fix": "CEMEK (2.5 NM to RW35)",
+     "role": "LP/LNAV step-down fix (900)"
+    },
+    {
+     "fix": "RW35",
+     "role": "MAP"
+    },
+    {
+     "fix": "WERDI",
+     "role": "missed approach waypoint (track 333 deg)"
+    },
+    {
+     "fix": "MUDNE",
+     "role": "missed approach hold (4 NM, 059/239 deg)"
+    },
+    {
+     "fix": "KUSLE",
+     "role": "IAF (second transition, listed after the primary route; track 281 deg, 8.4 NM, 3000, to JEPUG)"
+    },
+    {
+     "fix": "WIKAV",
+     "role": "IAF (track 061 deg, 8.4 NM, 3000, to JEPUG)"
+    },
+    {
+     "fix": "JIIMS",
+     "role": "feeder fix (track 316 deg, 7.2 NM, 3000, to BDAWK)"
+    },
+    {
+     "fix": "ALBEK",
+     "role": "feeder fix (track 212 deg, 6 NM, 4700, to KUSLE); procedure NA for arrivals at ALBEK on V312 northeast bound"
+    }
+   ],
+   "minima_summary": "LP MDA A-B 500 RVR 5500 HAT 487 (500-1), C-D 500-1 3/8; LNAV MDA A-B 500 RVR 5500 HAT 487 (500-1), C-D 500-1 3/8; Circling MDA 540-1 (HAA 504) / 600-1 / 620-1 1/2 / 720-2 1/4 (no LPV, no LNAV/VNAV)",
+   "missed_approach": "Climb to 3000 direct WERDI and on track 333 deg to MUDNE and hold.",
+   "missed_approach_verbatim": "MISSED APPROACH: Climb to 3000 direct WERDI and on track 333 deg to MUDNE and hold.",
+   "holding": "MUDNE 4 NM hold (missed approach; inbound 239 deg)",
+   "plate_notes": "WAAS CH 99721 W35A; GP 3.14 deg TCH 55 (CEMEK 2.5 NM to RW35); RNP APCH - GPS; Rwy 35 helicopter visibility reduction below RVR 4000 NA; TDZE 13; Rwy Ldg 6500. No ILS to runway 35 (NASR ILS list has none).",
+   "fix_order_note": "fixes_and_roles are listed in simulator route order: the primary transition first (IAF..FAF..MAP/missed approach hold), then any second transition. The plate flows the same fixes; the order is not a chart claim.",
+   "data_provenance": "Chart name/PDF/amendment from d-TPP metadata XML; fixes, roles, minima, missed approach read visually from the rendered PDF plate (240 dpi render, pdfjs-dist text layer used only to cross-check numbers; human transcription - spot-check before safety use)."
+  },
+  {
+   "chart_name": "RNAV (GPS) Y RWY 09L",
+   "chart_code": "IAP",
+   "pdf_name": "00320RY9L.PDF",
+   "amdt_dtpp_metadata": "2",
+   "amdt_date_dtpp_metadata": "03/24/2022",
+   "printed_amendment_on_plate": "Amdt 2 24MAR22",
+   "runway": "9L",
+   "approach_type": "RNAV (GPS) Y",
+   "final_approach_course_mag_deg": 87,
+   "tdze_ft_plate": 13,
+   "pdf": {
+    "url": "https://aeronav.faa.gov/d-tpp/2610/00320RY9L.PDF",
+    "http_status": 200,
+    "content_type": "application/pdf",
+    "verified_by": "curl -I (HEAD) and curl GET on 2026-10-21 (UTC 2026-10-22T01:13:52Z, User-Agent atc-simulator-research/1.0); the file begins with %PDF and its size equals the HEAD Content-Length",
+    "bytes": 262707,
+    "local_file": "raw/kphl_dtpp_2610_pdfs/00320RY9L.PDF"
+   },
+   "procuid": "18039",
+   "faa_nfd_id": null,
+   "copter": "",
+   "fixes_and_roles": [
+    {
+     "fix": "MXE (MODENA VORTAC 113.2)",
+     "role": "IAF (track 154 deg, 8.4 NM, 4000 (3000 when authorized by ATC), to QWEST); procedure NA for arrivals at MXE VORTAC on airway radials 129 CW 177"
+    },
+    {
+     "fix": "QWEST",
+     "role": "IF (4000; 3000 when authorized by ATC)"
+    },
+    {
+     "fix": "OBEKE",
+     "role": "fix on the final course (3000)"
+    },
+    {
+     "fix": "ANNET",
+     "role": "FAF (GP intercept 2100)"
+    },
+    {
+     "fix": "LANDI (2.2 NM to RW09L)",
+     "role": "LNAV step-down fix (760)"
+    },
+    {
+     "fix": "RW09L",
+     "role": "MAP"
+    },
+    {
+     "fix": "OOD (WOODSTOWN VORTAC 112.8)",
+     "role": "missed approach hold"
+    },
+    {
+     "fix": "DQO (DUPONT VORTAC 114.0)",
+     "role": "IAF (second transition, listed after the primary route; track 028 deg, 8.1 NM, 4000 (3000 when authorized by ATC), to QWEST); procedure NA for arrivals at DQO VORTAC on airway radials 309 CW 110"
+    }
+   ],
+   "minima_summary": "LPV DA 213 RVR 2400 HAT 200 (200-1/2) (# RVR 1800 with FD/AP/HUD to DA); LNAV/VNAV DA 325 RVR 2400 HAT 312 (300-1/2); LNAV MDA A-B 440 RVR 2400 HAT 427 (500-1/2), C-D RVR 4000 (500-3/4); Circling MDA 540-1 (HAA 504) / 600-1 / 620-1 1/2 / 720-2 1/4",
+   "missed_approach": "Climb to 1500 then climbing right turn to 3000 direct OOD VORTAC and hold.",
+   "missed_approach_verbatim": "MISSED APPROACH: Climb to 1500, then climbing right turn to 3000 direct OOD VORTAC and hold.",
+   "holding": "OOD VORTAC hold (missed approach; 034/214 deg)",
+   "plate_notes": "WAAS CH 45523 W09B; GP 3.00 deg TCH 53; RNP APCH - GPS; MALSR; for uncompensated Baro-VNAV systems LNAV/VNAV NA below -12 C or above 54 C; for inop ALS increase LNAV/VNAV visibility to RVR 4500 all Cats; TDZE 13; Rwy Ldg 9500.",
+   "fix_order_note": "fixes_and_roles are listed in simulator route order: the primary transition first (IAF..FAF..MAP/missed approach hold), then any second transition. The plate flows the same fixes; the order is not a chart claim.",
+   "data_provenance": "Chart name/PDF/amendment from d-TPP metadata XML; fixes, roles, minima, missed approach read visually from the rendered PDF plate (240 dpi render, pdfjs-dist text layer used only to cross-check numbers; human transcription - spot-check before safety use)."
+  },
+  {
+   "chart_name": "RNAV (GPS) Y RWY 09R",
+   "chart_code": "IAP",
+   "pdf_name": "00320RY9R.PDF",
+   "amdt_dtpp_metadata": "3A",
+   "amdt_date_dtpp_metadata": "02/01/2018",
+   "printed_amendment_on_plate": "Amdt 3A 01FEB18",
+   "runway": "9R",
+   "approach_type": "RNAV (GPS) Y",
+   "final_approach_course_mag_deg": 87,
+   "tdze_ft_plate": 21,
+   "pdf": {
+    "url": "https://aeronav.faa.gov/d-tpp/2610/00320RY9R.PDF",
+    "http_status": 200,
+    "content_type": "application/pdf",
+    "verified_by": "curl -I (HEAD) and curl GET on 2026-10-21 (UTC 2026-10-22T01:13:53Z, User-Agent atc-simulator-research/1.0); the file begins with %PDF and its size equals the HEAD Content-Length",
+    "bytes": 257787,
+    "local_file": "raw/kphl_dtpp_2610_pdfs/00320RY9R.PDF"
+   },
+   "procuid": "18041",
+   "faa_nfd_id": null,
+   "copter": "",
+   "fixes_and_roles": [
+    {
+     "fix": "MXE (MODENA VORTAC 113.2)",
+     "role": "IAF (track 155 deg, 8.6 NM, 4000, to BWINE); procedure NA for arrival on MXE VORTAC airway radials 129 CW 177"
+    },
+    {
+     "fix": "BWINE",
+     "role": "IF (3000 on the final course)"
+    },
+    {
+     "fix": "ASOCI",
+     "role": "fix on the final course (3000)"
+    },
+    {
+     "fix": "KELEE",
+     "role": "FAF (GP intercept 1800)"
+    },
+    {
+     "fix": "BALDN (2.1 NM to RW09R)",
+     "role": "LNAV step-down fix (740; 1.1 NM mark)"
+    },
+    {
+     "fix": "RW09R",
+     "role": "MAP"
+    },
+    {
+     "fix": "OOD (WOODSTOWN VORTAC 112.8)",
+     "role": "missed approach hold"
+    },
+    {
+     "fix": "DQO (DUPONT VORTAC 114.0)",
+     "role": "IAF (second transition, listed after the primary route; track 029 deg, 7.9 NM, 4000, to BWINE)"
+    }
+   ],
+   "minima_summary": "LPV DA 221 RVR 1800 HAT 200 (200-1/2); LNAV/VNAV DA 346 RVR 3000 HAT 325 (400-5/8); LNAV MDA A-B 440 RVR 2400 HAT 419 (500-1/2), C-D RVR 4000 (500-3/4); Circling MDA A 540-1 (HAA 504), B 640-1, C 640-1 3/4, D 720-2 1/4",
+   "missed_approach": "Climb to 1500 then climbing right turn to 3000 direct OOD VORTAC and hold.",
+   "missed_approach_verbatim": "MISSED APPROACH: Climb to 1500 then climbing right turn to 3000 direct OOD VORTAC and hold.",
+   "holding": "OOD VORTAC hold (missed approach; 034/214 deg)",
+   "plate_notes": "WAAS CH 40023 W09A; GP 3.00 deg TCH 58; VGSI and RNAV glidepath not coincident (VGSI angle 3.00 / TCH 72); RNP APCH - GPS; ALSF-2; for uncompensated Baro-VNAV systems LNAV/VNAV NA below -12 C (11 F) or above 54 C (130 F); DME/DME RNP-0.3 NA; for inop ALS increase LNAV/VNAV visibility all Cats to RVR 5000 and LNAV Cats C/D to RVR 6000; TDZE 21; Rwy Ldg 12000.",
+   "fix_order_note": "fixes_and_roles are listed in simulator route order: the primary transition first (IAF..FAF..MAP/missed approach hold), then any second transition. The plate flows the same fixes; the order is not a chart claim.",
+   "data_provenance": "Chart name/PDF/amendment from d-TPP metadata XML; fixes, roles, minima, missed approach read visually from the rendered PDF plate (240 dpi render, pdfjs-dist text layer used only to cross-check numbers; human transcription - spot-check before safety use)."
+  }
+ ],
+ "visual_approaches": [
+  {
+   "chart_name": "FREEDOM VISUAL RWY 09L",
+   "pdf_name": "00320FREEDOM_VIS9L.PDF",
+   "pdf": {
+    "url": "https://aeronav.faa.gov/d-tpp/2610/00320FREEDOM_VIS9L.PDF",
+    "http_status": 200,
+    "content_type": "application/pdf",
+    "verified_by": "curl -I (HEAD) and curl GET on 2026-10-21 (UTC 2026-10-22T01:13:53Z, User-Agent atc-simulator-research/1.0); the file begins with %PDF and its size equals the HEAD Content-Length",
+    "bytes": 215494,
+    "local_file": "raw/kphl_dtpp_2610_pdfs/00320FREEDOM_VIS9L.PDF"
+   },
+   "note": "Visual approach chart (d-TPP chart code IAP); not an instrument procedure; not transcribed."
+  },
+  {
+   "chart_name": "LIBERTY VISUAL RWY 27L",
+   "pdf_name": "00320LIBERTY_VIS27L.PDF",
+   "pdf": {
+    "url": "https://aeronav.faa.gov/d-tpp/2610/00320LIBERTY_VIS27L.PDF",
+    "http_status": 200,
+    "content_type": "application/pdf",
+    "verified_by": "curl -I (HEAD) and curl GET on 2026-10-21 (UTC 2026-10-22T01:13:54Z, User-Agent atc-simulator-research/1.0); the file begins with %PDF and its size equals the HEAD Content-Length",
+    "bytes": 198310,
+    "local_file": "raw/kphl_dtpp_2610_pdfs/00320LIBERTY_VIS27L.PDF"
+   },
+   "note": "Visual approach chart (d-TPP chart code IAP); not an instrument procedure; not transcribed."
+  },
+  {
+   "chart_name": "RIVER VISUAL RWY 09L/R",
+   "pdf_name": "00320RIVER_VIS9LR.PDF",
+   "pdf": {
+    "url": "https://aeronav.faa.gov/d-tpp/2610/00320RIVER_VIS9LR.PDF",
+    "http_status": 200,
+    "content_type": "application/pdf",
+    "verified_by": "curl -I (HEAD) and curl GET on 2026-10-21 (UTC 2026-10-22T01:13:54Z, User-Agent atc-simulator-research/1.0); the file begins with %PDF and its size equals the HEAD Content-Length",
+    "bytes": 159679,
+    "local_file": "raw/kphl_dtpp_2610_pdfs/00320RIVER_VIS9LR.PDF"
+   },
+   "note": "Visual approach chart (d-TPP chart code IAP); not an instrument procedure; not transcribed."
+  }
+ ],
+ "visual_approaches_note": "Three visual approach charts (FREEDOM VISUAL 9L, LIBERTY VISUAL 27L, RIVER VISUAL 9L/R) carry d-TPP chart code IAP. They are not instrument procedures and are kept out of instrument_approaches.",
+ "departure_procedures": [
+  {
+   "chart_name": "PHILADELPHIA FOUR DEPARTURE",
+   "type": "DP (radar-vector departure; named PHL4.PHL; NOT a SID with a published route)",
+   "faa_id": "PHL4.PHL",
+   "printed_date": "12JUN25 (chart footer)",
+   "pdf": {
+    "url": "https://aeronav.faa.gov/d-tpp/2610/00320PHILADELPHIA.PDF",
+    "http_status": 200,
+    "content_type": "application/pdf",
+    "verified_by": "curl -I (HEAD) and curl GET on 2026-10-21 (UTC 2026-10-22T01:13:55Z, User-Agent atc-simulator-research/1.0); the file begins with %PDF and its size equals the HEAD Content-Length",
+    "bytes": 232536,
+    "local_file": "raw/kphl_dtpp_2610_pdfs/00320PHILADELPHIA.PDF"
+   },
+   "continuation_pdf": {
+    "url": "https://aeronav.faa.gov/d-tpp/2610/00320PHILADELPHIA_C.PDF",
+    "http_status": 200,
+    "content_type": "application/pdf",
+    "verified_by": "curl -I (HEAD) and curl GET on 2026-10-21 (UTC 2026-10-22T01:13:56Z, User-Agent atc-simulator-research/1.0); the file begins with %PDF and its size equals the HEAD Content-Length",
+    "bytes": 101460,
+    "local_file": "raw/kphl_dtpp_2610_pdfs/00320PHILADELPHIA_C.PDF"
+   },
+   "radar_required": true,
+   "top_altitude_text": "TOP ALTITUDE: ASSIGNED BY ATC",
+   "takeoff_minimums": "Rwy 26: NA-ATC. Rwy 27L/R: Standard. Rwy 8: Standard with minimum climb of 300 ft/NM to 1500. Rwy 9L: Standard with minimum climb of 280 ft/NM to 1500. Rwy 9R: Standard with minimum climb of 250 ft/NM to 1500. Rwy 17: 300-1 or Standard with minimum climb of 611 ft/NM to 300. Rwy 35: Standard with minimum climb of 280 ft/NM to 1500.",
+   "route_description": {
+    "8, 9L/R, 17, 27L/R, 35": "Climb on heading assigned by ATC, thence....expect RADAR vectors to first navaid/fix. Maintain ATC assigned altitude, expect clearance to filed altitude/flight level within ten (10) minutes after departure.",
+    "27L/R (2200L-0600L)": "EXCEPTION: Climbing left turn heading 245, thence....expect RADAR vectors to first navaid/fix."
+   },
+   "common_text": "....expect RADAR vectors to first navaid/fix. Maintain ATC assigned altitude, expect clearance to filed altitude/flight level within ten (10) minutes after departure. NOTE: RADAR required.",
+   "departure_sectors": {
+    "NORTH DEP CON": "124.35 319.15 (all aircraft routed via MXE VORTAC, STOEN, PTW VORTAC, FJC VORTAC, ARD VOR/DME, REESY, HAPPS, FOLEZ, HOSKR, MAZIE)",
+    "SOUTH DEP CON": "119.75 269.25 (all aircraft routed via OOD VORTAC, DITCH, DQO VORTAC, RUUTH, RBV VORTAC, APEER, CHAZR, TEBEE, LULOO, RIDNG)"
+   },
+   "frequencies_on_chart": {
+    "D-ATIS DEP": "135.925",
+    "CLNC DEL": "118.85 348.6 (CPDLC)",
+    "GND CON": "121.9 348.6",
+    "TOWER": "118.5 327.05 (9L/27R, 8/26 and 17/35); 135.1 327.05 (9R/27L)"
+   },
+   "navaids_depicted": "ALLENTOWN FJC 117.5, POTTSTOWN PTW 116.5, YARDLEY ARD 108.2, MODENA MXE 113.2, ROBBINSVILLE RBV 113.8, DUPONT DQO 114.0, WOODSTOWN OOD 112.8, COYLE CYN 113.4, CEDAR LAKE VCN 115.2, SMYRNA ENO 111.4; fixes MAZIE HOSKR FOLEZ STOEN HAPPS REESY APEER RUUTH RIDNG DITCH LULOO CHAZR TEBEE",
+   "note": "One conventional radar-vector DP (two PDF pages) is published for KPHL. The simulator issues it like KMHT's MANCHESTER ONE: runway heading as assigned by ATC; the top altitude is assigned by ATC, so there is no maintain altitude (maintain_altitude_ft left null, never invented). The departure facility is split into NORTH DEP CON 124.35 and SOUTH DEP CON 119.75 by the first fix the aircraft is routed over."
+  }
+ ],
+ "obstacle_departure_procedures": {
+  "chart_name": "TAKEOFF MINIMUMS AND (OBSTACLE) DEPARTURE PROCEDURES (Northeast 4 booklet page)",
+  "pdf_name": "NE4TO.PDF",
+  "pdf": {
+   "url": "https://aeronav.faa.gov/d-tpp/2610/NE4TO.PDF",
+   "http_status": 200,
+   "content_type": "application/pdf",
+   "verified_by": "curl -I (HEAD) and curl GET on 2026-10-21 (UTC 2026-10-22T01:13:36Z, User-Agent atc-simulator-research/1.0); the file begins with %PDF and its size equals the HEAD Content-Length",
+   "bytes": 465842,
+   "local_file": "raw/kphl_dtpp_2610_pdfs/NE4TO.PDF"
+  },
+  "kphl_entry_version": "AMDT 11 25FEB21 (FAA) (PHL entry on booklet pages L34-L35)",
+  "content": "TAKEOFF MINIMUMS: Rwy 26 NA - ATC request. Rwy 8 std. w/ min. climb of 300 ft per NM to 1500. Rwy 9L std. w/ min. climb of 280 ft per NM to 1500. Rwy 9R std. w/ min. climb of 250 ft per NM to 1500. Rwy 17 300-1 or std. w/ min. climb of 611 ft per NM to 300. Rwy 35 std. w/ min. climb of 280 ft per NM to 1500.",
+  "note": "Quoted from the pdfjs-dist text of NE4TO.PDF (the same minimums are printed on the PHILADELPHIA FOUR page); the obstacle lists are not transcribed."
+ },
+ "stars": [
+  {
+   "chart_name": "BOJID FOUR (RNAV)",
+   "pdf_name": "00320BOJID.PDF",
+   "type": "STAR (RNAV 1, RADAR required)",
+   "faa_id": "HAR.BOJID4",
+   "pdf": {
+    "url": "https://aeronav.faa.gov/d-tpp/2610/00320BOJID.PDF",
+    "http_status": 200,
+    "content_type": "application/pdf",
+    "verified_by": "curl -I (HEAD) and curl GET on 2026-10-21 (UTC 2026-10-22T01:13:37Z, User-Agent atc-simulator-research/1.0); the file begins with %PDF and its size equals the HEAD Content-Length",
+    "bytes": 240353,
+    "local_file": "raw/kphl_dtpp_2610_pdfs/00320BOJID.PDF"
+   },
+   "note": "Transcribed in `star`; see the README section 'BOJID FOUR and PAATS FOUR'.",
+   "star": {
+    "sim_entry_fixes": [
+     "TRAGG",
+     "LRP"
+    ],
+    "sim_entry_note": "DESIGN VALUE: TRAGG is 40 NM and LRP 60 NM from the ARP on the common body (the transitions JST and PSB start 90 to 130 NM out). The chart prints no crossing altitudes.",
+    "ident": "BOJID4",
+    "faa_id": "HAR.BOJID4",
+    "spoken_name": "BOJID FOUR",
+    "printed_on_chart": "BOJID FOUR ARRIVAL (RNAV) (HAR.BOJID4) 05OCT23; AL-320 (FAA); chart id 23278; NE-4, 01 OCT 2026 to 29 OCT 2026; Philadelphia Intl (PHL)",
+    "provenance": "FAA d-TPP cycle 2610 PDF 00320BOJID.PDF (chart with the ARRIVAL ROUTE DESCRIPTION; the page is printed rotated 90 degrees), rendered at 240 dpi and read visually (human transcription, spot-check before safety use); route structure cross-checked against NASR 2026-10-01 STAR_RTE.csv and the fix coordinates from FIX_BASE.csv",
+    "notes": [
+     "RADAR required.",
+     "RNAV 1 - DME/DME/IRU or GPS.",
+     "BUNTS: Expect 8000 (an 'expect', not a crossing restriction).",
+     "Hold at BUNTS: 4 NM legs, inbound 104 deg, outbound 284 deg, 210K.",
+     "Chart frequencies: PHILADELPHIA APP CON 128.4 272.575, PHILADELPHIA FINAL CONTROL 125.4, D-ATIS ARR 133.4, Tower 118.5 327.05 (Rwys 8/26, 9L/27R and 17/35) and 135.1 327.05 (Rwy 9R/27L), GND CON 121.9 348.6.",
+     "Serves runways 9L/R and 27L/R only (NASR STAR_APT.csv; no 17/35 body)."
+    ],
+    "transitions": [
+     {
+      "name": "JOHNSTOWN",
+      "fixes": [
+       "JST",
+       "MIROY",
+       "COFAX",
+       "LOMON",
+       "HAR"
+      ]
+     },
+     {
+      "name": "PHILIPSBURG",
+      "fixes": [
+       "PSB",
+       "HAR"
+      ]
+     }
+    ],
+    "runways": [
+     {
+      "runway_end": "9L",
+      "fixes": [
+       "HAR",
+       "LRP",
+       "TRAGG",
+       "BUNTS",
+       "SCOOL",
+       "KYILL",
+       "EXPRS",
+       "WHEYY"
+      ],
+      "narrative": "Landing runways 9L/R: From BUNTS on track 105 to SCOOL, then on track 179 to KYILL, then on track 265 to EXPRS, then on track 267 to WHEYY, then on heading 265. Expect RADAR vectors to final approach course.",
+      "expect": "RADAR vectors to final approach course",
+      "join_approach_fixes": [
+       "QWEST",
+       "OBEKE",
+       "ANNET"
+      ]
+     },
+     {
+      "runway_end": "9R",
+      "fixes": [
+       "HAR",
+       "LRP",
+       "TRAGG",
+       "BUNTS",
+       "SCOOL",
+       "KYILL",
+       "EXPRS",
+       "WHEYY"
+      ],
+      "narrative": "Landing runways 9L/R: From BUNTS on track 105 to SCOOL, then on track 179 to KYILL, then on track 265 to EXPRS, then on track 267 to WHEYY, then on heading 265. Expect RADAR vectors to final approach course.",
+      "expect": "RADAR vectors to final approach course",
+      "join_approach_fixes": [
+       "BWINE",
+       "ASOCI",
+       "KELEE"
+      ]
+     },
+     {
+      "runway_end": "27L",
+      "fixes": [
+       "HAR",
+       "LRP",
+       "TRAGG",
+       "BUNTS",
+       "SCOOL",
+       "BOJID",
+       "HIFAL",
+       "EYRIE",
+       "FERUS"
+      ],
+      "narrative": "Landing runways 27L/R: From BUNTS on track 105 to SCOOL, then on track 106 to BOJID, then on track 177 to HIFAL, then on track 086 to EYRIE, then on track 086 to FERUS, then on heading 085. Expect RADAR vectors to final approach course.",
+      "expect": "RADAR vectors to final approach course",
+      "join_approach_fixes": [
+       "FESTI",
+       "TORNE"
+      ]
+     },
+     {
+      "runway_end": "27R",
+      "fixes": [
+       "HAR",
+       "LRP",
+       "TRAGG",
+       "BUNTS",
+       "SCOOL",
+       "BOJID",
+       "HIFAL",
+       "EYRIE",
+       "FERUS"
+      ],
+      "narrative": "Landing runways 27L/R: From BUNTS on track 105 to SCOOL, then on track 106 to BOJID, then on track 177 to HIFAL, then on track 086 to EYRIE, then on track 086 to FERUS, then on heading 085. Expect RADAR vectors to final approach course.",
+      "expect": "RADAR vectors to final approach course",
+      "join_approach_fixes": [
+       "MRTIN",
+       "JALTO"
+      ]
+     }
+    ],
+    "restrictions": [],
+    "restriction_notes": "No altitude or speed crossing restrictions are printed on BOJID FOUR; BUNTS carries 'Expect 8000' only. The numbers along the legs are MEAs.",
+    "legs": [
+     {
+      "from": "JST",
+      "to": "MIROY",
+      "distance_nm": 22,
+      "track_mag_deg": 102,
+      "mea_ft": 5400
+     },
+     {
+      "from": "MIROY",
+      "to": "COFAX",
+      "distance_nm": 18,
+      "track_mag_deg": 102,
+      "mea_ft": 5000
+     },
+     {
+      "from": "COFAX",
+      "to": "LOMON",
+      "distance_nm": 22,
+      "track_mag_deg": 103,
+      "mea_ft": 5000
+     },
+     {
+      "from": "LOMON",
+      "to": "HAR",
+      "distance_nm": 19,
+      "track_mag_deg": 103,
+      "mea_ft": 5000,
+      "gnss_mea_ft": 4400
+     },
+     {
+      "from": "PSB",
+      "to": "HAR",
+      "distance_nm": 56,
+      "track_mag_deg": 143,
+      "mea_ft": 4900
+     },
+     {
+      "from": "HAR",
+      "to": "LRP",
+      "distance_nm": 37,
+      "track_mag_deg": 119
+     },
+     {
+      "from": "LRP",
+      "to": "TRAGG",
+      "distance_nm": 16,
+      "track_mag_deg": 107
+     },
+     {
+      "from": "TRAGG",
+      "to": "BUNTS",
+      "distance_nm": 9,
+      "track_mag_deg": 107
+     },
+     {
+      "from": "BUNTS",
+      "to": "SCOOL",
+      "distance_nm": 15,
+      "track_mag_deg": 105
+     },
+     {
+      "from": "SCOOL",
+      "to": "BOJID",
+      "distance_nm": 10,
+      "track_mag_deg": 106
+     },
+     {
+      "from": "BOJID",
+      "to": "HIFAL",
+      "distance_nm": 5,
+      "track_mag_deg": 177
+     },
+     {
+      "from": "HIFAL",
+      "to": "EYRIE",
+      "distance_nm": 4,
+      "track_mag_deg": 86
+     },
+     {
+      "from": "EYRIE",
+      "to": "FERUS",
+      "distance_nm": 12,
+      "track_mag_deg": 86
+     },
+     {
+      "from": "SCOOL",
+      "to": "KYILL",
+      "distance_nm": 8,
+      "track_mag_deg": 179
+     },
+     {
+      "from": "KYILL",
+      "to": "EXPRS",
+      "distance_nm": 6,
+      "track_mag_deg": 265
+     },
+     {
+      "from": "EXPRS",
+      "to": "WHEYY",
+      "distance_nm": 14,
+      "track_mag_deg": 267
+     }
+    ]
+   }
+  },
+  {
+   "chart_name": "PAATS FOUR (RNAV)",
+   "pdf_name": "00320PAATS.PDF",
+   "type": "STAR (RNAV 1, jet aircraft only, RADAR required)",
+   "faa_id": "ESSSO.PAATS4",
+   "pdf": {
+    "url": "https://aeronav.faa.gov/d-tpp/2610/00320PAATS.PDF",
+    "http_status": 200,
+    "content_type": "application/pdf",
+    "verified_by": "curl -I (HEAD) and curl GET on 2026-10-21 (UTC 2026-10-22T01:13:39Z, User-Agent atc-simulator-research/1.0); the file begins with %PDF and its size equals the HEAD Content-Length",
+    "bytes": 204992,
+    "local_file": "raw/kphl_dtpp_2610_pdfs/00320PAATS.PDF"
+   },
+   "continuation_pdf": {
+    "url": "https://aeronav.faa.gov/d-tpp/2610/00320PAATS_C.PDF",
+    "http_status": 200,
+    "content_type": "application/pdf",
+    "verified_by": "curl -I (HEAD) and curl GET on 2026-10-21 (UTC 2026-10-22T01:13:39Z, User-Agent atc-simulator-research/1.0); the file begins with %PDF and its size equals the HEAD Content-Length",
+    "bytes": 302941,
+    "local_file": "raw/kphl_dtpp_2610_pdfs/00320PAATS_C.PDF"
+   },
+   "note": "Two PDF pages (transition routes; arrival routes). Transcribed in `star`.",
+   "star": {
+    "sim_entry_fixes": [
+     "CANNY",
+     "HEDGE"
+    ],
+    "sim_entry_note": "DESIGN VALUE: the simulator starts the arrival where Approach would take it over the transitions, 49 NM (CANNY) or 61 NM (HEDGE) from the ARP; both fixes are on all three transitions. The chart prints no crossing altitudes.",
+    "ident": "PAATS4",
+    "faa_id": "ESSSO.PAATS4",
+    "spoken_name": "PAATS FOUR",
+    "printed_on_chart": "PAATS FOUR ARRIVAL (RNAV) (ESSSO.PAATS4) 20APR23; AL-320 (FAA); chart id 25163; NE-4, 01 OCT 2026 to 29 OCT 2026; Philadelphia, Pennsylvania",
+    "provenance": "FAA d-TPP cycle 2610 PDFs 00320PAATS.PDF (transition routes page) and 00320PAATS_C.PDF (arrival routes page with the ARRIVAL ROUTE DESCRIPTION), rendered at 240 dpi and read visually (human transcription, spot-check before safety use); route structure cross-checked against NASR 2026-10-01 STAR_RTE.csv and the fix coordinates from FIX_BASE.csv",
+    "notes": [
+     "RADAR required.",
+     "RNAV 1 - DME/DME/IRU or GPS.",
+     "Jet aircraft only.",
+     "HYTRA transition: do not file - to be assigned by ATC.",
+     "CAUTION: Parachute jumping 2.7 NM SE CHPMN, 1.5 NM radius of Cross Keys Airport, AOB 13500 (SR-SS).",
+     "Hold at PAATS: 4 NM legs, inbound 051 deg, outbound 231 deg, 210K.",
+     "The chart prints no altitude or speed crossing restrictions; the numbers along the legs are MEAs (6000, with GNSS MEAs 1500-2800 marked *)."
+    ],
+    "transitions": [
+     {
+      "name": "BBDOL",
+      "fixes": [
+       "BBDOL",
+       "WNDYB",
+       "GDZLA",
+       "KRABY",
+       "BUKYY",
+       "JAYBO",
+       "HEDGE",
+       "CANNY",
+       "ESSSO"
+      ]
+     },
+     {
+      "name": "GORDONSVILLE",
+      "fixes": [
+       "GVE",
+       "BOOYA",
+       "BUKYY",
+       "JAYBO",
+       "HEDGE",
+       "CANNY",
+       "ESSSO"
+      ]
+     },
+     {
+      "name": "HYTRA",
+      "fixes": [
+       "HYTRA",
+       "PRNCZ",
+       "GARED",
+       "HEDGE",
+       "CANNY",
+       "ESSSO"
+      ]
+     }
+    ],
+    "runways": [
+     {
+      "runway_end": "9L",
+      "fixes": [
+       "ESSSO",
+       "PAATS",
+       "TRNBL",
+       "WEVVE",
+       "ERNYY"
+      ],
+      "narrative": "Landing PHL Rwy 9L/R: From PAATS on track 017 to TRNBL, then on track 350 to WEVVE, then on track 268 to ERNYY, then on track 268. Expect RADAR vectors to final approach course.",
+      "expect": "RADAR vectors to final approach course",
+      "join_approach_fixes": [
+       "QWEST",
+       "OBEKE",
+       "ANNET"
+      ]
+     },
+     {
+      "runway_end": "9R",
+      "fixes": [
+       "ESSSO",
+       "PAATS",
+       "TRNBL",
+       "WEVVE",
+       "ERNYY"
+      ],
+      "narrative": "Landing PHL Rwy 9L/R: From PAATS on track 017 to TRNBL, then on track 350 to WEVVE, then on track 268 to ERNYY, then on track 268. Expect RADAR vectors to final approach course.",
+      "expect": "RADAR vectors to final approach course",
+      "join_approach_fixes": [
+       "BWINE",
+       "ASOCI",
+       "KELEE"
+      ]
+     },
+     {
+      "runway_end": "26",
+      "fixes": [
+       "ESSSO",
+       "PAATS",
+       "RROLL",
+       "CHPMN",
+       "PSOUT",
+       "MKORD"
+      ],
+      "narrative": "Landing PHL Rwy 26, 27L/R: From PAATS on track 081 to RROLL, then on track 045 to CHPMN, then on track 060 to PSOUT, then on track 087 to MKORD, then on track 087. Expect RADAR vectors to final approach course.",
+      "expect": "RADAR vectors to final approach course",
+      "join_approach_fixes": [
+       "FERIN",
+       "KANKE"
+      ]
+     },
+     {
+      "runway_end": "27L",
+      "fixes": [
+       "ESSSO",
+       "PAATS",
+       "RROLL",
+       "CHPMN",
+       "PSOUT",
+       "MKORD"
+      ],
+      "narrative": "Landing PHL Rwy 26, 27L/R: From PAATS on track 081 to RROLL, then on track 045 to CHPMN, then on track 060 to PSOUT, then on track 087 to MKORD, then on track 087. Expect RADAR vectors to final approach course.",
+      "expect": "RADAR vectors to final approach course",
+      "join_approach_fixes": [
+       "FESTI",
+       "TORNE"
+      ]
+     },
+     {
+      "runway_end": "27R",
+      "fixes": [
+       "ESSSO",
+       "PAATS",
+       "RROLL",
+       "CHPMN",
+       "PSOUT",
+       "MKORD"
+      ],
+      "narrative": "Landing PHL Rwy 26, 27L/R: From PAATS on track 081 to RROLL, then on track 045 to CHPMN, then on track 060 to PSOUT, then on track 087 to MKORD, then on track 087. Expect RADAR vectors to final approach course.",
+      "expect": "RADAR vectors to final approach course",
+      "join_approach_fixes": [
+       "MRTIN",
+       "JALTO"
+      ]
+     },
+     {
+      "runway_end": "17",
+      "fixes": [
+       "ESSSO",
+       "PAATS",
+       "TEBEE"
+      ],
+      "narrative": "Landing PHL Rwy 17, 35: From PAATS on track 070 to TEBEE, then on track 055. Expect RADAR vectors to final approach course.",
+      "expect": "RADAR vectors to final approach course",
+      "join_approach_fixes": [
+       "COWAD",
+       "HYILL"
+      ]
+     },
+     {
+      "runway_end": "35",
+      "fixes": [
+       "ESSSO",
+       "PAATS",
+       "TEBEE"
+      ],
+      "narrative": "Landing PHL Rwy 17, 35: From PAATS on track 070 to TEBEE, then on track 055. Expect RADAR vectors to final approach course.",
+      "expect": "RADAR vectors to final approach course",
+      "join_approach_fixes": [
+       "JEPUG",
+       "HARLU"
+      ]
+     }
+    ],
+    "restrictions": [],
+    "restriction_notes": "No altitude or speed restrictions are printed on PAATS FOUR (verified on both pages; the only speed on the chart is the 210K hold speed at PAATS). `restrictions` is therefore empty: nothing is invented. With no published crossing altitudes the simulator's descend-via clearance has nothing to fly and the controller descends the aircraft by ordinary altitude assignments. Every runway route ends 'then on track/heading N ... Expect RADAR vectors to final approach course' (kept in `narrative`); no `then_heading_mag_deg` is set so that, as for KMHT's runway legs that have an approach, the simulator continues from the last published fix over the plate's join fixes (`join_approach_fixes`) and the controller clears the approach there.",
+    "legs": [
+     {
+      "from": "BBDOL",
+      "to": "WNDYB",
+      "distance_nm": 12,
+      "track_mag_deg": 49,
+      "mea_ft": 6000,
+      "gnss_mea_ft": 2100
+     },
+     {
+      "from": "WNDYB",
+      "to": "GDZLA",
+      "distance_nm": 20,
+      "track_mag_deg": 49,
+      "mea_ft": 6000,
+      "gnss_mea_ft": 2100
+     },
+     {
+      "from": "GDZLA",
+      "to": "KRABY",
+      "distance_nm": 23,
+      "track_mag_deg": 46,
+      "mea_ft": 6000,
+      "gnss_mea_ft": 2100
+     },
+     {
+      "from": "KRABY",
+      "to": "BUKYY",
+      "distance_nm": 27,
+      "track_mag_deg": 58,
+      "mea_ft": 6000,
+      "gnss_mea_ft": 2100
+     },
+     {
+      "from": "GVE",
+      "to": "BOOYA",
+      "distance_nm": 44,
+      "track_mag_deg": 70,
+      "mea_ft": 6000,
+      "gnss_mea_ft": 2800
+     },
+     {
+      "from": "BOOYA",
+      "to": "BUKYY",
+      "distance_nm": 34,
+      "mea_ft": 6000,
+      "gnss_mea_ft": 2100
+     },
+     {
+      "from": "BUKYY",
+      "to": "JAYBO",
+      "distance_nm": 35,
+      "track_mag_deg": 87,
+      "mea_ft": 6000,
+      "gnss_mea_ft": 1600
+     },
+     {
+      "from": "JAYBO",
+      "to": "HEDGE",
+      "distance_nm": 9,
+      "mea_ft": 6000,
+      "gnss_mea_ft": 1600
+     },
+     {
+      "from": "HEDGE",
+      "to": "CANNY",
+      "distance_nm": 13,
+      "track_mag_deg": 48,
+      "mea_ft": 6000,
+      "gnss_mea_ft": 1600
+     },
+     {
+      "from": "CANNY",
+      "to": "ESSSO",
+      "distance_nm": 13,
+      "track_mag_deg": 17,
+      "mea_ft": 6000,
+      "gnss_mea_ft": 1500
+     },
+     {
+      "from": "HYTRA",
+      "to": "PRNCZ",
+      "distance_nm": 25,
+      "track_mag_deg": 50,
+      "mea_ft": 6000,
+      "gnss_mea_ft": 1600
+     },
+     {
+      "from": "PRNCZ",
+      "to": "GARED",
+      "distance_nm": 5,
+      "track_mag_deg": 48,
+      "mea_ft": 6000,
+      "gnss_mea_ft": 1600
+     },
+     {
+      "from": "GARED",
+      "to": "HEDGE",
+      "distance_nm": 15,
+      "mea_ft": 6000,
+      "gnss_mea_ft": 1600
+     },
+     {
+      "from": "ESSSO",
+      "to": "PAATS",
+      "distance_nm": 8,
+      "track_mag_deg": 46
+     },
+     {
+      "from": "PAATS",
+      "to": "TRNBL",
+      "distance_nm": 11,
+      "track_mag_deg": 17
+     },
+     {
+      "from": "TRNBL",
+      "to": "WEVVE",
+      "distance_nm": 8,
+      "track_mag_deg": 350
+     },
+     {
+      "from": "WEVVE",
+      "to": "ERNYY",
+      "distance_nm": 4,
+      "track_mag_deg": 268
+     },
+     {
+      "from": "PAATS",
+      "to": "TEBEE",
+      "distance_nm": 13,
+      "track_mag_deg": 70
+     },
+     {
+      "from": "PAATS",
+      "to": "RROLL",
+      "distance_nm": 13,
+      "track_mag_deg": 81
+     },
+     {
+      "from": "RROLL",
+      "to": "CHPMN",
+      "distance_nm": 19,
+      "track_mag_deg": 45
+     },
+     {
+      "from": "CHPMN",
+      "to": "PSOUT",
+      "distance_nm": 9,
+      "track_mag_deg": 60
+     },
+     {
+      "from": "PSOUT",
+      "to": "MKORD",
+      "distance_nm": 3,
+      "track_mag_deg": 87
+     }
+    ],
+    "other_runway_routes_not_modelled": "MQS: ESSSO-PAATS-RANSM-EBRLY; TTN/KPNE: ESSSO-PAATS-RANSM-WOJIK-PSOUT-HENYY (the simulator has no landing runway at KMQS, KPNE or KTTN)."
+   }
+  },
+  {
+   "chart_name": "BUNTS THREE",
+   "pdf_name": "00320BUNTS.PDF",
+   "type": "STAR (conventional VOR route from HAR/LRP; aircraft capable of 250K or greater)",
+   "faa_id": "HAR.BUNTS3",
+   "pdf": {
+    "url": "https://aeronav.faa.gov/d-tpp/2610/00320BUNTS.PDF",
+    "http_status": 200,
+    "content_type": "application/pdf",
+    "verified_by": "curl -I (HEAD) and curl GET on 2026-10-21 (UTC 2026-10-22T01:13:38Z, User-Agent atc-simulator-research/1.0); the file begins with %PDF and its size equals the HEAD Content-Length",
+    "bytes": 160098,
+    "local_file": "raw/kphl_dtpp_2610_pdfs/00320BUNTS.PDF"
+   },
+   "note": "Listed from the metadata; not transcribed (HAR R-117 / LRP R-296 to LRP, LRP R-104 to BUNTS, expect to cross BUNTS at 8000)."
+  },
+  {
+   "chart_name": "JIIMS FOUR (RNAV)",
+   "pdf_name": "00320JIIMS.PDF",
+   "type": "STAR (RNAV 1)",
+   "faa_id": "JIIMS.JIIMS4",
+   "pdf": {
+    "url": "https://aeronav.faa.gov/d-tpp/2610/00320JIIMS.PDF",
+    "http_status": 200,
+    "content_type": "application/pdf",
+    "verified_by": "curl -I (HEAD) and curl GET on 2026-10-21 (UTC 2026-10-22T01:13:38Z, User-Agent atc-simulator-research/1.0); the file begins with %PDF and its size equals the HEAD Content-Length",
+    "bytes": 363470,
+    "local_file": "raw/kphl_dtpp_2610_pdfs/00320JIIMS.PDF"
+   },
+   "note": "Listed from the metadata; not transcribed (NASR bodies: JIIMS-ERNYY 9L/9R, JIIMS-MKORD 26/27L/27R, JIIMS-SNEDE 17/35; transitions BRIGS, DASHA, ZJAAY)."
+  },
+  {
+   "chart_name": "SLATT SIX",
+   "pdf_name": "00320SLATT.PDF",
+   "type": "STAR (conventional, from LVZ)",
+   "faa_id": "LVZ.SLATT6",
+   "pdf": {
+    "url": "https://aeronav.faa.gov/d-tpp/2610/00320SLATT.PDF",
+    "http_status": 200,
+    "content_type": "application/pdf",
+    "verified_by": "curl -I (HEAD) and curl GET on 2026-10-21 (UTC 2026-10-22T01:13:40Z, User-Agent atc-simulator-research/1.0); the file begins with %PDF and its size equals the HEAD Content-Length",
+    "bytes": 213415,
+    "local_file": "raw/kphl_dtpp_2610_pdfs/00320SLATT.PDF"
+   },
+   "note": "Listed from the metadata; not transcribed."
+  },
+  {
+   "chart_name": "SPUDS SEVEN (RNAV)",
+   "pdf_name": "00320SPUDS.PDF",
+   "type": "STAR (RNAV 1, jet aircraft only)",
+   "faa_id": "LVZ.SPUDS7",
+   "pdf": {
+    "url": "https://aeronav.faa.gov/d-tpp/2610/00320SPUDS.PDF",
+    "http_status": 200,
+    "content_type": "application/pdf",
+    "verified_by": "curl -I (HEAD) and curl GET on 2026-10-21 (UTC 2026-10-22T01:13:40Z, User-Agent atc-simulator-research/1.0); the file begins with %PDF and its size equals the HEAD Content-Length",
+    "bytes": 264683,
+    "local_file": "raw/kphl_dtpp_2610_pdfs/00320SPUDS.PDF"
+   },
+   "note": "Listed from the metadata; not transcribed (LVZ-SLATT-ETX-SPUDS-ANMAR, then BOJID/HIFAL/EYRIE/FERUS for 27L/R or SCOOL/KYILL/EXPRS/WHEYY for 9L/R; expect 10000 250K at SPUDS)."
+  }
+ ],
+ "stars_note": "Six STARs (seven PDF pages) are published for KPHL: BOJID FOUR, BUNTS THREE, JIIMS FOUR, PAATS FOUR (two pages), SLATT SIX, SPUDS SEVEN. BOJID FOUR and PAATS FOUR are transcribed in full (transitions, runway legs, legs with track and distance, notes). Selection: PAATS FOUR is the only RNAV STAR (with JIIMS FOUR) whose NASR bodies serve every landing runway (9L, 9R, 17, 26, 27L, 27R, 35) and has three transitions from the south and southwest; BOJID FOUR is the RNAV STAR of the west (Harrisburg) corridor serving the 9L/R and 27L/R pairs. No official usage statistic by STAR was found (searched 2026-10-21: phl.org Noise Office, FAA documents, search results); a flight-simulation forum post calls BOJID1 'probably the most used arrival' (anecdotal, not a source), so the choice rests on runway coverage and flow geometry, not measured use.",
+ "sids": [],
+ "sids_note": "No SID records for KPHL: PHILADELPHIA FOUR is a radar-vector departure listed under departure_procedures.",
+ "supporting_charts": {
+  "takeoff_minimums_pdf": [
+   {
+    "chart_name": "TAKEOFF MINIMUMS",
+    "pdf_name": "NE4TO.PDF",
+    "pdf": {
+     "url": "https://aeronav.faa.gov/d-tpp/2610/NE4TO.PDF",
+     "http_status": 200,
+     "content_type": "application/pdf",
+     "verified_by": "curl -I (HEAD) and curl GET on 2026-10-21 (UTC 2026-10-22T01:13:36Z, User-Agent atc-simulator-research/1.0); the file begins with %PDF and its size equals the HEAD Content-Length",
+     "bytes": 465842,
+     "local_file": "raw/kphl_dtpp_2610_pdfs/NE4TO.PDF"
+    }
+   },
+   {
+    "chart_name": "ALTERNATE MINIMUMS",
+    "pdf_name": "NE4ALT.PDF",
+    "pdf": {
+     "url": "https://aeronav.faa.gov/d-tpp/2610/NE4ALT.PDF",
+     "http_status": 200,
+     "content_type": "application/pdf",
+     "verified_by": "curl -I (HEAD) and curl GET on 2026-10-21 (UTC 2026-10-22T01:13:36Z, User-Agent atc-simulator-research/1.0); the file begins with %PDF and its size equals the HEAD Content-Length",
+     "bytes": 152508,
+     "local_file": "raw/kphl_dtpp_2610_pdfs/NE4ALT.PDF"
+    }
+   }
+  ],
+  "lahso": [],
+  "hot_spot": [
+   {
+    "chart_name": "HOT SPOT",
+    "pdf_name": "NE4HOTSPOT.PDF",
+    "pdf": {
+     "url": "https://aeronav.faa.gov/d-tpp/2610/NE4HOTSPOT.PDF",
+     "http_status": 200,
+     "content_type": "application/pdf",
+     "verified_by": "curl -I (HEAD) and curl GET on 2026-10-21 (UTC 2026-10-22T01:13:37Z, User-Agent atc-simulator-research/1.0); the file begins with %PDF and its size equals the HEAD Content-Length",
+     "bytes": 41771,
+     "local_file": "raw/kphl_dtpp_2610_pdfs/NE4HOTSPOT.PDF"
+    }
+   }
+  ],
+  "hot_spot_text": "HS 1: Twy Y and S int in close proximity of Rwy 09R-27L. HS 2: Maintain vigilance Twy K and Twy D close int to Rwy 35 and 27R.",
+  "lahso_note": "No LAHSO data: NASR APT_RWY_END has no LAHSO distance for any KPHL runway end and the d-TPP metadata lists no LAHSO page for KPHL.",
+  "hot_spot_note": "NE4HOTSPOT.PDF (page read 2026-10-21) lists, under PHILADELPHIA INTL (PHL): HS 1 'Twy Y and S int in close proximity of Rwy 09R-27L.' and HS 2 'Maintain vigilance Twy K and Twy D close int to Rwy 35 and 27R'. Both are circled on the airport diagram. The page is a Northeast-4 booklet page shared with other airports.",
+  "alternate_minimums_pdf_note": "NE4ALT.PDF is the Northeast 4 booklet page (many airports); alternate minimums were not transcribed."
+ },
+ "not_included": [
+  "Alternate minimums",
+  "Obstacle lists of the takeoff minimums",
+  "MVA chart (Philadelphia TRACON, not downloaded)"
+ ],
+ "readback_note": "The diagram prints \"CAUTION: BE ALERT TO RUNWAY CROSSING CLEARANCES. READBACK OF ALL RUNWAY HOLDING INSTRUCTIONS IS REQUIRED.\""
+}

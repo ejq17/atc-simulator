@@ -1,0 +1,2133 @@
+{
+ "_provenance": {
+  "sources": [
+   "FAA NASR 28-day subscription, cycle effective 2026-10-01; NAV_CSV, ILS_CSV, FIX_CSV zips (https://nfdc.faa.gov/webContent/28DaySub/extra/01_Oct_2026_<NAME>_CSV.zip)",
+   "FAA d-TPP cycle 2610 approach plate PDFs for roles/minima"
+  ],
+  "retrieved": "2026-10-21",
+  "faa_cycle_effective": "2026-10-01",
+  "faa_cycle_next": "2026-10-29",
+  "method": "Extracted by scripts/extract-nasr-airport.ts PHL KPHL. ILS rows with ARPT_ID == PHL; navaids named in kphl-procedures.json navaids_referenced; fixes = every 5-letter fix named in fixes_and_roles of an instrument approach and every fix of a STAR transcription (stars[].star) in that file (each also checked against NASR FIX_BASE and, in charted_on, FIX_CHRT).",
+  "raw": "raw/nasr_2026-10-01/, raw/kphl_dtpp_2610_pdfs/"
+ },
+ "primary_navaid": {
+  "id": "OOD",
+  "type": "VORTAC",
+  "name": "WOODSTOWN",
+  "status": "OPERATIONAL RESTRICTED",
+  "freq_mhz": 112.8,
+  "channel": "75X",
+  "lat": 39.63607752,
+  "lon": -75.30305627,
+  "elev_ft": 146.7,
+  "mag_var": "10W (1980)",
+  "remarks": [
+   "VOR UNUSBL 090-105; 039-041 BYD 20 NM BLW 2500 FT; 159-190.",
+   "DME UNUSBL 090-105; 045-065 BYD 20 NM BLW 2500 FT."
+  ],
+  "tacan_dme_channel": "75X",
+  "location_note": "KPHL has no VOR/DME of its own: the only on-field NASR navaid is PHL VOT 109.8 (VOR test facility, 39.86528 N 75.23365 W), which is not a navigation aid. OOD (WOODSTOWN VORTAC 112.8, chan 75X, 39.63607752 N 75.30305627 W, NJ, OPERATIONAL RESTRICTED) is the VORTAC named as the missed approach hold of most KPHL ILS/RNAV plates and is used as the primary navaid."
+ },
+ "ils_localizers": {
+  "runways_with_ils": [
+   "9L",
+   "9R",
+   "17",
+   "26",
+   "27L",
+   "27R"
+  ],
+  "runways_without_ils_or_loc": [
+   "8",
+   "35"
+  ],
+  "note": "Six ILS/LOC systems with DME at KPHL (NASR ILS_BASE): runway 9L I-VII 108.95 (CAT I), 9R I-PHL 109.3 (CAT IIIB), 17 I-MYY 108.75 (CAT I, OPERATIONAL RESTRICTED), 26 I-LLH 111.55 (CAT I, localizer offset), 27L I-GLC 109.3 (CAT I), 27R I-PDP 108.95 (CAT I). Runway 35 and runway 8 have no ILS or LOC. The plates call 9L/27R I-VII/I-PDP and 9R/27L I-PHL/I-GLC; each pair shares a frequency (interlocked at opposite ends of one runway).",
+  "systems": [
+   {
+    "runway_end": "09L",
+    "system_type_code": "LD",
+    "system_type_meaning": "LD = localizer with DME (NASR code; plates say LOC/DME and ILS/DME)",
+    "loc_ident": "VII",
+    "plate_ident": "I-VII",
+    "category": "CAT I",
+    "loc_freq_mhz": 108.95,
+    "dme_channel": "26Y",
+    "front_course_mag_deg": 87.47,
+    "mag_var": "12W",
+    "status": "OPERATIONAL IFR",
+    "status_date": "1990/10/18",
+    "localizer_antenna": {
+     "lat": 39.87597777,
+     "lon": -75.21910472,
+     "elev_ft": 7.2
+    },
+    "glideslope": {
+     "angle_deg": 3,
+     "freq_mhz": 329.15,
+     "type": "GS",
+     "antenna": {
+      "lat": 39.86834166,
+      "lon": -75.25168333,
+      "elev_ft": 8.9
+     },
+     "status": "OPERATIONAL IFR"
+    },
+    "dme_antenna": {
+     "lat": 39.876992,
+     "lon": -75.219761,
+     "elev_ft": 20,
+     "status": "OPERATIONAL IFR"
+    },
+    "marker_beacons": "none listed in ILS_MKR.csv for PHL",
+    "classification_remark": [
+     "DME ALSO SERVES RWY 27R.",
+     "ILS CLASSIFICATION CODE IIE."
+    ],
+    "approach_lighting": "MALSR",
+    "plate_data": {
+     "plate_minima": "ILS or LOC RWY 9L (Amdt 5 24MAR22): S-ILS 9L DA 213 RVR 2400 HAT 200 (200-1/2)",
+     "tdze_plate_ft": 13
+    },
+    "plate_data_source": "d-TPP cycle 2610 PDF 00320IL9L.PDF read visually (DA/DH values are NOT in NASR)"
+   },
+   {
+    "runway_end": "09R",
+    "system_type_code": "LD",
+    "system_type_meaning": "LD = localizer with DME (NASR code; plates say LOC/DME and ILS/DME)",
+    "loc_ident": "PHL",
+    "plate_ident": "I-PHL",
+    "category": "CAT IIIB",
+    "loc_freq_mhz": 109.3,
+    "dme_channel": "30X",
+    "front_course_mag_deg": 87.47,
+    "mag_var": "12W",
+    "status": "OPERATIONAL IFR",
+    "status_date": "1972/12/21",
+    "localizer_antenna": {
+     "lat": 39.86976602,
+     "lon": -75.23031708,
+     "elev_ft": 9.1
+    },
+    "glideslope": {
+     "angle_deg": 3,
+     "freq_mhz": 332,
+     "type": "GS",
+     "antenna": {
+      "lat": 39.8605065,
+      "lon": -75.27103538,
+      "elev_ft": 13.3
+     },
+     "status": "OPERATIONAL IFR"
+    },
+    "dme_antenna": {
+     "lat": 39.8686945,
+     "lon": -75.22973497,
+     "elev_ft": 23.5,
+     "status": "OPERATIONAL IFR"
+    },
+    "marker_beacons": "inner marker (39.86020433, -75.27821916, OPERATIONAL IFR)",
+    "classification_remark": [
+     "DME ALSO SERVES RY 27L.",
+     "ILS CLASSIFICATION CODE IIIE"
+    ],
+    "approach_lighting": "ALSF2",
+    "plate_data": {
+     "plate_minima": "ILS Z or LOC Z RWY 9R (Amdt 10 08DEC16): S-ILS 9R DA 221 RVR 1800 HAT 200 (200-1/2)",
+     "tdze_plate_ft": 21
+    },
+    "plate_data_source": "d-TPP cycle 2610 PDF 00320IZLZ9R.PDF read visually (DA/DH values are NOT in NASR); CAT II/III chart 00320IZ9RC2_3.PDF not transcribed"
+   },
+   {
+    "runway_end": "17",
+    "system_type_code": "LD",
+    "system_type_meaning": "LD = localizer with DME (NASR code; plates say LOC/DME and ILS/DME)",
+    "loc_ident": "MYY",
+    "plate_ident": "I-MYY",
+    "category": "CAT I",
+    "loc_freq_mhz": 108.75,
+    "dme_channel": "24Y",
+    "front_course_mag_deg": 171.06,
+    "mag_var": "12W",
+    "status": "OPERATIONAL RESTRICTED",
+    "status_date": "2018/02/07",
+    "localizer_antenna": {
+     "lat": 39.86842233,
+     "lon": -75.22653675,
+     "elev_ft": 12
+    },
+    "glideslope": {
+     "angle_deg": 3,
+     "freq_mhz": 330.35,
+     "type": "GS",
+     "antenna": {
+      "lat": 39.88497233,
+      "lon": -75.23574719,
+      "elev_ft": 6.2
+     },
+     "status": "OPERATIONAL IFR"
+    },
+    "dme_antenna": {
+     "lat": 39.86854077,
+     "lon": -75.22759366,
+     "elev_ft": 24.5,
+     "status": "OPERATIONAL IFR"
+    },
+    "marker_beacons": "none listed in ILS_MKR.csv for PHL",
+    "classification_remark": [
+     "LOC UNUSBL BYD 15 DEGS LEFT OF COURSE.",
+     "ILS CLASSIFICATION CODE IT."
+    ],
+    "approach_lighting": "MALSF",
+    "plate_data": {
+     "plate_minima": "ILS Z or LOC RWY 17 (Amdt 9A 02OCT25): S-ILS 17 DA 261 RVR 4000 HAT 250 (300-3/4)",
+     "tdze_plate_ft": 11
+    },
+    "plate_data_source": "d-TPP cycle 2610 PDF 00320IZL17.PDF read visually (DA/DH values are NOT in NASR)"
+   },
+   {
+    "runway_end": "26",
+    "system_type_code": "LD",
+    "system_type_meaning": "LD = localizer with DME (NASR code; plates say LOC/DME and ILS/DME)",
+    "loc_ident": "LLH",
+    "plate_ident": "I-LLH",
+    "category": "CAT I",
+    "loc_freq_mhz": 111.55,
+    "dme_channel": "52Y",
+    "front_course_mag_deg": 264.93,
+    "mag_var": "12W",
+    "status": "OPERATIONAL IFR",
+    "status_date": "1980/01/01",
+    "localizer_antenna": {
+     "lat": 39.87843972,
+     "lon": -75.22550775,
+     "elev_ft": 5.4
+    },
+    "glideslope": {
+     "angle_deg": 3.15,
+     "freq_mhz": 332.75,
+     "type": "GS",
+     "antenna": {
+      "lat": 39.88038072,
+      "lon": -75.21620758,
+      "elev_ft": 21.3
+     },
+     "status": "OPERATIONAL IFR"
+    },
+    "dme_antenna": {
+     "lat": 39.87839463,
+     "lon": -75.22566013,
+     "elev_ft": 28.9,
+     "status": "OPERATIONAL IFR"
+    },
+    "marker_beacons": "none listed in ILS_MKR.csv for PHL",
+    "classification_remark": [],
+    "approach_lighting": "MALSR",
+    "plate_data": {
+     "plate_minima": "ILS or LOC RWY 26 (Amdt 4E 02OCT25): S-ILS 26 DA 299 RVR 4000 HAT 263 (300-3/4), Cat D NA",
+     "tdze_plate_ft": 36
+    },
+    "plate_data_source": "d-TPP cycle 2610 PDF 00320IL26.PDF read visually (DA/DH values are NOT in NASR)"
+   },
+   {
+    "runway_end": "27L",
+    "system_type_code": "LD",
+    "system_type_meaning": "LD = localizer with DME (NASR code; plates say LOC/DME and ILS/DME)",
+    "loc_ident": "GLC",
+    "plate_ident": "I-GLC",
+    "category": "CAT I",
+    "loc_freq_mhz": 109.3,
+    "dme_channel": "30X",
+    "front_course_mag_deg": 267.49,
+    "mag_var": "12W",
+    "status": "OPERATIONAL IFR",
+    "status_date": "1974/06/13",
+    "localizer_antenna": {
+     "lat": 39.86007144,
+     "lon": -75.27887547,
+     "elev_ft": 6.8
+    },
+    "glideslope": {
+     "angle_deg": 3,
+     "freq_mhz": 332,
+     "type": "GS",
+     "antenna": {
+      "lat": 39.86591216,
+      "lon": -75.24381438,
+      "elev_ft": 8.5
+     },
+     "status": "OPERATIONAL IFR"
+    },
+    "dme_antenna": {
+     "lat": 39.8686945,
+     "lon": -75.22973497,
+     "elev_ft": 23.5,
+     "status": "OPERATIONAL IFR"
+    },
+    "marker_beacons": "none listed in ILS_MKR.csv for PHL",
+    "classification_remark": [
+     "ILS CLASSIFICATION CODE IIE."
+    ],
+    "approach_lighting": "MALSR",
+    "plate_data": {
+     "plate_minima": "ILS or LOC RWY 27L (Amdt 16 25JAN24): S-ILS 27L DA 210 RVR 2400 HAT 200 (200-1/2)",
+     "tdze_plate_ft": 10
+    },
+    "plate_data_source": "d-TPP cycle 2610 PDF 00320IL27L.PDF read visually (DA/DH values are NOT in NASR)"
+   },
+   {
+    "runway_end": "27R",
+    "system_type_code": "LD",
+    "system_type_meaning": "LD = localizer with DME (NASR code; plates say LOC/DME and ILS/DME)",
+    "loc_ident": "PDP",
+    "plate_ident": "I-PDP",
+    "category": "CAT I",
+    "loc_freq_mhz": 108.95,
+    "dme_channel": "26Y",
+    "front_course_mag_deg": 267.5,
+    "mag_var": "12W",
+    "status": "OPERATIONAL IFR",
+    "status_date": "1971/05/11",
+    "localizer_antenna": {
+     "lat": 39.86798605,
+     "lon": -75.25914619,
+     "elev_ft": 8.8
+    },
+    "glideslope": {
+     "angle_deg": 3,
+     "freq_mhz": 329.15,
+     "type": "GS",
+     "antenna": {
+      "lat": 39.87334627,
+      "lon": -75.22661511,
+      "elev_ft": 7.5
+     },
+     "status": "OPERATIONAL IFR"
+    },
+    "dme_antenna": {
+     "lat": 39.876992,
+     "lon": -75.219761,
+     "elev_ft": 20,
+     "status": "OPERATIONAL IFR"
+    },
+    "marker_beacons": "none listed in ILS_MKR.csv for PHL",
+    "classification_remark": [
+     "DME INSTALLED ON RWY 09L SERVES RWY 09L/27R.",
+     "ILS CLASSIFICATION CODE IIE."
+    ],
+    "approach_lighting": "MALSR",
+    "plate_data": {
+     "plate_minima": "ILS or LOC RWY 27R (Amdt 10J 02OCT25): S-ILS 27R DA 211 RVR 2400 HAT 200 (200-1/2)",
+     "tdze_plate_ft": 11
+    },
+    "plate_data_source": "d-TPP cycle 2610 PDF 00320IL27R.PDF read visually (DA/DH values are NOT in NASR)"
+   }
+  ]
+ },
+ "other_navaids_referenced": [
+  {
+   "id": "MXE",
+   "type": "VORTAC",
+   "name": "MODENA",
+   "status": "OPERATIONAL RESTRICTED",
+   "freq_mhz": 113.2,
+   "channel": "79X",
+   "lat": 39.91805002,
+   "lon": -75.6708215,
+   "elev_ft": 472.9,
+   "mag_var": "9W (1965)"
+  },
+  {
+   "id": "DQO",
+   "type": "VORTAC",
+   "name": "DUPONT",
+   "status": "OPERATIONAL RESTRICTED",
+   "freq_mhz": 114,
+   "channel": "87X",
+   "lat": 39.67814013,
+   "lon": -75.60708558,
+   "elev_ft": 70,
+   "mag_var": "10W (1980)"
+  },
+  {
+   "id": "PTW",
+   "type": "VORTAC",
+   "name": "POTTSTOWN",
+   "status": "OPERATIONAL RESTRICTED",
+   "freq_mhz": 116.5,
+   "channel": "112X",
+   "lat": 40.22223183,
+   "lon": -75.56025083,
+   "elev_ft": 284.5,
+   "mag_var": "9W (1965)"
+  },
+  {
+   "id": "CYN",
+   "type": "VORTAC",
+   "name": "COYLE",
+   "status": "OPERATIONAL RESTRICTED",
+   "freq_mhz": 113.4,
+   "channel": "81X",
+   "lat": 39.81733791,
+   "lon": -74.43162572,
+   "elev_ft": 203.4,
+   "mag_var": "10W (1965)"
+  },
+  {
+   "id": "ARD",
+   "type": "VOR/DME",
+   "name": "YARDLEY",
+   "status": "OPERATIONAL RESTRICTED",
+   "freq_mhz": 108.2,
+   "channel": "19X",
+   "lat": 40.25334247,
+   "lon": -74.90761238,
+   "elev_ft": 293.8,
+   "mag_var": "10W (1965)"
+  },
+  {
+   "id": "RBV",
+   "type": "VORTAC",
+   "name": "ROBBINSVILLE",
+   "status": "OPERATIONAL IFR",
+   "freq_mhz": 113.8,
+   "channel": "85X",
+   "lat": 40.20240208,
+   "lon": -74.49502611,
+   "elev_ft": 248.3,
+   "mag_var": "10W (1965)"
+  },
+  {
+   "id": "HAR",
+   "type": "VORTAC",
+   "name": "HARRISBURG",
+   "status": "OPERATIONAL RESTRICTED",
+   "freq_mhz": 115.35,
+   "channel": "100Y",
+   "lat": 40.30223972,
+   "lon": -77.06955888,
+   "elev_ft": 1301,
+   "mag_var": "10W (1985)"
+  },
+  {
+   "id": "LRP",
+   "type": "VOR/DME",
+   "name": "LANCASTER",
+   "status": "OPERATIONAL RESTRICTED",
+   "freq_mhz": 117.3,
+   "channel": "120X",
+   "lat": 40.11997552,
+   "lon": -76.29129536,
+   "elev_ft": 399.4,
+   "mag_var": "9W (1975)"
+  },
+  {
+   "id": "ETX",
+   "type": "VOR/DME",
+   "name": "EAST TEXAS",
+   "status": "OPERATIONAL RESTRICTED",
+   "freq_mhz": 110.2,
+   "channel": "39X",
+   "lat": 40.58103902,
+   "lon": -75.68403013,
+   "elev_ft": 741,
+   "mag_var": "9W (1965)"
+  },
+  {
+   "id": "LVZ",
+   "type": "VORTAC",
+   "name": "WILKES-BARRE",
+   "status": "OPERATIONAL RESTRICTED",
+   "freq_mhz": 111.6,
+   "channel": "53X",
+   "lat": 41.27279891,
+   "lon": -75.68946622,
+   "elev_ft": 2118.1,
+   "mag_var": "10W (1965)"
+  },
+  {
+   "id": "PSB",
+   "type": "VORTAC",
+   "name": "PHILIPSBURG",
+   "status": "OPERATIONAL RESTRICTED",
+   "freq_mhz": 115.5,
+   "channel": "102X",
+   "lat": 40.91625888,
+   "lon": -77.99271694,
+   "elev_ft": 2443.4,
+   "mag_var": "10W (1985)"
+  },
+  {
+   "id": "JST",
+   "type": "VOR/DME",
+   "name": "JOHNSTOWN",
+   "status": "OPERATIONAL RESTRICTED",
+   "freq_mhz": 113,
+   "channel": "77X",
+   "lat": 40.31672561,
+   "lon": -78.8341665,
+   "elev_ft": 2279.1,
+   "mag_var": "6W (1965)"
+  },
+  {
+   "id": "CFB",
+   "type": "VOR/DME",
+   "name": "BINGHAMTON",
+   "status": "OPERATIONAL RESTRICTED",
+   "freq_mhz": 112.2,
+   "channel": "59X",
+   "lat": 42.15749036,
+   "lon": -76.13647161,
+   "elev_ft": 1583.1,
+   "mag_var": "10W (1965)"
+  },
+  {
+   "id": "DNY",
+   "type": "VOR/DME",
+   "name": "DELANCEY",
+   "status": "OPERATIONAL IFR",
+   "freq_mhz": 112.1,
+   "channel": "58X",
+   "lat": 42.17828055,
+   "lon": -74.95694055,
+   "elev_ft": 2560,
+   "mag_var": "11W (1970)"
+  },
+  {
+   "id": "GVE",
+   "type": "VORTAC",
+   "name": "GORDONSVILLE",
+   "status": "OPERATIONAL RESTRICTED",
+   "freq_mhz": 115.6,
+   "channel": "103X",
+   "lat": 38.01359938,
+   "lon": -78.15302658,
+   "elev_ft": 382.6,
+   "mag_var": "6W (1965)"
+  }
+ ],
+ "fixes_named_on_approach_charts": [
+  {
+   "id": "ALBEK",
+   "lat": 39.77775555,
+   "lon": -74.90721944,
+   "fix_use_code": "RP",
+   "fix_use_meaning": null,
+   "artcc_low": "ZNY",
+   "charted_on": "CONTROLLER LOW, ENROUTE LOW, IAP",
+   "reference_navaid_radial_distance": [
+    {
+     "nav": "CYN",
+     "nav_type": "VORTAC",
+     "bearing_deg": 273.99,
+     "dist_nm": 22.12
+    },
+    {
+     "nav": "OOD",
+     "nav_type": "VORTAC",
+     "bearing_deg": 75.01,
+     "dist_nm": 20.2
+    },
+    {
+     "nav": "VCN",
+     "nav_type": "VOR/DME",
+     "bearing_deg": 20.9,
+     "dist_nm": null
+    }
+   ],
+   "roles_on_plates": {
+    "RNAV (GPS) RWY 26": "IAF (track 017 deg, 5 NM, 3300, to CIBOP); procedure NA for arrivals at ALBEK on V312 westbound",
+    "RNAV (GPS) RWY 35": "feeder fix (track 212 deg, 6 NM, 4700, to KUSLE); procedure NA for arrivals at ALBEK on V312 northeast bound"
+   },
+   "source": "NASR FIX_BASE.csv / FIX_NAV.csv / FIX_CHRT.csv; roles read from the d-TPP plate images (human transcription of PDF)"
+  },
+  {
+   "id": "ANNET",
+   "lat": 39.84188333,
+   "lon": -75.38941944,
+   "fix_use_code": "RP",
+   "fix_use_meaning": null,
+   "artcc_low": "ZDC",
+   "charted_on": "IAP",
+   "reference_navaid_radial_distance": [
+    {
+     "nav": "OOD",
+     "nav_type": "VORTAC",
+     "bearing_deg": 352.08,
+     "dist_nm": null
+    },
+    {
+     "nav": "VII",
+     "nav_type": "LOC",
+     "bearing_deg": 267.47,
+     "dist_nm": 8.12
+    }
+   ],
+   "roles_on_plates": {
+    "ILS OR LOC RWY 09L": "FAF (ILS glideslope intercept 2100)",
+    "RNAV (GPS) Y RWY 09L": "FAF (GP intercept 2100)"
+   },
+   "source": "NASR FIX_BASE.csv / FIX_NAV.csv / FIX_CHRT.csv; roles read from the d-TPP plate images (human transcription of PDF)"
+  },
+  {
+   "id": "ASOCI",
+   "lat": 39.82034722,
+   "lon": -75.47678333,
+   "fix_use_code": "RP",
+   "fix_use_meaning": null,
+   "artcc_low": "ZDC",
+   "charted_on": "IAP",
+   "reference_navaid_radial_distance": [
+    {
+     "nav": "MXE",
+     "nav_type": "VORTAC",
+     "bearing_deg": 132.1,
+     "dist_nm": null
+    },
+    {
+     "nav": "PHL",
+     "nav_type": "LOC",
+     "bearing_deg": 267.47,
+     "dist_nm": 11.78
+    }
+   ],
+   "roles_on_plates": {
+    "ILS Z OR LOC Z RWY 09R": "fix on the localizer course",
+    "ILS V RWY 09R (CONVERGING)": "fix on the localizer course",
+    "RNAV (GPS) Y RWY 09R": "fix on the final course (3000)"
+   },
+   "source": "NASR FIX_BASE.csv / FIX_NAV.csv / FIX_CHRT.csv; roles read from the d-TPP plate images (human transcription of PDF)"
+  },
+  {
+   "id": "BALDN",
+   "lat": 39.85201388,
+   "lon": -75.31918611,
+   "fix_use_code": "RP",
+   "fix_use_meaning": null,
+   "artcc_low": "ZDC",
+   "charted_on": "IAP",
+   "reference_navaid_radial_distance": [
+    {
+     "nav": "OOD",
+     "nav_type": "VORTAC",
+     "bearing_deg": 6.7,
+     "dist_nm": null
+    },
+    {
+     "nav": "PHL",
+     "nav_type": "LOC",
+     "bearing_deg": 267.47,
+     "dist_nm": 4.25
+    }
+   ],
+   "roles_on_plates": {
+    "ILS Z OR LOC Z RWY 09R": "LOC step-down fix (BALDN FIX MINIMUMS); VDP at I-PHL 3.5",
+    "RNAV (GPS) Y RWY 09R": "LNAV step-down fix (740; 1.1 NM mark)"
+   },
+   "source": "NASR FIX_BASE.csv / FIX_NAV.csv / FIX_CHRT.csv; roles read from the d-TPP plate images (human transcription of PDF)"
+  },
+  {
+   "id": "BBDOL",
+   "lat": 37.63588888,
+   "lon": -77.84662777,
+   "fix_use_code": "WP",
+   "fix_use_meaning": null,
+   "artcc_low": "ZDC",
+   "charted_on": "CONTROLLER HIGH, CONTROLLER LOW, ENROUTE HIGH, ENROUTE LOW, STAR",
+   "reference_navaid_radial_distance": [],
+   "roles_on_plates": {
+    "PAATS FOUR (RNAV)": "BBDOL transition entry fix"
+   },
+   "source": "NASR FIX_BASE.csv / FIX_NAV.csv / FIX_CHRT.csv; roles read from the d-TPP plate images (human transcription of PDF)"
+  },
+  {
+   "id": "BDAWK",
+   "lat": 39.60374444,
+   "lon": -75.09564722,
+   "fix_use_code": "WP",
+   "fix_use_meaning": null,
+   "artcc_low": "ZNY",
+   "charted_on": "IAP",
+   "reference_navaid_radial_distance": [],
+   "roles_on_plates": {
+    "RNAV (GPS) RWY 35": "IAF (track 351 deg, 5 NM, 3000, to JEPUG)"
+   },
+   "source": "NASR FIX_BASE.csv / FIX_NAV.csv / FIX_CHRT.csv; roles read from the d-TPP plate images (human transcription of PDF)"
+  },
+  {
+   "id": "BOJID",
+   "lat": 40.05579722,
+   "lon": -75.20451388,
+   "fix_use_code": "WP",
+   "fix_use_meaning": null,
+   "artcc_low": "ZNY",
+   "charted_on": "CONTROLLER LOW, ENROUTE LOW, SECTIONAL, STAR",
+   "reference_navaid_radial_distance": [],
+   "roles_on_plates": {
+    "BOJID FOUR (RNAV)": "runway 27L leg; runway 27R leg"
+   },
+   "source": "NASR FIX_BASE.csv / FIX_NAV.csv / FIX_CHRT.csv; roles read from the d-TPP plate images (human transcription of PDF)"
+  },
+  {
+   "id": "BOOYA",
+   "lat": 38.40569444,
+   "lon": -77.36287777,
+   "fix_use_code": "WP",
+   "fix_use_meaning": null,
+   "artcc_low": "ZDC",
+   "charted_on": "CONTROLLER HIGH, CONTROLLER LOW, ENROUTE HIGH, STAR",
+   "reference_navaid_radial_distance": [],
+   "roles_on_plates": {
+    "PAATS FOUR (RNAV)": "GORDONSVILLE transition"
+   },
+   "source": "NASR FIX_BASE.csv / FIX_NAV.csv / FIX_CHRT.csv; roles read from the d-TPP plate images (human transcription of PDF)"
+  },
+  {
+   "id": "BUKYY",
+   "lat": 38.70555555,
+   "lon": -76.745175,
+   "fix_use_code": "WP",
+   "fix_use_meaning": null,
+   "artcc_low": "ZDC",
+   "charted_on": "CONTROLLER HIGH, CONTROLLER LOW, ENROUTE HIGH, STAR",
+   "reference_navaid_radial_distance": [],
+   "roles_on_plates": {
+    "PAATS FOUR (RNAV)": "BBDOL transition; GORDONSVILLE transition"
+   },
+   "source": "NASR FIX_BASE.csv / FIX_NAV.csv / FIX_CHRT.csv; roles read from the d-TPP plate images (human transcription of PDF)"
+  },
+  {
+   "id": "BUNTS",
+   "lat": 40.082225,
+   "lon": -75.74859722,
+   "fix_use_code": "RP",
+   "fix_use_meaning": null,
+   "artcc_low": "ZNY",
+   "charted_on": "CONTROLLER LOW, ENROUTE LOW, IAP, STAR",
+   "reference_navaid_radial_distance": [
+    {
+     "nav": "DQO",
+     "nav_type": "VORTAC",
+     "bearing_deg": 354.95,
+     "dist_nm": 25.09
+    },
+    {
+     "nav": "LRP",
+     "nav_type": "VOR/DME",
+     "bearing_deg": 104,
+     "dist_nm": 25.09
+    },
+    {
+     "nav": "MXE",
+     "nav_type": "VORTAC",
+     "bearing_deg": 349.01,
+     "dist_nm": null
+    }
+   ],
+   "roles_on_plates": {
+    "BOJID FOUR (RNAV)": "runway 9L leg; runway 9R leg; runway 27L leg; runway 27R leg"
+   },
+   "source": "NASR FIX_BASE.csv / FIX_NAV.csv / FIX_CHRT.csv; roles read from the d-TPP plate images (human transcription of PDF)"
+  },
+  {
+   "id": "BWINE",
+   "lat": 39.80383055,
+   "lon": -75.55850277,
+   "fix_use_code": "RP",
+   "fix_use_meaning": null,
+   "artcc_low": "ZDC",
+   "charted_on": "IAP",
+   "reference_navaid_radial_distance": [
+    {
+     "nav": "MXE",
+     "nav_type": "VORTAC",
+     "bearing_deg": 151.81,
+     "dist_nm": 8.59
+    },
+    {
+     "nav": "PHL",
+     "nav_type": "LOC",
+     "bearing_deg": 267.47,
+     "dist_nm": 15.69
+    }
+   ],
+   "roles_on_plates": {
+    "ILS Z OR LOC Z RWY 09R": "IF",
+    "ILS V RWY 09R (CONVERGING)": "IF",
+    "RNAV (GPS) Y RWY 09R": "IF (3000 on the final course)"
+   },
+   "source": "NASR FIX_BASE.csv / FIX_NAV.csv / FIX_CHRT.csv; roles read from the d-TPP plate images (human transcription of PDF)"
+  },
+  {
+   "id": "CANNY",
+   "lat": 39.06108888,
+   "lon": -75.67795833,
+   "fix_use_code": "RP",
+   "fix_use_meaning": null,
+   "artcc_low": "ZDC",
+   "charted_on": "CONTROLLER HIGH, CONTROLLER LOW, ENROUTE HIGH, ENROUTE LOW, MILITARY SID, SECTIONAL, SID, STAR",
+   "reference_navaid_radial_distance": [
+    {
+     "nav": "ENO",
+     "nav_type": "VORTAC",
+     "bearing_deg": 225.54,
+     "dist_nm": 12.72
+    },
+    {
+     "nav": "SIE",
+     "nav_type": "VORTAC",
+     "bearing_deg": 276.4,
+     "dist_nm": 41.06
+    }
+   ],
+   "roles_on_plates": {
+    "PAATS FOUR (RNAV)": "BBDOL transition; GORDONSVILLE transition; HYTRA transition"
+   },
+   "source": "NASR FIX_BASE.csv / FIX_NAV.csv / FIX_CHRT.csv; roles read from the d-TPP plate images (human transcription of PDF)"
+  },
+  {
+   "id": "CEMEK",
+   "lat": 39.83204444,
+   "lon": -75.20848333,
+   "fix_use_code": "WP",
+   "fix_use_meaning": null,
+   "artcc_low": "ZDC",
+   "charted_on": "IAP",
+   "reference_navaid_radial_distance": [],
+   "roles_on_plates": {
+    "RNAV (GPS) RWY 35": "LP/LNAV step-down fix (900)"
+   },
+   "source": "NASR FIX_BASE.csv / FIX_NAV.csv / FIX_CHRT.csv; roles read from the d-TPP plate images (human transcription of PDF)"
+  },
+  {
+   "id": "CFLFX",
+   "lat": 39.88148055,
+   "lon": -75.21264444,
+   "fix_use_code": "CN",
+   "fix_use_meaning": null,
+   "artcc_low": "ZDC",
+   "charted_on": "IAP",
+   "reference_navaid_radial_distance": [],
+   "roles_on_plates": {
+    "ILS OR LOC RWY 26": "depicted in parentheses (not required); LOC VDP at I-LLH 2.5"
+   },
+   "source": "NASR FIX_BASE.csv / FIX_NAV.csv / FIX_CHRT.csv; roles read from the d-TPP plate images (human transcription of PDF)"
+  },
+  {
+   "id": "CHPMN",
+   "lat": 39.72959166,
+   "lon": -75.08250555,
+   "fix_use_code": "WP",
+   "fix_use_meaning": null,
+   "artcc_low": "ZNY",
+   "charted_on": "IAP, STAR",
+   "reference_navaid_radial_distance": [],
+   "roles_on_plates": {
+    "RNAV (GPS) RWY 27L": "IAF (track 075 deg, 8.0 NM, 5000, to HEDDA)",
+    "PAATS FOUR (RNAV)": "runway 26 leg; runway 27L leg; runway 27R leg"
+   },
+   "source": "NASR FIX_BASE.csv / FIX_NAV.csv / FIX_CHRT.csv; roles read from the d-TPP plate images (human transcription of PDF)"
+  },
+  {
+   "id": "CIBOP",
+   "lat": 39.86135,
+   "lon": -74.89858888,
+   "fix_use_code": "WP",
+   "fix_use_meaning": null,
+   "artcc_low": "ZDC",
+   "charted_on": "IAP",
+   "reference_navaid_radial_distance": [],
+   "roles_on_plates": {
+    "RNAV (GPS) RWY 26": "fix on the track 338 deg, 5.1 NM, 3300 route from ALBEK to FERIN"
+   },
+   "source": "NASR FIX_BASE.csv / FIX_NAV.csv / FIX_CHRT.csv; roles read from the d-TPP plate images (human transcription of PDF)"
+  },
+  {
+   "id": "COFAX",
+   "lat": 40.31298055,
+   "lon": -77.96693888,
+   "fix_use_code": "RP",
+   "fix_use_meaning": null,
+   "artcc_low": "ZOB",
+   "charted_on": "AREA, CONTROLLER LOW, ENROUTE LOW, IAP, SECTIONAL, STAR",
+   "reference_navaid_radial_distance": [
+    {
+     "nav": "JST",
+     "nav_type": "VOR/DME",
+     "bearing_deg": 96.04,
+     "dist_nm": 39.8
+    },
+    {
+     "nav": "PSB",
+     "nav_type": "VORTAC",
+     "bearing_deg": 188.13,
+     "dist_nm": 36.19
+    }
+   ],
+   "roles_on_plates": {
+    "BOJID FOUR (RNAV)": "JOHNSTOWN transition"
+   },
+   "source": "NASR FIX_BASE.csv / FIX_NAV.csv / FIX_CHRT.csv; roles read from the d-TPP plate images (human transcription of PDF)"
+  },
+  {
+   "id": "COWAD",
+   "lat": 40.09012777,
+   "lon": -75.33698611,
+   "fix_use_code": "RP",
+   "fix_use_meaning": null,
+   "artcc_low": "ZNY",
+   "charted_on": "IAP",
+   "reference_navaid_radial_distance": [
+    {
+     "nav": "MYY",
+     "nav_type": "LOC",
+     "bearing_deg": 351.06,
+     "dist_nm": 14.21
+    },
+    {
+     "nav": "PTW",
+     "nav_type": "VORTAC",
+     "bearing_deg": 136.57,
+     "dist_nm": 12.97
+    }
+   ],
+   "roles_on_plates": {
+    "ILS Z OR LOC RWY 17": "IF",
+    "ILS V RWY 17 (CONVERGING)": "IF",
+    "RNAV (GPS) RWY 17": "IF (3000)"
+   },
+   "source": "NASR FIX_BASE.csv / FIX_NAV.csv / FIX_CHRT.csv; roles read from the d-TPP plate images (human transcription of PDF)"
+  },
+  {
+   "id": "COYLE",
+   "lat": 39.84657777,
+   "lon": -86.28426944,
+   "fix_use_code": "WP",
+   "fix_use_meaning": null,
+   "artcc_low": "ZID",
+   "charted_on": "IAP",
+   "reference_navaid_radial_distance": [],
+   "roles_on_plates": {
+    "ILS OR LOC RWY 27L": "IAF (track 293 deg, 26.7 NM, 3000, to FESTI)"
+   },
+   "source": "NASR FIX_BASE.csv / FIX_NAV.csv / FIX_CHRT.csv; roles read from the d-TPP plate images (human transcription of PDF)"
+  },
+  {
+   "id": "DUCVA",
+   "lat": 39.93405833,
+   "lon": -74.92545,
+   "fix_use_code": "WP",
+   "fix_use_meaning": null,
+   "artcc_low": "ZNY",
+   "charted_on": "IAP",
+   "reference_navaid_radial_distance": [],
+   "roles_on_plates": {
+    "RNAV (GPS) RWY 27R": "IF (3500; # 3000 when authorized by ATC)"
+   },
+   "source": "NASR FIX_BASE.csv / FIX_NAV.csv / FIX_CHRT.csv; roles read from the d-TPP plate images (human transcription of PDF)"
+  },
+  {
+   "id": "ENZEW",
+   "lat": 39.94471666,
+   "lon": -74.86726111,
+   "fix_use_code": "RP",
+   "fix_use_meaning": null,
+   "artcc_low": "ZDC",
+   "charted_on": "CONTROLLER LOW, ENROUTE LOW, IAP",
+   "reference_navaid_radial_distance": [
+    {
+     "nav": "PDP",
+     "nav_type": "LOC",
+     "bearing_deg": 87.5,
+     "dist_nm": 16.77
+    },
+    {
+     "nav": "RBV",
+     "nav_type": "VORTAC",
+     "bearing_deg": 238.1,
+     "dist_nm": 23.08
+    }
+   ],
+   "roles_on_plates": {
+    "ILS OR LOC RWY 27R": "IAF (track 268 deg, 5.5 NM, 3000, to MRTIN); procedure NA for arrivals at ENZEW on V123-157-213 northeast bound",
+    "RNAV (GPS) RWY 26": "IAF (second transition, listed after the primary route; track 272 deg, 4.4 NM, 3300, to FERIN); procedure NA for arrivals at ENZEW via V123-157-213 northeast bound",
+    "RNAV (GPS) RWY 27R": "IAF (track 269 deg, 2.8 NM, 3500 (3000 when authorized by ATC), to DUCVA)"
+   },
+   "source": "NASR FIX_BASE.csv / FIX_NAV.csv / FIX_CHRT.csv; roles read from the d-TPP plate images (human transcription of PDF)"
+  },
+  {
+   "id": "ERNYY",
+   "lat": 39.67533055,
+   "lon": -75.69117222,
+   "fix_use_code": "WP",
+   "fix_use_meaning": null,
+   "artcc_low": "ZDC",
+   "charted_on": "STAR",
+   "reference_navaid_radial_distance": [],
+   "roles_on_plates": {
+    "PAATS FOUR (RNAV)": "runway 9L end of the procedure (IAF of the expected approach); runway 9R end of the procedure (IAF of the expected approach)"
+   },
+   "source": "NASR FIX_BASE.csv / FIX_NAV.csv / FIX_CHRT.csv; roles read from the d-TPP plate images (human transcription of PDF)"
+  },
+  {
+   "id": "ESKOE",
+   "lat": 39.90943888,
+   "lon": -75.09416111,
+   "fix_use_code": "RP",
+   "fix_use_meaning": null,
+   "artcc_low": "ZDC",
+   "charted_on": "IAP",
+   "reference_navaid_radial_distance": [
+    {
+     "nav": "LLH",
+     "nav_type": "LOC",
+     "bearing_deg": 84.93,
+     "dist_nm": 6.35
+    }
+   ],
+   "roles_on_plates": {
+    "ILS OR LOC RWY 26": "FAF (ILS glideslope intercept 2000)"
+   },
+   "source": "NASR FIX_BASE.csv / FIX_NAV.csv / FIX_CHRT.csv; roles read from the d-TPP plate images (human transcription of PDF)"
+  },
+  {
+   "id": "ESSSO",
+   "lat": 39.28416666,
+   "lon": -75.65361111,
+   "fix_use_code": "WP",
+   "fix_use_meaning": null,
+   "artcc_low": "ZDC",
+   "charted_on": "STAR",
+   "reference_navaid_radial_distance": [],
+   "roles_on_plates": {
+    "PAATS FOUR (RNAV)": "common fix"
+   },
+   "source": "NASR FIX_BASE.csv / FIX_NAV.csv / FIX_CHRT.csv; roles read from the d-TPP plate images (human transcription of PDF)"
+  },
+  {
+   "id": "EXPRS",
+   "lat": 39.90603611,
+   "lon": -75.50748333,
+   "fix_use_code": "WP",
+   "fix_use_meaning": null,
+   "artcc_low": "ZNY",
+   "charted_on": "STAR",
+   "reference_navaid_radial_distance": [],
+   "roles_on_plates": {
+    "BOJID FOUR (RNAV)": "runway 9L leg; runway 9R leg"
+   },
+   "source": "NASR FIX_BASE.csv / FIX_NAV.csv / FIX_CHRT.csv; roles read from the d-TPP plate images (human transcription of PDF)"
+  },
+  {
+   "id": "EYRIE",
+   "lat": 39.9914,
+   "lon": -75.0837,
+   "fix_use_code": "WP",
+   "fix_use_meaning": null,
+   "artcc_low": "ZNY",
+   "charted_on": "STAR",
+   "reference_navaid_radial_distance": [],
+   "roles_on_plates": {
+    "BOJID FOUR (RNAV)": "runway 27L leg; runway 27R leg"
+   },
+   "source": "NASR FIX_BASE.csv / FIX_NAV.csv / FIX_CHRT.csv; roles read from the d-TPP plate images (human transcription of PDF)"
+  },
+  {
+   "id": "FERIN",
+   "lat": 39.93158888,
+   "lon": -74.96081388,
+   "fix_use_code": "WP",
+   "fix_use_meaning": null,
+   "artcc_low": "ZDC",
+   "charted_on": "IAP",
+   "reference_navaid_radial_distance": [],
+   "roles_on_plates": {
+    "RNAV (GPS) RWY 26": "IF (3300)"
+   },
+   "source": "NASR FIX_BASE.csv / FIX_NAV.csv / FIX_CHRT.csv; roles read from the d-TPP plate images (human transcription of PDF)"
+  },
+  {
+   "id": "FERUS",
+   "lat": 40.04869444,
+   "lon": -74.82395277,
+   "fix_use_code": "WP",
+   "fix_use_meaning": null,
+   "artcc_low": "ZNY",
+   "charted_on": "STAR",
+   "reference_navaid_radial_distance": [],
+   "roles_on_plates": {
+    "BOJID FOUR (RNAV)": "runway 27L end of the procedure (IAF of the expected approach); runway 27R end of the procedure (IAF of the expected approach)"
+   },
+   "source": "NASR FIX_BASE.csv / FIX_NAV.csv / FIX_CHRT.csv; roles read from the d-TPP plate images (human transcription of PDF)"
+  },
+  {
+   "id": "FESTI",
+   "lat": 39.91633055,
+   "lon": -74.99538888,
+   "fix_use_code": "RP",
+   "fix_use_meaning": null,
+   "artcc_low": "ZDC",
+   "charted_on": "IAP",
+   "reference_navaid_radial_distance": [
+    {
+     "nav": "CYN",
+     "nav_type": "VORTAC",
+     "bearing_deg": 293.02,
+     "dist_nm": 26.71
+    },
+    {
+     "nav": "GLC",
+     "nav_type": "LOC",
+     "bearing_deg": 87.49,
+     "dist_nm": 11.19
+    }
+   ],
+   "roles_on_plates": {
+    "ILS OR LOC RWY 27L": "IF",
+    "RNAV (GPS) RWY 27L": "fix on the final course (3700)"
+   },
+   "source": "NASR FIX_BASE.csv / FIX_NAV.csv / FIX_CHRT.csv; roles read from the d-TPP plate images (human transcription of PDF)"
+  },
+  {
+   "id": "FLYNN",
+   "lat": 39.85311388,
+   "lon": -74.76353333,
+   "fix_use_code": "WP",
+   "fix_use_meaning": null,
+   "artcc_low": "ZNY",
+   "charted_on": "IAP",
+   "reference_navaid_radial_distance": [],
+   "roles_on_plates": {
+    "RNAV (GPS) RWY 27L": "track 356 deg, 4.2 NM, 5000, to PUURL"
+   },
+   "source": "NASR FIX_BASE.csv / FIX_NAV.csv / FIX_CHRT.csv; roles read from the d-TPP plate images (human transcription of PDF)"
+  },
+  {
+   "id": "FOSOM",
+   "lat": 39.91941111,
+   "lon": -75.05174444,
+   "fix_use_code": "RP",
+   "fix_use_meaning": null,
+   "artcc_low": "ZDC",
+   "charted_on": "IAP",
+   "reference_navaid_radial_distance": [
+    {
+     "nav": "LLH",
+     "nav_type": "LOC",
+     "bearing_deg": 84.93,
+     "dist_nm": 8.4
+    }
+   ],
+   "roles_on_plates": {
+    "ILS OR LOC RWY 26": "IF"
+   },
+   "source": "NASR FIX_BASE.csv / FIX_NAV.csv / FIX_CHRT.csv; roles read from the d-TPP plate images (human transcription of PDF)"
+  },
+  {
+   "id": "FROSE",
+   "lat": 40.06218333,
+   "lon": -75.47188888,
+   "fix_use_code": "RP",
+   "fix_use_meaning": null,
+   "artcc_low": "ZNY",
+   "charted_on": "CONTROLLER LOW, ENROUTE LOW, IAP",
+   "reference_navaid_radial_distance": [
+    {
+     "nav": "OOD",
+     "nav_type": "VORTAC",
+     "bearing_deg": 353.07,
+     "dist_nm": null
+    },
+    {
+     "nav": "SBJ",
+     "nav_type": "VOR/DME",
+     "bearing_deg": 237.25,
+     "dist_nm": 45.8
+    }
+   ],
+   "roles_on_plates": {
+    "RNAV (GPS) RWY 26": "missed approach hold (4 NM, 059/239 deg)"
+   },
+   "source": "NASR FIX_BASE.csv / FIX_NAV.csv / FIX_CHRT.csv; roles read from the d-TPP plate images (human transcription of PDF)"
+  },
+  {
+   "id": "GARED",
+   "lat": 38.69455833,
+   "lon": -76.02276666,
+   "fix_use_code": "WP",
+   "fix_use_meaning": null,
+   "artcc_low": "ZDC",
+   "charted_on": "CONTROLLER LOW, ENROUTE LOW, SID, STAR",
+   "reference_navaid_radial_distance": [],
+   "roles_on_plates": {
+    "PAATS FOUR (RNAV)": "HYTRA transition"
+   },
+   "source": "NASR FIX_BASE.csv / FIX_NAV.csv / FIX_CHRT.csv; roles read from the d-TPP plate images (human transcription of PDF)"
+  },
+  {
+   "id": "GDZLA",
+   "lat": 38.07278055,
+   "lon": -77.42900277,
+   "fix_use_code": "WP",
+   "fix_use_meaning": null,
+   "artcc_low": "ZDC",
+   "charted_on": "CONTROLLER HIGH, CONTROLLER LOW, ENROUTE HIGH, ENROUTE LOW, STAR",
+   "reference_navaid_radial_distance": [],
+   "roles_on_plates": {
+    "PAATS FOUR (RNAV)": "BBDOL transition"
+   },
+   "source": "NASR FIX_BASE.csv / FIX_NAV.csv / FIX_CHRT.csv; roles read from the d-TPP plate images (human transcription of PDF)"
+  },
+  {
+   "id": "GLOUS",
+   "lat": 39.89403055,
+   "lon": -75.10824444,
+   "fix_use_code": "RP",
+   "fix_use_meaning": null,
+   "artcc_low": "ZDC",
+   "charted_on": "IAP",
+   "reference_navaid_radial_distance": [
+    {
+     "nav": "GLC",
+     "nav_type": "LOC",
+     "bearing_deg": 87.49,
+     "dist_nm": 5.81
+    }
+   ],
+   "roles_on_plates": {
+    "ILS OR LOC RWY 27L": "fix on the localizer course (2060)",
+    "RNAV (GPS) RWY 27L": "fix on the final course (2060)"
+   },
+   "source": "NASR FIX_BASE.csv / FIX_NAV.csv / FIX_CHRT.csv; roles read from the d-TPP plate images (human transcription of PDF)"
+  },
+  {
+   "id": "HADNI",
+   "lat": 39.88422777,
+   "lon": -75.17762222,
+   "fix_use_code": "RP",
+   "fix_use_meaning": null,
+   "artcc_low": "ZDC",
+   "charted_on": "IAP",
+   "reference_navaid_radial_distance": [
+    {
+     "nav": "PDP",
+     "nav_type": "LOC",
+     "bearing_deg": 87.5,
+     "dist_nm": 2.01
+    }
+   ],
+   "roles_on_plates": {
+    "ILS OR LOC RWY 27R": "LOC step-down fix (LOC only, 740)"
+   },
+   "source": "NASR FIX_BASE.csv / FIX_NAV.csv / FIX_CHRT.csv; roles read from the d-TPP plate images (human transcription of PDF)"
+  },
+  {
+   "id": "HARLU",
+   "lat": 39.77648055,
+   "lon": -75.18094722,
+   "fix_use_code": "WP",
+   "fix_use_meaning": null,
+   "artcc_low": "ZDC",
+   "charted_on": "IAP",
+   "reference_navaid_radial_distance": [],
+   "roles_on_plates": {
+    "RNAV (GPS) RWY 35": "FAF (GP intercept 2000; 6.1 NM from JEPUG)"
+   },
+   "source": "NASR FIX_BASE.csv / FIX_NAV.csv / FIX_CHRT.csv; roles read from the d-TPP plate images (human transcription of PDF)"
+  },
+  {
+   "id": "HEDDA",
+   "lat": 39.78925555,
+   "lon": -74.92785277,
+   "fix_use_code": "WP",
+   "fix_use_meaning": null,
+   "artcc_low": "ZNY",
+   "charted_on": "IAP",
+   "reference_navaid_radial_distance": [],
+   "roles_on_plates": {
+    "RNAV (GPS) RWY 27L": "fix on the track 075 deg route (5.5 NM to WIWON, 5000)"
+   },
+   "source": "NASR FIX_BASE.csv / FIX_NAV.csv / FIX_CHRT.csv; roles read from the d-TPP plate images (human transcription of PDF)"
+  },
+  {
+   "id": "HEDGE",
+   "lat": 38.89225277,
+   "lon": -75.83735,
+   "fix_use_code": "WP",
+   "fix_use_meaning": null,
+   "artcc_low": "ZDC",
+   "charted_on": "CONTROLLER LOW, ENROUTE LOW, SECTIONAL, STAR",
+   "reference_navaid_radial_distance": [],
+   "roles_on_plates": {
+    "PAATS FOUR (RNAV)": "BBDOL transition; GORDONSVILLE transition; HYTRA transition"
+   },
+   "source": "NASR FIX_BASE.csv / FIX_NAV.csv / FIX_CHRT.csv; roles read from the d-TPP plate images (human transcription of PDF)"
+  },
+  {
+   "id": "HIFAL",
+   "lat": 39.972,
+   "lon": -75.1746,
+   "fix_use_code": "WP",
+   "fix_use_meaning": null,
+   "artcc_low": "ZNY",
+   "charted_on": "STAR",
+   "reference_navaid_radial_distance": [],
+   "roles_on_plates": {
+    "BOJID FOUR (RNAV)": "runway 27L leg; runway 27R leg"
+   },
+   "source": "NASR FIX_BASE.csv / FIX_NAV.csv / FIX_CHRT.csv; roles read from the d-TPP plate images (human transcription of PDF)"
+  },
+  {
+   "id": "HILBY",
+   "lat": 39.94414722,
+   "lon": -74.853625,
+   "fix_use_code": "WP",
+   "fix_use_meaning": null,
+   "artcc_low": "ZNY",
+   "charted_on": "IAP",
+   "reference_navaid_radial_distance": [],
+   "roles_on_plates": {
+    "RNAV (GPS) RWY 27L": "IF (5000)"
+   },
+   "source": "NASR FIX_BASE.csv / FIX_NAV.csv / FIX_CHRT.csv; roles read from the d-TPP plate images (human transcription of PDF)"
+  },
+  {
+   "id": "HOLEY",
+   "lat": 39.97158611,
+   "lon": -74.82687777,
+   "fix_use_code": "RP",
+   "fix_use_meaning": null,
+   "artcc_low": "ZDC",
+   "charted_on": "CONTROLLER LOW, ENROUTE LOW, IAP, STAR",
+   "reference_navaid_radial_distance": [
+    {
+     "nav": "CYN",
+     "nav_type": "VORTAC",
+     "bearing_deg": 307,
+     "dist_nm": null
+    },
+    {
+     "nav": "LLH",
+     "nav_type": "LOC",
+     "bearing_deg": 84.93,
+     "dist_nm": 19.24
+    },
+    {
+     "nav": "RBV",
+     "nav_type": "VORTAC",
+     "bearing_deg": 237.94,
+     "dist_nm": 20.62
+    }
+   ],
+   "roles_on_plates": {
+    "ILS OR LOC RWY 26": "IAF (2000 to FOSOM, 266 deg heading (1 NM) then 265 deg (9.8 NM))"
+   },
+   "source": "NASR FIX_BASE.csv / FIX_NAV.csv / FIX_CHRT.csv; roles read from the d-TPP plate images (human transcription of PDF)"
+  },
+  {
+   "id": "HOOCH",
+   "lat": 39.92198055,
+   "lon": -75.25315,
+   "fix_use_code": "RP",
+   "fix_use_meaning": null,
+   "artcc_low": "ZDC",
+   "charted_on": "IAP",
+   "reference_navaid_radial_distance": [
+    {
+     "nav": "MXE",
+     "nav_type": "VORTAC",
+     "bearing_deg": 98.17,
+     "dist_nm": null
+    },
+    {
+     "nav": "MYY",
+     "nav_type": "LOC",
+     "bearing_deg": 351.06,
+     "dist_nm": 3.41
+    }
+   ],
+   "roles_on_plates": {
+    "ILS Z OR LOC RWY 17": "LOC step-down fix (HOOCH FIX MINIMUMS); VDP at I-MYY 2.5"
+   },
+   "source": "NASR FIX_BASE.csv / FIX_NAV.csv / FIX_CHRT.csv; roles read from the d-TPP plate images (human transcription of PDF)"
+  },
+  {
+   "id": "HYILL",
+   "lat": 39.98262222,
+   "lon": -75.28333611,
+   "fix_use_code": "RP",
+   "fix_use_meaning": null,
+   "artcc_low": "ZDC",
+   "charted_on": "IAP",
+   "reference_navaid_radial_distance": [
+    {
+     "nav": "MXE",
+     "nav_type": "VORTAC",
+     "bearing_deg": 86.66,
+     "dist_nm": null
+    },
+    {
+     "nav": "MYY",
+     "nav_type": "LOC",
+     "bearing_deg": 351.06,
+     "dist_nm": 7.31
+    }
+   ],
+   "roles_on_plates": {
+    "ILS Z OR LOC RWY 17": "FAF (ILS glideslope intercept 2000)",
+    "ILS V RWY 17 (CONVERGING)": "FAF (ILS glideslope intercept 2000)",
+    "RNAV (GPS) RWY 17": "FAF (GP intercept 2000)"
+   },
+   "source": "NASR FIX_BASE.csv / FIX_NAV.csv / FIX_CHRT.csv; roles read from the d-TPP plate images (human transcription of PDF)"
+  },
+  {
+   "id": "HYTRA",
+   "lat": 38.29219722,
+   "lon": -76.41383333,
+   "fix_use_code": "WP",
+   "fix_use_meaning": null,
+   "artcc_low": "ZDC",
+   "charted_on": "CONTROLLER HIGH, CONTROLLER LOW, ENROUTE HIGH, ENROUTE LOW, SID, STAR",
+   "reference_navaid_radial_distance": [],
+   "roles_on_plates": {
+    "PAATS FOUR (RNAV)": "HYTRA transition entry fix"
+   },
+   "source": "NASR FIX_BASE.csv / FIX_NAV.csv / FIX_CHRT.csv; roles read from the d-TPP plate images (human transcription of PDF)"
+  },
+  {
+   "id": "JALTO",
+   "lat": 39.90136666,
+   "lon": -75.09126111,
+   "fix_use_code": "RP",
+   "fix_use_meaning": null,
+   "artcc_low": "ZDC",
+   "charted_on": "IAP",
+   "reference_navaid_radial_distance": [
+    {
+     "nav": "PDP",
+     "nav_type": "LOC",
+     "bearing_deg": 87.49,
+     "dist_nm": 6.11
+    }
+   ],
+   "roles_on_plates": {
+    "ILS OR LOC RWY 27R": "FAF (ILS glideslope intercept 2100)",
+    "RNAV (GPS) RWY 27R": "FAF (GP intercept 2100)"
+   },
+   "source": "NASR FIX_BASE.csv / FIX_NAV.csv / FIX_CHRT.csv; roles read from the d-TPP plate images (human transcription of PDF)"
+  },
+  {
+   "id": "JAYBO",
+   "lat": 38.85476944,
+   "lon": -76.02343055,
+   "fix_use_code": "WP",
+   "fix_use_meaning": null,
+   "artcc_low": "ZDC",
+   "charted_on": "CONTROLLER HIGH, CONTROLLER LOW, ENROUTE HIGH, ENROUTE LOW, STAR",
+   "reference_navaid_radial_distance": [],
+   "roles_on_plates": {
+    "PAATS FOUR (RNAV)": "BBDOL transition; GORDONSVILLE transition"
+   },
+   "source": "NASR FIX_BASE.csv / FIX_NAV.csv / FIX_CHRT.csv; roles read from the d-TPP plate images (human transcription of PDF)"
+  },
+  {
+   "id": "JEPUG",
+   "lat": 39.681625,
+   "lon": -75.13404722,
+   "fix_use_code": "WP",
+   "fix_use_meaning": null,
+   "artcc_low": "ZDC",
+   "charted_on": "IAP",
+   "reference_navaid_radial_distance": [],
+   "roles_on_plates": {
+    "RNAV (GPS) RWY 17": "missed approach hold (4 NM, 150/330 deg)",
+    "RNAV (GPS) RWY 35": "IF (3000)"
+   },
+   "source": "NASR FIX_BASE.csv / FIX_NAV.csv / FIX_CHRT.csv; roles read from the d-TPP plate images (human transcription of PDF)"
+  },
+  {
+   "id": "JIIMS",
+   "lat": 39.53767222,
+   "lon": -74.96714444,
+   "fix_use_code": "WP",
+   "fix_use_meaning": null,
+   "artcc_low": "ZDC",
+   "charted_on": "CONTROLLER LOW, ENROUTE LOW, IAP, SECTIONAL, STAR",
+   "reference_navaid_radial_distance": [],
+   "roles_on_plates": {
+    "RNAV (GPS) RWY 35": "feeder fix (track 316 deg, 7.2 NM, 3000, to BDAWK)"
+   },
+   "source": "NASR FIX_BASE.csv / FIX_NAV.csv / FIX_CHRT.csv; roles read from the d-TPP plate images (human transcription of PDF)"
+  },
+  {
+   "id": "KANKE",
+   "lat": 39.90676944,
+   "lon": -75.08672777,
+   "fix_use_code": "WP",
+   "fix_use_meaning": null,
+   "artcc_low": "ZDC",
+   "charted_on": "IAP",
+   "reference_navaid_radial_distance": [],
+   "roles_on_plates": {
+    "RNAV (GPS) RWY 26": "FAF (GP intercept 2000)"
+   },
+   "source": "NASR FIX_BASE.csv / FIX_NAV.csv / FIX_CHRT.csv; roles read from the d-TPP plate images (human transcription of PDF)"
+  },
+  {
+   "id": "KELEE",
+   "lat": 39.838125,
+   "lon": -75.38845833,
+   "fix_use_code": "RP",
+   "fix_use_meaning": null,
+   "artcc_low": "ZDC",
+   "charted_on": "IAP",
+   "reference_navaid_radial_distance": [
+    {
+     "nav": "MXE",
+     "nav_type": "VORTAC",
+     "bearing_deg": 119.08,
+     "dist_nm": null
+    },
+    {
+     "nav": "OOD",
+     "nav_type": "VORTAC",
+     "bearing_deg": 351.95,
+     "dist_nm": null
+    },
+    {
+     "nav": "PHL",
+     "nav_type": "LOC",
+     "bearing_deg": 267.47,
+     "dist_nm": 7.56
+    }
+   ],
+   "roles_on_plates": {
+    "ILS Z OR LOC Z RWY 09R": "FAF (ILS glideslope intercept 1800)",
+    "ILS V RWY 09R (CONVERGING)": "FAF (ILS glideslope intercept 1800)",
+    "RNAV (GPS) Y RWY 09R": "FAF (GP intercept 1800)"
+   },
+   "source": "NASR FIX_BASE.csv / FIX_NAV.csv / FIX_CHRT.csv; roles read from the d-TPP plate images (human transcription of PDF)"
+  },
+  {
+   "id": "KRABY",
+   "lat": 38.38642777,
+   "lon": -77.1627,
+   "fix_use_code": "WP",
+   "fix_use_meaning": null,
+   "artcc_low": "ZDC",
+   "charted_on": "CONTROLLER HIGH, CONTROLLER LOW, ENROUTE HIGH, ENROUTE LOW, STAR",
+   "reference_navaid_radial_distance": [],
+   "roles_on_plates": {
+    "PAATS FOUR (RNAV)": "BBDOL transition"
+   },
+   "source": "NASR FIX_BASE.csv / FIX_NAV.csv / FIX_CHRT.csv; roles read from the d-TPP plate images (human transcription of PDF)"
+  },
+  {
+   "id": "KUSLE",
+   "lat": 39.68363611,
+   "lon": -74.952725,
+   "fix_use_code": "WP",
+   "fix_use_meaning": null,
+   "artcc_low": "ZDC",
+   "charted_on": "IAP",
+   "reference_navaid_radial_distance": [],
+   "roles_on_plates": {
+    "RNAV (GPS) RWY 35": "IAF (second transition, listed after the primary route; track 281 deg, 8.4 NM, 3000, to JEPUG)"
+   },
+   "source": "NASR FIX_BASE.csv / FIX_NAV.csv / FIX_CHRT.csv; roles read from the d-TPP plate images (human transcription of PDF)"
+  },
+  {
+   "id": "KYILL",
+   "lat": 39.9356,
+   "lon": -75.38011944,
+   "fix_use_code": "WP",
+   "fix_use_meaning": null,
+   "artcc_low": "ZNY",
+   "charted_on": "STAR",
+   "reference_navaid_radial_distance": [],
+   "roles_on_plates": {
+    "BOJID FOUR (RNAV)": "runway 9L leg; runway 9R leg"
+   },
+   "source": "NASR FIX_BASE.csv / FIX_NAV.csv / FIX_CHRT.csv; roles read from the d-TPP plate images (human transcription of PDF)"
+  },
+  {
+   "id": "LANDI",
+   "lat": 39.85946666,
+   "lon": -75.30175555,
+   "fix_use_code": "RP",
+   "fix_use_meaning": null,
+   "artcc_low": "ZDC",
+   "charted_on": "IAP",
+   "reference_navaid_radial_distance": [
+    {
+     "nav": "OOD",
+     "nav_type": "VORTAC",
+     "bearing_deg": 10.26,
+     "dist_nm": null
+    },
+    {
+     "nav": "VII",
+     "nav_type": "LOC",
+     "bearing_deg": 267.47,
+     "dist_nm": 3.93
+    }
+   ],
+   "roles_on_plates": {
+    "ILS OR LOC RWY 09L": "LOC step-down fix (LANDI FIX MINIMUMS); VDP at I-VII 2.9",
+    "RNAV (GPS) RWY 27R": "missed approach waypoint (track 294 deg to MXE)",
+    "RNAV (GPS) Y RWY 09L": "LNAV step-down fix (760)"
+   },
+   "source": "NASR FIX_BASE.csv / FIX_NAV.csv / FIX_CHRT.csv; roles read from the d-TPP plate images (human transcription of PDF)"
+  },
+  {
+   "id": "LOMON",
+   "lat": 40.30806666,
+   "lon": -77.48340277,
+   "fix_use_code": "RP",
+   "fix_use_meaning": null,
+   "artcc_low": "ZNY",
+   "charted_on": "CONTROLLER LOW, ENROUTE LOW, STAR",
+   "reference_navaid_radial_distance": [
+    {
+     "nav": "HAR",
+     "nav_type": "VORTAC",
+     "bearing_deg": 281.19,
+     "dist_nm": 19
+    }
+   ],
+   "roles_on_plates": {
+    "BOJID FOUR (RNAV)": "JOHNSTOWN transition"
+   },
+   "source": "NASR FIX_BASE.csv / FIX_NAV.csv / FIX_CHRT.csv; roles read from the d-TPP plate images (human transcription of PDF)"
+  },
+  {
+   "id": "MENGE",
+   "lat": 40.00694166,
+   "lon": -74.96411388,
+   "fix_use_code": "RP",
+   "fix_use_meaning": null,
+   "artcc_low": "ZDC",
+   "charted_on": "CONTROLLER LOW, ENROUTE LOW, IAP",
+   "reference_navaid_radial_distance": [
+    {
+     "nav": "ARD",
+     "nav_type": "VOR/DME",
+     "bearing_deg": 200,
+     "dist_nm": 15
+    }
+   ],
+   "roles_on_plates": {
+    "ILS OR LOC RWY 27R": "IAF (second transition, listed after the primary route; track 200 deg, 5.1 NM, 3000, to MRTIN); procedure NA for arrivals at MENGE on V479 northbound",
+    "RNAV (GPS) RWY 26": "IAF (track 190 deg, 4.5 NM, 3300, to FERIN); procedure NA for arrivals at MENGE on V479 northbound"
+   },
+   "source": "NASR FIX_BASE.csv / FIX_NAV.csv / FIX_CHRT.csv; roles read from the d-TPP plate images (human transcription of PDF)"
+  },
+  {
+   "id": "MIROY",
+   "lat": 40.31547777,
+   "lon": -78.35741666,
+   "fix_use_code": "RP",
+   "fix_use_meaning": null,
+   "artcc_low": "ZOB",
+   "charted_on": "CONTROLLER HIGH, CONTROLLER LOW, ENROUTE HIGH, ENROUTE LOW, STAR",
+   "reference_navaid_radial_distance": [
+    {
+     "nav": "JST",
+     "nav_type": "VOR/DME",
+     "bearing_deg": 96.04,
+     "dist_nm": 21.88
+    },
+    {
+     "nav": "PSB",
+     "nav_type": "VORTAC",
+     "bearing_deg": 214.94,
+     "dist_nm": 39.69
+    }
+   ],
+   "roles_on_plates": {
+    "BOJID FOUR (RNAV)": "JOHNSTOWN transition"
+   },
+   "source": "NASR FIX_BASE.csv / FIX_NAV.csv / FIX_CHRT.csv; roles read from the d-TPP plate images (human transcription of PDF)"
+  },
+  {
+   "id": "MKORD",
+   "lat": 39.84797222,
+   "lon": -74.86983611,
+   "fix_use_code": "WP",
+   "fix_use_meaning": null,
+   "artcc_low": "ZNY",
+   "charted_on": "STAR",
+   "reference_navaid_radial_distance": [],
+   "roles_on_plates": {
+    "PAATS FOUR (RNAV)": "runway 26 end of the procedure (IAF of the expected approach); runway 27L end of the procedure (IAF of the expected approach); runway 27R end of the procedure (IAF of the expected approach)"
+   },
+   "source": "NASR FIX_BASE.csv / FIX_NAV.csv / FIX_CHRT.csv; roles read from the d-TPP plate images (human transcription of PDF)"
+  },
+  {
+   "id": "MRTIN",
+   "lat": 39.92267777,
+   "lon": -74.98336388,
+   "fix_use_code": "RP",
+   "fix_use_meaning": null,
+   "artcc_low": "ZDC",
+   "charted_on": "IAP",
+   "reference_navaid_radial_distance": [
+    {
+     "nav": "ARD",
+     "nav_type": "VOR/DME",
+     "bearing_deg": 200,
+     "dist_nm": null
+    },
+    {
+     "nav": "PDP",
+     "nav_type": "LOC",
+     "bearing_deg": 87.5,
+     "dist_nm": 11.27
+    }
+   ],
+   "roles_on_plates": {
+    "ILS OR LOC RWY 27R": "IF",
+    "RNAV (GPS) RWY 27R": "fix on the final course (3000; 5.1 NM to JALTO)"
+   },
+   "source": "NASR FIX_BASE.csv / FIX_NAV.csv / FIX_CHRT.csv; roles read from the d-TPP plate images (human transcription of PDF)"
+  },
+  {
+   "id": "MUDNE",
+   "lat": 40.09720833,
+   "lon": -75.42335555,
+   "fix_use_code": "RP",
+   "fix_use_meaning": null,
+   "artcc_low": "ZNY",
+   "charted_on": "CONTROLLER LOW, ENROUTE LOW, IAP",
+   "reference_navaid_radial_distance": [
+    {
+     "nav": "OOD",
+     "nav_type": "VORTAC",
+     "bearing_deg": 358.67,
+     "dist_nm": null
+    },
+    {
+     "nav": "SBJ",
+     "nav_type": "VOR/DME",
+     "bearing_deg": 237.25,
+     "dist_nm": null
+    }
+   ],
+   "roles_on_plates": {
+    "RNAV (GPS) RWY 35": "missed approach hold (4 NM, 059/239 deg)"
+   },
+   "source": "NASR FIX_BASE.csv / FIX_NAV.csv / FIX_CHRT.csv; roles read from the d-TPP plate images (human transcription of PDF)"
+  },
+  {
+   "id": "OBEKE",
+   "lat": 39.82401666,
+   "lon": -75.47802777,
+   "fix_use_code": "RP",
+   "fix_use_meaning": null,
+   "artcc_low": "ZDC",
+   "charted_on": "IAP",
+   "reference_navaid_radial_distance": [
+    {
+     "nav": "DQO",
+     "nav_type": "VORTAC",
+     "bearing_deg": 44.29,
+     "dist_nm": null
+    },
+    {
+     "nav": "MXE",
+     "nav_type": "VORTAC",
+     "bearing_deg": 131.27,
+     "dist_nm": null
+    },
+    {
+     "nav": "OOD",
+     "nav_type": "VORTAC",
+     "bearing_deg": 334.35,
+     "dist_nm": null
+    },
+    {
+     "nav": "VII",
+     "nav_type": "LOC",
+     "bearing_deg": 267.47,
+     "dist_nm": 12.35
+    }
+   ],
+   "roles_on_plates": {
+    "ILS OR LOC RWY 09L": "fix on the localizer course",
+    "RNAV (GPS) Y RWY 09L": "fix on the final course (3000)"
+   },
+   "source": "NASR FIX_BASE.csv / FIX_NAV.csv / FIX_CHRT.csv; roles read from the d-TPP plate images (human transcription of PDF)"
+  },
+  {
+   "id": "ORANE",
+   "lat": 39.92916666,
+   "lon": -74.930125,
+   "fix_use_code": "WP",
+   "fix_use_meaning": null,
+   "artcc_low": "ZNY",
+   "charted_on": "IAP",
+   "reference_navaid_radial_distance": [],
+   "roles_on_plates": {
+    "RNAV (GPS) RWY 27L": "fix on the final course (4600)"
+   },
+   "source": "NASR FIX_BASE.csv / FIX_NAV.csv / FIX_CHRT.csv; roles read from the d-TPP plate images (human transcription of PDF)"
+  },
+  {
+   "id": "PAATS",
+   "lat": 39.38805833,
+   "lon": -75.56318333,
+   "fix_use_code": "WP",
+   "fix_use_meaning": null,
+   "artcc_low": "ZDC",
+   "charted_on": "STAR",
+   "reference_navaid_radial_distance": [],
+   "roles_on_plates": {
+    "PAATS FOUR (RNAV)": "runway 9L leg; runway 9R leg; runway 26 leg; runway 27L leg; runway 27R leg; runway 17 leg; runway 35 leg"
+   },
+   "source": "NASR FIX_BASE.csv / FIX_NAV.csv / FIX_CHRT.csv; roles read from the d-TPP plate images (human transcription of PDF)"
+  },
+  {
+   "id": "PRNCZ",
+   "lat": 38.62725,
+   "lon": -76.08561111,
+   "fix_use_code": "WP",
+   "fix_use_meaning": null,
+   "artcc_low": "ZDC",
+   "charted_on": "CONTROLLER HIGH, CONTROLLER LOW, ENROUTE HIGH, ENROUTE LOW, SECTIONAL, STAR",
+   "reference_navaid_radial_distance": [],
+   "roles_on_plates": {
+    "PAATS FOUR (RNAV)": "HYTRA transition"
+   },
+   "source": "NASR FIX_BASE.csv / FIX_NAV.csv / FIX_CHRT.csv; roles read from the d-TPP plate images (human transcription of PDF)"
+  },
+  {
+   "id": "PSOUT",
+   "lat": 39.83503888,
+   "lon": -74.93254444,
+   "fix_use_code": "WP",
+   "fix_use_meaning": null,
+   "artcc_low": "ZDC",
+   "charted_on": "STAR",
+   "reference_navaid_radial_distance": [],
+   "roles_on_plates": {
+    "PAATS FOUR (RNAV)": "runway 26 leg; runway 27L leg; runway 27R leg"
+   },
+   "source": "NASR FIX_BASE.csv / FIX_NAV.csv / FIX_CHRT.csv; roles read from the d-TPP plate images (human transcription of PDF)"
+  },
+  {
+   "id": "PUURL",
+   "lat": 39.92033055,
+   "lon": -74.78916666,
+   "fix_use_code": "WP",
+   "fix_use_meaning": null,
+   "artcc_low": "ZNY",
+   "charted_on": "IAP",
+   "reference_navaid_radial_distance": [],
+   "roles_on_plates": {
+    "RNAV (GPS) RWY 27L": "track 308 deg, 3.3 NM, 5000, to HILBY"
+   },
+   "source": "NASR FIX_BASE.csv / FIX_NAV.csv / FIX_CHRT.csv; roles read from the d-TPP plate images (human transcription of PDF)"
+  },
+  {
+   "id": "QWEST",
+   "lat": 39.80759722,
+   "lon": -75.55916944,
+   "fix_use_code": "RP",
+   "fix_use_meaning": null,
+   "artcc_low": "ZDC",
+   "charted_on": "IAP",
+   "reference_navaid_radial_distance": [
+    {
+     "nav": "DQO",
+     "nav_type": "VORTAC",
+     "bearing_deg": 25.93,
+     "dist_nm": null
+    },
+    {
+     "nav": "MXE",
+     "nav_type": "VORTAC",
+     "bearing_deg": 151.05,
+     "dist_nm": null
+    },
+    {
+     "nav": "OOD",
+     "nav_type": "VORTAC",
+     "bearing_deg": 321.01,
+     "dist_nm": null
+    },
+    {
+     "nav": "VII",
+     "nav_type": "LOC",
+     "bearing_deg": 267.47,
+     "dist_nm": 16.23
+    }
+   ],
+   "roles_on_plates": {
+    "ILS OR LOC RWY 09L": "IF",
+    "RNAV (GPS) Y RWY 09L": "IF (4000; 3000 when authorized by ATC)"
+   },
+   "source": "NASR FIX_BASE.csv / FIX_NAV.csv / FIX_CHRT.csv; roles read from the d-TPP plate images (human transcription of PDF)"
+  },
+  {
+   "id": "RROLL",
+   "lat": 39.46401111,
+   "lon": -75.30974444,
+   "fix_use_code": "WP",
+   "fix_use_meaning": null,
+   "artcc_low": "ZDC",
+   "charted_on": "STAR",
+   "reference_navaid_radial_distance": [],
+   "roles_on_plates": {
+    "PAATS FOUR (RNAV)": "runway 26 leg; runway 27L leg; runway 27R leg"
+   },
+   "source": "NASR FIX_BASE.csv / FIX_NAV.csv / FIX_CHRT.csv; roles read from the d-TPP plate images (human transcription of PDF)"
+  },
+  {
+   "id": "SCOOL",
+   "lat": 40.06664722,
+   "lon": -75.41959722,
+   "fix_use_code": "WP",
+   "fix_use_meaning": null,
+   "artcc_low": "ZNY",
+   "charted_on": "CONTROLLER LOW, ENROUTE LOW, STAR",
+   "reference_navaid_radial_distance": [],
+   "roles_on_plates": {
+    "BOJID FOUR (RNAV)": "runway 9L leg; runway 9R leg; runway 27L leg; runway 27R leg"
+   },
+   "source": "NASR FIX_BASE.csv / FIX_NAV.csv / FIX_CHRT.csv; roles read from the d-TPP plate images (human transcription of PDF)"
+  },
+  {
+   "id": "TEBEE",
+   "lat": 39.50388055,
+   "lon": -75.32699722,
+   "fix_use_code": "RP",
+   "fix_use_meaning": null,
+   "artcc_low": "ZDC",
+   "charted_on": "AREA, CONTROLLER LOW, ENROUTE LOW, SID, STAR",
+   "reference_navaid_radial_distance": [
+    {
+     "nav": "OOD",
+     "nav_type": "VORTAC",
+     "bearing_deg": 197.99,
+     "dist_nm": 8
+    }
+   ],
+   "roles_on_plates": {
+    "PAATS FOUR (RNAV)": "runway 17 end of the procedure (IAF of the expected approach); runway 35 end of the procedure (IAF of the expected approach)"
+   },
+   "source": "NASR FIX_BASE.csv / FIX_NAV.csv / FIX_CHRT.csv; roles read from the d-TPP plate images (human transcription of PDF)"
+  },
+  {
+   "id": "TORNE",
+   "lat": 39.90608333,
+   "lon": -75.04732222,
+   "fix_use_code": "RP",
+   "fix_use_meaning": null,
+   "artcc_low": "ZNY",
+   "charted_on": "IAP",
+   "reference_navaid_radial_distance": [
+    {
+     "nav": "GLC",
+     "nav_type": "LOC",
+     "bearing_deg": 87.49,
+     "dist_nm": 8.72
+    }
+   ],
+   "roles_on_plates": {
+    "ILS OR LOC RWY 27L": "FAF (ILS glideslope intercept 3000)",
+    "RNAV (GPS) RWY 27L": "FAF (GP intercept 3000)"
+   },
+   "source": "NASR FIX_BASE.csv / FIX_NAV.csv / FIX_CHRT.csv; roles read from the d-TPP plate images (human transcription of PDF)"
+  },
+  {
+   "id": "TRAGG",
+   "lat": 40.09576388,
+   "lon": -75.93910833,
+   "fix_use_code": "RP",
+   "fix_use_meaning": null,
+   "artcc_low": "ZNY",
+   "charted_on": "CONTROLLER LOW, ENROUTE LOW, IAP, STAR",
+   "reference_navaid_radial_distance": [
+    {
+     "nav": "ETX",
+     "nav_type": "VOR/DME",
+     "bearing_deg": 210.99,
+     "dist_nm": 31.36
+    },
+    {
+     "nav": "LRP",
+     "nav_type": "VOR/DME",
+     "bearing_deg": 104,
+     "dist_nm": 16.28
+    }
+   ],
+   "roles_on_plates": {
+    "BOJID FOUR (RNAV)": "runway 9L leg; runway 9R leg; runway 27L leg; runway 27R leg"
+   },
+   "source": "NASR FIX_BASE.csv / FIX_NAV.csv / FIX_CHRT.csv; roles read from the d-TPP plate images (human transcription of PDF)"
+  },
+  {
+   "id": "TRNBL",
+   "lat": 39.56943333,
+   "lon": -75.54325555,
+   "fix_use_code": "WP",
+   "fix_use_meaning": null,
+   "artcc_low": "ZDC",
+   "charted_on": "STAR",
+   "reference_navaid_radial_distance": [],
+   "roles_on_plates": {
+    "PAATS FOUR (RNAV)": "runway 9L leg; runway 9R leg"
+   },
+   "source": "NASR FIX_BASE.csv / FIX_NAV.csv / FIX_CHRT.csv; roles read from the d-TPP plate images (human transcription of PDF)"
+  },
+  {
+   "id": "WENTO",
+   "lat": 39.92348611,
+   "lon": -75.2539,
+   "fix_use_code": "WP",
+   "fix_use_meaning": null,
+   "artcc_low": "ZDC",
+   "charted_on": "IAP",
+   "reference_navaid_radial_distance": [],
+   "roles_on_plates": {
+    "RNAV (GPS) RWY 17": "LNAV step-down fix (780)"
+   },
+   "source": "NASR FIX_BASE.csv / FIX_NAV.csv / FIX_CHRT.csv; roles read from the d-TPP plate images (human transcription of PDF)"
+  },
+  {
+   "id": "WERDI",
+   "lat": 39.94888055,
+   "lon": -75.26653333,
+   "fix_use_code": "WP",
+   "fix_use_meaning": null,
+   "artcc_low": "ZDC",
+   "charted_on": "IAP",
+   "reference_navaid_radial_distance": [],
+   "roles_on_plates": {
+    "RNAV (GPS) RWY 35": "missed approach waypoint (track 333 deg)"
+   },
+   "source": "NASR FIX_BASE.csv / FIX_NAV.csv / FIX_CHRT.csv; roles read from the d-TPP plate images (human transcription of PDF)"
+  },
+  {
+   "id": "WEVVE",
+   "lat": 39.69204166,
+   "lon": -75.60756944,
+   "fix_use_code": "WP",
+   "fix_use_meaning": null,
+   "artcc_low": "ZDC",
+   "charted_on": "STAR",
+   "reference_navaid_radial_distance": [],
+   "roles_on_plates": {
+    "PAATS FOUR (RNAV)": "runway 9L leg; runway 9R leg"
+   },
+   "source": "NASR FIX_BASE.csv / FIX_NAV.csv / FIX_CHRT.csv; roles read from the d-TPP plate images (human transcription of PDF)"
+  },
+  {
+   "id": "WHEYY",
+   "lat": 39.84698888,
+   "lon": -75.79218055,
+   "fix_use_code": "WP",
+   "fix_use_meaning": null,
+   "artcc_low": "ZNY",
+   "charted_on": "STAR",
+   "reference_navaid_radial_distance": [],
+   "roles_on_plates": {
+    "BOJID FOUR (RNAV)": "runway 9L end of the procedure (IAF of the expected approach); runway 9R end of the procedure (IAF of the expected approach)"
+   },
+   "source": "NASR FIX_BASE.csv / FIX_NAV.csv / FIX_CHRT.csv; roles read from the d-TPP plate images (human transcription of PDF)"
+  },
+  {
+   "id": "WIKAV",
+   "lat": 39.58984166,
+   "lon": -75.27097222,
+   "fix_use_code": "WP",
+   "fix_use_meaning": null,
+   "artcc_low": "ZDC",
+   "charted_on": "IAP",
+   "reference_navaid_radial_distance": [],
+   "roles_on_plates": {
+    "RNAV (GPS) RWY 35": "IAF (track 061 deg, 8.4 NM, 3000, to JEPUG)"
+   },
+   "source": "NASR FIX_BASE.csv / FIX_NAV.csv / FIX_CHRT.csv; roles read from the d-TPP plate images (human transcription of PDF)"
+  },
+  {
+   "id": "WIWON",
+   "lat": 39.82990277,
+   "lon": -74.82203055,
+   "fix_use_code": "WP",
+   "fix_use_meaning": null,
+   "artcc_low": "ZNY",
+   "charted_on": "IAP",
+   "reference_navaid_radial_distance": [],
+   "roles_on_plates": {
+    "RNAV (GPS) RWY 27L": "fix on the track 075 deg route (3 NM to FLYNN, 5000)"
+   },
+   "source": "NASR FIX_BASE.csv / FIX_NAV.csv / FIX_CHRT.csv; roles read from the d-TPP plate images (human transcription of PDF)"
+  },
+  {
+   "id": "WNDYB",
+   "lat": 37.80219722,
+   "lon": -77.68923055,
+   "fix_use_code": "WP",
+   "fix_use_meaning": null,
+   "artcc_low": "ZDC",
+   "charted_on": "CONTROLLER HIGH, CONTROLLER LOW, ENROUTE HIGH, ENROUTE LOW, STAR",
+   "reference_navaid_radial_distance": [],
+   "roles_on_plates": {
+    "PAATS FOUR (RNAV)": "BBDOL transition"
+   },
+   "source": "NASR FIX_BASE.csv / FIX_NAV.csv / FIX_CHRT.csv; roles read from the d-TPP plate images (human transcription of PDF)"
+  },
+  {
+   "id": "WUDRR",
+   "lat": 39.57012222,
+   "lon": -75.26019722,
+   "fix_use_code": "WP",
+   "fix_use_meaning": null,
+   "artcc_low": "ZNY",
+   "charted_on": "IAP, STAR",
+   "reference_navaid_radial_distance": [],
+   "roles_on_plates": {
+    "RNAV (GPS) RWY 27L": "missed approach hold (4 NM, 003/183 deg)"
+   },
+   "source": "NASR FIX_BASE.csv / FIX_NAV.csv / FIX_CHRT.csv; roles read from the d-TPP plate images (human transcription of PDF)"
+  },
+  {
+   "id": "XIVOY",
+   "lat": 39.87055,
+   "lon": -75.22638888,
+   "fix_use_code": "RP",
+   "fix_use_meaning": null,
+   "artcc_low": "ZDC",
+   "charted_on": "IAP",
+   "reference_navaid_radial_distance": [
+    {
+     "nav": "GLC",
+     "nav_type": "LOC",
+     "bearing_deg": 87.49,
+     "dist_nm": 0.19
+    }
+   ],
+   "roles_on_plates": {
+    "ILS OR LOC RWY 27L": "fix near the runway threshold (VDP at I-GLC 1)"
+   },
+   "source": "NASR FIX_BASE.csv / FIX_NAV.csv / FIX_CHRT.csv; roles read from the d-TPP plate images (human transcription of PDF)"
+  },
+  {
+   "id": "ZOKAR",
+   "lat": 39.89426666,
+   "lon": -75.14986111,
+   "fix_use_code": "WP",
+   "fix_use_meaning": null,
+   "artcc_low": "ZDC",
+   "charted_on": "IAP",
+   "reference_navaid_radial_distance": [],
+   "roles_on_plates": {
+    "RNAV (GPS) RWY 26": "LNAV step-down fix (1040)"
+   },
+   "source": "NASR FIX_BASE.csv / FIX_NAV.csv / FIX_CHRT.csv; roles read from the d-TPP plate images (human transcription of PDF)"
+  }
+ ],
+ "unverified": [
+  "Some approach intersections (QWEST, OBEKE, ANNET, LANDI, MRTIN, HADNI...) are ILS DME fixes; their NASR coordinates are used as published and were not compared with the plate geometry beyond the printed distances."
+ ]
+}

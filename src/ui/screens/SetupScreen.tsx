@@ -106,7 +106,7 @@ export function SetupScreen() {
   const callName = airportCallName(airport);
   /** Aircraft types the airport's traffic profile can generate (KACY: C172, A320; KMHT adds B738, BCS3, E175, CRJ9, B752, C208; KPGD: A320, A319, B38M, B738, C172, PA28; the registry also holds the KBOS / KPHL / EGLL types). */
   const offeredTypes = useMemo(() => profileTypes(airport.icao), [airport]);
-  /** Special traffic kinds the airport's profile has (KACY: all five; KMHT and KPGD: VFR transitions and vehicles). Only these are offered. */
+  /** Special traffic kinds the airport's profile has (KACY: all five; KMHT and KPGD: VFR transitions and vehicles; KPHL: vehicles only, Class B). Only these are offered. */
   const offeredSpecial = useMemo(() => availableSpecialKinds(airport.icao), [airport]);
   const starting = useSimStore((s) => s.starting);
   const startStatus = useSimStore((s) => s.startStatus);

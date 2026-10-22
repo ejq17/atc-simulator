@@ -191,6 +191,8 @@ const AIRPORT_CITIES: Record<string, string> = {
   KPWM: 'Portland', KFIT: 'Fitchburg', KBNA: 'Nashville', KMDW: 'Chicago Midway', KRSW: 'Fort Myers', KCHS: 'Charleston', KSDF: 'Louisville',
   KMEM: 'Memphis', KMYR: 'Myrtle Beach', KPGD: 'Punta Gorda', KFMY: 'Page Field', KVNC: 'Venice', KSRQ: 'Sarasota', KAPF: 'Naples', KIMM: 'Immokalee', KLAL: 'Lakeland', KALB: 'Albany', KAVL: 'Asheville', KCVG: 'Cincinnati', KPVD: 'Providence', KMSP: 'Minneapolis', KLEX: 'Lexington', KMCI: 'Kansas City', KROC: 'Rochester', KSYR: 'Syracuse', KGRR: 'Grand Rapids', KCAK: 'Akron Canton', KTYS: 'Knoxville', KMDT: 'Harrisburg',
   KOWD: 'Norwood', KPYM: 'Plymouth', KORH: 'Worcester', KHYA: 'Hyannis', KPVC: 'Provincetown', EGLL: 'London Heathrow', EDDF: 'Frankfurt', LFPG: 'Paris', EIDW: 'Dublin',
+  KDFW: 'Dallas Fort Worth', KDEN: 'Denver', KSTL: 'St. Louis', KIAH: 'Houston', KSFO: 'San Francisco', KSEA: 'Seattle',
+  KSLC: 'Salt Lake City', KLOM: 'Wings Field', KMQS: 'Coatesville', KOQN: 'Brandywine', KDYL: 'Doylestown', KPTW: 'Heritage Field',
 };
 
 /** Spoken name of an airport for clearances: "KPHL" -> "Philadelphia"; unknown ids are spelled in phonetics. */

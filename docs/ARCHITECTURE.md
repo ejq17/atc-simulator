@@ -1,4 +1,4 @@
-# ATC Simulator (KACY, KMHT) — Architecture
+# ATC Simulator (KACY, KMHT, KPHL) — Architecture
 
 Single-player, browser-based, local-first ATC simulator for two airports, Atlantic City
 International (KACY, default) and Manchester-Boston Regional (KMHT). This document is deliberately short: it records
@@ -26,7 +26,7 @@ gaps live in `docs/PROGRESS.md`; data provenance lives in `data/sources/README.m
 ```
 src/sim/        types.ts (contracts), api.ts (engine interface), engine.ts, aircraft physics,
                 state machines, runway occupancy, conflicts, pathfinding, scoring hooks
-src/airport/    projection (lat/lon <-> local metres), per-airport dataset loaders (kacy/, kmht/) and the registry
+src/airport/    projection (lat/lon <-> local metres), per-airport dataset loaders (kacy/, kmht/, kphl/) and the registry
                 (`getAirport`, `listAirports`), graph queries
 src/commands/   normalisation (spoken numbers, phonetics), grammar, entity resolution,
                 callsign matching, confidence, clarification

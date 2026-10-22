@@ -126,6 +126,8 @@ export interface AirportProfile {
    * `RWX-<a>x<b>` (runway ids with "/" written "-": "RWX-4L-22Rx9-27"); an airport with parallel runways only has none.
    */
   crossing?: { nodeId: string; name: string; notes: string };
+  /** Validation checks (matched by a substring of the check name) that fail because of a documented gap in the source data: reported as warnings with the reason instead of stopping the build. */
+  knownGaps?: { check: string; reason: string }[];
   /** File with the OSM-versus-diagram comparison appended to the report (relative to scripts/data). */
   diagramComparisonFile?: string;
   /** Sentence about diagram label words that are not taxiway labels (report only). */

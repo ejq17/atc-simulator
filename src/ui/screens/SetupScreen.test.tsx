@@ -17,11 +17,11 @@ afterEach(() => {
 });
 
 describe('<SetupScreen /> airport selector', () => {
-  it('defaults to KACY and offers KMHT, KBOS and KPGD', () => {
+  it('defaults to KACY and offers KMHT, KBOS, KPGD and KPHL', () => {
     render(<SetupScreen />);
     const select = screen.getByTestId('airport-select') as HTMLSelectElement;
     expect(select.value).toBe('KACY');
-    expect([...select.options].map((o) => o.value)).toEqual(['KACY', 'KMHT', 'KBOS', 'KPGD']);
+    expect([...select.options].map((o) => o.value)).toEqual(['KACY', 'KMHT', 'KBOS', 'KPHL', 'KPGD']);
     expect(screen.getByText('KACY ATC Simulator')).toBeInTheDocument();
     expect(fetchLiveMetar).toHaveBeenCalledWith('KACY');
   });
@@ -40,6 +40,23 @@ describe('<SetupScreen /> airport selector', () => {
     expect(screen.getByTestId('no-scenarios')).toHaveTextContent(/written around KACY.*not offered at KMHT/);
     fireEvent.click(screen.getByTestId('mode-training'));
     expect(screen.getByTestId('no-scenarios')).toHaveTextContent(/training lessons are written around KACY/);
+  });
+});
+
+describe('<SetupScreen /> KPHL', () => {
+  it('switching to KPHL re-labels the screen, fetches the KPHL METAR, lists its frequencies, offers only vehicles as special traffic and hides the KACY-only lessons', () => {
+    render(<SetupScreen />);
+    fireEvent.change(screen.getByTestId('airport-select'), { target: { value: 'KPHL' } });
+    expect(screen.getByText('KPHL ATC Simulator')).toBeInTheDocument();
+    expect(screen.getByText(/Philadelphia International · KPHL/)).toBeInTheDocument();
+    expect(fetchLiveMetar).toHaveBeenLastCalledWith('KPHL');
+    expect(screen.getByText('Live KPHL METAR')).toBeInTheDocument();
+    expect(screen.getAllByText(/118\.5/).length).toBeGreaterThan(0);
+    expect(screen.getByTestId('special-vehicles')).toBeChecked();
+    for (const k of ['helicopter', 'military', 'transition', 'training']) expect(screen.queryByTestId(`special-${k}`)).toBeNull();
+    expect([...(screen.getByTestId('close-runway') as HTMLSelectElement).options].map((o) => o.value)).toEqual(['none', '8/26', '9L/27R', '9R/27L', '17/35']);
+    fireEvent.click(screen.getByTestId('mode-career'));
+    expect(screen.getByTestId('no-scenarios')).toHaveTextContent(/written around KACY.*not offered at KPHL/);
   });
 });
 

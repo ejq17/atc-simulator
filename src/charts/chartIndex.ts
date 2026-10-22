@@ -1,5 +1,5 @@
 /**
- * Typed index of the official FAA d-TPP charts per airport (KACY, KMHT, KBOS, KPGD).
+ * Typed index of the official FAA d-TPP charts per airport (KACY, KMHT, KBOS, KPGD, KPHL).
  *
  * Built at import time from `data/sources/<icao>-procedures.json` (verified d-TPP
  * cycle 2610, every PDF URL checked HTTP 200 by the research pass). Nothing is
@@ -11,6 +11,7 @@ import rawProcedures from '../../data/sources/kacy-procedures.json';
 import rawKmhtProcedures from '../../data/sources/kmht-procedures.json';
 import rawKbosProcedures from '../../data/sources/kbos-procedures.json';
 import rawKpgdProcedures from '../../data/sources/kpgd-procedures.json';
+import rawKphlProcedures from '../../data/sources/kphl-procedures.json';
 
 export type ChartCategory = 'DIAGRAM' | 'IAP' | 'DP' | 'STAR' | 'HOT_SPOT' | 'LAHSO' | 'MINIMUMS';
 
@@ -73,8 +74,10 @@ interface ProceduresFile {
   _provenance: { cycle: string; effective_from: string; effective_to: string; retrieved: string; volume?: string };
   airport_diagram: SimpleChartRecord;
   instrument_approaches: IapRecord[];
-  departure_procedures: Array<{ chart_name: string; type?: string; faa_id?: string; printed_date?: string; pdf: PdfRef; continuation_pdf?: PdfRef; radar_required?: boolean }>;
-  stars?: Array<{ chart_name: string; pdf_name: string; type?: string; pdf: PdfRef }>;
+  departure_procedures: Array<{ chart_name: string; type?: string; faa_id?: string; printed_date?: string; pdf: PdfRef; continuation_pdf?: PdfRef & { local_file?: string }; radar_required?: boolean }>;
+  stars?: Array<{ chart_name: string; pdf_name: string; type?: string; pdf: PdfRef; continuation_pdf?: PdfRef }>;
+  /** Visual approach charts (KPHL: d-TPP chart code IAP, not instrument procedures). */
+  visual_approaches?: Array<{ chart_name: string; pdf_name: string; pdf: PdfRef }>;
   supporting_charts: {
     /** Holds both the TAKEOFF MINIMUMS and ALTERNATE MINIMUMS booklet pages. */
     takeoff_minimums_pdf: SimpleChartRecord[];
@@ -88,6 +91,7 @@ const DATASETS: Record<string, ProceduresFile> = {
   KMHT: rawKmhtProcedures as unknown as ProceduresFile,
   KBOS: rawKbosProcedures as unknown as ProceduresFile,
   KPGD: rawKpgdProcedures as unknown as ProceduresFile,
+  KPHL: rawKphlProcedures as unknown as ProceduresFile,
 };
 const DEFAULT_ICAO = 'KACY';
 
@@ -136,6 +140,7 @@ function approachRank(name: string): number {
   if (n.includes('RNP')) return 4;
   if (n.includes('RNAV')) return 3;
   if (n.includes('VOR') || n.includes('TACAN')) return n.startsWith('HI-') ? 6 : 5;
+  if (n.includes('VISUAL')) return 7;
   return 8;
 }
 
@@ -143,6 +148,12 @@ function approachRank(name: string): number {
 function volumeName(volume: string): string {
   const m = /^NE-(\d)/.exec(volume);
   return m ? `Northeast ${m[1]}` : volume.split(' ')[0];
+}
+
+/** Sort key of a runway end id: number, then L < C < R ("9L" < "9R" < "17" < "27L"). */
+function runwayOrder(runway: string | undefined): number {
+  const m = /^(\d+)([LCR]?)$/.exec(runway ?? '');
+  return m ? Number(m[1]) * 10 + 'LCR'.indexOf(m[2]) + 1 : 9999;
 }
 
 function buildCharts(data: ProceduresFile, icao: string): ChartEntry[] {
@@ -176,12 +187,16 @@ function buildCharts(data: ProceduresFile, icao: string): ChartEntry[] {
       if (/^COPTER/i.test(r.chart_name)) e.note = 'Helicopter procedure.';
       return e;
     })
-    .sort((a, b) => {
-      // runway ends like "4L", "22R": number first, then the letter
-      const ra = parseInt(a.runway ?? '', 10);
-      const rb = parseInt(b.runway ?? '', 10);
-      return ra - rb || (a.runway ?? '').localeCompare(b.runway ?? '') || approachRank(a.name) - approachRank(b.name) || a.name.localeCompare(b.name);
-    });
+    .concat(
+      (data.visual_approaches ?? []).map((r): ChartEntry => {
+        const e = base(r, r.chart_name, 'IAP');
+        e.runway = /RWY\s+0?(\d+[LRC]?)/i.exec(r.chart_name)?.[1];
+        e.approachType = 'Visual approach';
+        e.note = 'Visual approach chart (not an instrument procedure).';
+        return e;
+      }),
+    )
+    .sort((a, b) => runwayOrder(a.runway) - runwayOrder(b.runway) || approachRank(a.name) - approachRank(b.name) || a.name.localeCompare(b.name));
   out.push(...iaps);
 
   for (const dp of data.departure_procedures) {
@@ -189,9 +204,13 @@ function buildCharts(data: ProceduresFile, icao: string): ChartEntry[] {
     e.note = /radar vector/i.test(dp.type ?? 'radar vector') ? 'Radar vector departure (runway heading, then vectors); not a SID with a named route.' : (dp.type ?? '');
     if (dp.printed_date) e.printedAmendment = dp.printed_date;
     out.push(e);
-    if (dp.continuation_pdf) out.push({ ...base({ pdf: dp.continuation_pdf }, `${dp.chart_name}, CONT.1`, 'DP'), note: 'Departure route description page.' });
+    // a second PDF page of the same chart (KPHL: the departure route description page)
+    if (dp.continuation_pdf) out.push({ ...base({ pdf: dp.continuation_pdf }, `${dp.chart_name}, CONT.1`, 'DP'), note: 'Continuation page (departure route description).' });
   }
-  for (const st of data.stars ?? []) out.push({ ...base(st, st.chart_name, 'STAR'), ...(st.type ? { note: st.type } : {}) });
+  for (const st of data.stars ?? []) {
+    out.push({ ...base(st, st.chart_name, 'STAR'), ...(st.type ? { note: st.type } : {}) });
+    if (st.continuation_pdf) out.push({ ...base({ pdf: st.continuation_pdf }, `${st.chart_name}, CONT.1`, 'STAR'), note: 'Continuation page (arrival route description).' });
+  }
   for (const r of data.supporting_charts.hot_spot) out.push(base(r, r.chart_name, 'HOT_SPOT'));
   for (const r of data.supporting_charts.lahso) out.push(base(r, r.chart_name, 'LAHSO'));
   for (const r of data.supporting_charts.takeoff_minimums_pdf) {

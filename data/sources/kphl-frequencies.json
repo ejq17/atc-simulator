@@ -1,0 +1,1495 @@
+{
+ "_provenance": {
+  "source": "FAA NASR 28-day subscription, cycle effective 2026-10-01; https://nfdc.faa.gov/webContent/28DaySub/extra/01_Oct_2026_FRQ_CSV.zip (FRQ.csv)",
+  "also_used": [
+   "ATC_BASE.csv",
+   "ATC_ATIS.csv (ATIS phone)",
+   "ATC_RMK.csv",
+   "FAA d-TPP KPHL airport diagram 00320AD.PDF cycle 2610 (cross-check of the printed frequencies)",
+   "FAA d-TPP departure procedure charts (departure facility name)"
+  ],
+  "retrieved": "2026-10-21",
+  "faa_cycle_effective": "2026-10-01",
+  "faa_cycle_next": "2026-10-29",
+  "method": "All rows in FRQ.csv where FACILITY==PHL or SERVICED_FACILITY==PHL, copied verbatim (scripts/extract-nasr-airport.ts). No values from memory.",
+  "raw": "raw/nasr_2026-10-01/x_FRQ_CSV/FRQ.csv"
+ },
+ "facility": {
+  "id": "PHL",
+  "name": "PHILADELPHIA INTL",
+  "type": "ATCT-TRACON",
+  "tower_hours": "24",
+  "radio_call": "PHILADELPHIA",
+  "approach_radio_call": "PHILADELPHIA",
+  "departure_radio_call": "PHILADELPHIA",
+  "approach_provider": "PHL",
+  "approach_provider_name": "PHILADELPHIA INTL",
+  "controlling_artcc": "ZNY (NEW YORK)"
+ },
+ "summary_by_function": {
+  "ATIS": {
+   "vhf": "133.4",
+   "uhf": null,
+   "hours": "24",
+   "phone": null,
+   "note": "FRQ use code D-ATIS (ARR 133.4, DEP 135.925); no plain ATIS row; ATC_ATIS.csv phone . The ASOS row on the same frequency is the automated weather source."
+  },
+  "clearance_delivery": {
+   "vhf": "118.85",
+   "uhf": "348.6",
+   "note": "FRQ CD/P; the airport diagram prints CLNC DEL 118.85 348.6 (CPDLC, PDC)"
+  },
+  "ground": {
+   "vhf": "121.9",
+   "uhf": "348.6",
+   "note": "FRQ GND/P; the airport diagram prints GND CON 121.9 348.6"
+  },
+  "tower": {
+   "vhf": "118.5",
+   "uhf": null,
+   "note": "FRQ LCL/P; the airport diagram prints PHILADELPHIA TOWER 118.5 327.05 (RWYS 09L-27R, 08-26 and 17-35); 135.1 327.05 (RWY 09R-27L)"
+  },
+  "tower_all": [
+   {
+    "freq_mhz": "118.5",
+    "sectorization": "RWY 08/26, 09L/27R, 17/35",
+    "remark": null
+   },
+   {
+    "freq_mhz": "135.1",
+    "sectorization": "RWY 09R/27L",
+    "remark": null
+   }
+  ],
+  "ramp_control": [],
+  "tracon_vhf_rows": [],
+  "class_b_frequencies": [
+   {
+    "freq_mhz": "118.35",
+    "sectorization": "SW 6000 FT & BLW"
+   },
+   {
+    "freq_mhz": "119.75",
+    "sectorization": "SE RWY 09 ACTIVE 10000 FT & BLW"
+   },
+   {
+    "freq_mhz": "119.75",
+    "sectorization": "SE RWY 27 ACTIVE 8500-10000 FT"
+   },
+   {
+    "freq_mhz": "119.75",
+    "sectorization": "SOUTH/SOUTHWEST RWY 27 8500-10000 FT"
+   },
+   {
+    "freq_mhz": "123.8",
+    "sectorization": "NE 6500 FT & BLW"
+   },
+   {
+    "freq_mhz": "124.35",
+    "sectorization": "NE 7000-10000 FT"
+   },
+   {
+    "freq_mhz": "124.35",
+    "sectorization": "NW 8000-10000 FT"
+   },
+   {
+    "freq_mhz": "124.35",
+    "sectorization": "W RWY 09 ACTIVE 8500-10000 FT"
+   },
+   {
+    "freq_mhz": "124.35",
+    "sectorization": "W RWY 27 ACTIVE 10000 FT & BLW"
+   },
+   {
+    "freq_mhz": "126.85",
+    "sectorization": "5500 FT & BLW"
+   },
+   {
+    "freq_mhz": "127.35",
+    "sectorization": "SE-SW 5000 FT & BLW"
+   },
+   {
+    "freq_mhz": "128.4",
+    "sectorization": "NORTH 6500-7500"
+   },
+   {
+    "freq_mhz": "128.4",
+    "sectorization": "WEST RWY 09 ACTIVE 8000 FT & BLW"
+   },
+   {
+    "freq_mhz": "133.875",
+    "sectorization": "6000-8000 FT"
+   },
+   {
+    "freq_mhz": "133.875",
+    "sectorization": "SOUTHEAST RWY 27 5500-7500"
+   },
+   {
+    "freq_mhz": "263.125",
+    "sectorization": "5500 FT & BLW"
+   },
+   {
+    "freq_mhz": "269.25",
+    "sectorization": "SE RWY 09 ACTIVE 10000 FT & BLW"
+   },
+   {
+    "freq_mhz": "269.25",
+    "sectorization": "SE RWY 27 ACTIVE 8500-10000 FT"
+   },
+   {
+    "freq_mhz": "269.25",
+    "sectorization": "SOUTH/SOUTHWEST RWY 27 8500-10000 FT"
+   },
+   {
+    "freq_mhz": "272.575",
+    "sectorization": "NORTH 6500-7500"
+   },
+   {
+    "freq_mhz": "272.575",
+    "sectorization": "WEST RWY 09 ACTIVE 8000 FT & BLW"
+   },
+   {
+    "freq_mhz": "273.575",
+    "sectorization": "N NE 6500-7500"
+   },
+   {
+    "freq_mhz": "273.575",
+    "sectorization": "W RWY 09 ACTIVE 8000 FT & BLW"
+   },
+   {
+    "freq_mhz": "291.7",
+    "sectorization": "NE RWY 27 ACTIVE 5000 FT & BLW"
+   },
+   {
+    "freq_mhz": "317.55",
+    "sectorization": "6000-8000 FT"
+   },
+   {
+    "freq_mhz": "317.55",
+    "sectorization": "RWY 27, 5500-7500 FT"
+   },
+   {
+    "freq_mhz": "317.55",
+    "sectorization": "SE-SW 5000 FT & BLW"
+   },
+   {
+    "freq_mhz": "319.15",
+    "sectorization": "NE 7000-10000 FT"
+   },
+   {
+    "freq_mhz": "319.15",
+    "sectorization": "NW 8000-10000 FT"
+   },
+   {
+    "freq_mhz": "319.15",
+    "sectorization": "WEST RWY 09 ACTIVE 8500-10000 FT"
+   },
+   {
+    "freq_mhz": "323.1",
+    "sectorization": "SW 6000 FT & BLW"
+   }
+  ],
+  "atis_departure": {
+   "vhf": "135.925",
+   "note": "FRQ use code D-ATIS, sectorization DEP (departure ATIS)"
+  },
+  "ground_secondary": [
+   {
+    "vhf": "121.65",
+    "note": "FRQ GND/S (secondary ground control; not printed on the airport diagram)"
+   }
+  ],
+  "tower_additional": [
+   {
+    "vhf": "135.1",
+    "sectorization": "RWY 09R/27L",
+    "note": "further FRQ LCL/P row (a second tower position)"
+   }
+  ],
+  "prm_monitor": [
+   {
+    "vhf": "120.425",
+    "sectorization": "RWY 27L",
+    "note": "FRQ PRM (precision runway monitor); not an ATC position of this simulator"
+   },
+   {
+    "vhf": "123.6",
+    "sectorization": "RWY 26",
+    "note": "FRQ PRM (precision runway monitor); not an ATC position of this simulator"
+   }
+  ],
+  "final_approach": [
+   {
+    "vhf": "125.4",
+    "note": "FRQ FINAL APCH (final approach control); no sector of this simulator"
+   }
+  ],
+  "approach_sectors": [
+   {
+    "freq_mhz": "123.8",
+    "use_code": "APCH/P",
+    "sectorization": "001-089, 5000 FT & BLW",
+    "remark": null
+   },
+   {
+    "freq_mhz": "126.85",
+    "use_code": "APCH/P",
+    "sectorization": "270-360, 5000 FT & BLW",
+    "remark": null
+   },
+   {
+    "freq_mhz": "127.35",
+    "use_code": "APCH/P",
+    "sectorization": "090-269, 5000 FT & BLW",
+    "remark": null
+   },
+   {
+    "freq_mhz": "128.4",
+    "use_code": "APCH/P",
+    "sectorization": "270-089, ABV 5000 FT",
+    "remark": null
+   },
+   {
+    "freq_mhz": "133.875",
+    "use_code": "APCH/P",
+    "sectorization": "090-269, 6000-8000 FT",
+    "remark": null
+   }
+  ],
+  "departure_sectors": [
+   {
+    "freq_mhz": "119.75",
+    "use_code": "DEP/P",
+    "sectorization": "090-269",
+    "remark": null
+   },
+   {
+    "freq_mhz": "124.35",
+    "use_code": "DEP/P",
+    "sectorization": "270-089",
+    "remark": null
+   }
+  ],
+  "named_departure_positions": [
+   {
+    "freq_mhz": "119.75",
+    "use_code": "PHILADELPHIA DP",
+    "sectorization": "SOUTH DEP CON",
+    "remark": null
+   },
+   {
+    "freq_mhz": "124.35",
+    "use_code": "PHILADELPHIA DP",
+    "sectorization": "NORTH DEP CON",
+    "remark": null
+   }
+  ],
+  "star_frequencies": [
+   {
+    "freq_mhz": "128.4",
+    "use_code": "BUNTS STAR",
+    "sectorization": null,
+    "remark": null
+   },
+   {
+    "freq_mhz": "128.4",
+    "use_code": "SLATT STAR",
+    "sectorization": null,
+    "remark": null
+   },
+   {
+    "freq_mhz": "128.4",
+    "use_code": "SPUDS STAR",
+    "sectorization": null,
+    "remark": null
+   },
+   {
+    "freq_mhz": "133.875",
+    "use_code": "JIIMS STAR",
+    "sectorization": null,
+    "remark": null
+   },
+   {
+    "freq_mhz": "133.875",
+    "use_code": "PAATS STAR",
+    "sectorization": null,
+    "remark": null
+   }
+  ],
+  "approach_departure": {
+   "vhf": "124.35",
+   "uhf": "319.15",
+   "sectorization": null,
+   "chart_name": "PHILADELPHIA APP CON 124.35 319.15",
+   "facility": "PHL",
+   "facility_name": "PHILADELPHIA INTL",
+   "radio_call": "PHILADELPHIA",
+   "note": "FRQ APCH/P DEP/P (PHILADELPHIA INTL, serving PHL); no sectorization bearings are published for this row. Approach and departure share this frequency."
+  },
+  "class_c_sector_frequencies": [],
+  "emergency": {
+   "vhf": "121.5",
+   "uhf": "243.0"
+  },
+  "unicom": {
+   "vhf": "122.95",
+   "note": "FRQ use code UNICOM"
+  }
+ },
+ "all_frequencies_serving_airport": [
+  {
+   "freq_mhz": "118.35",
+   "use_code": "CLASS B",
+   "sectorization": "SW 6000 FT & BLW",
+   "remark": null,
+   "facility": "PHL",
+   "facility_name": "PHILADELPHIA INTL",
+   "facility_type": "ATCT-TRACON",
+   "serviced_facility": "PHL",
+   "serviced_site_type": "AIRPORT",
+   "radio_call": "PHILADELPHIA",
+   "approach_radio_call": "PHILADELPHIA",
+   "band": "VHF"
+  },
+  {
+   "freq_mhz": "118.5",
+   "use_code": "LCL/P",
+   "sectorization": "RWY 08/26, 09L/27R, 17/35",
+   "remark": null,
+   "facility": "PHL",
+   "facility_name": "PHILADELPHIA INTL",
+   "facility_type": "ATCT-TRACON",
+   "serviced_facility": "PHL",
+   "serviced_site_type": "AIRPORT",
+   "radio_call": "PHILADELPHIA",
+   "approach_radio_call": "PHILADELPHIA",
+   "band": "VHF"
+  },
+  {
+   "freq_mhz": "118.85",
+   "use_code": "CD/P",
+   "sectorization": null,
+   "remark": null,
+   "facility": "PHL",
+   "facility_name": "PHILADELPHIA INTL",
+   "facility_type": "ATCT-TRACON",
+   "serviced_facility": "PHL",
+   "serviced_site_type": "AIRPORT",
+   "radio_call": "PHILADELPHIA",
+   "approach_radio_call": "PHILADELPHIA",
+   "band": "VHF"
+  },
+  {
+   "freq_mhz": "119.75",
+   "use_code": "CLASS B",
+   "sectorization": "SE RWY 09 ACTIVE 10000 FT & BLW",
+   "remark": null,
+   "facility": "PHL",
+   "facility_name": "PHILADELPHIA INTL",
+   "facility_type": "ATCT-TRACON",
+   "serviced_facility": "PHL",
+   "serviced_site_type": "AIRPORT",
+   "radio_call": "PHILADELPHIA",
+   "approach_radio_call": "PHILADELPHIA",
+   "band": "VHF"
+  },
+  {
+   "freq_mhz": "119.75",
+   "use_code": "CLASS B",
+   "sectorization": "SE RWY 27 ACTIVE 8500-10000 FT",
+   "remark": null,
+   "facility": "PHL",
+   "facility_name": "PHILADELPHIA INTL",
+   "facility_type": "ATCT-TRACON",
+   "serviced_facility": "PHL",
+   "serviced_site_type": "AIRPORT",
+   "radio_call": "PHILADELPHIA",
+   "approach_radio_call": "PHILADELPHIA",
+   "band": "VHF"
+  },
+  {
+   "freq_mhz": "119.75",
+   "use_code": "CLASS B",
+   "sectorization": "SOUTH/SOUTHWEST RWY 27 8500-10000 FT",
+   "remark": null,
+   "facility": "PHL",
+   "facility_name": "PHILADELPHIA INTL",
+   "facility_type": "ATCT-TRACON",
+   "serviced_facility": "PHL",
+   "serviced_site_type": "AIRPORT",
+   "radio_call": "PHILADELPHIA",
+   "approach_radio_call": "PHILADELPHIA",
+   "band": "VHF"
+  },
+  {
+   "freq_mhz": "119.75",
+   "use_code": "DEP/P",
+   "sectorization": "090-269",
+   "remark": null,
+   "facility": "PHL",
+   "facility_name": "PHILADELPHIA INTL",
+   "facility_type": "ATCT-TRACON",
+   "serviced_facility": "PHL",
+   "serviced_site_type": "AIRPORT",
+   "radio_call": "PHILADELPHIA",
+   "approach_radio_call": "PHILADELPHIA",
+   "band": "VHF"
+  },
+  {
+   "freq_mhz": "119.75",
+   "use_code": "PHILADELPHIA DP",
+   "sectorization": "SOUTH DEP CON",
+   "remark": null,
+   "facility": "PHL",
+   "facility_name": "PHILADELPHIA INTL",
+   "facility_type": "ATCT-TRACON",
+   "serviced_facility": "PHL",
+   "serviced_site_type": "AIRPORT",
+   "radio_call": "PHILADELPHIA",
+   "approach_radio_call": "PHILADELPHIA",
+   "band": "VHF"
+  },
+  {
+   "freq_mhz": "120.425",
+   "use_code": "PRM",
+   "sectorization": "RWY 27L",
+   "remark": null,
+   "facility": "PHL",
+   "facility_name": "PHILADELPHIA INTL",
+   "facility_type": "ATCT-TRACON",
+   "serviced_facility": "PHL",
+   "serviced_site_type": "AIRPORT",
+   "radio_call": "PHILADELPHIA",
+   "approach_radio_call": "PHILADELPHIA",
+   "band": "VHF"
+  },
+  {
+   "freq_mhz": "121.5",
+   "use_code": "EMERG",
+   "sectorization": null,
+   "remark": null,
+   "facility": "PHL",
+   "facility_name": "PHILADELPHIA INTL",
+   "facility_type": "ATCT-TRACON",
+   "serviced_facility": "PHL",
+   "serviced_site_type": "AIRPORT",
+   "radio_call": "PHILADELPHIA",
+   "approach_radio_call": "PHILADELPHIA",
+   "band": "VHF"
+  },
+  {
+   "freq_mhz": "121.65",
+   "use_code": "GND/S",
+   "sectorization": null,
+   "remark": null,
+   "facility": "PHL",
+   "facility_name": "PHILADELPHIA INTL",
+   "facility_type": "ATCT-TRACON",
+   "serviced_facility": "PHL",
+   "serviced_site_type": "AIRPORT",
+   "radio_call": "PHILADELPHIA",
+   "approach_radio_call": "PHILADELPHIA",
+   "band": "VHF"
+  },
+  {
+   "freq_mhz": "121.9",
+   "use_code": "GND/P",
+   "sectorization": null,
+   "remark": null,
+   "facility": "PHL",
+   "facility_name": "PHILADELPHIA INTL",
+   "facility_type": "ATCT-TRACON",
+   "serviced_facility": "PHL",
+   "serviced_site_type": "AIRPORT",
+   "radio_call": "PHILADELPHIA",
+   "approach_radio_call": "PHILADELPHIA",
+   "band": "VHF"
+  },
+  {
+   "freq_mhz": "122.95",
+   "use_code": "UNICOM",
+   "sectorization": null,
+   "remark": null,
+   "facility": "PHL",
+   "facility_name": "PHILADELPHIA INTL",
+   "facility_type": "ATCT-TRACON",
+   "serviced_facility": "PHL",
+   "serviced_site_type": "AIRPORT",
+   "radio_call": null,
+   "approach_radio_call": null,
+   "band": "VHF"
+  },
+  {
+   "freq_mhz": "123.6",
+   "use_code": "PRM",
+   "sectorization": "RWY 26",
+   "remark": null,
+   "facility": "PHL",
+   "facility_name": "PHILADELPHIA INTL",
+   "facility_type": "ATCT-TRACON",
+   "serviced_facility": "PHL",
+   "serviced_site_type": "AIRPORT",
+   "radio_call": "PHILADELPHIA",
+   "approach_radio_call": "PHILADELPHIA",
+   "band": "VHF"
+  },
+  {
+   "freq_mhz": "123.8",
+   "use_code": "5500 & BLO",
+   "sectorization": "NORTH",
+   "remark": null,
+   "facility": "PHL",
+   "facility_name": "PHILADELPHIA INTL",
+   "facility_type": "ATCT-TRACON",
+   "serviced_facility": "PHL",
+   "serviced_site_type": "AIRPORT",
+   "radio_call": "PHILADELPHIA",
+   "approach_radio_call": "PHILADELPHIA",
+   "band": "VHF"
+  },
+  {
+   "freq_mhz": "123.8",
+   "use_code": "APCH/P",
+   "sectorization": "001-089, 5000 FT & BLW",
+   "remark": null,
+   "facility": "PHL",
+   "facility_name": "PHILADELPHIA INTL",
+   "facility_type": "ATCT-TRACON",
+   "serviced_facility": "PHL",
+   "serviced_site_type": "AIRPORT",
+   "radio_call": "PHILADELPHIA",
+   "approach_radio_call": "PHILADELPHIA",
+   "band": "VHF"
+  },
+  {
+   "freq_mhz": "123.8",
+   "use_code": "CLASS B",
+   "sectorization": "NE 6500 FT & BLW",
+   "remark": null,
+   "facility": "PHL",
+   "facility_name": "PHILADELPHIA INTL",
+   "facility_type": "ATCT-TRACON",
+   "serviced_facility": "PHL",
+   "serviced_site_type": "AIRPORT",
+   "radio_call": "PHILADELPHIA",
+   "approach_radio_call": "PHILADELPHIA",
+   "band": "VHF"
+  },
+  {
+   "freq_mhz": "124.35",
+   "use_code": "APCH/P DEP/P IC",
+   "sectorization": null,
+   "remark": null,
+   "facility": "PHL",
+   "facility_name": "PHILADELPHIA INTL",
+   "facility_type": "ATCT-TRACON",
+   "serviced_facility": "PHL",
+   "serviced_site_type": "AIRPORT",
+   "radio_call": "PHILADELPHIA",
+   "approach_radio_call": "PHILADELPHIA",
+   "band": "VHF"
+  },
+  {
+   "freq_mhz": "124.35",
+   "use_code": "CLASS B",
+   "sectorization": "NE 7000-10000 FT",
+   "remark": null,
+   "facility": "PHL",
+   "facility_name": "PHILADELPHIA INTL",
+   "facility_type": "ATCT-TRACON",
+   "serviced_facility": "PHL",
+   "serviced_site_type": "AIRPORT",
+   "radio_call": "PHILADELPHIA",
+   "approach_radio_call": "PHILADELPHIA",
+   "band": "VHF"
+  },
+  {
+   "freq_mhz": "124.35",
+   "use_code": "CLASS B",
+   "sectorization": "NW 8000-10000 FT",
+   "remark": null,
+   "facility": "PHL",
+   "facility_name": "PHILADELPHIA INTL",
+   "facility_type": "ATCT-TRACON",
+   "serviced_facility": "PHL",
+   "serviced_site_type": "AIRPORT",
+   "radio_call": "PHILADELPHIA",
+   "approach_radio_call": "PHILADELPHIA",
+   "band": "VHF"
+  },
+  {
+   "freq_mhz": "124.35",
+   "use_code": "CLASS B",
+   "sectorization": "W RWY 09 ACTIVE 8500-10000 FT",
+   "remark": null,
+   "facility": "PHL",
+   "facility_name": "PHILADELPHIA INTL",
+   "facility_type": "ATCT-TRACON",
+   "serviced_facility": "PHL",
+   "serviced_site_type": "AIRPORT",
+   "radio_call": "PHILADELPHIA",
+   "approach_radio_call": "PHILADELPHIA",
+   "band": "VHF"
+  },
+  {
+   "freq_mhz": "124.35",
+   "use_code": "CLASS B",
+   "sectorization": "W RWY 27 ACTIVE 10000 FT & BLW",
+   "remark": null,
+   "facility": "PHL",
+   "facility_name": "PHILADELPHIA INTL",
+   "facility_type": "ATCT-TRACON",
+   "serviced_facility": "PHL",
+   "serviced_site_type": "AIRPORT",
+   "radio_call": "PHILADELPHIA",
+   "approach_radio_call": "PHILADELPHIA",
+   "band": "VHF"
+  },
+  {
+   "freq_mhz": "124.35",
+   "use_code": "DEP/P",
+   "sectorization": "270-089",
+   "remark": null,
+   "facility": "PHL",
+   "facility_name": "PHILADELPHIA INTL",
+   "facility_type": "ATCT-TRACON",
+   "serviced_facility": "PHL",
+   "serviced_site_type": "AIRPORT",
+   "radio_call": "PHILADELPHIA",
+   "approach_radio_call": "PHILADELPHIA",
+   "band": "VHF"
+  },
+  {
+   "freq_mhz": "124.35",
+   "use_code": "PHILADELPHIA DP",
+   "sectorization": "NORTH DEP CON",
+   "remark": null,
+   "facility": "PHL",
+   "facility_name": "PHILADELPHIA INTL",
+   "facility_type": "ATCT-TRACON",
+   "serviced_facility": "PHL",
+   "serviced_site_type": "AIRPORT",
+   "radio_call": "PHILADELPHIA",
+   "approach_radio_call": "PHILADELPHIA",
+   "band": "VHF"
+  },
+  {
+   "freq_mhz": "125.4",
+   "use_code": "FINAL APCH",
+   "sectorization": null,
+   "remark": null,
+   "facility": "PHL",
+   "facility_name": "PHILADELPHIA INTL",
+   "facility_type": "ATCT-TRACON",
+   "serviced_facility": "PHL",
+   "serviced_site_type": "AIRPORT",
+   "radio_call": "PHILADELPHIA",
+   "approach_radio_call": "PHILADELPHIA",
+   "band": "VHF"
+  },
+  {
+   "freq_mhz": "126.85",
+   "use_code": "APCH/P",
+   "sectorization": "270-360, 5000 FT & BLW",
+   "remark": null,
+   "facility": "PHL",
+   "facility_name": "PHILADELPHIA INTL",
+   "facility_type": "ATCT-TRACON",
+   "serviced_facility": "PHL",
+   "serviced_site_type": "AIRPORT",
+   "radio_call": "PHILADELPHIA",
+   "approach_radio_call": "PHILADELPHIA",
+   "band": "VHF"
+  },
+  {
+   "freq_mhz": "126.85",
+   "use_code": "CLASS B",
+   "sectorization": "5500 FT & BLW",
+   "remark": null,
+   "facility": "PHL",
+   "facility_name": "PHILADELPHIA INTL",
+   "facility_type": "ATCT-TRACON",
+   "serviced_facility": "PHL",
+   "serviced_site_type": "AIRPORT",
+   "radio_call": "PHILADELPHIA",
+   "approach_radio_call": "PHILADELPHIA",
+   "band": "VHF"
+  },
+  {
+   "freq_mhz": "127.35",
+   "use_code": "APCH/P",
+   "sectorization": "090-269, 5000 FT & BLW",
+   "remark": null,
+   "facility": "PHL",
+   "facility_name": "PHILADELPHIA INTL",
+   "facility_type": "ATCT-TRACON",
+   "serviced_facility": "PHL",
+   "serviced_site_type": "AIRPORT",
+   "radio_call": "PHILADELPHIA",
+   "approach_radio_call": "PHILADELPHIA",
+   "band": "VHF"
+  },
+  {
+   "freq_mhz": "127.35",
+   "use_code": "CLASS B",
+   "sectorization": "SE-SW 5000 FT & BLW",
+   "remark": null,
+   "facility": "PHL",
+   "facility_name": "PHILADELPHIA INTL",
+   "facility_type": "ATCT-TRACON",
+   "serviced_facility": "PHL",
+   "serviced_site_type": "AIRPORT",
+   "radio_call": "PHILADELPHIA",
+   "approach_radio_call": "PHILADELPHIA",
+   "band": "VHF"
+  },
+  {
+   "freq_mhz": "128.4",
+   "use_code": "APCH/P",
+   "sectorization": "270-089, ABV 5000 FT",
+   "remark": null,
+   "facility": "PHL",
+   "facility_name": "PHILADELPHIA INTL",
+   "facility_type": "ATCT-TRACON",
+   "serviced_facility": "PHL",
+   "serviced_site_type": "AIRPORT",
+   "radio_call": "PHILADELPHIA",
+   "approach_radio_call": "PHILADELPHIA",
+   "band": "VHF"
+  },
+  {
+   "freq_mhz": "128.4",
+   "use_code": "BUNTS STAR",
+   "sectorization": null,
+   "remark": null,
+   "facility": "PHL",
+   "facility_name": "PHILADELPHIA INTL",
+   "facility_type": "ATCT-TRACON",
+   "serviced_facility": "PHL",
+   "serviced_site_type": "AIRPORT",
+   "radio_call": "PHILADELPHIA",
+   "approach_radio_call": "PHILADELPHIA",
+   "band": "VHF"
+  },
+  {
+   "freq_mhz": "128.4",
+   "use_code": "CLASS B",
+   "sectorization": "NORTH 6500-7500",
+   "remark": null,
+   "facility": "PHL",
+   "facility_name": "PHILADELPHIA INTL",
+   "facility_type": "ATCT-TRACON",
+   "serviced_facility": "PHL",
+   "serviced_site_type": "AIRPORT",
+   "radio_call": "PHILADELPHIA",
+   "approach_radio_call": "PHILADELPHIA",
+   "band": "VHF"
+  },
+  {
+   "freq_mhz": "128.4",
+   "use_code": "CLASS B",
+   "sectorization": "WEST RWY 09 ACTIVE 8000 FT & BLW",
+   "remark": null,
+   "facility": "PHL",
+   "facility_name": "PHILADELPHIA INTL",
+   "facility_type": "ATCT-TRACON",
+   "serviced_facility": "PHL",
+   "serviced_site_type": "AIRPORT",
+   "radio_call": "PHILADELPHIA",
+   "approach_radio_call": "PHILADELPHIA",
+   "band": "VHF"
+  },
+  {
+   "freq_mhz": "128.4",
+   "use_code": "SLATT STAR",
+   "sectorization": null,
+   "remark": null,
+   "facility": "PHL",
+   "facility_name": "PHILADELPHIA INTL",
+   "facility_type": "ATCT-TRACON",
+   "serviced_facility": "PHL",
+   "serviced_site_type": "AIRPORT",
+   "radio_call": "PHILADELPHIA",
+   "approach_radio_call": "PHILADELPHIA",
+   "band": "VHF"
+  },
+  {
+   "freq_mhz": "128.4",
+   "use_code": "SPUDS STAR",
+   "sectorization": null,
+   "remark": null,
+   "facility": "PHL",
+   "facility_name": "PHILADELPHIA INTL",
+   "facility_type": "ATCT-TRACON",
+   "serviced_facility": "PHL",
+   "serviced_site_type": "AIRPORT",
+   "radio_call": "PHILADELPHIA",
+   "approach_radio_call": "PHILADELPHIA",
+   "band": "VHF"
+  },
+  {
+   "freq_mhz": "133.4",
+   "use_code": "D-ATIS",
+   "sectorization": "ARR",
+   "remark": null,
+   "facility": "PHL",
+   "facility_name": "PHILADELPHIA INTL",
+   "facility_type": "ATCT-TRACON",
+   "serviced_facility": "PHL",
+   "serviced_site_type": "AIRPORT",
+   "radio_call": "PHILADELPHIA",
+   "approach_radio_call": "PHILADELPHIA",
+   "band": "VHF"
+  },
+  {
+   "freq_mhz": "133.875",
+   "use_code": "APCH/P",
+   "sectorization": "090-269, 6000-8000 FT",
+   "remark": null,
+   "facility": "PHL",
+   "facility_name": "PHILADELPHIA INTL",
+   "facility_type": "ATCT-TRACON",
+   "serviced_facility": "PHL",
+   "serviced_site_type": "AIRPORT",
+   "radio_call": "PHILADELPHIA",
+   "approach_radio_call": "PHILADELPHIA",
+   "band": "VHF"
+  },
+  {
+   "freq_mhz": "133.875",
+   "use_code": "CLASS B",
+   "sectorization": "6000-8000 FT",
+   "remark": null,
+   "facility": "PHL",
+   "facility_name": "PHILADELPHIA INTL",
+   "facility_type": "ATCT-TRACON",
+   "serviced_facility": "PHL",
+   "serviced_site_type": "AIRPORT",
+   "radio_call": "PHILADELPHIA",
+   "approach_radio_call": "PHILADELPHIA",
+   "band": "VHF"
+  },
+  {
+   "freq_mhz": "133.875",
+   "use_code": "CLASS B",
+   "sectorization": "SOUTHEAST RWY 27 5500-7500",
+   "remark": null,
+   "facility": "PHL",
+   "facility_name": "PHILADELPHIA INTL",
+   "facility_type": "ATCT-TRACON",
+   "serviced_facility": "PHL",
+   "serviced_site_type": "AIRPORT",
+   "radio_call": "PHILADELPHIA",
+   "approach_radio_call": "PHILADELPHIA",
+   "band": "VHF"
+  },
+  {
+   "freq_mhz": "133.875",
+   "use_code": "JIIMS STAR",
+   "sectorization": null,
+   "remark": null,
+   "facility": "PHL",
+   "facility_name": "PHILADELPHIA INTL",
+   "facility_type": "ATCT-TRACON",
+   "serviced_facility": "PHL",
+   "serviced_site_type": "AIRPORT",
+   "radio_call": "PHILADELPHIA",
+   "approach_radio_call": "PHILADELPHIA",
+   "band": "VHF"
+  },
+  {
+   "freq_mhz": "133.875",
+   "use_code": "PAATS STAR",
+   "sectorization": null,
+   "remark": null,
+   "facility": "PHL",
+   "facility_name": "PHILADELPHIA INTL",
+   "facility_type": "ATCT-TRACON",
+   "serviced_facility": "PHL",
+   "serviced_site_type": "AIRPORT",
+   "radio_call": "PHILADELPHIA",
+   "approach_radio_call": "PHILADELPHIA",
+   "band": "VHF"
+  },
+  {
+   "freq_mhz": "135.1",
+   "use_code": "LCL/P",
+   "sectorization": "RWY 09R/27L",
+   "remark": null,
+   "facility": "PHL",
+   "facility_name": "PHILADELPHIA INTL",
+   "facility_type": "ATCT-TRACON",
+   "serviced_facility": "PHL",
+   "serviced_site_type": "AIRPORT",
+   "radio_call": "PHILADELPHIA",
+   "approach_radio_call": "PHILADELPHIA",
+   "band": "VHF"
+  },
+  {
+   "freq_mhz": "135.925",
+   "use_code": "D-ATIS",
+   "sectorization": "DEP",
+   "remark": null,
+   "facility": "PHL",
+   "facility_name": "PHILADELPHIA INTL",
+   "facility_type": "ATCT-TRACON",
+   "serviced_facility": "PHL",
+   "serviced_site_type": "AIRPORT",
+   "radio_call": "PHILADELPHIA",
+   "approach_radio_call": "PHILADELPHIA",
+   "band": "VHF"
+  },
+  {
+   "freq_mhz": "243.0",
+   "use_code": "EMERG",
+   "sectorization": null,
+   "remark": null,
+   "facility": "PHL",
+   "facility_name": "PHILADELPHIA INTL",
+   "facility_type": "ATCT-TRACON",
+   "serviced_facility": "PHL",
+   "serviced_site_type": "AIRPORT",
+   "radio_call": "PHILADELPHIA",
+   "approach_radio_call": "PHILADELPHIA",
+   "band": "UHF"
+  },
+  {
+   "freq_mhz": "263.125",
+   "use_code": "APCH/P",
+   "sectorization": "270-360, 5000 FT & BLW",
+   "remark": null,
+   "facility": "PHL",
+   "facility_name": "PHILADELPHIA INTL",
+   "facility_type": "ATCT-TRACON",
+   "serviced_facility": "PHL",
+   "serviced_site_type": "AIRPORT",
+   "radio_call": "PHILADELPHIA",
+   "approach_radio_call": "PHILADELPHIA",
+   "band": "UHF"
+  },
+  {
+   "freq_mhz": "263.125",
+   "use_code": "CLASS B",
+   "sectorization": "5500 FT & BLW",
+   "remark": null,
+   "facility": "PHL",
+   "facility_name": "PHILADELPHIA INTL",
+   "facility_type": "ATCT-TRACON",
+   "serviced_facility": "PHL",
+   "serviced_site_type": "AIRPORT",
+   "radio_call": "PHILADELPHIA",
+   "approach_radio_call": "PHILADELPHIA",
+   "band": "UHF"
+  },
+  {
+   "freq_mhz": "269.25",
+   "use_code": "CLASS B",
+   "sectorization": "SE RWY 09 ACTIVE 10000 FT & BLW",
+   "remark": null,
+   "facility": "PHL",
+   "facility_name": "PHILADELPHIA INTL",
+   "facility_type": "ATCT-TRACON",
+   "serviced_facility": "PHL",
+   "serviced_site_type": "AIRPORT",
+   "radio_call": "PHILADELPHIA",
+   "approach_radio_call": "PHILADELPHIA",
+   "band": "UHF"
+  },
+  {
+   "freq_mhz": "269.25",
+   "use_code": "CLASS B",
+   "sectorization": "SE RWY 27 ACTIVE 8500-10000 FT",
+   "remark": null,
+   "facility": "PHL",
+   "facility_name": "PHILADELPHIA INTL",
+   "facility_type": "ATCT-TRACON",
+   "serviced_facility": "PHL",
+   "serviced_site_type": "AIRPORT",
+   "radio_call": "PHILADELPHIA",
+   "approach_radio_call": "PHILADELPHIA",
+   "band": "UHF"
+  },
+  {
+   "freq_mhz": "269.25",
+   "use_code": "CLASS B",
+   "sectorization": "SOUTH/SOUTHWEST RWY 27 8500-10000 FT",
+   "remark": null,
+   "facility": "PHL",
+   "facility_name": "PHILADELPHIA INTL",
+   "facility_type": "ATCT-TRACON",
+   "serviced_facility": "PHL",
+   "serviced_site_type": "AIRPORT",
+   "radio_call": "PHILADELPHIA",
+   "approach_radio_call": "PHILADELPHIA",
+   "band": "UHF"
+  },
+  {
+   "freq_mhz": "269.25",
+   "use_code": "DEP/P",
+   "sectorization": "090-269",
+   "remark": null,
+   "facility": "PHL",
+   "facility_name": "PHILADELPHIA INTL",
+   "facility_type": "ATCT-TRACON",
+   "serviced_facility": "PHL",
+   "serviced_site_type": "AIRPORT",
+   "radio_call": "PHILADELPHIA",
+   "approach_radio_call": "PHILADELPHIA",
+   "band": "UHF"
+  },
+  {
+   "freq_mhz": "269.25",
+   "use_code": "PHILADELPHIA DP",
+   "sectorization": "SOUTH DEP CON",
+   "remark": null,
+   "facility": "PHL",
+   "facility_name": "PHILADELPHIA INTL",
+   "facility_type": "ATCT-TRACON",
+   "serviced_facility": "PHL",
+   "serviced_site_type": "AIRPORT",
+   "radio_call": "PHILADELPHIA",
+   "approach_radio_call": "PHILADELPHIA",
+   "band": "UHF"
+  },
+  {
+   "freq_mhz": "272.575",
+   "use_code": "APCH/P",
+   "sectorization": "270-089, ABV 5000 FT",
+   "remark": null,
+   "facility": "PHL",
+   "facility_name": "PHILADELPHIA INTL",
+   "facility_type": "ATCT-TRACON",
+   "serviced_facility": "PHL",
+   "serviced_site_type": "AIRPORT",
+   "radio_call": "PHILADELPHIA",
+   "approach_radio_call": "PHILADELPHIA",
+   "band": "UHF"
+  },
+  {
+   "freq_mhz": "272.575",
+   "use_code": "BUNTS STAR",
+   "sectorization": null,
+   "remark": null,
+   "facility": "PHL",
+   "facility_name": "PHILADELPHIA INTL",
+   "facility_type": "ATCT-TRACON",
+   "serviced_facility": "PHL",
+   "serviced_site_type": "AIRPORT",
+   "radio_call": "PHILADELPHIA",
+   "approach_radio_call": "PHILADELPHIA",
+   "band": "UHF"
+  },
+  {
+   "freq_mhz": "272.575",
+   "use_code": "CLASS B",
+   "sectorization": "NORTH 6500-7500",
+   "remark": null,
+   "facility": "PHL",
+   "facility_name": "PHILADELPHIA INTL",
+   "facility_type": "ATCT-TRACON",
+   "serviced_facility": "PHL",
+   "serviced_site_type": "AIRPORT",
+   "radio_call": "PHILADELPHIA",
+   "approach_radio_call": "PHILADELPHIA",
+   "band": "UHF"
+  },
+  {
+   "freq_mhz": "272.575",
+   "use_code": "CLASS B",
+   "sectorization": "WEST RWY 09 ACTIVE 8000 FT & BLW",
+   "remark": null,
+   "facility": "PHL",
+   "facility_name": "PHILADELPHIA INTL",
+   "facility_type": "ATCT-TRACON",
+   "serviced_facility": "PHL",
+   "serviced_site_type": "AIRPORT",
+   "radio_call": "PHILADELPHIA",
+   "approach_radio_call": "PHILADELPHIA",
+   "band": "UHF"
+  },
+  {
+   "freq_mhz": "272.575",
+   "use_code": "SPUDS STAR",
+   "sectorization": null,
+   "remark": null,
+   "facility": "PHL",
+   "facility_name": "PHILADELPHIA INTL",
+   "facility_type": "ATCT-TRACON",
+   "serviced_facility": "PHL",
+   "serviced_site_type": "AIRPORT",
+   "radio_call": "PHILADELPHIA",
+   "approach_radio_call": "PHILADELPHIA",
+   "band": "UHF"
+  },
+  {
+   "freq_mhz": "273.575",
+   "use_code": "APCH/P",
+   "sectorization": "270-089, ABV 5000 FT",
+   "remark": null,
+   "facility": "PHL",
+   "facility_name": "PHILADELPHIA INTL",
+   "facility_type": "ATCT-TRACON",
+   "serviced_facility": "PHL",
+   "serviced_site_type": "AIRPORT",
+   "radio_call": "PHILADELPHIA",
+   "approach_radio_call": "PHILADELPHIA",
+   "band": "UHF"
+  },
+  {
+   "freq_mhz": "273.575",
+   "use_code": "CLASS B",
+   "sectorization": "N NE 6500-7500",
+   "remark": null,
+   "facility": "PHL",
+   "facility_name": "PHILADELPHIA INTL",
+   "facility_type": "ATCT-TRACON",
+   "serviced_facility": "PHL",
+   "serviced_site_type": "AIRPORT",
+   "radio_call": "PHILADELPHIA",
+   "approach_radio_call": "PHILADELPHIA",
+   "band": "UHF"
+  },
+  {
+   "freq_mhz": "273.575",
+   "use_code": "CLASS B",
+   "sectorization": "W RWY 09 ACTIVE 8000 FT & BLW",
+   "remark": null,
+   "facility": "PHL",
+   "facility_name": "PHILADELPHIA INTL",
+   "facility_type": "ATCT-TRACON",
+   "serviced_facility": "PHL",
+   "serviced_site_type": "AIRPORT",
+   "radio_call": "PHILADELPHIA",
+   "approach_radio_call": "PHILADELPHIA",
+   "band": "UHF"
+  },
+  {
+   "freq_mhz": "273.575",
+   "use_code": "SLATT STAR",
+   "sectorization": null,
+   "remark": null,
+   "facility": "PHL",
+   "facility_name": "PHILADELPHIA INTL",
+   "facility_type": "ATCT-TRACON",
+   "serviced_facility": "PHL",
+   "serviced_site_type": "AIRPORT",
+   "radio_call": "PHILADELPHIA",
+   "approach_radio_call": "PHILADELPHIA",
+   "band": "UHF"
+  },
+  {
+   "freq_mhz": "291.7",
+   "use_code": "5500 & BLO",
+   "sectorization": "NORTH",
+   "remark": null,
+   "facility": "PHL",
+   "facility_name": "PHILADELPHIA INTL",
+   "facility_type": "ATCT-TRACON",
+   "serviced_facility": "PHL",
+   "serviced_site_type": "AIRPORT",
+   "radio_call": "PHILADELPHIA",
+   "approach_radio_call": "PHILADELPHIA",
+   "band": "UHF"
+  },
+  {
+   "freq_mhz": "291.7",
+   "use_code": "APCH/P",
+   "sectorization": "001-089, 5000 FT & BLW",
+   "remark": null,
+   "facility": "PHL",
+   "facility_name": "PHILADELPHIA INTL",
+   "facility_type": "ATCT-TRACON",
+   "serviced_facility": "PHL",
+   "serviced_site_type": "AIRPORT",
+   "radio_call": "PHILADELPHIA",
+   "approach_radio_call": "PHILADELPHIA",
+   "band": "UHF"
+  },
+  {
+   "freq_mhz": "291.7",
+   "use_code": "CLASS B",
+   "sectorization": "NE RWY 27 ACTIVE 5000 FT & BLW",
+   "remark": null,
+   "facility": "PHL",
+   "facility_name": "PHILADELPHIA INTL",
+   "facility_type": "ATCT-TRACON",
+   "serviced_facility": "PHL",
+   "serviced_site_type": "AIRPORT",
+   "radio_call": "PHILADELPHIA",
+   "approach_radio_call": "PHILADELPHIA",
+   "band": "UHF"
+  },
+  {
+   "freq_mhz": "317.55",
+   "use_code": "APCH/P",
+   "sectorization": "090-269 6000-8000 FT",
+   "remark": null,
+   "facility": "PHL",
+   "facility_name": "PHILADELPHIA INTL",
+   "facility_type": "ATCT-TRACON",
+   "serviced_facility": "PHL",
+   "serviced_site_type": "AIRPORT",
+   "radio_call": "PHILADELPHIA",
+   "approach_radio_call": "PHILADELPHIA",
+   "band": "UHF"
+  },
+  {
+   "freq_mhz": "317.55",
+   "use_code": "APCH/P",
+   "sectorization": "090-269, 5000 FT & BLW",
+   "remark": null,
+   "facility": "PHL",
+   "facility_name": "PHILADELPHIA INTL",
+   "facility_type": "ATCT-TRACON",
+   "serviced_facility": "PHL",
+   "serviced_site_type": "AIRPORT",
+   "radio_call": "PHILADELPHIA",
+   "approach_radio_call": "PHILADELPHIA",
+   "band": "UHF"
+  },
+  {
+   "freq_mhz": "317.55",
+   "use_code": "CLASS B",
+   "sectorization": "6000-8000 FT",
+   "remark": null,
+   "facility": "PHL",
+   "facility_name": "PHILADELPHIA INTL",
+   "facility_type": "ATCT-TRACON",
+   "serviced_facility": "PHL",
+   "serviced_site_type": "AIRPORT",
+   "radio_call": "PHILADELPHIA",
+   "approach_radio_call": "PHILADELPHIA",
+   "band": "UHF"
+  },
+  {
+   "freq_mhz": "317.55",
+   "use_code": "CLASS B",
+   "sectorization": "RWY 27, 5500-7500 FT",
+   "remark": null,
+   "facility": "PHL",
+   "facility_name": "PHILADELPHIA INTL",
+   "facility_type": "ATCT-TRACON",
+   "serviced_facility": "PHL",
+   "serviced_site_type": "AIRPORT",
+   "radio_call": "PHILADELPHIA",
+   "approach_radio_call": "PHILADELPHIA",
+   "band": "UHF"
+  },
+  {
+   "freq_mhz": "317.55",
+   "use_code": "CLASS B",
+   "sectorization": "SE-SW 5000 FT & BLW",
+   "remark": null,
+   "facility": "PHL",
+   "facility_name": "PHILADELPHIA INTL",
+   "facility_type": "ATCT-TRACON",
+   "serviced_facility": "PHL",
+   "serviced_site_type": "AIRPORT",
+   "radio_call": "PHILADELPHIA",
+   "approach_radio_call": "PHILADELPHIA",
+   "band": "UHF"
+  },
+  {
+   "freq_mhz": "317.55",
+   "use_code": "JIIMS STAR",
+   "sectorization": null,
+   "remark": null,
+   "facility": "PHL",
+   "facility_name": "PHILADELPHIA INTL",
+   "facility_type": "ATCT-TRACON",
+   "serviced_facility": "PHL",
+   "serviced_site_type": "AIRPORT",
+   "radio_call": "PHILADELPHIA",
+   "approach_radio_call": "PHILADELPHIA",
+   "band": "UHF"
+  },
+  {
+   "freq_mhz": "317.55",
+   "use_code": "PAATS STAR",
+   "sectorization": null,
+   "remark": null,
+   "facility": "PHL",
+   "facility_name": "PHILADELPHIA INTL",
+   "facility_type": "ATCT-TRACON",
+   "serviced_facility": "PHL",
+   "serviced_site_type": "AIRPORT",
+   "radio_call": "PHILADELPHIA",
+   "approach_radio_call": "PHILADELPHIA",
+   "band": "UHF"
+  },
+  {
+   "freq_mhz": "319.15",
+   "use_code": "APCH/P DEP/P IC",
+   "sectorization": null,
+   "remark": null,
+   "facility": "PHL",
+   "facility_name": "PHILADELPHIA INTL",
+   "facility_type": "ATCT-TRACON",
+   "serviced_facility": "PHL",
+   "serviced_site_type": "AIRPORT",
+   "radio_call": "PHILADELPHIA",
+   "approach_radio_call": "PHILADELPHIA",
+   "band": "UHF"
+  },
+  {
+   "freq_mhz": "319.15",
+   "use_code": "CLASS B",
+   "sectorization": "NE 7000-10000 FT",
+   "remark": null,
+   "facility": "PHL",
+   "facility_name": "PHILADELPHIA INTL",
+   "facility_type": "ATCT-TRACON",
+   "serviced_facility": "PHL",
+   "serviced_site_type": "AIRPORT",
+   "radio_call": "PHILADELPHIA",
+   "approach_radio_call": "PHILADELPHIA",
+   "band": "UHF"
+  },
+  {
+   "freq_mhz": "319.15",
+   "use_code": "CLASS B",
+   "sectorization": "NW 8000-10000 FT",
+   "remark": null,
+   "facility": "PHL",
+   "facility_name": "PHILADELPHIA INTL",
+   "facility_type": "ATCT-TRACON",
+   "serviced_facility": "PHL",
+   "serviced_site_type": "AIRPORT",
+   "radio_call": "PHILADELPHIA",
+   "approach_radio_call": "PHILADELPHIA",
+   "band": "UHF"
+  },
+  {
+   "freq_mhz": "319.15",
+   "use_code": "CLASS B",
+   "sectorization": "WEST RWY 09 ACTIVE 8500-10000 FT",
+   "remark": null,
+   "facility": "PHL",
+   "facility_name": "PHILADELPHIA INTL",
+   "facility_type": "ATCT-TRACON",
+   "serviced_facility": "PHL",
+   "serviced_site_type": "AIRPORT",
+   "radio_call": "PHILADELPHIA",
+   "approach_radio_call": "PHILADELPHIA",
+   "band": "UHF"
+  },
+  {
+   "freq_mhz": "319.15",
+   "use_code": "DEP/P",
+   "sectorization": "270-089",
+   "remark": null,
+   "facility": "PHL",
+   "facility_name": "PHILADELPHIA INTL",
+   "facility_type": "ATCT-TRACON",
+   "serviced_facility": "PHL",
+   "serviced_site_type": "AIRPORT",
+   "radio_call": "PHILADELPHIA",
+   "approach_radio_call": "PHILADELPHIA",
+   "band": "UHF"
+  },
+  {
+   "freq_mhz": "319.15",
+   "use_code": "PHILADELPHIA DP",
+   "sectorization": "NORTH DEP CON",
+   "remark": null,
+   "facility": "PHL",
+   "facility_name": "PHILADELPHIA INTL",
+   "facility_type": "ATCT-TRACON",
+   "serviced_facility": "PHL",
+   "serviced_site_type": "AIRPORT",
+   "radio_call": "PHILADELPHIA",
+   "approach_radio_call": "PHILADELPHIA",
+   "band": "UHF"
+  },
+  {
+   "freq_mhz": "323.1",
+   "use_code": "CLASS B",
+   "sectorization": "SW 6000 FT & BLW",
+   "remark": null,
+   "facility": "PHL",
+   "facility_name": "PHILADELPHIA INTL",
+   "facility_type": "ATCT-TRACON",
+   "serviced_facility": "PHL",
+   "serviced_site_type": "AIRPORT",
+   "radio_call": "PHILADELPHIA",
+   "approach_radio_call": "PHILADELPHIA",
+   "band": "UHF"
+  },
+  {
+   "freq_mhz": "327.05",
+   "use_code": "LCL/P",
+   "sectorization": null,
+   "remark": null,
+   "facility": "PHL",
+   "facility_name": "PHILADELPHIA INTL",
+   "facility_type": "ATCT-TRACON",
+   "serviced_facility": "PHL",
+   "serviced_site_type": "AIRPORT",
+   "radio_call": "PHILADELPHIA",
+   "approach_radio_call": "PHILADELPHIA",
+   "band": "UHF"
+  },
+  {
+   "freq_mhz": "348.6",
+   "use_code": "CD/P",
+   "sectorization": null,
+   "remark": null,
+   "facility": "PHL",
+   "facility_name": "PHILADELPHIA INTL",
+   "facility_type": "ATCT-TRACON",
+   "serviced_facility": "PHL",
+   "serviced_site_type": "AIRPORT",
+   "radio_call": "PHILADELPHIA",
+   "approach_radio_call": "PHILADELPHIA",
+   "band": "UHF"
+  },
+  {
+   "freq_mhz": "348.6",
+   "use_code": "GND/P",
+   "sectorization": null,
+   "remark": null,
+   "facility": "PHL",
+   "facility_name": "PHILADELPHIA INTL",
+   "facility_type": "ATCT-TRACON",
+   "serviced_facility": "PHL",
+   "serviced_site_type": "AIRPORT",
+   "radio_call": "PHILADELPHIA",
+   "approach_radio_call": "PHILADELPHIA",
+   "band": "UHF"
+  },
+  {
+   "freq_mhz": "133.4",
+   "use_code": "PHL ASOS",
+   "sectorization": null,
+   "remark": null,
+   "facility": "PHL",
+   "facility_name": null,
+   "facility_type": "ASOS_AWOS",
+   "serviced_facility": "PHL",
+   "serviced_site_type": "ASOS",
+   "radio_call": null,
+   "approach_radio_call": null,
+   "band": "VHF"
+  },
+  {
+   "freq_mhz": "109.8",
+   "use_code": "PHL VOT",
+   "sectorization": null,
+   "remark": null,
+   "facility": "PHL",
+   "facility_name": "PHILADELPHIA",
+   "facility_type": "NAVAID",
+   "serviced_facility": "PHL",
+   "serviced_site_type": "VOT",
+   "radio_call": null,
+   "approach_radio_call": null,
+   "band": "VHF"
+  }
+ ],
+ "notes": [
+  ">=225 MHz are UHF (military) frequencies; the sim ignores UHF.",
+  "NASR ATC remark 1: ASDE-X IN USE. OPERATE TRANSPONDERS WITH ALTITUDE REPORTING MODE AND ADS-B (IF EQUIPPED) ENABLED ON ALL AIRPORT SURFACES.",
+  "NASR ATC remark 1: CLASS B: PILOTS CAN EXPC TO EXIT & RE-ENTER THE PHL CLASS B ASP DRG MDT TO HVY ARR PDS.",
+  "The approach/departure facility (PHL PHILADELPHIA INTL) is a separate TRACON; its radio call is \"PHILADELPHIA\" while the tower call is \"PHILADELPHIA\"."
+ ]
+}

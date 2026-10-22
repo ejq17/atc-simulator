@@ -1,0 +1,132 @@
+{
+ "_provenance": {
+  "note": "Hand-added, sourced constants of KPHL that NASR does not carry, merged by scripts/extract-nasr-airport.ts into kphl-facility.json (`airport.time_zone`, `runway_configurations`). Only documented runway configurations are listed; wind limits are NOT published in these documents and are omitted.",
+  "sources": [
+   {
+    "id": "PHL-NOISE-OFFICE",
+    "title": "PHL Noise Office (phl.org): flight patterns, East Flow / West Flow, Fly Quiet nighttime preferential runway use",
+    "url": "https://phl.org/Noise-Office",
+    "retrieved": "2026-10-21",
+    "saved": "raw/kphl_runway_config/noise_office.html",
+    "quotes": [
+     "The traffic flow in use at PHL at any given time is dictated primarily by the wind direction. With very few exceptions, aircraft land, and takeoff into the prevailing wind.",
+     "The directions at which airplanes arrive and depart PHL are referred to as \"East Flow\" and \"West Flow\". The majority of the time, wind at PHL blows from south-southwest to north-northwest. As such, approximately 70 percent of the flight operations during a given year at PHL take place when the airport is in \"West Flow.\"",
+     "Nighttime (Midnight to 6 am) The FAA will, to the extent feasible and reasonable to do so, use a preferential runway system: East Flow - Aircraft will depart on Runways 9L and 9R and land on Runway 9R. West Flow - Aircraft will depart on Runway 27L and arrive on Runway 27L and 27R."
+    ]
+   },
+   {
+    "id": "PHL-NEM-2010",
+    "title": "Philadelphia International Airport Noise Exposure Maps Update (Part 150), 2010 (Wyle, data 2008 / 2013 forecast)",
+    "url": "https://www.phl.org/drupalbin/media/2010%20Noise%20Exposure%20Maps%20Report_Part1.pdf",
+    "retrieved": "2026-10-21",
+    "saved": "raw/kphl_runway_config/nem2010_part1.pdf (text: nem.txt)",
+    "quotes": [
+     "(section 2.5.2) during west flow operations, aircraft depart from Runways 27L, 27R, and 35 and arrive to Runways 27L, 27R, 26, and 35 ... during east flow operations aircraft depart from Runways 09L, 09R, 08, and 17, and arrive to Runways 09L, 09R, and 17.",
+     "(section 3.3) During 2008, the airport operated in west flow 81% of the time, and in east flow the remaining 19% of the time, which is a notable change from historic average weather patterns that kept the airport in west flow approximately 70% of the time and east flow for the remaining 30%.",
+     "(section 3.3) Runways 27L and 27R were the busiest runways at the airport in 2008, accounting for nearly 65% of all operations at PHL. Runway 35 accounted for approximately 11% of operations, followed by Runways 09R, 09L, and 26. Both Runways 08 and 17 accounted for less than 3% of total operations.",
+     "(section 3.3) Runway 27R is the primary arrival runway at PHL for jet aircraft, while propeller aircraft more often utilized Runway 26, which is generally of insufficient length for use by most jet aircraft, and is also located near the general aviation area on the airfield. ... During the daytime hours aircraft in the widebody, narrowbody, and regional jet categories used Runway 27L for a majority of departures. Propeller aircraft ... used Runway 35 nearly as often as Runway 27L.",
+     "(section 2.5.2) nighttime preferential runway use (11:00 p.m. to 6:00 a.m., local conditions permitting): During west operations - Depart Runway 27L and Land Runways 27L/27R/26; Depart Runway 17 and Land Runway 35. During east operations - Depart Runways 09L/09R/08 and Land Runway 9R; Depart Runway 17 and Land Runway 35.",
+     "(Table 3-3, 2008 existing baseline, overall runway utilization, percent of total operations) 08 1.6%, 26 5.6%, 09L 8.2%, 09R 8.3%, 17 1.2%, 35 10.3%, 27L 34.7%, 27R 30.1%. (Table 4-2, 2013 future baseline) 08 1.0%, 26 1.8%, 09L 14.0%, 09R 14.8%, 17 1.5%, 35 28.1%, 27L 21.3%, 27R 17.5% (a forecast that assumed 70/30 west/east flow and the PHL Capacity Enhancement Program).",
+     "(Appendix A, measure NA 4) between midnight and 6:00 a.m., in east traffic flow, takeoffs are made from Runways 9R and 9L, landings are made on Runway 9R. During west flow, takeoffs are made on Runway 27L and landings are made on Runways 27R and 27L. When the crosswind runway is used, landings are made on Runway 35 and takeoffs are made on Runway 17. This preference is not applied when winds are from the east or when one or more of the runways is closed."
+    ],
+    "caveat": "Data of 2008-2009 and a 2013 forecast; the airport has since changed (runway 17/35 charted 6500 ft in 2026, Capacity Enhancement Program, new airspace procedures). The flow definitions are the current ones on phl.org; the percentages are historical and are labelled so."
+   }
+  ]
+ },
+ "configurations": [
+  {
+   "id": "WEST",
+   "name": "West flow",
+   "landing": [
+    "27R",
+    "27L",
+    "26",
+    "35"
+   ],
+   "departing": [
+    "27L",
+    "27R",
+    "35"
+   ],
+   "primary_landing": [
+    "27R"
+   ],
+   "primary_departing": [
+    "27L"
+   ],
+   "usage": "Approximately 70 percent of the flight operations in a year take place in west flow (phl.org Noise Office, 2026); 81 percent of the time in 2008, 75 percent in Jan-Sep 2009 (NEM 2010). 2008 daytime jet arrivals were mainly on 27R (narrowbody 13.3 of 16.9 percent of operations), jet departures mainly on 27L; propeller aircraft arrive on 26 and depart 35 or 27L.",
+   "notes": "Runway 35 and runway 26 are used by regional/commuter turboprops and general aviation (26: near the GA area, too short for most jets). Weather- and demand-dependent: the tower may use 27L/27R for both arrivals and departures.",
+   "source": "PHL Noise Office (https://phl.org/Noise-Office, retrieved 2026-10-21); PHL Noise Exposure Maps Update 2010 (Part 150): PHL-NOISE-OFFICE, PHL-NEM-2010 (sections 2.5.2 and 3.3, Table 3-3)",
+   "url": "https://phl.org/Noise-Office",
+   "retrieved": "2026-10-21"
+  },
+  {
+   "id": "EAST",
+   "name": "East flow",
+   "landing": [
+    "9R",
+    "9L",
+    "17"
+   ],
+   "departing": [
+    "9L",
+    "9R",
+    "8",
+    "17"
+   ],
+   "primary_landing": [
+    "9R"
+   ],
+   "primary_departing": [
+    "9L"
+   ],
+   "usage": "Roughly 30 percent of operations in a typical year (the complement of west flow; 19 percent of the time in 2008). 2008: 09R 8.3, 09L 8.2, 08 1.6, 17 1.2 percent of all operations.",
+   "notes": "The NEM states arrivals to 09L, 09R and 17 and departures from 09L, 09R, 08 and 17; the nighttime preference (below) names 9R as the arrival runway. Which of 9L/9R takes the daytime arrivals is not stated numerically in the documents read (2008 arrivals: 09R 6.5 percent, 09L 0.1 percent of daytime operations).",
+   "source": "PHL Noise Office (https://phl.org/Noise-Office, retrieved 2026-10-21); PHL Noise Exposure Maps Update 2010 (Part 150): PHL-NOISE-OFFICE, PHL-NEM-2010 (sections 2.5.2 and 3.3, Table 3-3)",
+   "url": "https://phl.org/Noise-Office",
+   "retrieved": "2026-10-21"
+  }
+ ],
+ "time_zone": "America/New_York",
+ "time_zone_source": "IANA time zone database: Philadelphia, Pennsylvania is in America/New_York (Eastern Time); not a NASR field. NASR APT_BASE.csv has no time-zone column.",
+ "documented_not_used": [
+  {
+   "id": "NIGHT-WEST",
+   "name": "Night preferential runway use, west flow",
+   "landing": [
+    "27L",
+    "27R",
+    "26"
+   ],
+   "departing": [
+    "27L"
+   ],
+   "hours_local": "midnight to 6 am (phl.org); 11 pm to 6 am (NEM 2010)",
+   "notes": "Crosswind pair in the NEM: depart 17 and land 35. Voluntary, 'to the extent feasible and reasonable', not applied when winds are from the east or a runway is closed. Departures from 27L/27R fly heading 245 between 10 pm and 6 am (phl.org, also the PHILADELPHIA FOUR DP exception 2200L-0600L).",
+   "source": "PHL Noise Office (https://phl.org/Noise-Office, retrieved 2026-10-21); PHL Noise Exposure Maps Update 2010 (Part 150): PHL-NOISE-OFFICE (Fly Quiet policies), PHL-NEM-2010 (section 2.5.2, Appendix A NA 4)",
+   "url": "https://phl.org/Noise-Office",
+   "retrieved": "2026-10-21"
+  },
+  {
+   "id": "NIGHT-EAST",
+   "name": "Night preferential runway use, east flow",
+   "landing": [
+    "9R"
+   ],
+   "departing": [
+    "9L",
+    "9R"
+   ],
+   "hours_local": "midnight to 6 am (phl.org); 11 pm to 6 am (NEM 2010)",
+   "notes": "The NEM also lists runway 8 for departures. Crosswind pair: depart 17 and land 35.",
+   "source": "PHL Noise Office (https://phl.org/Noise-Office, retrieved 2026-10-21); PHL Noise Exposure Maps Update 2010 (Part 150): PHL-NOISE-OFFICE (Fly Quiet policies), PHL-NEM-2010 (section 2.5.2, Appendix A NA 4)",
+   "url": "https://phl.org/Noise-Office",
+   "retrieved": "2026-10-21"
+  }
+ ],
+ "documented_not_used_note": "Documented but not offered as runway_configurations: the build's configuration selection (src/weather/runwayConfigurations.ts) picks by wind only, has no time of day, and would rank these ahead of WEST by headwind (their arrival runways omit 35, the crosswind runway).",
+ "not_found": [
+  "Wind limits or numeric criteria for choosing a configuration (the Noise Office says only that wind direction dominates and aircraft take off and land into the prevailing wind).",
+  "The FAA PHL Capacity Enhancement Program / Runway 17-35 extension EIS and the 2024-2026 Noise Office runway-use statistics were not downloaded (the PHL Noise Office page links to graphics, not tables)."
+ ]
+}

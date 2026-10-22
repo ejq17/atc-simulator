@@ -4,7 +4,7 @@
  *
  * Gameplay data, not aeronautical data. KACY keeps exactly the behaviour it had before profiles existed: Spirit 80 % / American 20 %,
  * A320 only, the short-hop destinations of ifr.ts and the old neighbour table. KMHT mirrors the airlines serving Manchester-Boston
- * Regional per flymanchester.com "Airlines serving MHT" (checked 2026-10-17); weights are a gameplay mix, not traffic statistics.
+ * Regional per flymanchester.com "Airlines serving MHT" (checked 2026-10-17); KPHL per phl.org "Our Airlines" (2026-10-21); weights are a gameplay mix, not traffic statistics.
  * The rows are the single place to change the mix (src/game/README.md).
  */
 
@@ -242,6 +242,81 @@ const KBOS: AirportTrafficProfile = {
 };
 
 // ---------------------------------------------------------------------------
+// KPHL: Philadelphia International
+// ---------------------------------------------------------------------------
+// Airlines: the carriers phl.org lists on "Our Airlines" (https://www.phl.org/about/airlines, read 2026-10-21; copy in data/sources/raw/kphl_traffic/):
+// Aer Lingus, Aeromexico, Air Canada, Alaska, Allegiant, American, American Eagle, British Airways, Delta, Frontier, JetBlue, Lufthansa /
+// Eurowings Discover, Qatar, Southwest, Sun Country, United. Destinations: the Wikipedia "Philadelphia International Airport" airlines and
+// destinations table (read 2026-10-21). Widebody international flights (Aer Lingus, BA, Lufthansa/Discover, Qatar, Aeromexico, American to
+// Europe) are not generated: the parser knows no transatlantic destination. UPS Airlines is the PHL cargo operator named by Wikipedia ("regional cargo
+// hub"; East Coast Region Air Hub in the UPS Airlines article; B767-300F / B757-200PF / A300-600F in its fleet table, March 2026); FedEx is not listed
+// for PHL there, so there is no FedEx flight although OSM maps FedEx stands. Aircraft types: American (A319 126, A320 48, A321 203, A321neo 74, B738 303,
+// B737 MAX 8 103 in service, June 2026), Frontier (A320neo, A321neo, A320ceo), PSA (CRJ700, CRJ900) and UPS come from the Wikipedia fleet tables;
+// Delta, United, JetBlue, Alaska, Sun Country and Southwest use A320 / B738 as stand-ins (their fleets were not looked up). Weights are a gameplay mix,
+// not traffic statistics.
+
+const KPHL: AirportTrafficProfile = {
+  icao: 'KPHL',
+  airlines: [
+    // American Airlines mainline (PHL hub), types repeated in proportion to the fleet.
+    { icao3: 'AAL', telephony: 'American', types: ['A319', 'A319', 'A320', 'A321', 'A321', 'A321', 'A21N', 'B738', 'B738', 'B738', 'B738', 'B38M'], weight: 30, flightNumbers: [100, 2999],
+      destinations: [dest('KCLT', 30000, 32000, 34000), dest('KORD', 30000, 32000, 34000), dest('KDFW', 32000, 34000, 36000), dest('KMIA', 32000, 34000, 36000), dest('KBOS', 20000, 22000, 24000), dest('KMCO', 32000, 34000, 36000), dest('KATL', 30000, 32000, 34000), dest('KPIT', 22000, 24000, 26000), dest('KDEN', 32000, 34000, 36000)] },
+    // American Eagle regionals (PSA "Blue Streak" CRJ-900, Republic "Brickyard" and Envoy E175).
+    { icao3: 'JIA', telephony: 'Blue Streak', types: ['CRJ9', 'CRJ7'], weight: 9, flightNumbers: [4300, 5999],
+      destinations: [dest('KPIT', 22000, 24000, 26000), dest('KDCA', 22000, 24000, 26000), dest('KBOS', 20000, 22000, 24000), dest('KRDU', 26000, 28000, 30000), dest('KDTW', 28000, 30000, 32000)] },
+    { icao3: 'RPA', telephony: 'Brickyard', types: ['E175'], weight: 10, flightNumbers: [4300, 6499],
+      destinations: [dest('KBNA', 28000, 30000, 32000), dest('KMEM', 30000, 32000, 34000), dest('KSDF', 26000, 28000, 30000), dest('KMHT', 20000, 22000, 24000), dest('KATL', 30000, 32000, 34000)] },
+    { icao3: 'ENY', telephony: 'Envoy', types: ['E175'], weight: 8, flightNumbers: [3000, 4999],
+      destinations: [dest('KPIT', 22000, 24000, 26000), dest('KDCA', 22000, 24000, 26000), dest('KBOS', 20000, 22000, 24000), dest('KDTW', 28000, 30000, 32000), dest('KRDU', 26000, 28000, 30000)] },
+    // Southwest (B737): Chicago Midway, Denver, Nashville, Orlando, St. Louis, Baltimore.
+    { icao3: 'SWA', telephony: 'Southwest', types: ['B738'], weight: 9, flightNumbers: [100, 2999],
+      destinations: [dest('KMDW', 28000, 30000, 32000), dest('KDEN', 32000, 34000, 36000), dest('KBNA', 30000, 32000, 34000), dest('KMCO', 32000, 34000, 36000), dest('KSTL', 30000, 32000, 34000)] },
+    // Frontier (A320 family): Atlanta, Charlotte, Chicago O'Hare, Denver, Dallas/Fort Worth, Orlando, Miami, Tampa.
+    { icao3: 'FFT', telephony: 'Frontier', types: ['A20N', 'A20N', 'A21N', 'A320'], weight: 8, flightNumbers: [100, 2999],
+      destinations: [dest('KATL', 30000, 32000, 34000), dest('KCLT', 30000, 32000, 34000), dest('KORD', 30000, 32000, 34000), dest('KDEN', 32000, 34000, 36000), dest('KMCO', 32000, 34000, 36000), dest('KMIA', 32000, 34000, 36000), dest('KTPA', 32000, 34000, 36000)] },
+    // Delta: Atlanta, Detroit, Minneapolis/St. Paul, Salt Lake City.
+    { icao3: 'DAL', telephony: 'Delta', types: ['A320', 'B738'], weight: 7, flightNumbers: [100, 2999],
+      destinations: [dest('KATL', 30000, 32000, 34000), dest('KDTW', 28000, 30000, 32000), dest('KMSP', 32000, 34000, 36000), dest('KSLC', 34000, 36000, 38000)] },
+    // United: Chicago O'Hare, Denver, Houston, San Francisco; United Express (SkyWest E175) to Houston and Dulles.
+    { icao3: 'UAL', telephony: 'United', types: ['A320', 'B738'], weight: 5, flightNumbers: [100, 2999],
+      destinations: [dest('KORD', 30000, 32000, 34000), dest('KDEN', 32000, 34000, 36000), dest('KIAH', 32000, 34000, 36000), dest('KSFO', 34000, 36000, 38000)] },
+    { icao3: 'SKW', telephony: 'SkyWest', types: ['E175'], weight: 3, flightNumbers: [3000, 6999], destinations: [dest('KIAD', 22000, 24000, 26000), dest('KIAH', 32000, 34000, 36000)] },
+    // JetBlue: Boston, Fort Lauderdale (and San Juan, not in the parser).
+    { icao3: 'JBU', telephony: 'JetBlue', types: ['A320'], weight: 3, flightNumbers: [100, 2999],
+      destinations: [dest('KBOS', 20000, 22000, 24000), dest('KFLL', 32000, 34000, 36000)] },
+    // Alaska (Seattle) and Sun Country (Minneapolis, seasonal): rare.
+    { icao3: 'ASA', telephony: 'Alaska', types: ['B738'], weight: 1, flightNumbers: [100, 2999], destinations: [dest('KSEA', 34000, 36000, 38000)] },
+    { icao3: 'SCX', telephony: 'Sun Country', types: ['B738'], weight: 1, flightNumbers: [100, 999], destinations: [dest('KMSP', 32000, 34000, 36000)] },
+    // UPS Airlines (regional cargo hub), mostly night. fleet B767-300F / B757-200PF / A300-600; the destination (Louisville, UPS's
+    // national hub) is an ESTIMATE, the sources give no UPS route.
+    { icao3: 'UPS', telephony: 'UPS', types: ['B763', 'B752', 'A306'], weight: 6, flightNumbers: [100, 999], hours: 'night', destinations: [dest('KSDF', 28000, 30000, 32000)] },
+  ],
+  // Neighbours: NASR ARP coordinates (APT_BASE.csv, 2026-10-01).
+  neighbours: {
+    KPNE: { name: 'Northeast Philadelphia', lat: 40.082, lon: -75.011, spoken: 'Northeast Philadelphia' },
+    KLOM: { name: 'Wings Field', lat: 40.138, lon: -75.265, spoken: 'Wings Field' },
+    KILG: { name: 'Wilmington', lat: 39.679, lon: -75.607, spoken: 'Wilmington' },
+    KTTN: { name: 'Trenton', lat: 40.277, lon: -74.813, spoken: 'Trenton' },
+    KVAY: { name: 'Mount Holly', lat: 39.943, lon: -74.846, spoken: 'Mount Holly' },
+    KMIV: { name: 'Millville', lat: 39.368, lon: -75.072, spoken: 'Millville' },
+    KMQS: { name: 'Coatesville', lat: 39.979, lon: -75.865, spoken: 'Coatesville' },
+    KOQN: { name: 'Brandywine', lat: 39.99, lon: -75.582, spoken: 'Brandywine' },
+    KDYL: { name: 'Doylestown', lat: 40.333, lon: -75.122, spoken: 'Doylestown' },
+    KPTW: { name: 'Heritage Field', lat: 40.24, lon: -75.557, spoken: 'Heritage Field' },
+    KABE: { name: 'Allentown', lat: 40.652, lon: -75.44, spoken: 'Allentown' },
+  },
+  gaRemote: ['KPNE', 'KLOM', 'KILG', 'KTTN', 'KVAY', 'KMIV', 'KMQS', 'KOQN', 'KDYL', 'KPTW'],
+  gaTypes: [['C172', 0.75], ['PA28', 0.25]],
+  referenceJet: 'A320',
+  // KPHL is a Class B airport (NASR). The engine's VFR-transition flow is Class C service (7110.65 7-8); Class B transitions need an explicit
+  // Class B clearance (7-9) that is not modelled, so there are none. Vehicles exist at every towered airport. No military or Coast Guard unit,
+  // no flight-training source (data/sources/README.md "Traffic variety").
+  special: {
+    vehicles: { perHour: 3 },
+  },
+};
+
+// ---------------------------------------------------------------------------
 // KPGD: Punta Gorda Airport (Allegiant base)
 // ---------------------------------------------------------------------------
 
@@ -281,7 +356,7 @@ const KPGD: AirportTrafficProfile = {
   },
 };
 
-const PROFILES: Readonly<Record<string, AirportTrafficProfile>> = { KACY, KMHT, KBOS, KPGD };
+const PROFILES: Readonly<Record<string, AirportTrafficProfile>> = { KACY, KMHT, KBOS, KPGD, KPHL };
 
 /** The traffic profile of an airport (unknown ICAO: KACY's). */
 export function profileFor(icao: string | undefined): AirportTrafficProfile {

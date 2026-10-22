@@ -33,6 +33,7 @@ import { renderDebugSvg } from './lib/svg.ts';
 import { kacyProfile } from './airports/kacy.ts';
 import { kmhtProfile } from './airports/kmht.ts';
 import { kbosProfile } from './airports/kbos.ts';
+import { kphlProfile } from './airports/kphl.ts';
 import { kpgdProfile } from './airports/kpgd.ts';
 import type { AirportProfile, ApronRec, BuildingRec, ParkingCtx, ParkRec } from './airports/types.ts';
 import type {
@@ -51,7 +52,7 @@ const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(HERE, '..');
 const SRC = path.join(ROOT, 'data/sources');
 
-const PROFILES: Record<string, AirportProfile> = { KACY: kacyProfile, KMHT: kmhtProfile, KBOS: kbosProfile, KPGD: kpgdProfile };
+const PROFILES: Record<string, AirportProfile> = { KACY: kacyProfile, KMHT: kmhtProfile, KBOS: kbosProfile, KPGD: kpgdProfile, KPHL: kphlProfile };
 const requested = (process.argv[2] ?? '').toUpperCase();
 const profile = PROFILES[requested] ?? PROFILES[`K${requested}`];
 if (!profile) {
@@ -1248,8 +1249,9 @@ const airport: KacyAirport = {
 // ---------------------------------------------------------------------------------------------
 const checks: { name: string; ok: boolean; detail: string }[] = [];
 const check = (name: string, ok: boolean, detail: string, fatal = true): void => {
-  checks.push({ name, ok, detail });
-  if (!ok) (fatal ? hard : warn)(`${name}: ${detail}`);
+  const gap = !ok && fatal ? profile.knownGaps?.find((g) => name.includes(g.check)) : undefined;
+  checks.push({ name, ok, detail: gap ? `${detail} [KNOWN SOURCE GAP, not fatal: ${gap.reason}]` : detail });
+  if (!ok) (fatal && !gap ? hard : warn)(`${name}: ${detail}${gap ? ` [KNOWN SOURCE GAP: ${gap.reason}]` : ''}`);
 };
 
 function components(filter: (e: KacyTaxiEdge) => boolean): Map<string, number> {

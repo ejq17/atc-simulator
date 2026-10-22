@@ -288,7 +288,9 @@ fs.writeFileSync(path.join(SRC, `${icaoLower}-facility.json`), JSON.stringify(fa
 // ---------------------------------------------------------------------------------------------------------------------
 // frequencies
 // ---------------------------------------------------------------------------------------------------------------------
-const frq = table('FRQ', 'FRQ.csv').filter((r) => r.FACILITY === FAA_ID || r.SERVICED_FACILITY === FAA_ID);
+// A TRACON that serves many airports (PHL: Newark, Teterboro, ...) has FACILITY == FAA_ID for the rows of all of them: rows that name another
+// serviced airport are not this airport's frequencies.
+const frq = table('FRQ', 'FRQ.csv').filter((r) => r.SERVICED_FACILITY === FAA_ID || (r.FACILITY === FAA_ID && (!r.SERVICED_FACILITY || r.SERVICED_FACILITY === r.FACILITY)));
 const frqRow = (r: Row): J => ({
   freq_mhz: r.FREQ,
   use_code: r.FREQ_USE,
@@ -318,7 +320,7 @@ if (!cd) throw new Error('no VHF clearance delivery row (CD/P or CD PRE TAXI CLN
 const gndRows = vhfUse('GND/P').filter((r) => r.FACILITY === FAA_ID);
 if (!gndRows.length) throw new Error('no VHF GND/P row');
 const gnd = gndRows[0];
-const lclRows = vhfUse('LCL/P').filter((r) => r.FACILITY === FAA_ID && (r.FACILITY_TYPE === 'ATCT' || r.FACILITY_TYPE === ''));
+const lclRows = vhfUse('LCL/P').filter((r) => r.FACILITY === FAA_ID && (r.FACILITY_TYPE.startsWith('ATCT') || r.FACILITY_TYPE === ''));
 if (!lclRows.length) throw new Error('no VHF LCL/P row');
 const lcl = lclRows.find((r) => !str(r.SECTORIZATION)) ?? lclRows.find((r) => r.SECTORIZATION !== 'HELICOPTERS') ?? lclRows[0];
 const appRows = frq.filter((r) => r.FREQ_USE.startsWith('APCH/P DEP/P')); // 'APCH/P DEP/P' and 'APCH/P DEP/P IC' (PGD lists its UHF row with the IC suffix)
@@ -327,6 +329,19 @@ const appUhf = appRows.find((r) => Number(r.FREQ) >= 225);
 const tracon = frq.filter((r) => r.FACILITY_TYPE === 'TRACON' && Number(r.FREQ) < 225);
 const classC = frq.filter((r) => r.FREQ_USE === 'CLASS C');
 const classB = frq.filter((r) => r.FREQ_USE === 'CLASS B');
+// Further use codes of a large TRACON-airport (PHL): secondary ground, PRM monitor, final approach, sectorized approach / departure rows, the named
+// departure positions and the STAR frequencies. Present in the summary only when the airport has them (KACY, KMHT, KBOS unchanged).
+// (only for a combined ATCT-TRACON facility, so that other airports' files stay byte-identical)
+const combined = atcBase?.FACILITY_TYPE === 'ATCT-TRACON';
+const rowSummary = (r: Row): J => ({ freq_mhz: r.FREQ, use_code: r.FREQ_USE, sectorization: str(r.SECTORIZATION), remark: str(r.REMARK) });
+const atisDepRow = !combined ? undefined : frq.find((r) => r.FREQ_USE === 'D-ATIS' && r.SECTORIZATION === 'DEP' && Number(r.FREQ) < 225);
+const gndSecondary = !combined ? [] : frq.filter((r) => r.FREQ_USE === 'GND/S' && Number(r.FREQ) < 225);
+const prmRows = !combined ? [] : frq.filter((r) => r.FREQ_USE === 'PRM' && Number(r.FREQ) < 225);
+const finalRows = !combined ? [] : frq.filter((r) => r.FREQ_USE === 'FINAL APCH' && Number(r.FREQ) < 225);
+const apchSectors = !combined ? [] : frq.filter((r) => r.FREQ_USE === 'APCH/P' && Number(r.FREQ) < 225 && r.FACILITY_TYPE.startsWith('ATCT'));
+const depSectors = !combined ? [] : frq.filter((r) => r.FREQ_USE === 'DEP/P' && Number(r.FREQ) < 225 && r.FACILITY_TYPE.startsWith('ATCT'));
+const namedDep = !combined ? [] : frq.filter((r) => r.FREQ_USE.endsWith(' DP') && Number(r.FREQ) < 225);
+const starRows = !combined ? [] : frq.filter((r) => r.FREQ_USE.endsWith(' STAR') && Number(r.FREQ) < 225);
 const emerg = frq.find((r) => r.FREQ_USE === 'EMERG' && Number(r.FREQ) < 225);
 const emergU = frq.find((r) => r.FREQ_USE === 'EMERG' && Number(r.FREQ) >= 225);
 const unicom = frq.find((r) => r.FREQ_USE === 'UNICOM');
@@ -361,6 +376,15 @@ const frequencies = {
     ramp_control: frq.filter((r) => r.FREQ_USE === 'RAMP CTL' && Number(r.FREQ) < 225).map((r) => ({ freq_mhz: r.FREQ, note: 'FRQ RAMP CTL' })),
     tracon_vhf_rows: tracon.map((r) => ({ freq_mhz: r.FREQ, use_code: r.FREQ_USE, sectorization: str(r.SECTORIZATION), facility: r.FACILITY, facility_name: r.FAC_NAME })),
     class_b_frequencies: classB.map((r) => ({ freq_mhz: r.FREQ, sectorization: str(r.SECTORIZATION) })),
+    ...(atisDepRow ? { atis_departure: { vhf: atisDepRow.FREQ, note: 'FRQ use code D-ATIS, sectorization DEP (departure ATIS)' } } : {}),
+    ...(gndSecondary.length ? { ground_secondary: gndSecondary.map((r) => ({ vhf: r.FREQ, note: 'FRQ GND/S (secondary ground control; not printed on the airport diagram)' })) } : {}),
+    ...(combined && lclRows.length > 1 ? { tower_additional: lclRows.filter((r) => r !== lcl).map((r) => ({ vhf: r.FREQ, sectorization: str(r.SECTORIZATION), note: 'further FRQ LCL/P row (a second tower position)' })) } : {}),
+    ...(prmRows.length ? { prm_monitor: prmRows.map((r) => ({ vhf: r.FREQ, sectorization: str(r.SECTORIZATION), note: 'FRQ PRM (precision runway monitor); not an ATC position of this simulator' })) } : {}),
+    ...(finalRows.length ? { final_approach: finalRows.map((r) => ({ vhf: r.FREQ, note: 'FRQ FINAL APCH (final approach control); no sector of this simulator' })) } : {}),
+    ...(apchSectors.length ? { approach_sectors: apchSectors.map(rowSummary) } : {}),
+    ...(depSectors.length ? { departure_sectors: depSectors.map(rowSummary) } : {}),
+    ...(namedDep.length ? { named_departure_positions: namedDep.map(rowSummary) } : {}),
+    ...(starRows.length ? { star_frequencies: starRows.map(rowSummary) } : {}),
     approach_departure: {
       vhf: appRows.length ? appVhf.FREQ : null,
       uhf: appUhf?.FREQ ?? null,
