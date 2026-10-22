@@ -3,9 +3,10 @@
  * from the verified FAA/OSM sources in `data/sources/`; never edit it by hand.
  */
 import type { KacyAirport } from '../types';
-import egllJson from './egll.airport.json';
+import { notPreloadedError } from '../lazy';
 
 let cached: KacyAirport | undefined;
+let raw: unknown;
 
 /** Structural sanity check run once on load (cheap; catches a stale or truncated build). */
 function rehydrate(raw: unknown): KacyAirport {
@@ -23,7 +24,15 @@ function rehydrate(raw: unknown): KacyAirport {
 
 /** The EGLL `Airport` (shared, read-only; `{ fresh: true }` returns a private deep copy). */
 export function loadEgll(opts: { fresh?: boolean } = {}): KacyAirport {
-  if (opts.fresh) return rehydrate(structuredClone(egllJson));
-  cached ??= rehydrate(egllJson);
+  if (raw === undefined) throw notPreloadedError('EGLL');
+  if (opts.fresh) return rehydrate(structuredClone(raw));
+  cached ??= rehydrate(raw);
+  return cached;
+}
+
+/** Loads the EGLL dataset as its own chunk (dynamic import) and fills the cache behind the synchronous `loadEgll()`. Idempotent. */
+export async function preloadEgll(): Promise<KacyAirport> {
+  if (raw === undefined) raw = (await import('./egll.airport.json')).default;
+  cached ??= rehydrate(raw);
   return cached;
 }

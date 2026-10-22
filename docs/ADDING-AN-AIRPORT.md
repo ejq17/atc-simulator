@@ -29,9 +29,9 @@ omitted and listed under "Not verified" in `data/sources/README.md`. Gameplay tu
    `scripts/build-airport.ts`.
 7. **Build.** `npx tsx scripts/build-airport.ts <ICAO>` writes `src/airport/<slug>/<slug>.airport.json`, `build-report.md` and `debug-graph.svg`.
    Read the report: hard errors stop the build, warnings list every simplification.
-8. **Loader.** `src/airport/<slug>/index.ts` (copy `src/airport/kmht/index.ts`). Its `rehydrate` sanity check tests the ICAO and the runway count of
+8. **Loader.** `src/airport/<slug>/index.ts` (copy `src/airport/kmht/index.ts`; it holds the synchronous `loadXxx()` and the async `preloadXxx()` that fills its cache through `import('./<slug>.airport.json')`, so Rollup emits the dataset as its own lazy chunk; never import the JSON statically). Its `rehydrate` sanity check tests the ICAO and the runway count of
    that airport (KACY and KMHT check `runways.length !== 2`; a new loader checks its own count or only the ICAO). Never edit the JSON by hand.
-9. **Registry.** Add the loader to `AIRPORTS` in `src/airport/index.ts`; the setup-screen airport selector (`listAirports()`) picks it up.
+9. **Registry.** In `src/airport/index.ts` add one import line (`import { loadXxx, preloadXxx } from './<slug>';`, plus the matching `export`) and one entry in `AIRPORTS`: `XXXX: { name: '<JSON name>', load: loadXxx, preload: preloadXxx },`. The setup-screen selector (`listAirportOptions()`) picks it up without loading any data, and `src/airport/preload.test.ts` checks `name` against the JSON. `getAirport` / `airportOrDefault` stay synchronous but throw until `await preloadAirport('XXXX')` has resolved: the setup screen and `startSession` do this, and the Vitest setup file `src/test/preloadAirports.ts` calls `preloadAllAirports()` so tests need nothing. Do not add a Rollup `codeSplitting` group for `airport.json` in `vite.config.ts` (it would merge the per-airport chunks).
 10. **Shared files, per airport** (each has a KACY and KMHT entry to copy): charts index `src/charts/chartIndex.ts` (`DATASETS`), navaid panel
     `src/charts/navaidData.ts` (`AIRPORTS`), traffic profile `src/game/airportProfile.ts` (airlines, aircraft types, neighbours, special traffic;
     the IFR destinations of `src/game/ifr.ts` then follow the profile), spoken airport names `src/radio/spoken.ts` (`AIRPORT_CITIES`), the command

@@ -4,9 +4,10 @@
  */
 import type { Airport } from '../../sim/types';
 import type { KacyAirport } from '../types';
-import kacyJson from './kacy.airport.json';
+import { notPreloadedError } from '../lazy';
 
 let cached: KacyAirport | undefined;
+let raw: unknown;
 
 /** Structural sanity check run once on load (cheap; catches a stale or truncated build). */
 function rehydrate(raw: unknown): KacyAirport {
@@ -27,10 +28,18 @@ function rehydrate(raw: unknown): KacyAirport {
  * read-only; pass `{ fresh: true }` for a private deep copy.
  */
 export function loadKacy(opts: { fresh?: boolean } = {}): KacyAirport {
-  if (opts.fresh) return rehydrate(structuredClone(kacyJson));
-  cached ??= rehydrate(kacyJson);
+  if (raw === undefined) throw notPreloadedError('KACY');
+  if (opts.fresh) return rehydrate(structuredClone(raw));
+  cached ??= rehydrate(raw);
   return cached;
 }
 
 /** Type-level reminder that `KacyAirport` is an `Airport`. */
 export const asAirport = (a: KacyAirport): Airport => a;
+
+/** Loads the KACY dataset as its own chunk (dynamic import) and fills the cache behind the synchronous `loadKacy()`. Idempotent. */
+export async function preloadKacy(): Promise<KacyAirport> {
+  if (raw === undefined) raw = (await import('./kacy.airport.json')).default;
+  cached ??= rehydrate(raw);
+  return cached;
+}

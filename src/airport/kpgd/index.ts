@@ -3,9 +3,10 @@
  * from the verified FAA/OSM sources in `data/sources/`; never edit it by hand.
  */
 import type { KacyAirport } from '../types';
-import kpgdJson from './kpgd.airport.json';
+import { notPreloadedError } from '../lazy';
 
 let cached: KacyAirport | undefined;
+let raw: unknown;
 
 /** Structural sanity check run once on load (cheap; catches a stale or truncated build). */
 function rehydrate(raw: unknown): KacyAirport {
@@ -23,7 +24,15 @@ function rehydrate(raw: unknown): KacyAirport {
 
 /** The KPGD `Airport` (shared, read-only; `{ fresh: true }` returns a private deep copy). */
 export function loadKpgd(opts: { fresh?: boolean } = {}): KacyAirport {
-  if (opts.fresh) return rehydrate(structuredClone(kpgdJson));
-  cached ??= rehydrate(kpgdJson);
+  if (raw === undefined) throw notPreloadedError('KPGD');
+  if (opts.fresh) return rehydrate(structuredClone(raw));
+  cached ??= rehydrate(raw);
+  return cached;
+}
+
+/** Loads the KPGD dataset as its own chunk (dynamic import) and fills the cache behind the synchronous `loadKpgd()`. Idempotent. */
+export async function preloadKpgd(): Promise<KacyAirport> {
+  if (raw === undefined) raw = (await import('./kpgd.airport.json')).default;
+  cached ??= rehydrate(raw);
   return cached;
 }

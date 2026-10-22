@@ -61,14 +61,14 @@ export default defineConfig({
     // The remaining chunks over 500 kB are lazy-loaded and not on the first-paint path: the TTS/STT/PDF workers
     // (kokoro 2.2 MB, piper 1.4 MB, pdf.js worker 1.3 MB, whisper 0.6 MB; workers cannot be split further and
     // download only when the user turns that voice/charts feature on) and the 3-D tower view (three.js).
-    // The main chunk is split below so airport data and React cache separately from application code.
+    // Airport data is not grouped: each `<slug>.airport.json` is reached only through a dynamic import (src/airport/<slug>/index.ts), so it is its own
+    // lazy chunk. The main chunk is split below so React caches separately from application code.
     chunkSizeWarningLimit: 2400,
     rolldownOptions: {
       onLog: dropKokoroImportMeta,
       output: {
         codeSplitting: {
           groups: [
-            { name: 'airport-data', test: /airport\.json$/, priority: 20 },
             { name: 'react-vendor', test: /node_modules[\\/](react|react-dom|scheduler|zustand)[\\/]/, priority: 10 },
           ],
         },

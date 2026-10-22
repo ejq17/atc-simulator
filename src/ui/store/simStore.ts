@@ -10,7 +10,7 @@
 import { create } from 'zustand';
 import { game, createScenarioEventRunner } from '../../game';
 import type { CareerProgress, DebriefReport, FreePlayOptions, TrainingStepState } from '../../game';
-import { airportOrDefault } from '../../airport';
+import { DEFAULT_AIRPORT_ICAO, airportOrDefault, preloadAirport } from '../../airport';
 import { createEngine } from '../../sim/engine';
 import { closedEndsOf, closedRunwayEnds } from '../../sim/airportOps';
 import type { GameMode, Scenario, SimEvent, SimulationState, Weather } from '../../sim/types';
@@ -160,6 +160,8 @@ export const useSimStore = create<SimStore>((set, get) => ({
     // Browsers only play audio after a user gesture: this runs synchronously inside the "Start session" click, before any await.
     unlockAudio();
     set({ starting: true, startStatus: 'Preparing airport data…', notices: [], scenarioComplete: false });
+    // Airport data is a lazy chunk: wait for it so a direct start (URL parameter, test helper) cannot race the setup screen's preload.
+    await preloadAirport(opts.icao ?? DEFAULT_AIRPORT_ICAO).catch(() => preloadAirport(DEFAULT_AIRPORT_ICAO));
     const airport = airportOrDefault(opts.icao);
     const seed = opts.seed ?? Math.floor(Math.random() * 2 ** 31);
     const notices: Notice[] = [];

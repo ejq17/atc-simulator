@@ -3,7 +3,7 @@ import { game } from '../../game';
 import type { FreePlayOptions, ScenarioSummary } from '../../game';
 import type { ClosureSpec } from '../../sim/types';
 import { closedEndsOf } from '../../sim/airportOps';
-import { DEFAULT_AIRPORT_ICAO, airportOrDefault, listAirports } from '../../airport';
+import { DEFAULT_AIRPORT_ICAO, airportOrDefault, isAirportLoaded, listAirportOptions, preloadAirport } from '../../airport';
 import { airportCallName } from '../../radio/frequencies';
 import { towerClosedNotice, towerHoursLabel } from '../../game/towerHours';
 import { profileTypes } from '../../game/airportProfile';
@@ -102,8 +102,34 @@ function SectionTitle({ n, children }: { n: number; children: React.ReactNode })
 
 /** `nowMs`: the real clock used for the tower-hours notice (tests pass a fixed instant). */
 export function SetupScreen({ nowMs }: { nowMs?: number } = {}) {
+  const initialIcao = useSimStore((s) => s.startOptions?.icao) ?? DEFAULT_AIRPORT_ICAO;
+  const [ready, setReady] = useState(() => isAirportLoaded(initialIcao));
+  useEffect(() => {
+    if (ready) return;
+    let live = true;
+    // Airport data is a lazy chunk per airport; the setup screen needs the initial airport before it can render.
+    preloadAirport(initialIcao).catch(() => preloadAirport(DEFAULT_AIRPORT_ICAO)).then(() => live && setReady(true), () => live && setReady(true));
+    return () => { live = false; };
+  }, [ready, initialIcao]);
+  if (!ready) {
+    return (
+      <div className="flex h-full items-center justify-center font-sans text-[12px] uppercase tracking-[0.2em] text-atc-muted" role="status" data-testid="airport-loading">Loading airport data…</div>
+    );
+  }
+  return <SetupForm nowMs={nowMs} initialIcao={initialIcao} />;
+}
+
+function SetupForm({ nowMs, initialIcao }: { nowMs?: number; initialIcao: string }) {
   const prev = useSimStore((s) => s.startOptions);
-  const [icao, setIcao] = useState<string>(prev?.icao ?? DEFAULT_AIRPORT_ICAO);
+  /** The airport the screen shows (its data is loaded); `chosenIcao` is the selector value, ahead of it while that airport's chunk downloads. */
+  const [icao, setIcao] = useState<string>(initialIcao);
+  const [chosenIcao, setChosenIcao] = useState<string>(initialIcao);
+  const loadingAirport = chosenIcao !== icao;
+  const chooseAirport = (code: string) => {
+    setChosenIcao(code);
+    if (isAirportLoaded(code)) { setIcao(code); return; }
+    preloadAirport(code).then(() => setChosenIcao((cur) => { if (cur === code) setIcao(code); return cur; }), () => setChosenIcao((cur) => (cur === code ? icao : cur)));
+  };
   const airport = useMemo(() => airportOrDefault(icao), [icao]);
   const callName = airportCallName(airport);
   const [openedAtMs] = useState(() => nowMs ?? Date.now());
@@ -256,7 +282,7 @@ export function SetupScreen({ nowMs }: { nowMs?: number } = {}) {
     ...(closeRunway !== 'none' ? [{ kind: 'RUNWAY' as const, ident: closeRunway, reason: 'closed for the session (setup option)' }] : []),
     ...(closeTaxiway !== 'none' ? [{ kind: 'TAXIWAY' as const, ident: closeTaxiway, reason: 'closed for the session (setup option)' }] : []),
   ];
-  const canStart = !starting && (isCustom || (!!selected && isUnlocked(selected)));
+  const canStart = !starting && !loadingAirport && (isCustom || (!!selected && isUnlocked(selected)));
 
   const start = () => {
     const seed = seedText.trim() === '' ? undefined : Number(seedText);
@@ -313,9 +339,10 @@ export function SetupScreen({ nowMs }: { nowMs?: number } = {}) {
             </p>
             <label className="mt-4 flex items-center gap-3">
               <span className={LABEL}>Airport</span>
-              <select className={SELECT} value={icao} onChange={(e) => setIcao(e.target.value)} aria-label="Airport" data-testid="airport-select">
-                {listAirports().map((code) => (<option key={code} value={code}>{code} · {airportOrDefault(code).name}</option>))}
+              <select className={SELECT} value={chosenIcao} onChange={(e) => chooseAirport(e.target.value)} aria-label="Airport" data-testid="airport-select">
+                {listAirportOptions().map(({ icao: code, name }) => (<option key={code} value={code}>{code} · {name}</option>))}
               </select>
+              {loadingAirport && <span className="font-sans text-[11px] text-atc-cyan" role="status" data-testid="airport-loading">Loading airport data…</span>}
               {hoursLabel && <span className="font-sans text-[11px] text-atc-muted" data-testid="tower-hours">Tower hours {hoursLabel}</span>}
             </label>
             {towerClosed && <p className="mt-2 max-w-xl font-sans text-[12px] leading-relaxed text-atc-amber" role="status" data-testid="tower-closed-notice">{towerClosed}</p>}

@@ -3,9 +3,10 @@
  * from the verified FAA/OSM sources in `data/sources/`; never edit it by hand.
  */
 import type { KacyAirport } from '../types';
-import kbosJson from './kbos.airport.json';
+import { notPreloadedError } from '../lazy';
 
 let cached: KacyAirport | undefined;
+let raw: unknown;
 
 /** Structural sanity check run once on load (cheap; catches a stale or truncated build). */
 function rehydrate(raw: unknown): KacyAirport {
@@ -23,7 +24,15 @@ function rehydrate(raw: unknown): KacyAirport {
 
 /** The KBOS `Airport` (shared, read-only; `{ fresh: true }` returns a private deep copy). */
 export function loadKbos(opts: { fresh?: boolean } = {}): KacyAirport {
-  if (opts.fresh) return rehydrate(structuredClone(kbosJson));
-  cached ??= rehydrate(kbosJson);
+  if (raw === undefined) throw notPreloadedError('KBOS');
+  if (opts.fresh) return rehydrate(structuredClone(raw));
+  cached ??= rehydrate(raw);
+  return cached;
+}
+
+/** Loads the KBOS dataset as its own chunk (dynamic import) and fills the cache behind the synchronous `loadKbos()`. Idempotent. */
+export async function preloadKbos(): Promise<KacyAirport> {
+  if (raw === undefined) raw = (await import('./kbos.airport.json')).default;
+  cached ??= rehydrate(raw);
   return cached;
 }

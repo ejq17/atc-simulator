@@ -3,9 +3,10 @@
  * from the verified FAA/OSM sources in `data/sources/`; never edit it by hand.
  */
 import type { KacyAirport } from '../types';
-import kmhtJson from './kmht.airport.json';
+import { notPreloadedError } from '../lazy';
 
 let cached: KacyAirport | undefined;
+let raw: unknown;
 
 /** Structural sanity check run once on load (cheap; catches a stale or truncated build). */
 function rehydrate(raw: unknown): KacyAirport {
@@ -23,7 +24,15 @@ function rehydrate(raw: unknown): KacyAirport {
 
 /** The KMHT `Airport` (shared, read-only; `{ fresh: true }` returns a private deep copy). */
 export function loadKmht(opts: { fresh?: boolean } = {}): KacyAirport {
-  if (opts.fresh) return rehydrate(structuredClone(kmhtJson));
-  cached ??= rehydrate(kmhtJson);
+  if (raw === undefined) throw notPreloadedError('KMHT');
+  if (opts.fresh) return rehydrate(structuredClone(raw));
+  cached ??= rehydrate(raw);
+  return cached;
+}
+
+/** Loads the KMHT dataset as its own chunk (dynamic import) and fills the cache behind the synchronous `loadKmht()`. Idempotent. */
+export async function preloadKmht(): Promise<KacyAirport> {
+  if (raw === undefined) raw = (await import('./kmht.airport.json')).default;
+  cached ??= rehydrate(raw);
   return cached;
 }
