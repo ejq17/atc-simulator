@@ -46,6 +46,27 @@ Per-airport settings live in `scripts/airports/<icao>.ts`. Do not type aeronauti
 add them to the source JSON with a provenance note, then rebuild. See `data/sources/README.md`; a new airport follows `docs/ADDING-AN-AIRPORT.md`.
 `npx tsx scripts/extract-nasr-airport.ts` produces the facility, frequency and navaid files for a US airport; EGLL has no machine-readable source, so its JSON files are transcribed by hand from the UK AIP (each field names its AIP section).
 
+## Raw sources
+
+`data/sources/raw/` (git-ignored, about 230 MB) holds the downloads the provenance records refer to: the NASR CSV zips and their unzipped
+`x_<NAME>_CSV/` folders (the input of `scripts/extract-nasr-airport.ts`), the d-TPP 2610 metafile and PDFs, Overpass responses, the EGLL eAIP pages and
+chart PDFs, the EUROCONTROL ACD pages and the other documents the realism notes cite. `npx tsx scripts/fetch-raw-sources.ts` re-creates it:
+
+```bash
+npx tsx scripts/fetch-raw-sources.ts                   # everything, into data/sources/raw
+npx tsx scripts/fetch-raw-sources.ts --only nasr,dtpp  # groups: nasr | dtpp | osm | aip | docs
+npx tsx scripts/fetch-raw-sources.ts --out /path/raw   # another directory;  --list prints the plan, --verbose every row
+```
+
+Each file is validated (PDF header, XML and JSON parse, zip test), compared with the size recorded in `data/sources/README.md` or the
+`*-procedures.json` `pdf.bytes`, and reported as MATCH, MISMATCH, UNRECORDED (no size recorded), REFETCH, MISSING (HTTP 404 and similar, not retried) or
+FAILED; the full table is written to `fetch-report.tsv` and the SHA-256 of every file to `fetch-manifest.json` in the output directory. Existing valid files are
+kept, so a second run downloads nothing. Overpass pulls and the AWC / NWS weather samples are live data: they are labelled REFETCH and differ from the record by
+design. The committed `*-taxiways.geojson` carry the original `osm_base_timestamp` and stay the record; never convert a re-fetched
+`overpass_<slug>_raw.json` over them. The UK AIP is (c) NATS Limited and the EUROCONTROL ACD pages need copyright permission to redistribute: they are fetched for
+local provenance only. Do not commit anything under `data/sources/raw/`. To check a re-fetched NASR cycle, run
+`npx tsx scripts/extract-nasr-airport.ts BOS KBOS 2026-10-01 2026-10-21` (and the other airports) and compare the output with git.
+
 ## Charts
 
 `npm run fetch-charts` downloads the FAA chart PDFs of the five US airports into `public/charts/` (git-ignored). Do not commit PDFs. EGLL's charts (UK AIP, copyright NATS Limited) are linked, never downloaded or bundled.
