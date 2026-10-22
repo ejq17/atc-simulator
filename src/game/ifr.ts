@@ -258,11 +258,15 @@ export const IFR_DESTINATIONS: readonly Destination[] = [
  * (src/commands/airports.ts); no departure exit fix is named (the filed route is empty, the departure frequency is the airport's first DEP
  * frequency). The airline entries themselves choose destination and cruise altitude at generation time; this list serves the lookups.
  */
-const KMHT_PROFILE_DESTINATIONS: readonly Destination[] = profileDestinations(profileFor('KMHT')).map((d) => ({ icao: d.icao, jet: [...d.altitudesFt], exit: '' }));
+const PROFILE_DESTINATIONS = new Map<string, readonly Destination[]>();
 
-/** The destination list for an airport (KACY: the short hops above). */
+/** The destination list for an airport: KACY the short hops above, any airport with a registered traffic profile (KMHT, hubs) the legs of its profile. */
 export function ifrDestinationsFor(airport: Pick<Airport, 'icao'>): readonly Destination[] {
-  return airport.icao === 'KMHT' ? KMHT_PROFILE_DESTINATIONS : IFR_DESTINATIONS;
+  const icao = airport.icao.toUpperCase();
+  if (icao === 'KACY' || profileFor(icao).icao !== icao) return IFR_DESTINATIONS;
+  let hit = PROFILE_DESTINATIONS.get(icao);
+  if (!hit) PROFILE_DESTINATIONS.set(icao, (hit = profileDestinations(profileFor(icao)).map((d) => ({ icao: d.icao, jet: [...d.altitudesFt], exit: '' }))));
+  return hit;
 }
 
 /** C172 IFR cruise: 4,000-6,000 ft. */

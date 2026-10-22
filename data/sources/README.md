@@ -247,3 +247,15 @@ RECAT (TBL A-1, page A1): A = A388; B = A332 A333 A359 B744 B748 B772 B77W B788 
 - Wing span and height are recorded in `_not_in_type_shape` and in `src/ui/tower/aircraftModel.ts` (Tower view, 2D glyph); there is no stand-size model in the simulator, so the figures are not used for stand fit (parking has categories only).
 - The KMHT types (B738, BCS3, E175, CRJ9, B752, C208) are still the 2026-10-17 ESTIMATEs; the ACD has pages for B738, BCS3, B752, C208 and CRJ9, so they can be cross-checked against it later (the ACD B738 Vat is 147 kt against the 140 kt in the file).
 - Operator presence in 2026 (BA 747-400, UPS / FedEx MD-11 after the November 2025 accident, Q400 operators) is not checked.
+
+## Runway configurations, time zone and non-FAA provenance (facility JSON, optional fields)
+
+Hub airports run published runway configurations (which runways take arrivals, which take departures, in which wind). The facility JSON may carry
+`runway_configurations`: a list in operator-preference order (ties and calm wind use the first usable entry), each `{ id, name, landing: [end ids],
+departing: [end ids], wind_from_deg?, wind_to_deg?, max_tailwind_kt?, notes, source, url?, retrieved?, approximate? }`. End ids are the runway-end
+identifiers ("4R", "27L"); the wind sector is magnetic, wind FROM, clockwise from `wind_from_deg` to `wind_to_deg` (may wrap through north).
+Each entry must cite where the configuration is published (ATIS, airport operator, AIP); an airport with no sourced configuration omits the list and
+the simulator falls back to one best-headwind runway for arrivals and departures. `airport.time_zone` (IANA, "Europe/London") is a sourced constant of
+the profile, not extracted; absent means America/New_York. `airspace.class` gives the airspace class letter. For an airport built from a non-FAA
+source (EGLL: UK AIP) `_provenance.source_name` / `source_url` in the facility JSON, and `source_name` / `source_url` in the procedures JSON
+`_provenance`, replace the default NASR / d-TPP labels in the built provenance entries. The field list is also in `scripts/airports/types.ts`.

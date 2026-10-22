@@ -27,6 +27,7 @@ import type { Rng } from '../../sim/rng';
 import { getPresetWeather, randomWeather, WEATHER_PRESET_IDS } from '../../weather/presets';
 import type { WeatherPresetId } from '../../weather/presets';
 import { preferredEndOrder, recommendRunways } from '../../weather/runwaySelection';
+import { selectRunwayConfiguration } from '../../weather/runwayConfigurations';
 import type { GameScenario } from '../types';
 import { randomNNumber, runwayIdOf, runwayLongEnoughFor, callsignTail } from '../world';
 import { pickFlight, pickGaType, pickLeg, profileFor, profileTypes, resolveTypeSelection, usableAirlines } from '../airportProfile';
@@ -69,6 +70,12 @@ export function resolveWeather(w: FreePlayOptions['weather'], seed: number): Wea
 
 /** Runway config for the weather. `jets` restricts the choice to ends the airport's reference airliner (KACY A320, KMHT B738) can depart from (engine performance data vs the declared runway length). */
 export function recommendConfig(airport: Airport, weather: Weather | 'live', jets: boolean, closedEnds: readonly string[] = []): { departing: string[]; landing: string[] } {
+  if (airport.runwayConfigurations?.length) {
+    const w0 = weather === 'live' ? { windDirDeg: 0 as const, windSpeedKt: 0 } : weather;
+    const jet = profileFor(airport.icao).referenceJet;
+    const published = selectRunwayConfiguration(airport.runwayConfigurations, w0, airport, { closedEnds, ...(jets ? { endUsable: (id: string) => runwayLongEnoughFor(airport, jet, id) } : {}) });
+    if (published) return { departing: [...published.config.departing], landing: [...published.config.landing] };
+  }
   const ends = airport.runways.flatMap((r) => r.ends.map((e) => ({ id: e.id, magneticHeadingDeg: e.magneticHeadingDeg })));
   const open = ends.filter((e) => !closedEnds.includes(e.id)); // never a closed runway (JO 7110.65 3-3-2)
   const usable = jets ? open.filter((e) => runwayLongEnoughFor(airport, profileFor(airport.icao).referenceJet, e.id)) : open;

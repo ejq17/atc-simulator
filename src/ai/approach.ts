@@ -11,7 +11,7 @@
  */
 import type { Aircraft, ApproachType } from '../sim/types';
 import { assessClearanceSafety } from '../sim/conflicts';
-import { findRunwayEnd } from '../sim/runways';
+import { alongCross, findRunwayEnd } from '../sim/runways';
 import type { RunwayEndGeom } from '../sim/runways';
 import { analyzeProcedure, assessApproach, matchingProcedures, visualApproachAllowed } from '../sim/approach';
 import type { ProcedureInfo } from '../sim/approach';
@@ -140,15 +140,58 @@ function joinFix(v: AgentView, ac: Aircraft, info: ProcedureInfo): string | unde
   return bestD < JOIN_FIX_PASSED_NM && best + 1 < usable.length ? usable[best + 1] : usable[best];
 }
 
-/** The nearest arrival ahead of `ac` for the same runway (closer to the threshold), if any. */
-function leaderOf(v: AgentView, ac: Aircraft, g: RunwayEndGeom): { leader: Aircraft; gapNm: number } | undefined {
+/** Longest centreline spacing (ft) of adjacent parallel finals still handled as dependent approaches (JO 7110.65 5-9-6: up to 9,000 ft). */
+export const DEPENDENT_PARALLEL_MAX_FT = 9000;
+/**
+ * Diagonal radar separation between successive aircraft on adjacent final approach courses (JO 7110.65 5-9-6, read on faa.gov 2026-10-21): 1 nm when the
+ * centrelines are 2,500 to 3,600 ft apart, 1.5 nm for 3,600 to 8,300 ft, 2 nm for 8,300 to 9,000 ft. Closer than 2,500 ft the paragraph gives no
+ * stagger: the AI keeps the 3 nm radar separation then.
+ */
+export function dependentDiagonalNm(centrelineFt: number): number {
+  if (centrelineFt < 2500) return 3;
+  if (centrelineFt <= 3600) return 1;
+  return centrelineFt <= 8300 ? 1.5 : 2;
+}
+/** Margin the AI adds to the diagonal minimum when it builds the stagger (DESIGN VALUE: the finals converge and speeds differ). */
+const DEPENDENT_MARGIN_NM = 1;
+
+interface Leader { leader: Aircraft; gapNm: number; spacingNm: number; needNm: number | undefined; minProjectedNm: number }
+
+/**
+ * The most binding arrival ahead of `ac`: the nearest for the same runway (spacing 5 nm), or one on the adjacent parallel final (same direction, centrelines
+ * up to 9,000 ft apart) that is nearer the threshold and closer than the dependent-approach stagger (5-9-6, plus a margin) needs along the course.
+ */
+function leaderOf(v: AgentView, ac: Aircraft, g: RunwayEndGeom): Leader | undefined {
   const mine = distToThresholdNm(ac, g);
-  let best: { leader: Aircraft; gapNm: number } | undefined;
+  let best: Leader | undefined;
+  const slack = (l: Leader): number => l.gapNm - l.spacingNm;
   for (const o of Object.values(v.state.aircraft)) {
     // Pattern traffic is Tower's: it is sequenced around the approach traffic (sequence.ts), not the other way round.
-    if (o.id === ac.id || !isInboundArrival(o) || o.phase === 'PATTERN' || o.assignedRunwayEnd !== g.end.id) continue;
-    const gap = mine - distToThresholdNm(o, g);
-    if (gap > 0 && (!best || gap < best.gapNm)) best = { leader: o, gapNm: gap };
+    if (o.id === ac.id || !isInboundArrival(o) || o.phase === 'PATTERN') continue;
+    if (o.assignedRunwayEnd === g.end.id) {
+      const gap = mine - distToThresholdNm(o, g);
+      if (gap > 0) {
+        const cand: Leader = { leader: o, gapNm: gap, spacingNm: ARRIVAL_SPACING_NM, needNm: undefined, minProjectedNm: MIN_PROJECTED_GAP_NM };
+        if (!best || slack(cand) < slack(best)) best = cand;
+      }
+      continue;
+    }
+    const og = findRunwayEnd(v.airport, o.assignedRunwayEnd);
+    if (!og || og.runway.id === g.runway.id) continue;
+    let dh = Math.abs(og.headingDeg - g.headingDeg) % 360;
+    if (dh > 180) dh = 360 - dh;
+    if (dh > 15) continue;
+    const latFt = Math.abs(alongCross(g, og.end.threshold).cross) / 0.3048;
+    if (latFt > DEPENDENT_PARALLEL_MAX_FT) continue;
+    // the other aircraft's distance to its own threshold, against mine: thresholds of parallel runways are abeam or staggered by a known amount
+    const stagger = alongCross(g, og.end.threshold).along / 1852; // metres -> nm (other threshold along my course)
+    const gap = mine - (distToThresholdNm(o, og) - stagger);
+    if (gap <= -DEPENDENT_MARGIN_NM) continue; // the other one is behind (it follows me, and is judged from its own side)
+    const latNm = (latFt * 0.3048) / 1852;
+    const diag = dependentDiagonalNm(latFt) + DEPENDENT_MARGIN_NM;
+    const along = Math.sqrt(Math.max(0, diag * diag - latNm * latNm));
+    const cand: Leader = { leader: o, gapNm: gap, spacingNm: along, needNm: along, minProjectedNm: along };
+    if (gap > 0 && (!best || slack(cand) < slack(best))) best = cand;
   }
   return best;
 }
@@ -254,9 +297,9 @@ export function createApproachAgent(handleDepartures: (v: AgentView) => boolean)
 
       // Spacing against the aircraft ahead, then the approach clearance.
       const lead = leaderOf(v, ac, choice.end);
-      const need = requiredGapNm(ac);
+      const need = lead?.needNm ?? requiredGapNm(ac);
       const proj = lead ? projectedGapNm(ac, lead.leader, choice.end) : undefined;
-      const gapOk = !lead || (lead.gapNm >= ARRIVAL_SPACING_NM && proj!.atLeaderThresholdNm >= need && proj!.minNm >= MIN_PROJECTED_GAP_NM);
+      const gapOk = !lead || (lead.gapNm >= lead.spacingNm && proj!.atLeaderThresholdNm >= need && proj!.minNm >= lead.minProjectedNm);
       const clearance = mkCmd('APPROACH', ac, { approachType: choice.type, runwayEnd: choice.end.end.id, runwayId: choice.end.runway.id });
       // Not while the aircraft is too high to get down to the final approach fix altitude (`tooHighForFaf`): it keeps descending to its assigned altitude and is cleared
       // when the fix is within reach.
@@ -288,7 +331,7 @@ export function createApproachAgent(handleDepartures: (v: AgentView) => boolean)
       const speedKt = fixing ?? steps[steps.length - 1];
       const slowAvailable = dNm > SLOW_FROM_NM && speedKt !== undefined && !mem.done.has(`${ac.id}:slow:${speedKt}`);
       const speedsExhausted = fixing === undefined;
-      const tryHold = lead.gapNm < ARRIVAL_SPACING_NM - 1.5 || (speedsExhausted && !slowAvailable && proj!.atLeaderThresholdNm < need - HOLD_SHORTFALL_NM);
+      const tryHold = lead.gapNm < lead.spacingNm - 1.5 || (speedsExhausted && !slowAvailable && proj!.atLeaderThresholdNm < need - HOLD_SHORTFALL_NM);
       if (tryHold && choice.info && ac.nav) {
         const hold = publishedHoldFor(v, ac);
         if (hold) {

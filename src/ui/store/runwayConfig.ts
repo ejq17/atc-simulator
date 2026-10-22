@@ -5,9 +5,12 @@
 import type { Airport, Weather } from '../../sim/types';
 import { loadKacy } from '../../airport';
 import { preferredEndOrder, recommendRunways } from '../../weather/runwaySelection';
+import { configurationChangeForWind, selectRunwayConfiguration } from '../../weather/runwayConfigurations';
 
-/** Runway configuration recommended for a weather snapshot (best headwind end, used for both arrivals and departures). */
-export function recommendedRunways(weather: Weather, airport: Pick<Airport, 'icao' | 'runways' | 'magneticVariationDeg'> = loadKacy(), closedEnds: readonly string[] = []): { departing: string[]; landing: string[]; summary: string } {
+/** Runway configuration recommended for a weather snapshot: the published configuration for the wind when the airport has any (`selectRunwayConfiguration`), else the best headwind end used for both arrivals and departures. */
+export function recommendedRunways(weather: Weather, airport: Pick<Airport, 'icao' | 'runways' | 'magneticVariationDeg' | 'runwayConfigurations'> = loadKacy(), closedEnds: readonly string[] = []): { departing: string[]; landing: string[]; summary: string } {
+  const published = selectRunwayConfiguration(airport.runwayConfigurations, weather, airport, { closedEnds });
+  if (published) return { departing: [...published.config.departing], landing: [...published.config.landing], summary: published.summary };
   const ends = airport.runways.flatMap((r) => r.ends.map((e) => ({ id: e.id, magneticHeadingDeg: e.magneticHeadingDeg })));
   const rec = recommendRunways(weather, ends, { preferredOrder: preferredEndOrder(airport, 'high'), variationDeg: airport.magneticVariationDeg, excludeEnds: closedEnds });
   const top = rec.ranking.find((r) => r.id === rec.primary);
@@ -22,7 +25,11 @@ export function recommendedRunways(weather: Weather, airport: Pick<Airport, 'ica
  * on every METAR it only proposes a change when the runway now in use is no longer among the best ends AND (the wind is not calm OR the
  * current runway has a tailwind).
  */
-export function runwayChangeForWind(weather: Weather, current: { landing: string[]; departing: string[] }, airport: Pick<Airport, 'icao' | 'runways' | 'magneticVariationDeg'> = loadKacy(), closedEnds: readonly string[] = []): { departing: string[]; landing: string[]; summary: string } | undefined {
+export function runwayChangeForWind(weather: Weather, current: { landing: string[]; departing: string[] }, airport: Pick<Airport, 'icao' | 'runways' | 'magneticVariationDeg' | 'runwayConfigurations'> = loadKacy(), closedEnds: readonly string[] = []): { departing: string[]; landing: string[]; summary: string } | undefined {
+  if (airport.runwayConfigurations?.length) {
+    const change = configurationChangeForWind(airport.runwayConfigurations, weather, current, airport, { closedEnds });
+    return change && { departing: [...change.config.departing], landing: [...change.config.landing], summary: change.summary };
+  }
   const ends = airport.runways.flatMap((r) => r.ends.map((e) => ({ id: e.id, magneticHeadingDeg: e.magneticHeadingDeg })));
   const rec = recommendRunways(weather, ends, { preferredOrder: preferredEndOrder(airport, 'high'), variationDeg: airport.magneticVariationDeg, excludeEnds: closedEnds });
   const inUse = current.landing[0] ?? current.departing[0];

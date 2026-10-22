@@ -21,10 +21,11 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createProjection, trueToMagnetic } from '../src/airport/projection.ts';
 import type { Projection } from '../src/airport/projection.ts';
-import type { DataProvenance, HotSpot, InstrumentProcedure, LatLon, NavigationAid, RadioFrequency, Vec2 } from '../src/sim/types.ts';
+import type { Airport, DataProvenance, HotSpot, InstrumentProcedure, LatLon, NavigationAid, RadioFrequency, RunwayConfiguration, Vec2 } from '../src/sim/types.ts';
 import { angDiff, bearing, dist, distToPolygonEdge, lerp, pointInPolygon, projectOnSegment, r2, r6 } from './lib/geom.ts';
 import type { P } from './lib/geom.ts';
 import { Planar } from './lib/planar.ts';
+import { crossingName, crossingNodeId, findRunwayCrossings } from './lib/crossings.ts';
 import type { PWay } from './lib/planar.ts';
 import { inferIdentifiers } from './lib/inference.ts';
 import type { Decision, DiagramLabel } from './lib/inference.ts';
@@ -111,11 +112,16 @@ const NASR_FROM = facility._provenance.faa_cycle_effective as string; // 2026-10
 const DTPP_FROM = (procSrc._provenance.effective_from as string).slice(0, 10);
 const DTPP_TO = (procSrc._provenance.effective_to as string).slice(0, 10);
 const NASR_TO = (facility._provenance.faa_cycle_next as string) ?? DTPP_TO;
-const NASR_URL = 'https://www.faa.gov/air_traffic/flight_info/aeronav/aero_data/NASR_Subscription/2026-10-01/';
+// Source label / URL of the facility data. Default: the FAA NASR subscription. Airports built from another authority (EGLL: UK AIP)
+// set `source_name` / `source_url` in the facility JSON `_provenance`; the NASR-specific wording below is then replaced by it.
+const NASR_URL = (facility._provenance.source_url as string | undefined) ?? 'https://www.faa.gov/air_traffic/flight_info/aeronav/aero_data/NASR_Subscription/2026-10-01/';
+const FACILITY_SOURCE_NAME = (facility._provenance.source_name as string | undefined) ?? 'FAA NASR 28-day subscription (cycle 2026-10-01)';
+// d-TPP-style source of the procedures file: `source_name` (procedures JSON _provenance) overrides the default label.
+const PROC_SOURCE_NAME = (procSrc._provenance.source_name as string | undefined) ?? `FAA d-TPP cycle ${procSrc._provenance.cycle as string}`;
 const OSM_ATTR = '(c) OpenStreetMap contributors, ODbL 1.0 (https://www.openstreetmap.org/copyright)';
 
 const nasrProv = (notes?: string, extra: Partial<DataProvenance> = {}): DataProvenance => ({
-  source: 'FAA NASR 28-day subscription (cycle 2026-10-01)',
+  source: FACILITY_SOURCE_NAME,
   url: NASR_URL,
   retrievedOn: RETRIEVED,
   effectiveFrom: NASR_FROM,
@@ -124,7 +130,7 @@ const nasrProv = (notes?: string, extra: Partial<DataProvenance> = {}): DataProv
   ...extra,
 });
 const dtppProv = (url: string, notes?: string): DataProvenance => ({
-  source: `FAA d-TPP cycle ${procSrc._provenance.cycle as string}`,
+  source: PROC_SOURCE_NAME,
   url,
   retrievedOn: RETRIEVED,
   effectiveFrom: DTPP_FROM,
@@ -155,7 +161,8 @@ const ll = (p: P): LatLon => {
 // ---------------------------------------------------------------------------------------------
 // Runways
 // ---------------------------------------------------------------------------------------------
-const endId = (nasrId: string): string => String(parseInt(nasrId, 10)); // "04" -> "4" (matches src/sim/types.ts comments)
+/** NASR / AIP runway-end id -> simulator end id: leading zeros dropped, the parallel-runway letter kept ("04" -> "4", "04L" -> "4L", "09R" -> "9R"; matches src/sim/types.ts and graphUtils.normalizeRunwayEnd). */
+const endId = (nasrId: string): string => String(nasrId).trim().toUpperCase().replace(/^0+(?=\d)/, '');
 // source key names differ slightly between the first airport's hand-written files and the extractor's output
 const navPrimary: J = navSrc.primary_navaid ?? navSrc.vortac_acy;
 const navIls: J = navSrc.ils_localizers ?? navSrc.ils_localizers_at_kacy;
@@ -183,7 +190,7 @@ for (const src of facility.runways as J[]) {
     const lahso: LahsoInfo | null = e.lahso
       ? {
           availableLandingDistanceFt: e.lahso.available_landing_distance_ft,
-          holdShortOfRunwayId: String(e.lahso.hold_short_of).split('/').map((x: string) => String(parseInt(x, 10))).join('/'),
+          holdShortOfRunwayId: String(e.lahso.hold_short_of).split('/').map((x: string) => endId(x)).join('/'),
           holdShortPoint: { latLon: { lat: e.lahso.hold_short_point.lat, lon: e.lahso.hold_short_point.lon }, pos: pr(loc(e.lahso.hold_short_point.lat, e.lahso.hold_short_point.lon)) },
         }
       : null;
@@ -810,10 +817,20 @@ for (const n of sortedNodes) {
   else if (k === 'intersection') nodeIdOf.set(n, `X${String(++xCount).padStart(3, '0')}`);
   else nodeIdOf.set(n, `T${String(++tCount).padStart(4, '0')}`);
 }
-// the runway-runway crossing node (KACY: FAA hot spot HS 1)
-const xRunwayNode = [...pl.runwayNodes.get(runways[0].id)!].find((n) => (runwaysOfNode.get(n) ?? []).length === 2);
-if (xRunwayNode === undefined) hard(`runway centrelines ${runways[0].id} and ${runways[1].id} do not intersect in the built graph`);
-else nodeIdOf.set(xRunwayNode, profile.crossing.nodeId);
+// Runway-runway crossings: every node where two or more runway centrelines meet (none for parallel-only airports). The crossing
+// of runways[0] and runways[1] takes its id/name/notes from `profile.crossing` when the profile has one (KACY HS1-X, KMHT RWX-X;
+// kept so those airports' output does not change); every other crossing is `RWX-<a>x<b>` (see scripts/lib/crossings.ts).
+const runwayCrossings = findRunwayCrossings(pl.runwayNodes, runways.map((r) => r.id));
+const crossingInfo = new Map<number, { id: string; name: string; notes?: string }>();
+for (const c of runwayCrossings) {
+  const legacy = profile.crossing !== undefined && c.runwayIds.length === 2 && c.runwayIds[0] === runways[0].id && c.runwayIds[1] === runways[1].id;
+  crossingInfo.set(c.node, legacy ? { id: profile.crossing!.nodeId, name: profile.crossing!.name, notes: profile.crossing!.notes } : { id: crossingNodeId(c.runwayIds), name: crossingName(c.runwayIds), notes: `Intersection of the ${c.runwayIds.join(', ')} runway centrelines (computed from the NASR thresholds).` });
+  nodeIdOf.set(c.node, crossingInfo.get(c.node)!.id);
+}
+if (profile.crossing !== undefined && !runwayCrossings.some((c) => crossingInfo.get(c.node)!.id === profile.crossing!.nodeId)) hard(`profile.crossing is set but runway centrelines ${runways.map((r) => r.id).join(' and ')} do not intersect in the built graph`);
+// the first crossing is the one the FAA hot spot (when any) is drawn over
+const xRunwayNode: number | undefined = runwayCrossings[0]?.node;
+const crossingNodeIds = new Set([...crossingInfo.values()].map((c) => c.id));
 
 const nodes: Record<string, KacyTaxiNode> = {};
 for (const n of sortedNodes) {
@@ -824,7 +841,7 @@ for (const n of sortedNodes) {
   const node: KacyTaxiNode = { id, kind, pos: pr(pl.pos[n]), latLon: ll(pl.pos[n]), taxiways };
   const rids = runwaysOfNode.get(n);
   if (kind === 'runway' && rids) {
-    node.runwayId = rids.length === 2 ? [...rids].sort((p, q) => runwayById(q).runway.lengthFt - runwayById(p).runway.lengthFt)[0] : rids[0]; // a crossing node belongs to the longer runway
+    node.runwayId = rids.length >= 2 ? [...rids].sort((p, q) => runwayById(q).runway.lengthFt - runwayById(p).runway.lengthFt)[0] : rids[0]; // a crossing node belongs to the longer runway
     node.runwayIds = rids;
     const dists: Record<string, number> = {};
     for (const rid of rids) {
@@ -835,9 +852,10 @@ for (const n of sortedNodes) {
     }
     node.distFromThresholdM = dists;
     if (thrNodeIds.has(n)) node.name = `Threshold ${nodeIdOf.get(n)!.replace('THR', '')}`;
-    if (n === xRunwayNode) {
-      node.name = profile.crossing.name;
-      node.notes = profile.crossing.notes;
+    const xi = crossingInfo.get(n);
+    if (xi) {
+      node.name = xi.name;
+      node.notes = xi.notes;
     }
   }
   if (kind === 'holding_position') {
@@ -890,7 +908,8 @@ const titleCase = (s: string): string => s.toLowerCase().replace(/\b\w/g, (c) =>
 const spokenName = (nasrName: string): string => profile.spokenName?.(nasrName) ?? titleCase(nasrName.replace(/\bINTL\b/, 'INTERNATIONAL').replace(/\bRGNL\b/, 'REGIONAL'));
 const callName = titleCase(freqSrc.facility.radio_call as string); // "Atlantic City", "Manchester"
 const approachCallName = titleCase((freqSrc.facility.approach_radio_call ?? freqSrc.facility.radio_call) as string); // "Atlantic City", "Boston"
-const freqProv = (note: string): DataProvenance => nasrProv(note, { source: `FAA NASR 28-day subscription (FRQ.csv, cycle ${NASR_FROM}); cross-checked with d-TPP airport diagram ${profile.diagramPdf.replace(/\.PDF$/i, '')} cycle ${procSrc._provenance.cycle as string}` });
+const CUSTOM_FACILITY_SOURCE = facility._provenance.source_name !== undefined;
+const freqProv = (note: string): DataProvenance => nasrProv(note, CUSTOM_FACILITY_SOURCE ? { source: `${FACILITY_SOURCE_NAME} (frequencies); cross-checked with airport diagram ${profile.diagramPdf.replace(/\.PDF$/i, '')}` } : { source: `FAA NASR 28-day subscription (FRQ.csv, cycle ${NASR_FROM}); cross-checked with d-TPP airport diagram ${profile.diagramPdf.replace(/\.PDF$/i, '')} cycle ${procSrc._provenance.cycle as string}` });
 /** "130-309" -> { fromDeg: 130, toDeg: 309 } (NASR sectorization bearings; may wrap through north, e.g. 310-129). */
 const sector = (s: string | undefined): { sectorBearings: { fromDeg: number; toDeg: number } } | Record<string, never> => {
   const m = /^(\d{1,3})-(\d{1,3})$/.exec(s ?? '');
@@ -903,7 +922,7 @@ const frequencies: RadioFrequency[] = profile.frequencies({ freqSrc, callName, a
 // ---------------------------------------------------------------------------------------------
 // Navaids and fixes (all values read from <slug>-navaids.json)
 // ---------------------------------------------------------------------------------------------
-const navProv = (note: string): DataProvenance => nasrProv(note, { source: `FAA NASR 28-day subscription (NAV/ILS/FIX CSV, cycle ${NASR_FROM})` });
+const navProv = (note: string): DataProvenance => nasrProv(note, { source: CUSTOM_FACILITY_SOURCE ? `${FACILITY_SOURCE_NAME} (navaids, fixes)` : `FAA NASR 28-day subscription (NAV/ILS/FIX CSV, cycle ${NASR_FROM})` });
 const mkNav = (n: Omit<NavigationAid, 'pos' | 'provenance'> & { notes: string }): NavigationAid & Record<string, unknown> => {
   const { notes, ...rest } = n;
   return { ...rest, pos: pr(loc(n.latLon.lat, n.latLon.lon)), provenance: navProv(notes) };
@@ -1099,6 +1118,30 @@ const hotSpot: HotSpot | undefined = hotSpotText
     }
   : undefined;
 
+// Runway configurations: copied from facility.runway_configurations (sourced by the airport's data agent; nothing is invented here).
+// Each runway end named must exist; the wind sector and tailwind limit are optional.
+const runwayConfigurations: RunwayConfiguration[] = ((facility.runway_configurations ?? []) as J[]).map((c: J) => {
+  for (const e of [...(c.landing as string[]), ...(c.departing as string[])]) {
+    if (!runways.some((r) => r.ends.some((x) => x.id === e))) hard(`runway configuration ${c.id as string} names runway end ${e}, which is not in the facility data`);
+  }
+  return {
+    id: c.id as string,
+    name: c.name as string,
+    landing: [...(c.landing as string[])],
+    departing: [...(c.departing as string[])],
+    ...(typeof c.wind_from_deg === 'number' ? { windFromDeg: c.wind_from_deg as number } : {}),
+    ...(typeof c.wind_to_deg === 'number' ? { windToDeg: c.wind_to_deg as number } : {}),
+    ...(typeof c.max_tailwind_kt === 'number' ? { maxTailwindKt: c.max_tailwind_kt as number } : {}),
+    notes: (c.notes as string | undefined) ?? '',
+    provenance: {
+      source: (c.source as string | undefined) ?? FACILITY_SOURCE_NAME,
+      ...(typeof c.url === 'string' ? { url: c.url as string } : {}),
+      retrievedOn: (c.retrieved as string | undefined) ?? RETRIEVED,
+      ...(c.approximate ? { approximate: true } : {}),
+    },
+  };
+});
+
 const parking: KacyParking[] = parkRecs.map((r) => ({
   id: r.id,
   name: r.name,
@@ -1141,13 +1184,16 @@ const airport: KacyAirport = {
   procedures,
   hotSpots: hotSpot ? [hotSpot] : [],
   ...(mva ? { mvaSectors } : {}),
-  towerHours: facility.tower.tower_hours,
-  airspaceClass: facility.airspace.class_c ? 'C' : undefined,
+  towerHours: facility.tower?.tower_hours,
+  // `airspace.class` ("B" | "C" | "D" | ...) when the facility file gives it; else the legacy NASR class_c flag
+  airspaceClass: (facility.airspace?.class as Airport['airspaceClass'] | undefined) ?? (facility.airspace?.class_c ? 'C' : undefined),
+  ...(typeof facility.airport.time_zone === 'string' ? { timeZone: facility.airport.time_zone as string } : {}),
+  ...(runwayConfigurations.length ? { runwayConfigurations } : {}),
   provenance: [
     nasrProv(`nasrName: ${facility.airport.name as string}. ${SLUG}-facility.json: ARP, elevation, magnetic variation ${facility.airport.magnetic_variation.deg as number} ${facility.airport.magnetic_variation.hemisphere as string} (epoch ${facility.airport.magnetic_variation.epoch_year as string}, stale), runways, remarks, tower hours, Class C flag.`),
     freqProv(`${SLUG}-frequencies.json`),
     navProv(profile.provenanceNotes.navaids),
-    dtppProv('https://www.faa.gov/air_traffic/flight_info/aeronav/digital_products/dtpp/', profile.provenanceNotes.procedures),
+    dtppProv((procSrc._provenance.source_url as string | undefined) ?? 'https://www.faa.gov/air_traffic/flight_info/aeronav/digital_products/dtpp/', profile.provenanceNotes.procedures),
     osmProv(profile.provenanceNotes.osm, true),
     ...(mva ? [mva.provenance] : []),
     dtppProv(procSrc.airport_diagram.pdf.url as string, profile.provenanceNotes.diagramReconciliation),
@@ -1264,7 +1310,7 @@ for (const rb of runwayBuilds) {
   const total = dist(rb.a, rb.b);
   rb.runway.ends.forEach((end, idx) => {
     const ids = Object.values(nodes)
-      .filter((n) => n.kind === 'runway' && n.runwayIds?.includes(rb.runway.id) && !n.id.startsWith('THR') && n.id !== profile.crossing.nodeId)
+      .filter((n) => n.kind === 'runway' && n.runwayIds?.includes(rb.runway.id) && !n.id.startsWith('THR') && !crossingNodeIds.has(n.id))
       .filter((n) => n.taxiways.length > 0)
       .filter((n) => {
         const d = n.distFromThresholdM?.[end.id] ?? Infinity;
@@ -1382,7 +1428,7 @@ for (const rb of runwayBuilds) {
   const rn = Object.values(nodes).filter((n) => n.kind === 'runway' && n.runwayIds?.includes(rb.runway.id)).sort((a, b) => (a.distFromThresholdM?.[rb.runway.ends[0].id] ?? 0) - (b.distFromThresholdM?.[rb.runway.ends[0].id] ?? 0));
   R.push(`**Runway ${rb.runway.id}**`);
   R.push('');
-  R.push(...mdTable(['node', `m from ${rb.runway.ends[0].id}`, `m from ${rb.runway.ends[1].id}`, 'taxiways'], rn.map((n) => [n.id, n.distFromThresholdM?.[rb.runway.ends[0].id] ?? '', n.distFromThresholdM?.[rb.runway.ends[1].id] ?? '', n.taxiways.join(', ') || (n.id === 'HS1-X' ? '(runway intersection, HS 1)' : '(threshold)')])));
+  R.push(...mdTable(['node', `m from ${rb.runway.ends[0].id}`, `m from ${rb.runway.ends[1].id}`, 'taxiways'], rn.map((n) => [n.id, n.distFromThresholdM?.[rb.runway.ends[0].id] ?? '', n.distFromThresholdM?.[rb.runway.ends[1].id] ?? '', n.taxiways.join(', ') || (n.id === 'HS1-X' ? '(runway intersection, HS 1)' : crossingNodeIds.has(n.id) && n.id !== profile.crossing?.nodeId ? '(runway intersection)' : '(threshold)')])));
   R.push('');
 }
 R.push(`End-region entry/exit counts (each runway split at its midpoint): ${regionCounts.map((c) => `${c.runway}/${c.end}: ${c.count}`).join('; ')}`);

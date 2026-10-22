@@ -206,6 +206,27 @@ export interface HotSpot {
   provenance: DataProvenance;
 }
 
+/**
+ * A published runway configuration (use of runways by direction of flow), read from the facility data when the airport has any (hubs:
+ * KBOS, KPHL, EGLL). Runway ids are runway END ids as in `RunwayEnd.id` ("4R", "9", "27L"). The list order of
+ * `Airport.runwayConfigurations` is the operator preference used for ties and calm wind (the airport data source documents it).
+ */
+export interface RunwayConfiguration {
+  id: string;
+  name: string;
+  /** Runway ends used for arrivals. */
+  landing: string[];
+  /** Runway ends used for departures. */
+  departing: string[];
+  /** Magnetic wind-direction sector (wind FROM, clockwise from `windFromDeg` to `windToDeg`, may wrap through north) in which the source says the configuration is used. */
+  windFromDeg?: number;
+  windToDeg?: number;
+  /** Largest tailwind component (kt) the source accepts for this configuration; undefined = the source gives none. */
+  maxTailwindKt?: number;
+  notes: string;
+  provenance: DataProvenance;
+}
+
 export interface Airport {
   icao: string;            // "KACY"
   faaId: string;           // "ACY"
@@ -221,6 +242,10 @@ export interface Airport {
   procedures: InstrumentProcedure[];
   hotSpots: HotSpot[];
   towerHours?: string;
+  /** IANA time zone of the airport ("America/New_York", "Europe/London"); drives local-time traffic density, sunrise / sunset and the ATIS clock. Absent = 'America/New_York' (KACY, KMHT). */
+  timeZone?: string;
+  /** Published runway configurations in operator-preference order (see `RunwayConfiguration`). Absent: one best-headwind runway for arrivals and departures. */
+  runwayConfigurations?: RunwayConfiguration[];
   /** Published traffic pattern altitude (ft MSL) when the dataset has one (NASR carries none for KACY / KMHT: the AIM 4-3-3 defaults apply). */
   trafficPatternAltitudeFt?: number;
   airspaceClass?: 'B' | 'C' | 'D' | 'E' | 'G';

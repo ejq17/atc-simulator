@@ -76,9 +76,11 @@ export default function TowerDisplay() {
 
     if (saved && saved.session === sess) { camRef.current = { ...saved.cam }; followRef.current = saved.follow; setFollowState(saved.follow); setBinoc(saved.cam.binoculars); }
     else {
-      // First look: along the runway with the most traffic would be a guess; start facing the airfield (the first runway's far threshold).
+      // First look: along the runway with the most traffic would be a guess; start facing the airfield: the far threshold of the first
+      // runway (two-runway airports, unchanged) or of the longest runway (hubs, where the list order carries no meaning for a camera).
       const t = runwayEndTargets(ap.runways)[0];
-      camRef.current = t ? snapToPoint(initialCam(0), site.pos, CAB_EYE_HEIGHT_M, ap.runways[0].ends[1].threshold) : initialCam(0);
+      const lookRunway = ap.runways.length > 2 ? ap.runways.reduce((a, b) => (b.lengthFt > a.lengthFt ? b : a)) : ap.runways[0];
+      camRef.current = t ? snapToPoint(initialCam(0), site.pos, CAB_EYE_HEIGHT_M, lookRunway.ends[1].threshold) : initialCam(0);
     }
 
     let scene: TowerScene;

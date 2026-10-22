@@ -34,7 +34,7 @@ import { NM, callsignTail, randomNNumber, runwayLongEnoughFor } from './world';
 import { pickFlight, pickGaType, pickLeg, profileFor, resolveTypeSelection, usableAirlines } from './airportProfile';
 import type { Flight } from './airportProfile';
 import { CARGO_PREFIXES } from './airportProfile';
-import { localHourAt } from './trafficDensity';
+import { airportTimeZone, localHourAt } from './trafficDensity';
 import { simUtcMs } from '../sim/solar';
 import { pickArrivalStart, pickParking } from './placement';
 import type { AirbornePoint } from './placement';
@@ -170,7 +170,7 @@ export function createTrafficGenerator(scenario: Scenario, airport: Airport, opt
       if (!cand.size) return undefined;
       allowedTypes = cand;
     }
-    const localHour = options.densityAt ? localHourAt(simUtcMs(state)) : undefined;
+    const localHour = options.densityAt ? localHourAt(simUtcMs(state), airportTimeZone(airport)) : undefined;
     let last: Flight | undefined;
     for (let i = 0; i < 80; i++) {
       let f: Flight | undefined = ga ? { callsign: randomNNumber(rng!), type: pickGaType(rng!, icao) } : pickFlight(rng!, icao, { allowedTypes, localHour });
@@ -247,6 +247,20 @@ export function createTrafficGenerator(scenario: Scenario, airport: Airport, opt
 
   const withParkingOpt = (spec: SpawnSpec | undefined, flight: Flight): SpawnSpec | undefined => (spec ? withParkingIntent(spec, flight) : spec);
 
+  /** Landing runway ends an arrival of `type` may be given: long enough (declared LDA), approach available first, arrival slot free. */
+  const arrivalEndsFor = (state: Readonly<SimulationState>, ends: readonly string[], type: string, ga: boolean): string[] => {
+    if (ends.length === 1) return arrivalFits(state, ends[0], type) ? [ends[0]] : [];
+    const ldaOk = (e: string): boolean => {
+      const g = findRunwayEnd(airport, e);
+      return !g || getPerformance(type).landingDistanceFt <= g.ldaM / 0.3048;
+    };
+    const long = ends.filter(ldaOk);
+    const base = long.length ? long : [...ends];
+    const withApproach = !ga && flows.arrivals ? base.filter((e) => (isTurbojet(type) && starArrival(airport, e)) || arrivalProcedure(airport, e)) : [];
+    const preferred = withApproach.length ? withApproach : base;
+    return preferred.filter((e) => arrivalFits(state, e, type));
+  };
+
   const trySpawnArrival = (state: Readonly<SimulationState>): SpawnSpec | undefined => {
     const ends = state.activeRunways.landing.length ? state.activeRunways.landing : state.activeRunways.departing;
     if (!ends.length) return undefined;
@@ -254,8 +268,13 @@ export function createTrafficGenerator(scenario: Scenario, airport: Airport, opt
     const flight = nextFlight(ga, state);
     if (!flight) return undefined;
     const type = flight.type;
-    const endId = ends[Math.min(ends.length - 1, Math.floor(rng!() * ends.length))];
-    if (!arrivalFits(state, endId, flight.type)) return undefined;
+    // Several landing runways (a published configuration, e.g. KBOS 4R + 4L or KPHL 27R): the arrival goes to one of the runways that can take
+    // the type (landing distance available), preferring runways with an IFR procedure for an airliner when IFR flows are on, and whose arrival
+    // slot is free. One random number is drawn whatever the count, so single-runway seeds are unchanged.
+    const pool = arrivalEndsFor(state, ends, type, ga);
+    const draw = rng!(); // drawn even when no runway can take the arrival (keeps the seeded stream of single-runway runs unchanged)
+    if (!pool.length) return undefined;
+    const endId = pool[Math.min(pool.length - 1, Math.floor(draw * pool.length))];
     if (!ga && flows.arrivals && isTurbojet(type) && starArrival(airport, endId)) return withParkingOpt(trySpawnStarArrival(state, flight, endId), flight);
     if (!ga && flows.arrivals && arrivalProcedure(airport, endId)) return withParkingOpt(trySpawnIfrArrival(state, flight, endId), flight);
     const others: AirbornePoint[] = Object.values(state.aircraft)

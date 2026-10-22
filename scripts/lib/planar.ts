@@ -272,16 +272,18 @@ export class Planar {
         }
       }
     }
-    // (c) the two centrelines intersect: one shared node
-    if (runways.length === 2) {
-      const [r1, r2] = runways;
-      const hit = segIntersect(r1.a, r1.b, r2.a, r2.b);
-      if (hit) {
-        const x = this.addNode(hit.p);
-        this.pinned.add(x);
-        this.runwayNodes.get(r1.id)!.add(x);
-        this.runwayNodes.get(r2.id)!.add(x);
-        this.notes.push(`runway centrelines ${r1.id} and ${r2.id} intersect at local (${hit.p.x.toFixed(1)}, ${hit.p.y.toFixed(1)})`);
+    // (c) any two centrelines intersect: one shared node per intersection (none for parallel runways)
+    for (let i = 0; i < runways.length; i++) {
+      for (let j = i + 1; j < runways.length; j++) {
+        const [r1, r2] = [runways[i], runways[j]];
+        const hit = segIntersect(r1.a, r1.b, r2.a, r2.b);
+        if (hit) {
+          const x = this.addNode(hit.p);
+          this.pinned.add(x);
+          this.runwayNodes.get(r1.id)!.add(x);
+          this.runwayNodes.get(r2.id)!.add(x);
+          this.notes.push(`runway centrelines ${r1.id} and ${r2.id} intersect at local (${hit.p.x.toFixed(1)}, ${hit.p.y.toFixed(1)})`);
+        }
       }
     }
     // (d) build the runway ways, nodes sorted along the centreline

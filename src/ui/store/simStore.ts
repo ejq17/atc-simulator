@@ -57,7 +57,7 @@ export interface StartOptions {
   /** AI controllers work the positions the player does not (default true). False leaves them unstaffed (aircraft there are "not on frequency"). */
   ai?: boolean;
   /** 'auto' = recommended from the wind; otherwise explicit ends. */
-  runways: 'auto' | { landing: string; departing: string };
+  runways: 'auto' | { landing: string | string[]; departing: string | string[] };
   /**
    * Real-time mode (default true): sim time follows the wall clock, the UTC epoch is the real time at start, free-play traffic follows the
    * time-of-day curve and the ATIS letter follows the hourly cycle. False = the old "sim clock at the speed buttons' multiple" behaviour.
@@ -204,7 +204,8 @@ export const useSimStore = create<SimStore>((set, get) => ({
       const refWeather = weather ?? getPresetWeather('clear');
       const closedEnds = closedEndsOf(airport, opts.freePlay.closures ?? []);
       let runways: { departing: string[]; landing: string[] } | undefined;
-      if (opts.runways !== 'auto' && ![opts.runways.departing, opts.runways.landing].some((e) => closedEnds.includes(e))) runways = { departing: [opts.runways.departing], landing: [opts.runways.landing] };
+      const asList = (v: string | string[]): string[] => (Array.isArray(v) ? [...v] : [v]); // a published configuration names several ends per direction
+      if (opts.runways !== 'auto' && ![...asList(opts.runways.departing), ...asList(opts.runways.landing)].some((e) => closedEnds.includes(e))) runways = { departing: asList(opts.runways.departing), landing: asList(opts.runways.landing) };
       else if (opts.runways !== 'auto') {
         note('warn', 'The runway you chose is closed for this session (NOTAM); the best open runway was selected instead.');
         const rec = recommendedRunways(refWeather, airport, closedEnds);

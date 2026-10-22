@@ -161,6 +161,8 @@ export function SetupScreen() {
   const [airportEvents, setAirportEvents] = useState<boolean>(prev?.freePlay.airportEvents !== false);
   const [landing, setLanding] = useState<string>('auto');
   const [departing, setDeparting] = useState<string>('auto');
+  /** Published runway configuration id, or 'auto' (airports with `runwayConfigurations` only). */
+  const [configId, setConfigId] = useState<string>('auto');
   const [position, setPosition] = useState<PositionChoice>(prev?.controller ?? 'TWR');
   const [aiOn, setAiOn] = useState<boolean>(prev?.ai ?? true);
   const [realTime, setRealTime] = useState<boolean>(prev?.realTime ?? true);
@@ -180,6 +182,7 @@ export function SetupScreen() {
     lastIcao.current = icao;
     setLanding('auto');
     setDeparting('auto');
+    setConfigId('auto');
     setCloseRunway('none');
     setCloseTaxiway('none');
     setScenarioId(CUSTOM);
@@ -240,6 +243,9 @@ export function SetupScreen() {
   const closedEnds = useMemo(() => closedEndsOf(airport, closeRunway !== 'none' ? [{ kind: 'RUNWAY', ident: closeRunway }] : []), [airport, closeRunway]);
   const rec = useMemo(() => recommendedRunways(previewWx, airport, closedEnds), [previewWx, airport, closedEnds]);
   const ends = airport.runways.flatMap((r) => r.ends.map((e) => e.id));
+  const configs = airport.runwayConfigurations ?? [];
+  const hasConfigs = configs.length > 0;
+  const chosenConfig = configs.find((c) => c.id === configId);
   const taxiwayNames = useMemo(() => [...new Set(airport.taxiwayGraph.edges.map((e) => e.taxiway.toUpperCase()).filter((t) => !/^RWY/i.test(t)))].sort(), [airport]);
   const closures: ClosureSpec[] = [
     ...(closeRunway !== 'none' ? [{ kind: 'RUNWAY' as const, ident: closeRunway, reason: 'closed for the session (setup option)' }] : []),
@@ -274,7 +280,7 @@ export function SetupScreen() {
       controller: position,
       ai: aiOn,
       realTime,
-      runways: landing === 'auto' && departing === 'auto' ? 'auto' : { landing: landing === 'auto' ? rec.landing[0] : landing, departing: departing === 'auto' ? rec.departing[0] : departing },
+      runways: chosenConfig ? { landing: chosenConfig.landing, departing: chosenConfig.departing } : hasConfigs || (landing === 'auto' && departing === 'auto') ? 'auto' : { landing: landing === 'auto' ? rec.landing[0] : landing, departing: departing === 'auto' ? rec.departing[0] : departing },
     };
     void startSession(opts);
   };
@@ -478,18 +484,32 @@ export function SetupScreen() {
                     {weatherChoice.kind === 'scenario' && 'The scenario sets its own weather.'}
                   </div>
                 </div>
-                <Field label="Landing runway">
-                  <select className={SELECT} value={landing} onChange={(e) => setLanding(e.target.value)} aria-label="Landing runway">
-                    <option value="auto">Auto · {rec.landing[0]}</option>
-                    {ends.map((e) => (<option key={e} value={e} disabled={closedEnds.includes(e)}>{e}{closedEnds.includes(e) ? ' (closed)' : ''}</option>))}
-                  </select>
-                </Field>
-                <Field label="Departing runway">
-                  <select className={SELECT} value={departing} onChange={(e) => setDeparting(e.target.value)} aria-label="Departing runway">
-                    <option value="auto">Auto · {rec.departing[0]}</option>
-                    {ends.map((e) => (<option key={e} value={e} disabled={closedEnds.includes(e)}>{e}{closedEnds.includes(e) ? ' (closed)' : ''}</option>))}
-                  </select>
-                </Field>
+                {hasConfigs ? (
+                  <Field label="Runway configuration" hint="Published use of the runways (arrivals / departures). Auto picks the one the wind favours; ready-made scenarios keep their own runways unless you pick one here.">
+                    <select className={SELECT} value={configId} onChange={(e) => setConfigId(e.target.value)} aria-label="Runway configuration" data-testid="runway-configuration">
+                      <option value="auto">Auto · {rec.landing.join('/')} arr, {rec.departing.join('/')} dep</option>
+                      {configs.map((c) => {
+                        const closed = [...c.landing, ...c.departing].some((e) => closedEnds.includes(e));
+                        return (<option key={c.id} value={c.id} disabled={closed}>{c.name}: arr {c.landing.join('/')}, dep {c.departing.join('/')}{closed ? ' (closed runway)' : ''}</option>);
+                      })}
+                    </select>
+                  </Field>
+                ) : (
+                  <>
+                  <Field label="Landing runway">
+                    <select className={SELECT} value={landing} onChange={(e) => setLanding(e.target.value)} aria-label="Landing runway">
+                      <option value="auto">Auto · {rec.landing[0]}</option>
+                      {ends.map((e) => (<option key={e} value={e} disabled={closedEnds.includes(e)}>{e}{closedEnds.includes(e) ? ' (closed)' : ''}</option>))}
+                    </select>
+                  </Field>
+                  <Field label="Departing runway">
+                    <select className={SELECT} value={departing} onChange={(e) => setDeparting(e.target.value)} aria-label="Departing runway">
+                      <option value="auto">Auto · {rec.departing[0]}</option>
+                      {ends.map((e) => (<option key={e} value={e} disabled={closedEnds.includes(e)}>{e}{closedEnds.includes(e) ? ' (closed)' : ''}</option>))}
+                    </select>
+                  </Field>
+                  </>
+                )}
                 <p className="col-span-2 text-[11px] leading-snug text-atc-muted">
                   {rec.summary}. {!isCustom && 'Ready-made scenarios keep their own runway unless you pick one here.'}
                 </p>

@@ -39,10 +39,10 @@ export function birdTimeFactor(localHour: number): number {
 }
 
 /** Probability that a session sees bird activity. Neutral 0.2 without a start time. */
-export function birdActivityProbability(utcMs?: number): number {
+export function birdActivityProbability(utcMs?: number, timeZone?: string): number {
   if (utcMs === undefined) return 0.2;
   const month = new Date(utcMs).getUTCMonth();
-  return Math.max(0, Math.min(0.7, 0.3 * BIRD_MONTH_WEIGHT[month] * birdTimeFactor(localHourAt(utcMs))));
+  return Math.max(0, Math.min(0.7, 0.3 * BIRD_MONTH_WEIGHT[month] * birdTimeFactor(localHourAt(utcMs, timeZone))));
 }
 
 const BIRD_PHRASES = ['flocks of small birds', 'a flock of geese', 'numerous flocks of ducks'];
@@ -133,7 +133,7 @@ export function buildAirportEvents(airport: Airport, seed: number, o: AirportEve
   const bAtMin = 3 + Math.floor(rng() * 28);
   const bDurMin = 20 + Math.floor(rng() * 26);
   const bWhat = BIRD_PHRASES[Math.floor(rng() * BIRD_PHRASES.length)];
-  if (bRoll < birdActivityProbability(o.startUtcMs)) {
+  if (bRoll < birdActivityProbability(o.startUtcMs, airport.timeZone)) {
     events.push({
       atSec: bAtMin * 60, kind: 'birds', detail: `${bWhat}, altitude unknown`, durationSec: bDurMin * 60,
       text: `Bird activity in the vicinity of the airport: ${bWhat}, altitude unknown.`,

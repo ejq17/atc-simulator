@@ -59,6 +59,7 @@ const AIRLINE_CODES = ['NKS', 'AAL', 'DAL', 'JBU', 'SWA', 'UAL'];
  */
 export function createBasicTrafficGenerator(): TrafficGenerator {
   let rng: (() => number) | undefined;
+  let arrivalCounter = 0;
   let nextArrival = Infinity;
   let nextDeparture = Infinity;
   let counter = 0;
@@ -88,11 +89,14 @@ export function createBasicTrafficGenerator(): TrafficGenerator {
         }
         return `N${++counter}ZZ`;
       };
-      const landing = state.activeRunways.landing[0] ?? state.activeRunways.departing[0];
+      // several landing runways (a published configuration): arrivals alternate over them, deterministically (no random number)
+      const landingEnds = state.activeRunways.landing.length ? state.activeRunways.landing : state.activeRunways.departing;
+      const landing = landingEnds[arrivalCounter % Math.max(1, landingEnds.length)];
       const departing = state.activeRunways.departing[0] ?? landing;
       if (now >= nextArrival) {
         nextArrival = now + gap(t.arrivalsPerHour);
         if (count < t.maxAircraft && landing) {
+          arrivalCounter++;
           const ga = rng() < t.gaFraction;
           const g = findRunwayEnd(state.airport, landing);
           if (g) {

@@ -3,7 +3,7 @@ import { loadKacy } from '../airport';
 import { createEngine } from '../sim/engine';
 import { game } from '../game/game';
 import { createAiControllers } from './index';
-import type { Aircraft, SimEvent } from '../sim/types';
+import type { Aircraft, Airport, SimEvent } from '../sim/types';
 import { holdNodeAt } from './world';
 import { findRunwayEnd } from '../sim/runways';
 
@@ -58,18 +58,28 @@ export interface SoakHooks {
   perSecond?: (engine: ReturnType<typeof createEngine>, ai: ReturnType<typeof createAiControllers>, nowSec: number) => void;
 }
 
-export function runFreePlaySoak(seed: number, realism: Realism, simHours: number, hooks: SoakHooks = {}): SoakResult {
-  const sc = game.buildFreePlay(kacy, {
-    seed, weather: 'clear', aircraftCount: 2, maxAircraft: 14, arrivalsPerHour: 10, departuresPerHour: 10, difficulty: 'normal', startingScenario: 'quiet',
+export interface SoakOptions {
+  /** Airport to work (default KACY) and the runway configuration to run (default: the airport's own recommendation). */
+  airport?: Airport;
+  activeRunways?: { landing: string[]; departing: string[] };
+  arrivalsPerHour?: number;
+  departuresPerHour?: number;
+}
+
+export function runFreePlaySoak(seed: number, realism: Realism, simHours: number, hooks: SoakHooks = {}, opts: SoakOptions = {}): SoakResult {
+  const ap = opts.airport ?? kacy;
+  const sc = game.buildFreePlay(ap, {
+    seed, weather: 'clear', aircraftCount: 2, maxAircraft: 14, arrivalsPerHour: opts.arrivalsPerHour ?? 10, departuresPerHour: opts.departuresPerHour ?? 10, difficulty: 'normal', startingScenario: 'quiet',
+    ...(opts.activeRunways ? { activeRunways: opts.activeRunways } : {}),
     specialTraffic: { helicopter: false, military: false, transition: false, training: false, vehicles: false }, airportEvents: false, startUtcMs: Date.UTC(2026, 5, 1, 15),
   });
   sc.controllerPositions = ['CLNC', 'GND', 'TWR', 'APP', 'DEP'];
   sc.playerPositions = [];
   if (realism === 'off') sc.pilotBehaviour = { ground: { holdShortOmitFraction: 0, unfamiliarFraction: 0, taxiwayErrorShare: 0 } };
   const engine = createEngine({
-    airport: kacy, scenario: sc, trafficGenerator: game.createTrafficGenerator(sc, kacy), readbackErrorRate: realism === 'off' ? 0 : 0.04, utcStartMs: Date.UTC(2026, 5, 1, 15),
+    airport: ap, scenario: sc, trafficGenerator: game.createTrafficGenerator(sc, ap), readbackErrorRate: realism === 'off' ? 0 : 0.04, utcStartMs: Date.UTC(2026, 5, 1, 15),
   });
-  const ai = createAiControllers({ engine, airport: kacy, positions: ['CLNC', 'GND', 'TWR', 'APP', 'DEP'], playerPositions: [], seed: 5 });
+  const ai = createAiControllers({ engine, airport: ap, positions: ['CLNC', 'GND', 'TWR', 'APP', 'DEP'], playerPositions: [], seed: 5 });
   const events: SimEvent[] = [];
   let last = 0;
   engine.subscribe((s) => {
@@ -124,8 +134,8 @@ export function runFreePlaySoak(seed: number, realism: Realism, simHours: number
     for (const a of Object.values(s.aircraft)) {
       if (a.isDeparture && a.onGround) {
         if (a.phase === 'HOLDING_SHORT' || a.phase === 'LINE_UP_AND_WAIT') {
-          const rid = findRunwayEnd(kacy, a.assignedRunwayEnd)?.runway.id;
-          if (!towerSince.has(a.id) && rid && holdNodeAt(kacy, a)?.runwayId === rid) towerSince.set(a.id, now);
+          const rid = findRunwayEnd(ap, a.assignedRunwayEnd)?.runway.id;
+          if (!towerSince.has(a.id) && rid && holdNodeAt(ap, a)?.runwayId === rid) towerSince.set(a.id, now);
         } else if ((a.phase === 'CLEARED_FOR_TAKEOFF' || a.phase === 'TAKEOFF_ROLL') && towerSince.has(a.id)) {
           res.towerWaitsSec.push(now - towerSince.get(a.id)!);
           towerSince.delete(a.id);

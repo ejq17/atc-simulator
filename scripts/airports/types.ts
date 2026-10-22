@@ -118,8 +118,12 @@ export interface AirportProfile {
   mva?(helpers: { loc(lat: number, lon: number): P; pr(p: P): Vec2 }): MvaResult;
   /** Hot spot (from the d-TPP hot-spot text) - only when the source file has `supporting_charts.hot_spot_text`. */
   hotSpotProvenanceNote?: string;
-  /** Id / name / notes of the runway-runway crossing node. */
-  crossing: { nodeId: string; name: string; notes: string };
+  /**
+   * Id / name / notes of the crossing of runways[0] and runways[1]. Optional: only the first two airports (KACY, KMHT) set it so
+   * their built ids stay stable. Every runway-runway intersection of any airport is found automatically and gets the id
+   * `RWX-<a>x<b>` (runway ids with "/" written "-": "RWX-4L-22Rx9-27"); an airport with parallel runways only has none.
+   */
+  crossing?: { nodeId: string; name: string; notes: string };
   /** File with the OSM-versus-diagram comparison appended to the report (relative to scripts/data). */
   diagramComparisonFile?: string;
   /** Sentence about diagram label words that are not taxiway labels (report only). */
@@ -135,5 +139,19 @@ export interface AirportProfile {
   /** One-line notes for the airport.provenance entries (source file summaries with counts). */
   provenanceNotes: { navaids: string; procedures: string; osm: string; diagramReconciliation: string };
 }
+
+/**
+ * Optional facility-JSON fields read by the generic build (data/sources/<slug>-facility.json), beyond the NASR-extractor fields:
+ *
+ *   _provenance.source_name   label stored in every facility-derived provenance entry (default "FAA NASR 28-day subscription (cycle 2026-10-01)")
+ *   _provenance.source_url    URL stored with it (default: the NASR subscription page). EGLL sets both to the UK AIP.
+ *   airport.time_zone         IANA zone ("Europe/London"); default (absent) = America/New_York at runtime.
+ *   airspace.class            "B" | "C" | "D" | "E" | "G"; absent = legacy `airspace.class_c` flag.
+ *   runway_configurations     [{ id, name, landing: ["4R"], departing: ["4L","9"], wind_from_deg?, wind_to_deg? (magnetic sector, wind FROM,
+ *                             clockwise, may wrap north), max_tailwind_kt?, notes, source, url?, retrieved?, approximate? }]
+ *                             Runway END ids as in `runways[].ends[].id`. List order = operator preference (ties and calm wind).
+ * The procedures JSON `_provenance.source_name` (default "FAA d-TPP cycle <cycle>") and `_provenance.source_url` do the same for chart provenance.
+ * Nothing in these fields is invented by the build; each value must come from the cited source.
+ */
 
 export type { DiagramLabel, LatLon };

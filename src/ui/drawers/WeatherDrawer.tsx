@@ -14,6 +14,8 @@ import type { WindComponents } from '../../sim/wind';
 const fmtHw = (c: WindComponents): string => (c.headwindKt >= 0 ? `H ${Math.round(c.headwindKt)}` : `T ${Math.round(c.tailwindKt)}`);
 const fmtXw = (c: WindComponents): string => (c.crosswindFrom === 'none' ? 'X 0' : `X ${Math.round(c.crosswindKt)} ${c.crosswindFrom === 'left' ? 'L' : 'R'}`);
 
+const sameEnds = (a: readonly string[], b: readonly string[]): boolean => a.length === b.length && a.every((e) => b.includes(e));
+
 export function WeatherPanel() {
   const session = useSimStore((s) => s.session);
   const setWeather = useSimStore((s) => s.setWeather);
@@ -85,9 +87,23 @@ export function WeatherPanel() {
               </select>
             </Field>
           </div>
+          {(st.airport.runwayConfigurations?.length ?? 0) > 0 && (
+            <Field label="Runway configuration">
+              <select
+                className={SELECT}
+                value={st.airport.runwayConfigurations!.find((c) => sameEnds(c.landing, st.activeRunways.landing) && sameEnds(c.departing, st.activeRunways.departing))?.id ?? ''}
+                onChange={(e) => { const c = st.airport.runwayConfigurations!.find((x) => x.id === e.target.value); if (c) setRunways({ landing: [...c.landing], departing: [...c.departing] }); }}
+                aria-label="Runway configuration"
+                data-testid="runway-configuration"
+              >
+                <option value="" disabled>Custom</option>
+                {st.airport.runwayConfigurations!.map((c) => (<option key={c.id} value={c.id} disabled={[...c.landing, ...c.departing].some((e) => closedEnds.includes(e))}>{c.name}: arr {c.landing.join('/')}, dep {c.departing.join('/')}</option>))}
+              </select>
+            </Field>
+          )}
           <p className="text-[11px] text-atc-muted">{rec.summary}.</p>
-          <Btn className="self-start" onClick={() => setRunways({ departing: rec.departing, landing: rec.landing })}>Use recommended ({rec.landing[0]})</Btn>
-          <p className="text-[11px] leading-snug text-atc-muted">Changing runways issues a new ATIS letter. Aircraft already cleared keep their clearance; 13/31 and 4/22 intersect, so using both at once is flagged by the safety checks.</p>
+          <Btn className="self-start" onClick={() => setRunways({ departing: rec.departing, landing: rec.landing })}>Use recommended ({rec.landing.join('/')})</Btn>
+          <p className="text-[11px] leading-snug text-atc-muted">Changing runways issues a new ATIS letter. Aircraft already cleared keep their clearance; using intersecting runways at the same time is flagged by the safety checks.</p>
         </section>
       </div>
     </div>

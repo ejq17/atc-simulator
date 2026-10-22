@@ -2,7 +2,7 @@
  * Traffic density by local time of day (real-time mode).
  *
  * The scenario's hourly rates describe the busiest banks; in real-time mode they are scaled by this curve of the airport's LOCAL
- * hour (KACY: America/New_York, so daylight saving is handled by Intl). Piecewise-linear between key points, 1.0 at the peaks:
+ * hour (the airport's IANA zone, default America/New_York, so daylight saving is handled by Intl). Piecewise-linear between key points, 1.0 at the peaks:
  *
  *   00:00-05:00  0.10   overnight, very quiet
  *   05:00-07:30  ramps up to 1.00   morning bank, 07:30
@@ -18,7 +18,13 @@
 import type { SimulationState } from '../sim/types';
 import { simUtcMs } from '../sim/solar';
 
+/** Zone of an airport without `Airport.timeZone` (KACY and KMHT). Other airports carry their own IANA zone in the airport data. */
 export const AIRPORT_TIME_ZONE = 'America/New_York';
+
+/** IANA time zone of an airport (`Airport.timeZone`), default America/New_York. */
+export function airportTimeZone(airport: { timeZone?: string }): string {
+  return airport.timeZone ?? AIRPORT_TIME_ZONE;
+}
 
 /** [local hour, density] key points, hour 0..24. */
 export const DENSITY_CURVE: ReadonlyArray<readonly [number, number]> = [
@@ -51,5 +57,5 @@ export function trafficDensityAt(utcMs: number, timeZone?: string): number {
 
 /** `densityAt` for the traffic generator: follows the simulation's UTC epoch, i.e. the real clock in real-time mode. */
 export function realTimeDensity(state: Readonly<SimulationState>): number {
-  return trafficDensityAt(simUtcMs(state));
+  return trafficDensityAt(simUtcMs(state), airportTimeZone(state.airport));
 }

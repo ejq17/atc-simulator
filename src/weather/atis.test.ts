@@ -224,6 +224,12 @@ describe('generateAtis - details', () => {
     expect(b.spokenText).toContain('Landing runway two two, departing runway three one. ');
   });
 
+  it('reads a multi-runway configuration: landing 4R, departing 4L and 9', () => {
+    const a = generateAtis(base(getPresetWeather('clear'), { approachesInUse: ['visual approaches'], activeRunways: { landing: ['4R'], departing: ['4L', '9'] } }));
+    expect(a.text).toContain('Landing runway 4R, departing runways 4L and 9. ');
+    expect(a.spokenText).toContain('Landing runway four right, departing runways four left and niner. ');
+  });
+
   it('asks for hold short readbacks before the closing statement unless turned off', () => {
     const a = generateAtis(base(getPresetWeather('clear')));
     expect(a.text.endsWith('Read back all runway hold short instructions. Advise on initial contact you have information Alpha.')).toBe(true);
