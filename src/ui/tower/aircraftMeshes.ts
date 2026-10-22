@@ -250,11 +250,13 @@ export function buildGeometry(type: string, livery: Livery): BuiltModel {
   const props: BuiltModel['props'] = [];
   if (rc.engines === 'wing') {
     for (const side of [-1, 1]) {
-      const x = side * eng.x * semi;
-      const cy = wingY(x) - thick * 0.5 - rN * 0.95;
-      const zf = wingLE(x) - nLen * 0.62;
-      nacelle(x, cy, zf, true);
-      air.push(paint(box(rN * 0.28, rN * 0.9, nLen * 0.55, x, cy + rN * 0.8, zf + nLen * 0.5), livery.wing)); // pylon
+      for (const frac of eng.x2 === undefined ? [eng.x] : [eng.x, eng.x2]) {
+        const x = side * frac * semi;
+        const cy = wingY(x) - thick * 0.5 - rN * 0.95;
+        const zf = wingLE(x) - nLen * 0.62;
+        nacelle(x, cy, zf, true);
+        air.push(paint(box(rN * 0.28, rN * 0.9, nLen * 0.55, x, cy + rN * 0.8, zf + nLen * 0.5), livery.wing)); // pylon
+      }
     }
   } else if (rc.engines === 'rear') {
     const zf = zNose + 0.775 * L;

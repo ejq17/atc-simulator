@@ -44,6 +44,8 @@ export const GA_PREFIXES = rec<RegExp>({
   cirrus: /^(SR2|SF50)/, beech: /^(BE|B\d|BON)/, bonanza: /^(BE|B3|BON|S35)/,
   mooney: /^M20/, diamond: /^DA\d/, baron: /^(BE5|BE6|B55|B58)/, comanche: /^PA24/,
   seneca: /^PA34/, citation: /^C5/, saratoga: /^PA32/,
+  // business / commuter types of the KBOS / KPHL / EGLL traffic (AIM 4-2-4: type, model or manufacturer name before the registration)
+  challenger: /^CL\d/, gulfstream: /^(GLF|G\d{3})/, global: /^GLEX/, pilatus: /^PC\d/, learjet: /^LJ/,
 });
 
 /** Multi-word phrases collapsed to one token. kind 'word' means plain word. */
@@ -51,6 +53,7 @@ export interface PhraseTarget { text: string; kind?: 'airline' | 'letter' }
 // A target `text` with spaces ("hold short") expands to several plain words that share the phrase's raw range.
 export const PHRASES: readonly { words: readonly string[]; to: PhraseTarget }[] = [
   { words: ['x', 'ray'], to: { text: 'x', kind: 'letter' } },
+  { words: ['king', 'air'], to: { text: 'beech' } }, // 'King Air 123AB': the beech prefix (BE20 / BE9L)
   { words: ['sun', 'country'], to: { text: 'SCX', kind: 'airline' } },
   { words: ['jet', 'blue'], to: { text: 'JBU', kind: 'airline' } },
   { words: ['fed', 'ex'], to: { text: 'FDX', kind: 'airline' } },

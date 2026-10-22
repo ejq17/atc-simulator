@@ -6,7 +6,7 @@
 import type { Airport, ParkingPosition, RunwayEnd, ScenarioAircraftSpawn, TaxiNode, Vec2 } from '../sim/types';
 import { holdingPositionsForRunway, runwayEntryNodes } from '../airport';
 import { findTaxiRoute } from '../sim/pathfinding';
-import { getPerformance, patternAltitudeFt } from '../sim/performance';
+import { getPerformance, isBusinessJetType, patternAltitudeFt } from '../sim/performance';
 import { CARGO_TYPES, findNeighbour, pickFlight, profileFor } from './airportProfile';
 import type { PickFlightOptions } from './airportProfile';
 
@@ -263,7 +263,7 @@ export function parkingPoolFor(airport: Airport, type: string): ParkingPosition[
     const cargo = airport.parking.filter((p) => p.category === 'cargo');
     if (cargo.length) return cargo;
   }
-  const cats = light ? ['ga', 'fbo'] : ['airline'];
+  const cats = light ? ['ga', 'fbo'] : isBusinessJetType(type) ? ['fbo', 'ga'] : ['airline'];
   return airport.parking.filter((p) => cats.includes(p.category));
 }
 

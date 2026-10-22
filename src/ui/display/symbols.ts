@@ -121,14 +121,16 @@ function buildGlyph(type: string): Glyph {
   // Wing leading edge, with underwing nacelles (airliner, turboprop) as bumps forward of it.
   pts.push([fw, leRoot]);
   if (rc.engines === 'wing' || rc.engines === 'turboprop') {
-    const xe = eng.x * W;
-    const x0 = Math.max(fw + 0.01, xe - rN);
-    const x1 = xe + rN;
-    const fwd = eLen * (rc.engines === 'turboprop' ? 0.9 : 0.62);
-    pts.push([x0, leAt(x0)], [x0, leAt(x0) - fwd], [x1, leAt(x1) - fwd], [x1, leAt(x1)]);
-    if (rc.engines === 'turboprop' && rc.prop) {
-      const py = leAt(xe) - fwd - 0.02;
-      bars.push({ pts: [[xe - rc.prop.r * 2, py], [xe + rc.prop.r * 2, py], [xe + rc.prop.r * 2, py - 0.012], [xe - rc.prop.r * 2, py - 0.012]], mirror: true });
+    for (const frac of rc.engines === 'wing' && eng.x2 !== undefined ? [eng.x, eng.x2] : [eng.x]) {
+      const xe = frac * W;
+      const x0 = Math.max(fw + 0.01, xe - rN);
+      const x1 = xe + rN;
+      const fwd = eLen * (rc.engines === 'turboprop' ? 0.9 : 0.62);
+      pts.push([x0, leAt(x0)], [x0, leAt(x0) - fwd], [x1, leAt(x1) - fwd], [x1, leAt(x1)]);
+      if (rc.engines === 'turboprop' && rc.prop) {
+        const py = leAt(xe) - fwd - 0.02;
+        bars.push({ pts: [[xe - rc.prop.r * 2, py], [xe + rc.prop.r * 2, py], [xe + rc.prop.r * 2, py - 0.012], [xe - rc.prop.r * 2, py - 0.012]], mirror: true });
+      }
     }
   }
   pts.push([W, leTip], [W, teTip]);

@@ -8,7 +8,7 @@ import {
 } from './geometry';
 import type { MeshData } from './geometry';
 import {
-  aircraftDims, bankFromTurnRate, billboardWorldHeight, classifyAircraft, familyOf, gearDown, lightState, modelPitchRad, pitchFromVerticalSpeed, placeAircraft, vehicleBeacon, withinRange,
+  RECIPES, aircraftDims, bankFromTurnRate, billboardWorldHeight, classifyAircraft, familyOf, gearDown, lightState, modelPitchRad, pitchFromVerticalSpeed, placeAircraft, vehicleBeacon, withinRange,
 } from './aircraftModel';
 import type { ModelFamily } from './aircraftModel';
 import { buildGeometry, countTriangles, createAircraftFactory } from './aircraftMeshes';
@@ -427,6 +427,10 @@ describe('aircraft families and models', () => {
   const TYPES: [string, ModelFamily][] = [
     ['A320', 'narrowbody'], ['B738', 'narrowbody'], ['E175', 'narrowbody'], ['CRJ9', 'regionalJet'], ['DH8D', 'turboprop'], ['C208', 'turbopropSingle'],
     ['C25B', 'bizjet'], ['GLF4', 'bizjet'], ['C172', 'gaHigh'], ['PA28', 'gaLow'], ['SR22', 'gaLow'],
+    // types of the KBOS / KPHL / EGLL traffic (2026-10-21)
+    ['A319', 'narrowbody'], ['B38M', 'narrowbody'], ['E190', 'narrowbody'], ['CRJ7', 'regionalJet'], ['B763', 'widebody'], ['B772', 'widebody'], ['B788', 'widebody'],
+    ['A333', 'widebody'], ['A359', 'widebody'], ['MD11', 'widebody'], ['A306', 'widebody'], ['A388', 'widebodyQuad'], ['B744', 'widebodyQuad'], ['B748', 'widebodyQuad'],
+    ['BE20', 'turboprop'], ['PC12', 'turbopropSingle'], ['C402', 'gaLow'], ['C56X', 'bizjet'], ['CL35', 'bizjet'], ['GLF5', 'bizjet'], ['GLEX', 'bizjet'],
   ];
   it('maps types to families and keeps the sim class', () => {
     for (const [t, f] of TYPES) expect(familyOf(t)).toBe(f);
@@ -434,6 +438,18 @@ describe('aircraft families and models', () => {
     expect(classifyAircraft('DH8D')).toBe('airliner');
     expect(classifyAircraft('C208')).toBe('ga');
     expect(familyOf('ZZZZ')).toBe('gaHigh'); // unknown types fall back to the C172 performance entry
+  });
+  it('draws the heavies with the wide-body recipes, sized from the ACD length / span / height (retrieved 2026-10-21)', () => {
+    const b77w = aircraftDims('B77W');
+    expect(b77w.family).toBe('widebody');
+    expect(b77w.lengthM).toBeCloseTo(73.9, 6);
+    expect(b77w.wingspanM).toBeCloseTo(64.8, 6);
+    const a388 = aircraftDims('A388');
+    expect(a388.family).toBe('widebodyQuad');
+    expect(a388.wingspanM).toBeCloseTo(79.8, 1);
+    expect(a388.cls).toBe('airliner');
+    expect(aircraftDims('C56X').lengthM).toBeCloseTo(15.8, 6); // was 19.4 in the table, not a Citation Excel figure
+    expect(RECIPES.widebodyQuad.engine.x2).toBeGreaterThan(RECIPES.widebodyQuad.engine.x);
   });
   it('uses the real wingspan/length ratio of each type', () => {
     const b738 = aircraftDims('B738'); // not in the performance table: real length 39.5 m
@@ -448,7 +464,7 @@ describe('aircraft families and models', () => {
   it('builds every family without throwing, finite, within the triangle budget and the right size', () => {
     const factory = createAircraftFactory();
     for (const [t] of TYPES) {
-      const livery = liveryFor(t === 'C172' || t === 'PA28' || t === 'SR22' || t === 'C208' ? 'N123AB' : 'NKS123');
+      const livery = liveryFor(['C172', 'PA28', 'SR22', 'C208', 'C402', 'PC12'].includes(t) ? 'N123AB' : 'NKS123');
       const built = buildGeometry(t, livery);
       for (const g of [built.fuselage, built.airframe, built.gear]) {
         const arr = g.getAttribute('position').array as Float32Array;

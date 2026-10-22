@@ -236,6 +236,14 @@ export function planCancelTakeoff(env: Env): PlanResult {
 const TYPE_WORDS: Record<string, string> = {
   C172: 'cessna skyhawk 172 one seventy two', C208: 'cessna caravan 208', A320: 'airbus 320 three twenty', B738: 'boeing 737 seven thirty seven',
   B752: 'boeing 757 seven fifty seven', BCS3: 'airbus 220', E175: 'embraer 175 jet', CRJ9: 'bombardier canadair regional jet crj',
+  A319: 'airbus 319 three nineteen', A321: 'airbus 321 three twenty one', A20N: 'airbus 320 three twenty neo', A21N: 'airbus 321 three twenty one neo',
+  B737: 'boeing 737 seven thirty seven', B38M: 'boeing 737 seven thirty seven max', B739: 'boeing 737 seven thirty seven',
+  B762: 'boeing 767 seven sixty seven heavy', B763: 'boeing 767 seven sixty seven heavy', A306: 'airbus 300 three hundred heavy',
+  B772: 'boeing 777 seven seventy seven heavy', B77W: 'boeing 777 seven seventy seven heavy', B788: 'boeing 787 seven eighty seven heavy', B789: 'boeing 787 seven eighty seven heavy',
+  A332: 'airbus 330 three thirty heavy', A333: 'airbus 330 three thirty heavy', A339: 'airbus 330 three thirty heavy', A359: 'airbus 350 three fifty heavy', A35K: 'airbus 350 three fifty heavy',
+  A388: 'airbus 380 three eighty super', B744: 'boeing 747 seven forty seven heavy', B748: 'boeing 747 seven forty seven heavy', MD11: 'md11 mcdonnell douglas heavy',
+  E190: 'embraer 190 one ninety jet', CRJ7: 'bombardier canadair regional jet crj 700', DH8D: 'dash 8 dash eight q400 turboprop',
+  BE20: 'king air beech 200', BE9L: 'king air beech 90', PC12: 'pilatus pc12', C402: 'cessna 402', C56X: 'citation excel', CL35: 'challenger 350', GLF5: 'gulfstream 5 five', GLEX: 'global express bombardier',
 };
 
 /** Words a controller might use for this aircraft: its spoken callsign, callsign, and type words. */
@@ -538,6 +546,22 @@ const TYPE_SPOKEN: Record<string, { text: string; spoken: string }> = {
   A320: { text: 'Airbus 320', spoken: 'Airbus three twenty' }, B738: { text: 'Boeing 737', spoken: 'Boeing seven thirty seven' },
   B752: { text: 'Boeing 757', spoken: 'Boeing seven fifty seven' }, BCS3: { text: 'Airbus 220', spoken: 'Airbus two twenty' },
   E175: { text: 'Embraer 175', spoken: 'Embraer one seventy five' }, CRJ9: { text: 'Regional jet', spoken: 'Regional jet' },
+  A319: { text: 'Airbus 319', spoken: 'Airbus three nineteen' }, A321: { text: 'Airbus 321', spoken: 'Airbus three twenty one' },
+  A20N: { text: 'Airbus 320', spoken: 'Airbus three twenty' }, A21N: { text: 'Airbus 321', spoken: 'Airbus three twenty one' },
+  B737: { text: 'Boeing 737', spoken: 'Boeing seven thirty seven' }, B38M: { text: 'Boeing 737', spoken: 'Boeing seven thirty seven' }, B739: { text: 'Boeing 737', spoken: 'Boeing seven thirty seven' },
+  E190: { text: 'Embraer 190', spoken: 'Embraer one ninety' }, CRJ7: { text: 'Regional jet', spoken: 'Regional jet' }, DH8D: { text: 'Dash 8', spoken: 'Dash eight' },
+  BE20: { text: 'King Air', spoken: 'King Air' }, BE9L: { text: 'King Air', spoken: 'King Air' }, PC12: { text: 'Pilatus', spoken: 'Pilatus' }, C402: { text: 'Cessna', spoken: 'Cessna' },
+  C56X: { text: 'Citation', spoken: 'Citation' }, CL35: { text: 'Challenger', spoken: 'Challenger' }, GLF5: { text: 'Gulfstream', spoken: 'Gulfstream' }, GLEX: { text: 'Global Express', spoken: 'Global Express' },
+  // JO 7110.65 2-4-20: "when issuing traffic information to aircraft following a heavy aircraft, specify the word heavy before the manufacturer's name and model"
+  // ("Heavy Boeing Seven Forty-Seven"); "Super A-Three-Eighty" for the A388 (Category A).
+  B762: { text: 'Heavy Boeing 767', spoken: 'Heavy Boeing seven sixty seven' }, B763: { text: 'Heavy Boeing 767', spoken: 'Heavy Boeing seven sixty seven' },
+  A306: { text: 'Heavy Airbus 300', spoken: 'Heavy Airbus three hundred' }, MD11: { text: 'Heavy MD-11', spoken: 'Heavy M D eleven' },
+  B772: { text: 'Heavy Boeing 777', spoken: 'Heavy Boeing seven seventy seven' }, B77W: { text: 'Heavy Boeing 777', spoken: 'Heavy Boeing seven seventy seven' },
+  B788: { text: 'Heavy Boeing 787', spoken: 'Heavy Boeing seven eighty seven' }, B789: { text: 'Heavy Boeing 787', spoken: 'Heavy Boeing seven eighty seven' },
+  A332: { text: 'Heavy Airbus 330', spoken: 'Heavy Airbus three thirty' }, A333: { text: 'Heavy Airbus 330', spoken: 'Heavy Airbus three thirty' }, A339: { text: 'Heavy Airbus 330', spoken: 'Heavy Airbus three thirty' },
+  A359: { text: 'Heavy Airbus 350', spoken: 'Heavy Airbus three fifty' }, A35K: { text: 'Heavy Airbus 350', spoken: 'Heavy Airbus three fifty' },
+  A388: { text: 'Super Airbus A380', spoken: 'Super Airbus three eighty' },
+  B744: { text: 'Heavy Boeing 747', spoken: 'Heavy Boeing seven forty seven' }, B748: { text: 'Heavy Boeing 747', spoken: 'Heavy Boeing seven forty seven' },
 };
 
 /**

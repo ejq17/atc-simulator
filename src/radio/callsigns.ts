@@ -9,7 +9,7 @@
  *  - Never abbreviated on initial contact or when other callsigns on the frequency sound alike (AIM 4-2-4, 2-4-20: full identification
  *    in reply to similar sounding identifications). Air carriers and other aircraft with authorised callsigns are never abbreviated.
  */
-import { digitsSpoken, spokenCallsign } from './spoken';
+import { digitsSpoken, gaPrefixWords, spokenCallsign } from './spoken';
 
 const GA_ID = /^N(\d{1,5}[A-Z]{0,2})$/;
 
@@ -29,7 +29,7 @@ export function abbreviatedCallsign(callsign: string, type?: string): string | u
   const id = registrationOf(callsign);
   if (!id || id.length < 4) return undefined;
   const full = spokenCallsign(callsign, type);
-  const prefix = full.split(' ')[0];
+  const prefix = gaPrefixWords(full);
   return `${prefix} ${digitsSpoken(id.slice(-3))}`;
 }
 

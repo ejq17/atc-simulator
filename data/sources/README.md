@@ -217,3 +217,33 @@ Web sources (retrieved 2026-10-18): USCG MH-65E fact sheet (dcms.uscg.mil, via s
 The COPTER ILS 13 plate (HCH 58) in `kacy-procedures.json` is not flown: helicopters in the simulator are VFR and go straight to their pad.
 
 Callsign digits of generated Coast Guard (`CGD#####`) and Air Guard (`ANG#####`) flights are generated, exactly as the N-numbers of generated GA traffic are; no real serial number is stored anywhere.
+
+## Aircraft performance: types added for KBOS, KPHL and EGLL (2026-10-21)
+
+Types added to `src/sim/performance.ts` and `aircraft-performance.json` (entries `A319 A20N A21N A321 B737 B38M B739 E190 CRJ7 B762 B763 A306 B772 B77W B788 B789 A332 A333 A339 A359 A35K A388 B744 B748 MD11 DH8D BE20 BE9L PC12 C402 C56X CL35 GLF5 GLEX`; the block `_meta_kbos_kphl_egll` lists the source keys). Whether a given airline flies a type at each airport in 2026 is NOT checked here (that is the airport traffic profile's own sourcing): the entries only make the performance model complete.
+
+Downloads (all retrieved 2026-10-21, `User-Agent: atc-simulator-research/1.0`):
+
+| What | URL | HTTP | Raw copy |
+|---|---|---|---|
+| EUROCONTROL Aircraft Performance Database, one page per type (34 types) | `https://learningzone.eurocontrol.int/ilp/customs/ATCPFDB/details.aspx?ICAO=<TYPE>` (`https://contentzone.eurocontrol.int/aircraftperformance/details.aspx?ICAO=<TYPE>` answers 301 to it) | 200 | `raw/realism/eurocontrol_acd_<TYPE>.html` |
+| FAA JO 7110.126A (09/28/2019), Appendix A TBL A-1 (page A1) | `https://www.faa.gov/documentLibrary/media/Order/JO_7110.126A.pdf` | 200 | `raw/realism/faa_JO_7110.126A.pdf` (listing from `pdftotext -layout`, confirmed on the page rendered with `pdftoppm -r 150`) |
+| FAA JO 7110.65 chapter 2 section 4 (2-4-14 super / heavy in the identification, 2-4-20 aircraft types) | `https://www.faa.gov/air_traffic/publications/atpubs/atc_html/chap2_section_4.html` | 200 | `raw/realism/faa_7110_65_chap2_section_4.html` |
+| Airbus A350 Aircraft Characteristics - Airport and Maintenance Planning, Jul 01/26 (A359 take-off and landing distance only) | `https://mediaassets.airbus.com/pm_38_916_916746-gxtwm2qvq4.pdf?fileName=a350-aircraft-characteristics-airport-and-maintenance-planning.pdf` (link from the Airbus "Aircraft Characteristics" page) | 200, 178 MB | not stored; section 3-3-0 (take-off weight vs runway length, ISA) and 3-4-0 (landing field length) read visually |
+
+Read per type from the ACD "performance table": V2, take-off distance, WTC (ICAO L/M/H/J), RECAT-EU, MTOW, initial-climb IAS / ROC, climb-to-FL150 IAS / ROC, cruise TAS and ceiling, descent IAS / ROD, approach IAS / ROD, landing Vat and distance, APC, wing span, length, height, power plant. The ACD page says "All data presented is only indicative and should not be used operationally ... Copyright permission must be sought from EUROCONTROL": the figures are facts used as references with attribution; the raw pages are not committed.
+
+Derivations (each repeated in the type's `_sources`): rotate = V2 - 5 kt; approach = Vat; touchdown = Vat - 5 kt; climb speed / rate = initial climb IAS / ROC; take-off and landing distance = ACD figures at MTOW (ft = m x 3.28084, rounded to 10); cruise 250 kt for jets (14 CFR 91.117(a)); `accelKtPerSec` = VR^2 / (2 x 0.8 x take-off distance) (ground roll 80 % of the distance, the A320 / B738 ratio); `maxSpeedKt` for jets = max(ACD climb IAS, descent IAS) + 30 kt; minimum speed = Vat - 15 kt. Taxi speeds, turn rates, braking and the 2,000 ft/min jet descent rate are DESIGN values (as for A320 / B738). Take-off distances are MTOW-basis: B77W (9,840 ft) fits only the longest ends (KBOS 4R/22L is 10,005 ft: the engine's check needs distance + 50 m, so it is marginal), B744 and B748 (10,830 / 10,470 ft) exceed it.
+
+RECAT (TBL A-1, page A1): A = A388; B = A332 A333 A359 B744 B748 B772 B77W B788 B789; C = A306 B762 B763 MD11; D = A339; E = B752; F = A319 A321 B737 B739 DH8D E190 GLEX GLF5; G = CRJ7; H = C56X; I = C402 PC12 BE20. Derived (type absent from TBL A-1, UNVERIFIED as listings): A20N, A21N, B38M = F (sibling types), A35K = B (the A359 is B), BE9L = I (10,100 lb is within the Category I definition), CL35 = H (40,600 lb is within the Category H definition).
+
+"super" / "heavy" in the callsign: Category A -> "super", B, C, D -> "heavy" (JO 7110.126A Appendix B amends JO 7110.65 2-4-14 / 2-1-20; 2-4-14: "The word heavy must be used as part of the identification in all communications with or about heavy aircraft", example "United Fifty-Eight Heavy"). The ICAO categories H / J in the ACD give the same set (A388 = J).
+
+### Not verified / not added (aircraft performance, 2026-10-21)
+
+- **Not added, no source for the figures**: `E75L` / `E75S` (no ACD page; the existing `E175` entry remains an ESTIMATE; both are RECAT G in TBL A-1), `AT76` (no ACD page; the ACD lists AT43, AT44, AT45, AT72 and AT75 only), `CL60` (ACD page has no take-off or landing distance). `B753`, `B77L`, `C680`, `C550` etc. were not requested.
+- A359 take-off / landing distance: the ACD shows 888 m for both (a data error); the entry uses chart reads of the Airbus A350 AC (about 2,550 m take-off at 268 t, ISA, sea level; about 1,950 m landing field length at maximum landing weight, +/-150 m).
+- The ACD figures are "indicative" and at MTOW / ISA / sea level; none is a certified performance figure. Some look odd and were taken as published: B38M take-off distance 2,500 m, C402 Vat 110 kt (a 2015 Cape Air training flashcard set, seen only as a web-search result, also lists 110 kt "Vref at threshold": a weak source), PC12 climb IAS 130 kt, A388 V2 150 kt. `cruiseSpeedKt` of DH8D / BE20 / BE9L / PC12 / C402 is an ACD climb or approach IAS, not a published cruise IAS.
+- Wing span and height are recorded in `_not_in_type_shape` and in `src/ui/tower/aircraftModel.ts` (Tower view, 2D glyph); there is no stand-size model in the simulator, so the figures are not used for stand fit (parking has categories only).
+- The KMHT types (B738, BCS3, E175, CRJ9, B752, C208) are still the 2026-10-17 ESTIMATEs; the ACD has pages for B738, BCS3, B752, C208 and CRJ9, so they can be cross-checked against it later (the ACD B738 Vat is 147 kt against the 140 kt in the file).
+- Operator presence in 2026 (BA 747-400, UPS / FedEx MD-11 after the November 2025 accident, Q400 operators) is not checked.

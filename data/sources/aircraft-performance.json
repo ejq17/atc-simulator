@@ -432,6 +432,3081 @@
       }
     }
   },
+  "_meta_kbos_kphl_egll": {
+    "added_2026-10-21": "A319, A20N, A21N, A321, B737, B38M, B739, E190, CRJ7, B762, B763, A306, B772, B77W, B788, B789, A332, A333, A339, A359, A35K, A388, B744, B748, MD11, DH8D, BE20, BE9L, PC12, C402, C56X, CL35, GLF5 and GLEX were added for KBOS, KPHL and EGLL traffic. Every figure is read from the EUROCONTROL Aircraft Performance Database page of the type (retrieved 2026-10-21, HTTP 200; raw copies raw/realism/eurocontrol_acd_<TYPE>.html) or derived from it by the formula stated in the field's _sources entry; wake / RECAT from FAA JO 7110.126A TBL A-1. Gameplay values (taxi, turn, braking, jet descent rate) are marked DESIGN. The ACD states 'All data presented is only indicative and should not be used operationally'; NOT for flight planning. Take-off and landing distances are the ACD MTOW-basis figures (KMHT types B738 etc. use typical-weight ESTIMATEs, see the 2026-10-17 note).",
+    "not_added_2026-10-21": {
+      "E75L / E75S": "no ACD page (the ACD lists E170, E190, E195 only); E175 already in this file as an ESTIMATE; RECAT of E75L / E75S = G is read from TBL A-1 and already used for E175",
+      "AT76": "no ACD page for the ATR 72-600 (AT75 is the -500 and is not the type designator flown today); no other source retrieved",
+      "CL60": "ACD page has no take-off and landing distance ('no data')",
+      "A359 take-off / landing distance": "ACD shows 888 m for both (data error): replaced by chart-read Airbus AC values, see the A359 entry"
+    },
+    "source_keys": {
+      "EUROCONTROL_ACD": "EUROCONTROL Aircraft Performance Database, per-type page https://learningzone.eurocontrol.int/ilp/customs/ATCPFDB/details.aspx?ICAO=<TYPE> (the 'contentzone.eurocontrol.int/aircraftperformance' address redirects HTTP 301 to it), table 'Show performance table'; retrieved 2026-10-21 with User-Agent atc-simulator-research/1.0, HTTP 200 for all added types. Page footer: 'All data presented is only indicative and should not be used operationally ... Copyright permission must be sought from EUROCONTROL'.",
+      "FAA_JO_7110_126A": "https://www.faa.gov/documentLibrary/media/Order/JO_7110.126A.pdf (09/28/2019), Appendix A TBL A-1 page A1: pdftotext layout for the listing and the rendered page read visually (pdftoppm -r 150, 2026-10-21); Appendix B amends JO 7110.65 2-4-14 / 2-1-20: Super (Category A) and Heavy (B, C, D) in the identification",
+      "JO7110_65_2_4": "https://www.faa.gov/air_traffic/publications/atpubs/atc_html/chap2_section_4.html (retrieved 2026-10-21): 2-4-14 'The word super must be used as part of the identification in all communications with or about super aircraft. The word heavy must be used ... heavy aircraft' with the NOTE that most airlines say heavy after the company prefix and flight number (example 'United Fifty-Eight Heavy'); 2-4-20 'Heavy Boeing Seven Forty-Seven', 'Super A-Three-Eighty'",
+      "AIRBUS_A350_AC": "Airbus A350 Aircraft Characteristics - Airport and Maintenance Planning, Jul 01/26: https://mediaassets.airbus.com/pm_38_916_916746-gxtwm2qvq4.pdf?fileName=a350-aircraft-characteristics-airport-and-maintenance-planning.pdf (retrieved 2026-10-21, 178 MB, not stored); section 3-3-0 figure P_AC_030300 'ISA conditions' take-off weight versus runway length, 3-4-0 landing field length; charts read visually"
+    }
+  },
+  "A319": {
+    "type": "A319",
+    "category": "large",
+    "wakeCategory": "medium",
+    "taxiSpeedKt": 20,
+    "taxiTurnSpeedKt": 10,
+    "accelKtPerSec": 3.1,
+    "decelKtPerSec": 6.0,
+    "rotateSpeedKt": 130,
+    "climbSpeedKt": 165,
+    "cruiseSpeedKt": 250,
+    "approachSpeedKt": 130,
+    "touchdownSpeedKt": 125,
+    "climbRateFpm": 2500,
+    "descentRateFpm": 2000,
+    "turnRateDegPerSec": 2.5,
+    "groundTurnRateDegPerSec": 15,
+    "minSpeedKt": 115,
+    "maxSpeedKt": 320,
+    "serviceCeilingFt": 39000,
+    "takeoffDistanceFt": 5740,
+    "landingDistanceFt": 4430,
+    "lengthM": 33.8,
+    "_sources": {
+      "_summary": {
+        "value": "Airbus A319",
+        "source": "EUROCONTROL_ACD (page A319); FAA_JO_7110_126A; CFR91.117",
+        "status": "SOURCED (ACD, retrieved 2026-10-21) with the derivations noted per field; gameplay values marked DESIGN"
+      },
+      "ACD row read": {
+        "value": "ACD A319 'Show performance table': V2 135 kt, take-off distance 1750 m, WTC M, RECAT-EU Upper Medium, MTOW 64000 kg; initial climb IAS 165 kt ROC 2500 ft/min; climb to FL150 IAS 290 kt ROC 2200; cruise TAS 450 kt, ceiling FL390; descent to FL100 IAS 290 kt ROD 3500; approach IAS 230 kt ROD 1500; landing Vat 130 kt, distance 1350 m, APC C; technical: wing span 34.1 m, length 33.84 m, height 11.76 m; type L2J",
+        "source": "https://learningzone.eurocontrol.int/ilp/customs/ATCPFDB/details.aspx?ICAO=A319 (retrieved 2026-10-21, HTTP 200; raw/realism/eurocontrol_acd_A319.html)",
+        "status": "verified transcription"
+      },
+      "category/wakeCategory": {
+        "value": "large / medium",
+        "source": "ACD WTC M (ICAO wake turbulence category L/M/H/J) and MTOW 64000 kg; FAA category: large = MTOW above 12,500 lb (5,670 kg)",
+        "status": "verified"
+      },
+      "RECAT (src/sim/performance.ts RECAT)": {
+        "value": "F",
+        "source": "JO 7110.126A TBL A-1 (page A1, read visually 2026-10-21)",
+        "status": "VERIFIED"
+      },
+      "takeoff/landing distance": {
+        "value": "5740 ft / 4430 ft",
+        "source": "ACD take-off distance 1750 m (at MTOW 64000 kg, ISA, sea level) and landing distance 1350 m, converted at 3.28084 ft/m and rounded to 10 ft",
+        "status": "verified (ACD figures are MTOW / indicative: the engine refuses a departure from a runway shorter than takeoffDistanceFt, so these are the heaviest-case need; KMHT types use typical-weight ESTIMATEs, see _meta)"
+      },
+      "rotate/climb/approach speeds": {
+        "value": "rotate 130, climb 165, approach 130, touchdown 125",
+        "source": "rotate = ACD V2 135 - 5 kt (A320 precedent: VR a few kt below V2); climb speed = ACD initial climb IAS 165 kt; approach = ACD Vat 130 kt; touchdown = Vat - 5 kt (A320 precedent)",
+        "status": "derived from ACD"
+      },
+      "climbRateFpm / descentRateFpm": {
+        "value": "2500 / 2000",
+        "source": "climb = ACD initial climb ROC 2500 ft/min; descent: DESIGN 2,000 ft/min as for A320/B738 (ACD descent to FL100 ROD 3500, approach ROD 1500 ft/min)",
+        "status": "climb verified; descent DESIGN where 2,000"
+      },
+      "cruiseSpeedKt / maxSpeedKt": {
+        "value": "250 / 320",
+        "source": "cruise: 14 CFR 91.117(a) 250 kt limit below 10,000 ft (as A320/B738); max: ACD max(climb IAS 290, descent IAS 290) + 30 kt rounded to 10 (A320 precedent: 290 -> 320), a sim cap not a VMO",
+        "status": "DESIGN / derived"
+      },
+      "accel/decel": {
+        "value": "3.1 / 6.0 kt/s",
+        "source": "accel: a = VR^2 / (2 x 0.8 x takeoffDistanceFt) with VR 130 kt (ground roll taken as 80 % of the 35 ft take-off distance; the A320 and B738 entries give 0.83 / 0.80); decel: DESIGN, as the class precedent (A320 6.0, B752 5.5)",
+        "status": "ESTIMATE (derived) / DESIGN"
+      },
+      "taxi/turn rates, min speed": {
+        "value": "taxi 20 kt, taxi turn 10 kt, turn 2.5 deg/s, ground turn 15 deg/s, min 115 kt",
+        "source": "none authoritative; gameplay simplifications as C172/A320/B752; min speed = Vat - 15 kt as A320 (120 vs 135) and B738 (125 vs 140)",
+        "status": "DESIGN value (UNVERIFIED simplification)"
+      },
+      "serviceCeilingFt / lengthM": {
+        "value": "39000 / 33.8",
+        "source": "ACD ceiling FL390; ACD length 33.84 m",
+        "status": "verified"
+      },
+      "_not_in_type_shape": {
+        "wingspan_m": 34.1,
+        "height_m": 11.76,
+        "mtow_kg": 64000,
+        "wingspan_source": "ACD technical data (wing span 34.1 m, height 11.76 m)",
+        "wake_srs_category": "FAA JO 7110.65 3-9-6 NOTE (derived: Category I small single-engine propeller <= 12,500 lb; II small twin-engine propeller <= 12,500 lb; III all other)",
+        "engine": "L2J; 2 x 98kN CFM56-5A4 or 2 x 104.6kN IAE V2524-A5 turbofans.",
+        "radio_wake_word": "none"
+      }
+    }
+  },
+  "A20N": {
+    "type": "A20N",
+    "category": "large",
+    "wakeCategory": "medium",
+    "taxiSpeedKt": 20,
+    "taxiTurnSpeedKt": 10,
+    "accelKtPerSec": 3.2,
+    "decelKtPerSec": 6.0,
+    "rotateSpeedKt": 140,
+    "climbSpeedKt": 175,
+    "cruiseSpeedKt": 250,
+    "approachSpeedKt": 135,
+    "touchdownSpeedKt": 130,
+    "climbRateFpm": 2200,
+    "descentRateFpm": 2000,
+    "turnRateDegPerSec": 2.5,
+    "groundTurnRateDegPerSec": 15,
+    "minSpeedKt": 120,
+    "maxSpeedKt": 320,
+    "serviceCeilingFt": 39000,
+    "takeoffDistanceFt": 6400,
+    "landingDistanceFt": 5410,
+    "lengthM": 37.6,
+    "_sources": {
+      "_summary": {
+        "value": "Airbus A320neo",
+        "source": "EUROCONTROL_ACD (page A20N); FAA_JO_7110_126A; CFR91.117",
+        "status": "SOURCED (ACD, retrieved 2026-10-21) with the derivations noted per field; gameplay values marked DESIGN"
+      },
+      "ACD row read": {
+        "value": "ACD A20N 'Show performance table': V2 145 kt, take-off distance 1951 m, WTC M, RECAT-EU Upper Medium, MTOW 79000 kg; initial climb IAS 175 kt ROC 2200 ft/min; climb to FL150 IAS 290 kt ROC 2000; cruise TAS 450 kt, ceiling FL390; descent to FL100 IAS 290 kt ROD 3000; approach IAS 250 kt ROD 1500; landing Vat 135 kt, distance 1650 m, APC C; technical: wing span 35.8 m, length 37.57 m, height 11.76 m; type L2J",
+        "source": "https://learningzone.eurocontrol.int/ilp/customs/ATCPFDB/details.aspx?ICAO=A20N (retrieved 2026-10-21, HTTP 200; raw/realism/eurocontrol_acd_A20N.html)",
+        "status": "verified transcription"
+      },
+      "category/wakeCategory": {
+        "value": "large / medium",
+        "source": "ACD WTC M (ICAO wake turbulence category L/M/H/J) and MTOW 79000 kg; FAA category: large = MTOW above 12,500 lb (5,670 kg)",
+        "status": "verified"
+      },
+      "RECAT (src/sim/performance.ts RECAT)": {
+        "value": "F",
+        "source": "DERIVED: not listed; the A320 (same airframe, F) and A321 (F) are listed: kept F",
+        "status": "UNVERIFIED (type absent from TBL A-1)"
+      },
+      "takeoff/landing distance": {
+        "value": "6400 ft / 5410 ft",
+        "source": "ACD take-off distance 1951 m (at MTOW 79000 kg, ISA, sea level) and landing distance 1650 m, converted at 3.28084 ft/m and rounded to 10 ft",
+        "status": "verified (ACD figures are MTOW / indicative: the engine refuses a departure from a runway shorter than takeoffDistanceFt, so these are the heaviest-case need; KMHT types use typical-weight ESTIMATEs, see _meta)"
+      },
+      "rotate/climb/approach speeds": {
+        "value": "rotate 140, climb 175, approach 135, touchdown 130",
+        "source": "rotate = ACD V2 145 - 5 kt (A320 precedent: VR a few kt below V2); climb speed = ACD initial climb IAS 175 kt; approach = ACD Vat 135 kt; touchdown = Vat - 5 kt (A320 precedent)",
+        "status": "derived from ACD"
+      },
+      "climbRateFpm / descentRateFpm": {
+        "value": "2200 / 2000",
+        "source": "climb = ACD initial climb ROC 2200 ft/min; descent: DESIGN 2,000 ft/min as for A320/B738 (ACD descent to FL100 ROD 3000, approach ROD 1500 ft/min)",
+        "status": "climb verified; descent DESIGN where 2,000"
+      },
+      "cruiseSpeedKt / maxSpeedKt": {
+        "value": "250 / 320",
+        "source": "cruise: 14 CFR 91.117(a) 250 kt limit below 10,000 ft (as A320/B738); max: ACD max(climb IAS 290, descent IAS 290) + 30 kt rounded to 10 (A320 precedent: 290 -> 320), a sim cap not a VMO",
+        "status": "DESIGN / derived"
+      },
+      "accel/decel": {
+        "value": "3.2 / 6.0 kt/s",
+        "source": "accel: a = VR^2 / (2 x 0.8 x takeoffDistanceFt) with VR 140 kt (ground roll taken as 80 % of the 35 ft take-off distance; the A320 and B738 entries give 0.83 / 0.80); decel: DESIGN, as the class precedent (A320 6.0, B752 5.5)",
+        "status": "ESTIMATE (derived) / DESIGN"
+      },
+      "taxi/turn rates, min speed": {
+        "value": "taxi 20 kt, taxi turn 10 kt, turn 2.5 deg/s, ground turn 15 deg/s, min 120 kt",
+        "source": "none authoritative; gameplay simplifications as C172/A320/B752; min speed = Vat - 15 kt as A320 (120 vs 135) and B738 (125 vs 140)",
+        "status": "DESIGN value (UNVERIFIED simplification)"
+      },
+      "serviceCeilingFt / lengthM": {
+        "value": "39000 / 37.6",
+        "source": "ACD ceiling FL390; ACD length 37.57 m",
+        "status": "verified"
+      },
+      "_not_in_type_shape": {
+        "wingspan_m": 35.8,
+        "height_m": 11.76,
+        "mtow_kg": 79000,
+        "wingspan_source": "ACD technical data (wing span 35.8 m, height 11.76 m)",
+        "wake_srs_category": "FAA JO 7110.65 3-9-6 NOTE (derived: Category I small single-engine propeller <= 12,500 lb; II small twin-engine propeller <= 12,500 lb; III all other)",
+        "engine": "L2J; 2 x 120.6kN CFM International LEAP-1A or Pratt & Whitney PW1100G",
+        "radio_wake_word": "none"
+      }
+    }
+  },
+  "A21N": {
+    "type": "A21N",
+    "category": "large",
+    "wakeCategory": "medium",
+    "taxiSpeedKt": 20,
+    "taxiTurnSpeedKt": 10,
+    "accelKtPerSec": 2.9,
+    "decelKtPerSec": 6.0,
+    "rotateSpeedKt": 140,
+    "climbSpeedKt": 175,
+    "cruiseSpeedKt": 250,
+    "approachSpeedKt": 140,
+    "touchdownSpeedKt": 135,
+    "climbRateFpm": 2000,
+    "descentRateFpm": 2000,
+    "turnRateDegPerSec": 2.5,
+    "groundTurnRateDegPerSec": 15,
+    "minSpeedKt": 125,
+    "maxSpeedKt": 320,
+    "serviceCeilingFt": 39000,
+    "takeoffDistanceFt": 7050,
+    "landingDistanceFt": 6070,
+    "lengthM": 44.5,
+    "_sources": {
+      "_summary": {
+        "value": "Airbus A321neo",
+        "source": "EUROCONTROL_ACD (page A21N); FAA_JO_7110_126A; CFR91.117",
+        "status": "SOURCED (ACD, retrieved 2026-10-21) with the derivations noted per field; gameplay values marked DESIGN"
+      },
+      "ACD row read": {
+        "value": "ACD A21N 'Show performance table': V2 145 kt, take-off distance 2150 m, WTC M, RECAT-EU Upper Medium, MTOW 97000 kg; initial climb IAS 175 kt ROC 2000 ft/min; climb to FL150 IAS 290 kt ROC 1500; cruise TAS 450 kt, ceiling FL390; descent to FL100 IAS 290 kt ROD 2500; approach IAS 250 kt ROD 1300; landing Vat 140 kt, distance 1850 m, APC C; technical: wing span 35.8 m, length 44.51 m, height 11.76 m; type L2J",
+        "source": "https://learningzone.eurocontrol.int/ilp/customs/ATCPFDB/details.aspx?ICAO=A21N (retrieved 2026-10-21, HTTP 200; raw/realism/eurocontrol_acd_A21N.html)",
+        "status": "verified transcription"
+      },
+      "category/wakeCategory": {
+        "value": "large / medium",
+        "source": "ACD WTC M (ICAO wake turbulence category L/M/H/J) and MTOW 97000 kg; FAA category: large = MTOW above 12,500 lb (5,670 kg)",
+        "status": "verified"
+      },
+      "RECAT (src/sim/performance.ts RECAT)": {
+        "value": "F",
+        "source": "DERIVED: not listed; the A321 is listed under F",
+        "status": "UNVERIFIED (type absent from TBL A-1)"
+      },
+      "takeoff/landing distance": {
+        "value": "7050 ft / 6070 ft",
+        "source": "ACD take-off distance 2150 m (at MTOW 97000 kg, ISA, sea level) and landing distance 1850 m, converted at 3.28084 ft/m and rounded to 10 ft",
+        "status": "verified (ACD figures are MTOW / indicative: the engine refuses a departure from a runway shorter than takeoffDistanceFt, so these are the heaviest-case need; KMHT types use typical-weight ESTIMATEs, see _meta)"
+      },
+      "rotate/climb/approach speeds": {
+        "value": "rotate 140, climb 175, approach 140, touchdown 135",
+        "source": "rotate = ACD V2 145 - 5 kt (A320 precedent: VR a few kt below V2); climb speed = ACD initial climb IAS 175 kt; approach = ACD Vat 140 kt; touchdown = Vat - 5 kt (A320 precedent)",
+        "status": "derived from ACD"
+      },
+      "climbRateFpm / descentRateFpm": {
+        "value": "2000 / 2000",
+        "source": "climb = ACD initial climb ROC 2000 ft/min; descent: DESIGN 2,000 ft/min as for A320/B738 (ACD descent to FL100 ROD 2500, approach ROD 1300 ft/min)",
+        "status": "climb verified; descent DESIGN where 2,000"
+      },
+      "cruiseSpeedKt / maxSpeedKt": {
+        "value": "250 / 320",
+        "source": "cruise: 14 CFR 91.117(a) 250 kt limit below 10,000 ft (as A320/B738); max: ACD max(climb IAS 290, descent IAS 290) + 30 kt rounded to 10 (A320 precedent: 290 -> 320), a sim cap not a VMO",
+        "status": "DESIGN / derived"
+      },
+      "accel/decel": {
+        "value": "2.9 / 6.0 kt/s",
+        "source": "accel: a = VR^2 / (2 x 0.8 x takeoffDistanceFt) with VR 140 kt (ground roll taken as 80 % of the 35 ft take-off distance; the A320 and B738 entries give 0.83 / 0.80); decel: DESIGN, as the class precedent (A320 6.0, B752 5.5)",
+        "status": "ESTIMATE (derived) / DESIGN"
+      },
+      "taxi/turn rates, min speed": {
+        "value": "taxi 20 kt, taxi turn 10 kt, turn 2.5 deg/s, ground turn 15 deg/s, min 125 kt",
+        "source": "none authoritative; gameplay simplifications as C172/A320/B752; min speed = Vat - 15 kt as A320 (120 vs 135) and B738 (125 vs 140)",
+        "status": "DESIGN value (UNVERIFIED simplification)"
+      },
+      "serviceCeilingFt / lengthM": {
+        "value": "39000 / 44.5",
+        "source": "ACD ceiling FL390; ACD length 44.51 m",
+        "status": "verified"
+      },
+      "_not_in_type_shape": {
+        "wingspan_m": 35.8,
+        "height_m": 11.76,
+        "mtow_kg": 97000,
+        "wingspan_source": "ACD technical data (wing span 35.8 m, height 11.76 m)",
+        "wake_srs_category": "FAA JO 7110.65 3-9-6 NOTE (derived: Category I small single-engine propeller <= 12,500 lb; II small twin-engine propeller <= 12,500 lb; III all other)",
+        "engine": "L2J; 2 x 147.3kN CFM International LEAP-1A or Pratt & Whitney PW1100G",
+        "radio_wake_word": "none"
+      }
+    }
+  },
+  "A321": {
+    "type": "A321",
+    "category": "large",
+    "wakeCategory": "medium",
+    "taxiSpeedKt": 20,
+    "taxiTurnSpeedKt": 10,
+    "accelKtPerSec": 2.9,
+    "decelKtPerSec": 6.0,
+    "rotateSpeedKt": 140,
+    "climbSpeedKt": 175,
+    "cruiseSpeedKt": 250,
+    "approachSpeedKt": 141,
+    "touchdownSpeedKt": 136,
+    "climbRateFpm": 2500,
+    "descentRateFpm": 2000,
+    "turnRateDegPerSec": 2.5,
+    "groundTurnRateDegPerSec": 15,
+    "minSpeedKt": 126,
+    "maxSpeedKt": 320,
+    "serviceCeilingFt": 41000,
+    "takeoffDistanceFt": 7250,
+    "landingDistanceFt": 5250,
+    "lengthM": 44.5,
+    "_sources": {
+      "_summary": {
+        "value": "Airbus A321",
+        "source": "EUROCONTROL_ACD (page A321); FAA_JO_7110_126A; CFR91.117",
+        "status": "SOURCED (ACD, retrieved 2026-10-21) with the derivations noted per field; gameplay values marked DESIGN"
+      },
+      "ACD row read": {
+        "value": "ACD A321 'Show performance table': V2 145 kt, take-off distance 2210 m, WTC M, RECAT-EU Upper Medium, MTOW 83000 kg; initial climb IAS 175 kt ROC 2500 ft/min; climb to FL150 IAS 290 kt ROC 2000; cruise TAS 450 kt, ceiling FL410; descent to FL100 IAS 290 kt ROD 2500; approach IAS 225 kt ROD 1500; landing Vat 141 kt, distance 1600 m, APC C; technical: wing span 34.1 m, length 44.51 m, height 11.76 m; type L2J",
+        "source": "https://learningzone.eurocontrol.int/ilp/customs/ATCPFDB/details.aspx?ICAO=A321 (retrieved 2026-10-21, HTTP 200; raw/realism/eurocontrol_acd_A321.html)",
+        "status": "verified transcription"
+      },
+      "category/wakeCategory": {
+        "value": "large / medium",
+        "source": "ACD WTC M (ICAO wake turbulence category L/M/H/J) and MTOW 83000 kg; FAA category: large = MTOW above 12,500 lb (5,670 kg)",
+        "status": "verified"
+      },
+      "RECAT (src/sim/performance.ts RECAT)": {
+        "value": "F",
+        "source": "JO 7110.126A TBL A-1 (page A1, read visually 2026-10-21)",
+        "status": "VERIFIED"
+      },
+      "takeoff/landing distance": {
+        "value": "7250 ft / 5250 ft",
+        "source": "ACD take-off distance 2210 m (at MTOW 83000 kg, ISA, sea level) and landing distance 1600 m, converted at 3.28084 ft/m and rounded to 10 ft",
+        "status": "verified (ACD figures are MTOW / indicative: the engine refuses a departure from a runway shorter than takeoffDistanceFt, so these are the heaviest-case need; KMHT types use typical-weight ESTIMATEs, see _meta)"
+      },
+      "rotate/climb/approach speeds": {
+        "value": "rotate 140, climb 175, approach 141, touchdown 136",
+        "source": "rotate = ACD V2 145 - 5 kt (A320 precedent: VR a few kt below V2); climb speed = ACD initial climb IAS 175 kt; approach = ACD Vat 141 kt; touchdown = Vat - 5 kt (A320 precedent)",
+        "status": "derived from ACD"
+      },
+      "climbRateFpm / descentRateFpm": {
+        "value": "2500 / 2000",
+        "source": "climb = ACD initial climb ROC 2500 ft/min; descent: DESIGN 2,000 ft/min as for A320/B738 (ACD descent to FL100 ROD 2500, approach ROD 1500 ft/min)",
+        "status": "climb verified; descent DESIGN where 2,000"
+      },
+      "cruiseSpeedKt / maxSpeedKt": {
+        "value": "250 / 320",
+        "source": "cruise: 14 CFR 91.117(a) 250 kt limit below 10,000 ft (as A320/B738); max: ACD max(climb IAS 290, descent IAS 290) + 30 kt rounded to 10 (A320 precedent: 290 -> 320), a sim cap not a VMO",
+        "status": "DESIGN / derived"
+      },
+      "accel/decel": {
+        "value": "2.9 / 6.0 kt/s",
+        "source": "accel: a = VR^2 / (2 x 0.8 x takeoffDistanceFt) with VR 140 kt (ground roll taken as 80 % of the 35 ft take-off distance; the A320 and B738 entries give 0.83 / 0.80); decel: DESIGN, as the class precedent (A320 6.0, B752 5.5)",
+        "status": "ESTIMATE (derived) / DESIGN"
+      },
+      "taxi/turn rates, min speed": {
+        "value": "taxi 20 kt, taxi turn 10 kt, turn 2.5 deg/s, ground turn 15 deg/s, min 126 kt",
+        "source": "none authoritative; gameplay simplifications as C172/A320/B752; min speed = Vat - 15 kt as A320 (120 vs 135) and B738 (125 vs 140)",
+        "status": "DESIGN value (UNVERIFIED simplification)"
+      },
+      "serviceCeilingFt / lengthM": {
+        "value": "41000 / 44.5",
+        "source": "ACD ceiling FL410; ACD length 44.51 m",
+        "status": "verified"
+      },
+      "_not_in_type_shape": {
+        "wingspan_m": 34.1,
+        "height_m": 11.76,
+        "mtow_kg": 83000,
+        "wingspan_source": "ACD technical data (wing span 34.1 m, height 11.76 m)",
+        "wake_srs_category": "FAA JO 7110.65 3-9-6 NOTE (derived: Category I small single-engine propeller <= 12,500 lb; II small twin-engine propeller <= 12,500 lb; III all other)",
+        "engine": "L2J; 2 x 133kN  CFM56-5B1 or 2 x 133kN  IAE V2530-A5 turbofans.",
+        "radio_wake_word": "none"
+      }
+    }
+  },
+  "B737": {
+    "type": "B737",
+    "category": "large",
+    "wakeCategory": "medium",
+    "taxiSpeedKt": 20,
+    "taxiTurnSpeedKt": 10,
+    "accelKtPerSec": 3.8,
+    "decelKtPerSec": 6.0,
+    "rotateSpeedKt": 145,
+    "climbSpeedKt": 165,
+    "cruiseSpeedKt": 250,
+    "approachSpeedKt": 137,
+    "touchdownSpeedKt": 132,
+    "climbRateFpm": 3000,
+    "descentRateFpm": 2000,
+    "turnRateDegPerSec": 2.5,
+    "groundTurnRateDegPerSec": 15,
+    "minSpeedKt": 122,
+    "maxSpeedKt": 310,
+    "serviceCeilingFt": 41000,
+    "takeoffDistanceFt": 5910,
+    "landingDistanceFt": 4590,
+    "lengthM": 33.6,
+    "_sources": {
+      "_summary": {
+        "value": "Boeing 737-700",
+        "source": "EUROCONTROL_ACD (page B737); FAA_JO_7110_126A; CFR91.117",
+        "status": "SOURCED (ACD, retrieved 2026-10-21) with the derivations noted per field; gameplay values marked DESIGN"
+      },
+      "ACD row read": {
+        "value": "ACD B737 'Show performance table': V2 150 kt, take-off distance 1800 m, WTC M, RECAT-EU Upper Medium, MTOW 66320 kg; initial climb IAS 165 kt ROC 3000 ft/min; climb to FL150 IAS 280 kt ROC 2500; cruise TAS 460 kt, ceiling FL410; descent to FL100 IAS 280 kt ROD 3500; approach IAS 250 kt ROD 1500; landing Vat 137 kt, distance 1400 m, APC C; technical: wing span 34.3 m, length 33.6 m, height 12.6 m; type L2J",
+        "source": "https://learningzone.eurocontrol.int/ilp/customs/ATCPFDB/details.aspx?ICAO=B737 (retrieved 2026-10-21, HTTP 200; raw/realism/eurocontrol_acd_B737.html)",
+        "status": "verified transcription"
+      },
+      "category/wakeCategory": {
+        "value": "large / medium",
+        "source": "ACD WTC M (ICAO wake turbulence category L/M/H/J) and MTOW 66320 kg; FAA category: large = MTOW above 12,500 lb (5,670 kg)",
+        "status": "verified"
+      },
+      "RECAT (src/sim/performance.ts RECAT)": {
+        "value": "F",
+        "source": "JO 7110.126A TBL A-1 (page A1, read visually 2026-10-21)",
+        "status": "VERIFIED"
+      },
+      "takeoff/landing distance": {
+        "value": "5910 ft / 4590 ft",
+        "source": "ACD take-off distance 1800 m (at MTOW 66320 kg, ISA, sea level) and landing distance 1400 m, converted at 3.28084 ft/m and rounded to 10 ft",
+        "status": "verified (ACD figures are MTOW / indicative: the engine refuses a departure from a runway shorter than takeoffDistanceFt, so these are the heaviest-case need; KMHT types use typical-weight ESTIMATEs, see _meta)"
+      },
+      "rotate/climb/approach speeds": {
+        "value": "rotate 145, climb 165, approach 137, touchdown 132",
+        "source": "rotate = ACD V2 150 - 5 kt (A320 precedent: VR a few kt below V2); climb speed = ACD initial climb IAS 165 kt; approach = ACD Vat 137 kt; touchdown = Vat - 5 kt (A320 precedent)",
+        "status": "derived from ACD"
+      },
+      "climbRateFpm / descentRateFpm": {
+        "value": "3000 / 2000",
+        "source": "climb = ACD initial climb ROC 3000 ft/min; descent: DESIGN 2,000 ft/min as for A320/B738 (ACD descent to FL100 ROD 3500, approach ROD 1500 ft/min)",
+        "status": "climb verified; descent DESIGN where 2,000"
+      },
+      "cruiseSpeedKt / maxSpeedKt": {
+        "value": "250 / 310",
+        "source": "cruise: 14 CFR 91.117(a) 250 kt limit below 10,000 ft (as A320/B738); max: ACD max(climb IAS 280, descent IAS 280) + 30 kt rounded to 10 (A320 precedent: 290 -> 320), a sim cap not a VMO",
+        "status": "DESIGN / derived"
+      },
+      "accel/decel": {
+        "value": "3.8 / 6.0 kt/s",
+        "source": "accel: a = VR^2 / (2 x 0.8 x takeoffDistanceFt) with VR 145 kt (ground roll taken as 80 % of the 35 ft take-off distance; the A320 and B738 entries give 0.83 / 0.80); decel: DESIGN, as the class precedent (A320 6.0, B752 5.5)",
+        "status": "ESTIMATE (derived) / DESIGN"
+      },
+      "taxi/turn rates, min speed": {
+        "value": "taxi 20 kt, taxi turn 10 kt, turn 2.5 deg/s, ground turn 15 deg/s, min 122 kt",
+        "source": "none authoritative; gameplay simplifications as C172/A320/B752; min speed = Vat - 15 kt as A320 (120 vs 135) and B738 (125 vs 140)",
+        "status": "DESIGN value (UNVERIFIED simplification)"
+      },
+      "serviceCeilingFt / lengthM": {
+        "value": "41000 / 33.6",
+        "source": "ACD ceiling FL410; ACD length 33.6 m",
+        "status": "verified"
+      },
+      "_not_in_type_shape": {
+        "wingspan_m": 34.3,
+        "height_m": 12.6,
+        "mtow_kg": 66320,
+        "wingspan_source": "ACD technical data (wing span 34.3 m, height 12.6 m)",
+        "wake_srs_category": "FAA JO 7110.65 3-9-6 NOTE (derived: Category I small single-engine propeller <= 12,500 lb; II small twin-engine propeller <= 12,500 lb; III all other)",
+        "engine": "L2J; 2 x 89 kN CFM56-7 or 2 x 107 kN CFM56-7HGW turbofans.",
+        "radio_wake_word": "none"
+      }
+    }
+  },
+  "B38M": {
+    "type": "B38M",
+    "category": "large",
+    "wakeCategory": "medium",
+    "taxiSpeedKt": 20,
+    "taxiTurnSpeedKt": 10,
+    "accelKtPerSec": 2.5,
+    "decelKtPerSec": 6.0,
+    "rotateSpeedKt": 140,
+    "climbSpeedKt": 165,
+    "cruiseSpeedKt": 250,
+    "approachSpeedKt": 145,
+    "touchdownSpeedKt": 140,
+    "climbRateFpm": 2500,
+    "descentRateFpm": 2000,
+    "turnRateDegPerSec": 2.5,
+    "groundTurnRateDegPerSec": 15,
+    "minSpeedKt": 130,
+    "maxSpeedKt": 320,
+    "serviceCeilingFt": 41000,
+    "takeoffDistanceFt": 8200,
+    "landingDistanceFt": 4920,
+    "lengthM": 39.5,
+    "_sources": {
+      "_summary": {
+        "value": "Boeing 737 MAX 8",
+        "source": "EUROCONTROL_ACD (page B38M); FAA_JO_7110_126A; CFR91.117",
+        "status": "SOURCED (ACD, retrieved 2026-10-21) with the derivations noted per field; gameplay values marked DESIGN"
+      },
+      "ACD row read": {
+        "value": "ACD B38M 'Show performance table': V2 145 kt, take-off distance 2500 m, WTC M, RECAT-EU Upper Medium, MTOW 82600 kg; initial climb IAS 165 kt ROC 2500 ft/min; climb to FL150 IAS 290 kt ROC 2300; cruise TAS 453 kt, ceiling FL410; descent to FL100 IAS 290 kt ROD 3500; approach IAS 250 kt ROD 1500; landing Vat 145 kt, distance 1500 m, APC D; technical: wing span 35.9 m, length 39.52 m, height 12.29 m; type L2J",
+        "source": "https://learningzone.eurocontrol.int/ilp/customs/ATCPFDB/details.aspx?ICAO=B38M (retrieved 2026-10-21, HTTP 200; raw/realism/eurocontrol_acd_B38M.html)",
+        "status": "verified transcription"
+      },
+      "category/wakeCategory": {
+        "value": "large / medium",
+        "source": "ACD WTC M (ICAO wake turbulence category L/M/H/J) and MTOW 82600 kg; FAA category: large = MTOW above 12,500 lb (5,670 kg)",
+        "status": "verified"
+      },
+      "RECAT (src/sim/performance.ts RECAT)": {
+        "value": "F",
+        "source": "DERIVED: not listed; B737 / B738 / B739 are listed under F",
+        "status": "UNVERIFIED (type absent from TBL A-1)"
+      },
+      "takeoff/landing distance": {
+        "value": "8200 ft / 4920 ft",
+        "source": "ACD take-off distance 2500 m (at MTOW 82600 kg, ISA, sea level) and landing distance 1500 m, converted at 3.28084 ft/m and rounded to 10 ft",
+        "status": "verified (ACD figures are MTOW / indicative: the engine refuses a departure from a runway shorter than takeoffDistanceFt, so these are the heaviest-case need; KMHT types use typical-weight ESTIMATEs, see _meta)"
+      },
+      "rotate/climb/approach speeds": {
+        "value": "rotate 140, climb 165, approach 145, touchdown 140",
+        "source": "rotate = ACD V2 145 - 5 kt (A320 precedent: VR a few kt below V2); climb speed = ACD initial climb IAS 165 kt; approach = ACD Vat 145 kt; touchdown = Vat - 5 kt (A320 precedent)",
+        "status": "derived from ACD"
+      },
+      "climbRateFpm / descentRateFpm": {
+        "value": "2500 / 2000",
+        "source": "climb = ACD initial climb ROC 2500 ft/min; descent: DESIGN 2,000 ft/min as for A320/B738 (ACD descent to FL100 ROD 3500, approach ROD 1500 ft/min)",
+        "status": "climb verified; descent DESIGN where 2,000"
+      },
+      "cruiseSpeedKt / maxSpeedKt": {
+        "value": "250 / 320",
+        "source": "cruise: 14 CFR 91.117(a) 250 kt limit below 10,000 ft (as A320/B738); max: ACD max(climb IAS 290, descent IAS 290) + 30 kt rounded to 10 (A320 precedent: 290 -> 320), a sim cap not a VMO",
+        "status": "DESIGN / derived"
+      },
+      "accel/decel": {
+        "value": "2.5 / 6.0 kt/s",
+        "source": "accel: a = VR^2 / (2 x 0.8 x takeoffDistanceFt) with VR 140 kt (ground roll taken as 80 % of the 35 ft take-off distance; the A320 and B738 entries give 0.83 / 0.80); decel: DESIGN, as the class precedent (A320 6.0, B752 5.5)",
+        "status": "ESTIMATE (derived) / DESIGN"
+      },
+      "taxi/turn rates, min speed": {
+        "value": "taxi 20 kt, taxi turn 10 kt, turn 2.5 deg/s, ground turn 15 deg/s, min 130 kt",
+        "source": "none authoritative; gameplay simplifications as C172/A320/B752; min speed = Vat - 15 kt as A320 (120 vs 135) and B738 (125 vs 140)",
+        "status": "DESIGN value (UNVERIFIED simplification)"
+      },
+      "serviceCeilingFt / lengthM": {
+        "value": "41000 / 39.5",
+        "source": "ACD ceiling FL410; ACD length 39.52 m",
+        "status": "verified"
+      },
+      "_not_in_type_shape": {
+        "wingspan_m": 35.9,
+        "height_m": 12.29,
+        "mtow_kg": 82600,
+        "wingspan_source": "ACD technical data (wing span 35.9 m, height 12.29 m)",
+        "wake_srs_category": "FAA JO 7110.65 3-9-6 NOTE (derived: Category I small single-engine propeller <= 12,500 lb; II small twin-engine propeller <= 12,500 lb; III all other)",
+        "engine": "L2J; 2 x CFM International LEAP-1B (130 kN) turbofans",
+        "radio_wake_word": "none"
+      }
+    }
+  },
+  "B739": {
+    "type": "B739",
+    "category": "large",
+    "wakeCategory": "medium",
+    "taxiSpeedKt": 20,
+    "taxiTurnSpeedKt": 10,
+    "accelKtPerSec": 2.9,
+    "decelKtPerSec": 6.0,
+    "rotateSpeedKt": 144,
+    "climbSpeedKt": 165,
+    "cruiseSpeedKt": 250,
+    "approachSpeedKt": 150,
+    "touchdownSpeedKt": 145,
+    "climbRateFpm": 3000,
+    "descentRateFpm": 2000,
+    "turnRateDegPerSec": 2.5,
+    "groundTurnRateDegPerSec": 15,
+    "minSpeedKt": 135,
+    "maxSpeedKt": 320,
+    "serviceCeilingFt": 41000,
+    "takeoffDistanceFt": 7550,
+    "landingDistanceFt": 5580,
+    "lengthM": 42.1,
+    "_sources": {
+      "_summary": {
+        "value": "Boeing 737-900",
+        "source": "EUROCONTROL_ACD (page B739); FAA_JO_7110_126A; CFR91.117",
+        "status": "SOURCED (ACD, retrieved 2026-10-21) with the derivations noted per field; gameplay values marked DESIGN"
+      },
+      "ACD row read": {
+        "value": "ACD B739 'Show performance table': V2 149 kt, take-off distance 2300 m, WTC M, RECAT-EU Upper Medium, MTOW 79015 kg; initial climb IAS 165 kt ROC 3000 ft/min; climb to FL150 IAS 290 kt ROC 2000; cruise TAS 460 kt, ceiling FL410; descent to FL100 IAS 280 kt ROD 3500; approach IAS 250 kt ROD 1500; landing Vat 150 kt, distance 1700 m, APC D; technical: wing span 34.3 m, length 42.1 m, height 12.5 m; type L2J",
+        "source": "https://learningzone.eurocontrol.int/ilp/customs/ATCPFDB/details.aspx?ICAO=B739 (retrieved 2026-10-21, HTTP 200; raw/realism/eurocontrol_acd_B739.html)",
+        "status": "verified transcription"
+      },
+      "category/wakeCategory": {
+        "value": "large / medium",
+        "source": "ACD WTC M (ICAO wake turbulence category L/M/H/J) and MTOW 79015 kg; FAA category: large = MTOW above 12,500 lb (5,670 kg)",
+        "status": "verified"
+      },
+      "RECAT (src/sim/performance.ts RECAT)": {
+        "value": "F",
+        "source": "JO 7110.126A TBL A-1 (page A1, read visually 2026-10-21)",
+        "status": "VERIFIED"
+      },
+      "takeoff/landing distance": {
+        "value": "7550 ft / 5580 ft",
+        "source": "ACD take-off distance 2300 m (at MTOW 79015 kg, ISA, sea level) and landing distance 1700 m, converted at 3.28084 ft/m and rounded to 10 ft",
+        "status": "verified (ACD figures are MTOW / indicative: the engine refuses a departure from a runway shorter than takeoffDistanceFt, so these are the heaviest-case need; KMHT types use typical-weight ESTIMATEs, see _meta)"
+      },
+      "rotate/climb/approach speeds": {
+        "value": "rotate 144, climb 165, approach 150, touchdown 145",
+        "source": "rotate = ACD V2 149 - 5 kt (A320 precedent: VR a few kt below V2); climb speed = ACD initial climb IAS 165 kt; approach = ACD Vat 150 kt; touchdown = Vat - 5 kt (A320 precedent)",
+        "status": "derived from ACD"
+      },
+      "climbRateFpm / descentRateFpm": {
+        "value": "3000 / 2000",
+        "source": "climb = ACD initial climb ROC 3000 ft/min; descent: DESIGN 2,000 ft/min as for A320/B738 (ACD descent to FL100 ROD 3500, approach ROD 1500 ft/min)",
+        "status": "climb verified; descent DESIGN where 2,000"
+      },
+      "cruiseSpeedKt / maxSpeedKt": {
+        "value": "250 / 320",
+        "source": "cruise: 14 CFR 91.117(a) 250 kt limit below 10,000 ft (as A320/B738); max: ACD max(climb IAS 290, descent IAS 280) + 30 kt rounded to 10 (A320 precedent: 290 -> 320), a sim cap not a VMO",
+        "status": "DESIGN / derived"
+      },
+      "accel/decel": {
+        "value": "2.9 / 6.0 kt/s",
+        "source": "accel: a = VR^2 / (2 x 0.8 x takeoffDistanceFt) with VR 144 kt (ground roll taken as 80 % of the 35 ft take-off distance; the A320 and B738 entries give 0.83 / 0.80); decel: DESIGN, as the class precedent (A320 6.0, B752 5.5)",
+        "status": "ESTIMATE (derived) / DESIGN"
+      },
+      "taxi/turn rates, min speed": {
+        "value": "taxi 20 kt, taxi turn 10 kt, turn 2.5 deg/s, ground turn 15 deg/s, min 135 kt",
+        "source": "none authoritative; gameplay simplifications as C172/A320/B752; min speed = Vat - 15 kt as A320 (120 vs 135) and B738 (125 vs 140)",
+        "status": "DESIGN value (UNVERIFIED simplification)"
+      },
+      "serviceCeilingFt / lengthM": {
+        "value": "41000 / 42.1",
+        "source": "ACD ceiling FL410; ACD length 42.1 m",
+        "status": "verified"
+      },
+      "_not_in_type_shape": {
+        "wingspan_m": 34.3,
+        "height_m": 12.5,
+        "mtow_kg": 79015,
+        "wingspan_source": "ACD technical data (wing span 34.3 m, height 12.5 m)",
+        "wake_srs_category": "FAA JO 7110.65 3-9-6 NOTE (derived: Category I small single-engine propeller <= 12,500 lb; II small twin-engine propeller <= 12,500 lb; III all other)",
+        "engine": "L2J; 2 x 116,5 kN CFMI CFM56-7B turbofans.",
+        "radio_wake_word": "none"
+      }
+    }
+  },
+  "E190": {
+    "type": "E190",
+    "category": "large",
+    "wakeCategory": "medium",
+    "taxiSpeedKt": 20,
+    "taxiTurnSpeedKt": 10,
+    "accelKtPerSec": 2.8,
+    "decelKtPerSec": 6.0,
+    "rotateSpeedKt": 133,
+    "climbSpeedKt": 190,
+    "cruiseSpeedKt": 250,
+    "approachSpeedKt": 131,
+    "touchdownSpeedKt": 126,
+    "climbRateFpm": 3400,
+    "descentRateFpm": 2000,
+    "turnRateDegPerSec": 3.0,
+    "groundTurnRateDegPerSec": 16,
+    "minSpeedKt": 116,
+    "maxSpeedKt": 330,
+    "serviceCeilingFt": 41000,
+    "takeoffDistanceFt": 6750,
+    "landingDistanceFt": 4340,
+    "lengthM": 36.2,
+    "_sources": {
+      "_summary": {
+        "value": "Embraer 190",
+        "source": "EUROCONTROL_ACD (page E190); FAA_JO_7110_126A; CFR91.117",
+        "status": "SOURCED (ACD, retrieved 2026-10-21) with the derivations noted per field; gameplay values marked DESIGN"
+      },
+      "ACD row read": {
+        "value": "ACD E190 'Show performance table': V2 138 kt, take-off distance 2056 m, WTC M, RECAT-EU Lower Medium, MTOW 45995 kg; initial climb IAS 190 kt ROC 3400 ft/min; climb to FL150 IAS 300 kt ROC 2800; cruise TAS 460 kt, ceiling FL410; descent to FL100 IAS 250 kt ROD 2200; approach IAS 230 kt ROD 1600; landing Vat 131 kt, distance 1323 m, APC C; technical: wing span 28.7 m, length 36.2 m, height 10.6 m; type L2J",
+        "source": "https://learningzone.eurocontrol.int/ilp/customs/ATCPFDB/details.aspx?ICAO=E190 (retrieved 2026-10-21, HTTP 200; raw/realism/eurocontrol_acd_E190.html)",
+        "status": "verified transcription"
+      },
+      "category/wakeCategory": {
+        "value": "large / medium",
+        "source": "ACD WTC M (ICAO wake turbulence category L/M/H/J) and MTOW 45995 kg; FAA category: large = MTOW above 12,500 lb (5,670 kg)",
+        "status": "verified"
+      },
+      "RECAT (src/sim/performance.ts RECAT)": {
+        "value": "F",
+        "source": "JO 7110.126A TBL A-1 (page A1, read visually 2026-10-21)",
+        "status": "VERIFIED"
+      },
+      "takeoff/landing distance": {
+        "value": "6750 ft / 4340 ft",
+        "source": "ACD take-off distance 2056 m (at MTOW 45995 kg, ISA, sea level) and landing distance 1323 m, converted at 3.28084 ft/m and rounded to 10 ft",
+        "status": "verified (ACD figures are MTOW / indicative: the engine refuses a departure from a runway shorter than takeoffDistanceFt, so these are the heaviest-case need; KMHT types use typical-weight ESTIMATEs, see _meta)"
+      },
+      "rotate/climb/approach speeds": {
+        "value": "rotate 133, climb 190, approach 131, touchdown 126",
+        "source": "rotate = ACD V2 138 - 5 kt (A320 precedent: VR a few kt below V2); climb speed = ACD initial climb IAS 190 kt; approach = ACD Vat 131 kt; touchdown = Vat - 5 kt (A320 precedent)",
+        "status": "derived from ACD"
+      },
+      "climbRateFpm / descentRateFpm": {
+        "value": "3400 / 2000",
+        "source": "climb = ACD initial climb ROC 3400 ft/min; descent: DESIGN 2,000 ft/min as for A320/B738 (ACD descent to FL100 ROD 2200, approach ROD 1600 ft/min)",
+        "status": "climb verified; descent DESIGN where 2,000"
+      },
+      "cruiseSpeedKt / maxSpeedKt": {
+        "value": "250 / 330",
+        "source": "cruise: 14 CFR 91.117(a) 250 kt limit below 10,000 ft (as A320/B738); max: ACD max(climb IAS 300, descent IAS 250) + 30 kt rounded to 10 (A320 precedent: 290 -> 320), a sim cap not a VMO",
+        "status": "DESIGN / derived"
+      },
+      "accel/decel": {
+        "value": "2.8 / 6.0 kt/s",
+        "source": "accel: a = VR^2 / (2 x 0.8 x takeoffDistanceFt) with VR 133 kt (ground roll taken as 80 % of the 35 ft take-off distance; the A320 and B738 entries give 0.83 / 0.80); decel: DESIGN, as the class precedent (A320 6.0, B752 5.5)",
+        "status": "ESTIMATE (derived) / DESIGN"
+      },
+      "taxi/turn rates, min speed": {
+        "value": "taxi 20 kt, taxi turn 10 kt, turn 3.0 deg/s, ground turn 16 deg/s, min 116 kt",
+        "source": "none authoritative; gameplay simplifications as C172/A320/B752; min speed = Vat - 15 kt as A320 (120 vs 135) and B738 (125 vs 140)",
+        "status": "DESIGN value (UNVERIFIED simplification)"
+      },
+      "serviceCeilingFt / lengthM": {
+        "value": "41000 / 36.2",
+        "source": "ACD ceiling FL410; ACD length 36.2 m",
+        "status": "verified"
+      },
+      "_not_in_type_shape": {
+        "wingspan_m": 28.7,
+        "height_m": 10.6,
+        "mtow_kg": 45995,
+        "wingspan_source": "ACD technical data (wing span 28.7 m, height 10.6 m)",
+        "wake_srs_category": "FAA JO 7110.65 3-9-6 NOTE (derived: Category I small single-engine propeller <= 12,500 lb; II small twin-engine propeller <= 12,500 lb; III all other)",
+        "engine": "L2J; General Electric CF34-10E",
+        "radio_wake_word": "none"
+      }
+    }
+  },
+  "CRJ7": {
+    "type": "CRJ7",
+    "category": "large",
+    "wakeCategory": "medium",
+    "taxiSpeedKt": 20,
+    "taxiTurnSpeedKt": 10,
+    "accelKtPerSec": 3.4,
+    "decelKtPerSec": 6.0,
+    "rotateSpeedKt": 130,
+    "climbSpeedKt": 165,
+    "cruiseSpeedKt": 250,
+    "approachSpeedKt": 135,
+    "touchdownSpeedKt": 130,
+    "climbRateFpm": 3000,
+    "descentRateFpm": 2000,
+    "turnRateDegPerSec": 3.0,
+    "groundTurnRateDegPerSec": 16,
+    "minSpeedKt": 120,
+    "maxSpeedKt": 320,
+    "serviceCeilingFt": 41000,
+    "takeoffDistanceFt": 5250,
+    "landingDistanceFt": 4850,
+    "lengthM": 32.5,
+    "_sources": {
+      "_summary": {
+        "value": "Bombardier CRJ-700",
+        "source": "EUROCONTROL_ACD (page CRJ7); FAA_JO_7110_126A; CFR91.117",
+        "status": "SOURCED (ACD, retrieved 2026-10-21) with the derivations noted per field; gameplay values marked DESIGN"
+      },
+      "ACD row read": {
+        "value": "ACD CRJ7 'Show performance table': V2 135 kt, take-off distance 1600 m, WTC M, RECAT-EU Lower Medium, MTOW 33000 kg; initial climb IAS 165 kt ROC 3000 ft/min; climb to FL150 IAS 290 kt ROC 2500; cruise TAS 442 kt, ceiling FL410; descent to FL100 IAS 290 kt ROD 3500; approach IAS 250 kt ROD 1500; landing Vat 135 kt, distance 1478 m, APC C; technical: wing span 23.24 m, length 32.51 m, height 7.57 m; type L2J",
+        "source": "https://learningzone.eurocontrol.int/ilp/customs/ATCPFDB/details.aspx?ICAO=CRJ7 (retrieved 2026-10-21, HTTP 200; raw/realism/eurocontrol_acd_CRJ7.html)",
+        "status": "verified transcription"
+      },
+      "category/wakeCategory": {
+        "value": "large / medium",
+        "source": "ACD WTC M (ICAO wake turbulence category L/M/H/J) and MTOW 33000 kg; FAA category: large = MTOW above 12,500 lb (5,670 kg)",
+        "status": "verified"
+      },
+      "RECAT (src/sim/performance.ts RECAT)": {
+        "value": "G",
+        "source": "JO 7110.126A TBL A-1 (page A1, read visually 2026-10-21)",
+        "status": "VERIFIED"
+      },
+      "takeoff/landing distance": {
+        "value": "5250 ft / 4850 ft",
+        "source": "ACD take-off distance 1600 m (at MTOW 33000 kg, ISA, sea level) and landing distance 1478 m, converted at 3.28084 ft/m and rounded to 10 ft",
+        "status": "verified (ACD figures are MTOW / indicative: the engine refuses a departure from a runway shorter than takeoffDistanceFt, so these are the heaviest-case need; KMHT types use typical-weight ESTIMATEs, see _meta)"
+      },
+      "rotate/climb/approach speeds": {
+        "value": "rotate 130, climb 165, approach 135, touchdown 130",
+        "source": "rotate = ACD V2 135 - 5 kt (A320 precedent: VR a few kt below V2); climb speed = ACD initial climb IAS 165 kt; approach = ACD Vat 135 kt; touchdown = Vat - 5 kt (A320 precedent)",
+        "status": "derived from ACD"
+      },
+      "climbRateFpm / descentRateFpm": {
+        "value": "3000 / 2000",
+        "source": "climb = ACD initial climb ROC 3000 ft/min; descent: DESIGN 2,000 ft/min as for A320/B738 (ACD descent to FL100 ROD 3500, approach ROD 1500 ft/min)",
+        "status": "climb verified; descent DESIGN where 2,000"
+      },
+      "cruiseSpeedKt / maxSpeedKt": {
+        "value": "250 / 320",
+        "source": "cruise: 14 CFR 91.117(a) 250 kt limit below 10,000 ft (as A320/B738); max: ACD max(climb IAS 290, descent IAS 290) + 30 kt rounded to 10 (A320 precedent: 290 -> 320), a sim cap not a VMO",
+        "status": "DESIGN / derived"
+      },
+      "accel/decel": {
+        "value": "3.4 / 6.0 kt/s",
+        "source": "accel: a = VR^2 / (2 x 0.8 x takeoffDistanceFt) with VR 130 kt (ground roll taken as 80 % of the 35 ft take-off distance; the A320 and B738 entries give 0.83 / 0.80); decel: DESIGN, as the class precedent (A320 6.0, B752 5.5)",
+        "status": "ESTIMATE (derived) / DESIGN"
+      },
+      "taxi/turn rates, min speed": {
+        "value": "taxi 20 kt, taxi turn 10 kt, turn 3.0 deg/s, ground turn 16 deg/s, min 120 kt",
+        "source": "none authoritative; gameplay simplifications as C172/A320/B752; min speed = Vat - 15 kt as A320 (120 vs 135) and B738 (125 vs 140)",
+        "status": "DESIGN value (UNVERIFIED simplification)"
+      },
+      "serviceCeilingFt / lengthM": {
+        "value": "41000 / 32.5",
+        "source": "ACD ceiling FL410; ACD length 32.51 m",
+        "status": "verified"
+      },
+      "_not_in_type_shape": {
+        "wingspan_m": 23.24,
+        "height_m": 7.57,
+        "mtow_kg": 33000,
+        "wingspan_source": "ACD technical data (wing span 23.24 m, height 7.57 m)",
+        "wake_srs_category": "FAA JO 7110.65 3-9-6 NOTE (derived: Category I small single-engine propeller <= 12,500 lb; II small twin-engine propeller <= 12,500 lb; III all other)",
+        "engine": "L2J; 2 x 56.4 or 61.3 kN rated GE CF34 - 8C1 turbofans.",
+        "radio_wake_word": "none"
+      }
+    }
+  },
+  "B762": {
+    "type": "B762",
+    "category": "heavy",
+    "wakeCategory": "heavy",
+    "taxiSpeedKt": 20,
+    "taxiTurnSpeedKt": 10,
+    "accelKtPerSec": 2.9,
+    "decelKtPerSec": 5.5,
+    "rotateSpeedKt": 155,
+    "climbSpeedKt": 190,
+    "cruiseSpeedKt": 250,
+    "approachSpeedKt": 135,
+    "touchdownSpeedKt": 130,
+    "climbRateFpm": 2000,
+    "descentRateFpm": 2000,
+    "turnRateDegPerSec": 2.5,
+    "groundTurnRateDegPerSec": 10,
+    "minSpeedKt": 120,
+    "maxSpeedKt": 320,
+    "serviceCeilingFt": 45000,
+    "takeoffDistanceFt": 8860,
+    "landingDistanceFt": 4920,
+    "lengthM": 48.5,
+    "_sources": {
+      "_summary": {
+        "value": "Boeing 767-200",
+        "source": "EUROCONTROL_ACD (page B762); FAA_JO_7110_126A; CFR91.117",
+        "status": "SOURCED (ACD, retrieved 2026-10-21) with the derivations noted per field; gameplay values marked DESIGN"
+      },
+      "ACD row read": {
+        "value": "ACD B762 'Show performance table': V2 160 kt, take-off distance 2700 m, WTC H, RECAT-EU Lower Heavy, MTOW 179170 kg; initial climb IAS 190 kt ROC 2000 ft/min; climb to FL150 IAS 290 kt ROC 2500; cruise TAS 470 kt, ceiling FL450; descent to FL100 IAS 290 kt ROD 1600; approach IAS 250 kt ROD 1500; landing Vat 135 kt, distance 1500 m, APC C; technical: wing span 47.6 m, length 48.5 m, height 15.9 m; type L2J",
+        "source": "https://learningzone.eurocontrol.int/ilp/customs/ATCPFDB/details.aspx?ICAO=B762 (retrieved 2026-10-21, HTTP 200; raw/realism/eurocontrol_acd_B762.html)",
+        "status": "verified transcription"
+      },
+      "category/wakeCategory": {
+        "value": "heavy / heavy",
+        "source": "ACD WTC H (ICAO wake turbulence category L/M/H/J) and MTOW 179170 kg; FAA category: large = MTOW above 12,500 lb (5,670 kg)",
+        "status": "verified"
+      },
+      "RECAT (src/sim/performance.ts RECAT)": {
+        "value": "C",
+        "source": "JO 7110.126A TBL A-1 (page A1, read visually 2026-10-21)",
+        "status": "VERIFIED"
+      },
+      "takeoff/landing distance": {
+        "value": "8860 ft / 4920 ft",
+        "source": "ACD take-off distance 2700 m (at MTOW 179170 kg, ISA, sea level) and landing distance 1500 m, converted at 3.28084 ft/m and rounded to 10 ft",
+        "status": "verified (ACD figures are MTOW / indicative: the engine refuses a departure from a runway shorter than takeoffDistanceFt, so these are the heaviest-case need; KMHT types use typical-weight ESTIMATEs, see _meta)"
+      },
+      "rotate/climb/approach speeds": {
+        "value": "rotate 155, climb 190, approach 135, touchdown 130",
+        "source": "rotate = ACD V2 160 - 5 kt (A320 precedent: VR a few kt below V2); climb speed = ACD initial climb IAS 190 kt; approach = ACD Vat 135 kt; touchdown = Vat - 5 kt (A320 precedent)",
+        "status": "derived from ACD"
+      },
+      "climbRateFpm / descentRateFpm": {
+        "value": "2000 / 2000",
+        "source": "climb = ACD initial climb ROC 2000 ft/min; descent: DESIGN 2,000 ft/min as for A320/B738 (ACD descent to FL100 ROD 1600, approach ROD 1500 ft/min)",
+        "status": "climb verified; descent DESIGN where 2,000"
+      },
+      "cruiseSpeedKt / maxSpeedKt": {
+        "value": "250 / 320",
+        "source": "cruise: 14 CFR 91.117(a) 250 kt limit below 10,000 ft (as A320/B738); max: ACD max(climb IAS 290, descent IAS 290) + 30 kt rounded to 10 (A320 precedent: 290 -> 320), a sim cap not a VMO",
+        "status": "DESIGN / derived"
+      },
+      "accel/decel": {
+        "value": "2.9 / 5.5 kt/s",
+        "source": "accel: a = VR^2 / (2 x 0.8 x takeoffDistanceFt) with VR 155 kt (ground roll taken as 80 % of the 35 ft take-off distance; the A320 and B738 entries give 0.83 / 0.80); decel: DESIGN, as the class precedent (A320 6.0, B752 5.5)",
+        "status": "ESTIMATE (derived) / DESIGN"
+      },
+      "taxi/turn rates, min speed": {
+        "value": "taxi 20 kt, taxi turn 10 kt, turn 2.5 deg/s, ground turn 10 deg/s, min 120 kt",
+        "source": "none authoritative; gameplay simplifications as C172/A320/B752; min speed = Vat - 15 kt as A320 (120 vs 135) and B738 (125 vs 140)",
+        "status": "DESIGN value (UNVERIFIED simplification)"
+      },
+      "serviceCeilingFt / lengthM": {
+        "value": "45000 / 48.5",
+        "source": "ACD ceiling FL450; ACD length 48.5 m",
+        "status": "verified"
+      },
+      "_not_in_type_shape": {
+        "wingspan_m": 47.6,
+        "height_m": 15.9,
+        "mtow_kg": 179170,
+        "wingspan_source": "ACD technical data (wing span 47.6 m, height 15.9 m)",
+        "wake_srs_category": "FAA JO 7110.65 3-9-6 NOTE (derived: Category I small single-engine propeller <= 12,500 lb; II small twin-engine propeller <= 12,500 lb; III all other)",
+        "engine": "L2J; 2 x 281.6 kN P&W PW4062 or\r\n2 x 276.2 kN GE CF6-80C2B7F",
+        "radio_wake_word": "heavy"
+      }
+    }
+  },
+  "B763": {
+    "type": "B763",
+    "category": "heavy",
+    "wakeCategory": "heavy",
+    "taxiSpeedKt": 20,
+    "taxiTurnSpeedKt": 10,
+    "accelKtPerSec": 2.7,
+    "decelKtPerSec": 5.5,
+    "rotateSpeedKt": 155,
+    "climbSpeedKt": 190,
+    "cruiseSpeedKt": 250,
+    "approachSpeedKt": 140,
+    "touchdownSpeedKt": 135,
+    "climbRateFpm": 3000,
+    "descentRateFpm": 2000,
+    "turnRateDegPerSec": 2.5,
+    "groundTurnRateDegPerSec": 10,
+    "minSpeedKt": 125,
+    "maxSpeedKt": 320,
+    "serviceCeilingFt": 45000,
+    "takeoffDistanceFt": 9510,
+    "landingDistanceFt": 5910,
+    "lengthM": 54.9,
+    "_sources": {
+      "_summary": {
+        "value": "Boeing 767-300",
+        "source": "EUROCONTROL_ACD (page B763); FAA_JO_7110_126A; CFR91.117",
+        "status": "SOURCED (ACD, retrieved 2026-10-21) with the derivations noted per field; gameplay values marked DESIGN"
+      },
+      "ACD row read": {
+        "value": "ACD B763 'Show performance table': V2 160 kt, take-off distance 2900 m, WTC H, RECAT-EU Lower Heavy, MTOW 186880 kg; initial climb IAS 190 kt ROC 3000 ft/min; climb to FL150 IAS 290 kt ROC 2500; cruise TAS 460 kt, ceiling FL450; descent to FL100 IAS 290 kt ROD 3000; approach IAS 230 kt ROD 1500; landing Vat 140 kt, distance 1800 m, APC C; technical: wing span 47.6 m, length 54.9 m, height 15.9 m; type L2J",
+        "source": "https://learningzone.eurocontrol.int/ilp/customs/ATCPFDB/details.aspx?ICAO=B763 (retrieved 2026-10-21, HTTP 200; raw/realism/eurocontrol_acd_B763.html)",
+        "status": "verified transcription"
+      },
+      "category/wakeCategory": {
+        "value": "heavy / heavy",
+        "source": "ACD WTC H (ICAO wake turbulence category L/M/H/J) and MTOW 186880 kg; FAA category: large = MTOW above 12,500 lb (5,670 kg)",
+        "status": "verified"
+      },
+      "RECAT (src/sim/performance.ts RECAT)": {
+        "value": "C",
+        "source": "JO 7110.126A TBL A-1 (page A1, read visually 2026-10-21)",
+        "status": "VERIFIED"
+      },
+      "takeoff/landing distance": {
+        "value": "9510 ft / 5910 ft",
+        "source": "ACD take-off distance 2900 m (at MTOW 186880 kg, ISA, sea level) and landing distance 1800 m, converted at 3.28084 ft/m and rounded to 10 ft",
+        "status": "verified (ACD figures are MTOW / indicative: the engine refuses a departure from a runway shorter than takeoffDistanceFt, so these are the heaviest-case need; KMHT types use typical-weight ESTIMATEs, see _meta)"
+      },
+      "rotate/climb/approach speeds": {
+        "value": "rotate 155, climb 190, approach 140, touchdown 135",
+        "source": "rotate = ACD V2 160 - 5 kt (A320 precedent: VR a few kt below V2); climb speed = ACD initial climb IAS 190 kt; approach = ACD Vat 140 kt; touchdown = Vat - 5 kt (A320 precedent)",
+        "status": "derived from ACD"
+      },
+      "climbRateFpm / descentRateFpm": {
+        "value": "3000 / 2000",
+        "source": "climb = ACD initial climb ROC 3000 ft/min; descent: DESIGN 2,000 ft/min as for A320/B738 (ACD descent to FL100 ROD 3000, approach ROD 1500 ft/min)",
+        "status": "climb verified; descent DESIGN where 2,000"
+      },
+      "cruiseSpeedKt / maxSpeedKt": {
+        "value": "250 / 320",
+        "source": "cruise: 14 CFR 91.117(a) 250 kt limit below 10,000 ft (as A320/B738); max: ACD max(climb IAS 290, descent IAS 290) + 30 kt rounded to 10 (A320 precedent: 290 -> 320), a sim cap not a VMO",
+        "status": "DESIGN / derived"
+      },
+      "accel/decel": {
+        "value": "2.7 / 5.5 kt/s",
+        "source": "accel: a = VR^2 / (2 x 0.8 x takeoffDistanceFt) with VR 155 kt (ground roll taken as 80 % of the 35 ft take-off distance; the A320 and B738 entries give 0.83 / 0.80); decel: DESIGN, as the class precedent (A320 6.0, B752 5.5)",
+        "status": "ESTIMATE (derived) / DESIGN"
+      },
+      "taxi/turn rates, min speed": {
+        "value": "taxi 20 kt, taxi turn 10 kt, turn 2.5 deg/s, ground turn 10 deg/s, min 125 kt",
+        "source": "none authoritative; gameplay simplifications as C172/A320/B752; min speed = Vat - 15 kt as A320 (120 vs 135) and B738 (125 vs 140)",
+        "status": "DESIGN value (UNVERIFIED simplification)"
+      },
+      "serviceCeilingFt / lengthM": {
+        "value": "45000 / 54.9",
+        "source": "ACD ceiling FL450; ACD length 54.9 m",
+        "status": "verified"
+      },
+      "_not_in_type_shape": {
+        "wingspan_m": 47.6,
+        "height_m": 15.9,
+        "mtow_kg": 186880,
+        "wingspan_source": "ACD technical data (wing span 47.6 m, height 15.9 m)",
+        "wake_srs_category": "FAA JO 7110.65 3-9-6 NOTE (derived: Category I small single-engine propeller <= 12,500 lb; II small twin-engine propeller <= 12,500 lb; III all other)",
+        "engine": "L2J; 2 x 281.6kN P&W PW4062 or 2 x 276.2kN GE CF6-80C2B7F or 2 x 264.7kN RR RB211-524",
+        "radio_wake_word": "heavy"
+      }
+    }
+  },
+  "A306": {
+    "type": "A306",
+    "category": "heavy",
+    "wakeCategory": "heavy",
+    "taxiSpeedKt": 20,
+    "taxiTurnSpeedKt": 10,
+    "accelKtPerSec": 3.4,
+    "decelKtPerSec": 5.5,
+    "rotateSpeedKt": 155,
+    "climbSpeedKt": 190,
+    "cruiseSpeedKt": 250,
+    "approachSpeedKt": 139,
+    "touchdownSpeedKt": 134,
+    "climbRateFpm": 3000,
+    "descentRateFpm": 2000,
+    "turnRateDegPerSec": 2.5,
+    "groundTurnRateDegPerSec": 10,
+    "minSpeedKt": 124,
+    "maxSpeedKt": 320,
+    "serviceCeilingFt": 37000,
+    "takeoffDistanceFt": 7350,
+    "landingDistanceFt": 5030,
+    "lengthM": 54.1,
+    "_sources": {
+      "_summary": {
+        "value": "Airbus A300-600",
+        "source": "EUROCONTROL_ACD (page A306); FAA_JO_7110_126A; CFR91.117",
+        "status": "SOURCED (ACD, retrieved 2026-10-21) with the derivations noted per field; gameplay values marked DESIGN"
+      },
+      "ACD row read": {
+        "value": "ACD A306 'Show performance table': V2 160 kt, take-off distance 2240 m, WTC H, RECAT-EU Lower Heavy, MTOW 171700 kg; initial climb IAS 190 kt ROC 3000 ft/min; climb to FL150 IAS 290 kt ROC 3200; cruise TAS 470 kt, ceiling FL370; descent to FL100 IAS 290 kt ROD 2000; approach IAS 240 kt ROD 1500; landing Vat 139 kt, distance 1532 m, APC C; technical: wing span 44.84 m, length 54.1 m, height 16.54 m; type L2J",
+        "source": "https://learningzone.eurocontrol.int/ilp/customs/ATCPFDB/details.aspx?ICAO=A306 (retrieved 2026-10-21, HTTP 200; raw/realism/eurocontrol_acd_A306.html)",
+        "status": "verified transcription"
+      },
+      "category/wakeCategory": {
+        "value": "heavy / heavy",
+        "source": "ACD WTC H (ICAO wake turbulence category L/M/H/J) and MTOW 171700 kg; FAA category: large = MTOW above 12,500 lb (5,670 kg)",
+        "status": "verified"
+      },
+      "RECAT (src/sim/performance.ts RECAT)": {
+        "value": "C",
+        "source": "JO 7110.126A TBL A-1 (page A1, read visually 2026-10-21)",
+        "status": "VERIFIED"
+      },
+      "takeoff/landing distance": {
+        "value": "7350 ft / 5030 ft",
+        "source": "ACD take-off distance 2240 m (at MTOW 171700 kg, ISA, sea level) and landing distance 1532 m, converted at 3.28084 ft/m and rounded to 10 ft",
+        "status": "verified (ACD figures are MTOW / indicative: the engine refuses a departure from a runway shorter than takeoffDistanceFt, so these are the heaviest-case need; KMHT types use typical-weight ESTIMATEs, see _meta)"
+      },
+      "rotate/climb/approach speeds": {
+        "value": "rotate 155, climb 190, approach 139, touchdown 134",
+        "source": "rotate = ACD V2 160 - 5 kt (A320 precedent: VR a few kt below V2); climb speed = ACD initial climb IAS 190 kt; approach = ACD Vat 139 kt; touchdown = Vat - 5 kt (A320 precedent)",
+        "status": "derived from ACD"
+      },
+      "climbRateFpm / descentRateFpm": {
+        "value": "3000 / 2000",
+        "source": "climb = ACD initial climb ROC 3000 ft/min; descent: ACD descent to FL100 ROD 2000 ft/min",
+        "status": "climb verified; descent DESIGN where 2,000"
+      },
+      "cruiseSpeedKt / maxSpeedKt": {
+        "value": "250 / 320",
+        "source": "cruise: 14 CFR 91.117(a) 250 kt limit below 10,000 ft (as A320/B738); max: ACD max(climb IAS 290, descent IAS 290) + 30 kt rounded to 10 (A320 precedent: 290 -> 320), a sim cap not a VMO",
+        "status": "DESIGN / derived"
+      },
+      "accel/decel": {
+        "value": "3.4 / 5.5 kt/s",
+        "source": "accel: a = VR^2 / (2 x 0.8 x takeoffDistanceFt) with VR 155 kt (ground roll taken as 80 % of the 35 ft take-off distance; the A320 and B738 entries give 0.83 / 0.80); decel: DESIGN, as the class precedent (A320 6.0, B752 5.5)",
+        "status": "ESTIMATE (derived) / DESIGN"
+      },
+      "taxi/turn rates, min speed": {
+        "value": "taxi 20 kt, taxi turn 10 kt, turn 2.5 deg/s, ground turn 10 deg/s, min 124 kt",
+        "source": "none authoritative; gameplay simplifications as C172/A320/B752; min speed = Vat - 15 kt as A320 (120 vs 135) and B738 (125 vs 140)",
+        "status": "DESIGN value (UNVERIFIED simplification)"
+      },
+      "serviceCeilingFt / lengthM": {
+        "value": "37000 / 54.1",
+        "source": "ACD ceiling FL370; ACD length 54.1 m",
+        "status": "verified"
+      },
+      "_not_in_type_shape": {
+        "wingspan_m": 44.84,
+        "height_m": 16.54,
+        "mtow_kg": 171700,
+        "wingspan_source": "ACD technical data (wing span 44.84 m, height 16.54 m)",
+        "wake_srs_category": "FAA JO 7110.65 3-9-6 NOTE (derived: Category I small single-engine propeller <= 12,500 lb; II small twin-engine propeller <= 12,500 lb; III all other)",
+        "engine": "L2J; 2 x 262kN CF6-80C2 or 2 x 249kN P&W PW4000 turbofans.",
+        "radio_wake_word": "heavy"
+      }
+    }
+  },
+  "B772": {
+    "type": "B772",
+    "category": "heavy",
+    "wakeCategory": "heavy",
+    "taxiSpeedKt": 20,
+    "taxiTurnSpeedKt": 10,
+    "accelKtPerSec": 3.0,
+    "decelKtPerSec": 5.5,
+    "rotateSpeedKt": 165,
+    "climbSpeedKt": 200,
+    "cruiseSpeedKt": 250,
+    "approachSpeedKt": 140,
+    "touchdownSpeedKt": 135,
+    "climbRateFpm": 3000,
+    "descentRateFpm": 2000,
+    "turnRateDegPerSec": 2.5,
+    "groundTurnRateDegPerSec": 10,
+    "minSpeedKt": 125,
+    "maxSpeedKt": 330,
+    "serviceCeilingFt": 43000,
+    "takeoffDistanceFt": 9510,
+    "landingDistanceFt": 5580,
+    "lengthM": 63.7,
+    "_sources": {
+      "_summary": {
+        "value": "Boeing 777-200",
+        "source": "EUROCONTROL_ACD (page B772); FAA_JO_7110_126A; CFR91.117",
+        "status": "SOURCED (ACD, retrieved 2026-10-21) with the derivations noted per field; gameplay values marked DESIGN"
+      },
+      "ACD row read": {
+        "value": "ACD B772 'Show performance table': V2 170 kt, take-off distance 2900 m, WTC H, RECAT-EU Upper Heavy, MTOW 247210 kg; initial climb IAS 200 kt ROC 3000 ft/min; climb to FL150 IAS 300 kt ROC 2500; cruise TAS 480 kt, ceiling FL430; descent to FL100 IAS 300 kt ROD 3000; approach IAS 250 kt ROD 1500; landing Vat 140 kt, distance 1700 m, APC C; technical: wing span 60.9 m, length 63.7 m, height 18.4 m; type L2J",
+        "source": "https://learningzone.eurocontrol.int/ilp/customs/ATCPFDB/details.aspx?ICAO=B772 (retrieved 2026-10-21, HTTP 200; raw/realism/eurocontrol_acd_B772.html)",
+        "status": "verified transcription"
+      },
+      "category/wakeCategory": {
+        "value": "heavy / heavy",
+        "source": "ACD WTC H (ICAO wake turbulence category L/M/H/J) and MTOW 247210 kg; FAA category: large = MTOW above 12,500 lb (5,670 kg)",
+        "status": "verified"
+      },
+      "RECAT (src/sim/performance.ts RECAT)": {
+        "value": "B",
+        "source": "JO 7110.126A TBL A-1 (page A1, read visually 2026-10-21)",
+        "status": "VERIFIED"
+      },
+      "takeoff/landing distance": {
+        "value": "9510 ft / 5580 ft",
+        "source": "ACD take-off distance 2900 m (at MTOW 247210 kg, ISA, sea level) and landing distance 1700 m, converted at 3.28084 ft/m and rounded to 10 ft",
+        "status": "verified (ACD figures are MTOW / indicative: the engine refuses a departure from a runway shorter than takeoffDistanceFt, so these are the heaviest-case need; KMHT types use typical-weight ESTIMATEs, see _meta)"
+      },
+      "rotate/climb/approach speeds": {
+        "value": "rotate 165, climb 200, approach 140, touchdown 135",
+        "source": "rotate = ACD V2 170 - 5 kt (A320 precedent: VR a few kt below V2); climb speed = ACD initial climb IAS 200 kt; approach = ACD Vat 140 kt; touchdown = Vat - 5 kt (A320 precedent)",
+        "status": "derived from ACD"
+      },
+      "climbRateFpm / descentRateFpm": {
+        "value": "3000 / 2000",
+        "source": "climb = ACD initial climb ROC 3000 ft/min; descent: DESIGN 2,000 ft/min as for A320/B738 (ACD descent to FL100 ROD 3000, approach ROD 1500 ft/min)",
+        "status": "climb verified; descent DESIGN where 2,000"
+      },
+      "cruiseSpeedKt / maxSpeedKt": {
+        "value": "250 / 330",
+        "source": "cruise: 14 CFR 91.117(a) 250 kt limit below 10,000 ft (as A320/B738); max: ACD max(climb IAS 300, descent IAS 300) + 30 kt rounded to 10 (A320 precedent: 290 -> 320), a sim cap not a VMO",
+        "status": "DESIGN / derived"
+      },
+      "accel/decel": {
+        "value": "3.0 / 5.5 kt/s",
+        "source": "accel: a = VR^2 / (2 x 0.8 x takeoffDistanceFt) with VR 165 kt (ground roll taken as 80 % of the 35 ft take-off distance; the A320 and B738 entries give 0.83 / 0.80); decel: DESIGN, as the class precedent (A320 6.0, B752 5.5)",
+        "status": "ESTIMATE (derived) / DESIGN"
+      },
+      "taxi/turn rates, min speed": {
+        "value": "taxi 20 kt, taxi turn 10 kt, turn 2.5 deg/s, ground turn 10 deg/s, min 125 kt",
+        "source": "none authoritative; gameplay simplifications as C172/A320/B752; min speed = Vat - 15 kt as A320 (120 vs 135) and B738 (125 vs 140)",
+        "status": "DESIGN value (UNVERIFIED simplification)"
+      },
+      "serviceCeilingFt / lengthM": {
+        "value": "43000 / 63.7",
+        "source": "ACD ceiling FL430; ACD length 63.7 m",
+        "status": "verified"
+      },
+      "_not_in_type_shape": {
+        "wingspan_m": 60.9,
+        "height_m": 18.4,
+        "mtow_kg": 247210,
+        "wingspan_source": "ACD technical data (wing span 60.9 m, height 18.4 m)",
+        "wake_srs_category": "FAA JO 7110.65 3-9-6 NOTE (derived: Category I small single-engine propeller <= 12,500 lb; II small twin-engine propeller <= 12,500 lb; III all other)",
+        "engine": "L2J; 2 x 332 kN P&W PW 4074 or 2 x 336 kN GE GE90-75B or 2 x 336.3 kN R-R Trent 875 o",
+        "radio_wake_word": "heavy"
+      }
+    }
+  },
+  "B77W": {
+    "type": "B77W",
+    "category": "heavy",
+    "wakeCategory": "heavy",
+    "taxiSpeedKt": 20,
+    "taxiTurnSpeedKt": 10,
+    "accelKtPerSec": 2.8,
+    "decelKtPerSec": 5.5,
+    "rotateSpeedKt": 163,
+    "climbSpeedKt": 200,
+    "cruiseSpeedKt": 250,
+    "approachSpeedKt": 149,
+    "touchdownSpeedKt": 144,
+    "climbRateFpm": 3000,
+    "descentRateFpm": 2000,
+    "turnRateDegPerSec": 2.5,
+    "groundTurnRateDegPerSec": 10,
+    "minSpeedKt": 134,
+    "maxSpeedKt": 330,
+    "serviceCeilingFt": 43000,
+    "takeoffDistanceFt": 9840,
+    "landingDistanceFt": 5910,
+    "lengthM": 73.9,
+    "_sources": {
+      "_summary": {
+        "value": "Boeing 777-300ER",
+        "source": "EUROCONTROL_ACD (page B77W); FAA_JO_7110_126A; CFR91.117",
+        "status": "SOURCED (ACD, retrieved 2026-10-21) with the derivations noted per field; gameplay values marked DESIGN"
+      },
+      "ACD row read": {
+        "value": "ACD B77W 'Show performance table': V2 168 kt, take-off distance 3000 m, WTC H, RECAT-EU Upper Heavy, MTOW 351500 kg; initial climb IAS 200 kt ROC 3000 ft/min; climb to FL150 IAS 300 kt ROC 2500; cruise TAS 490 kt, ceiling FL430; descent to FL100 IAS 300 kt ROD 3000; approach IAS 240 kt ROD 1500; landing Vat 149 kt, distance 1800 m, APC D; technical: wing span 64.8 m, length 73.9 m, height 18.5 m; type L2J",
+        "source": "https://learningzone.eurocontrol.int/ilp/customs/ATCPFDB/details.aspx?ICAO=B77W (retrieved 2026-10-21, HTTP 200; raw/realism/eurocontrol_acd_B77W.html)",
+        "status": "verified transcription"
+      },
+      "category/wakeCategory": {
+        "value": "heavy / heavy",
+        "source": "ACD WTC H (ICAO wake turbulence category L/M/H/J) and MTOW 351500 kg; FAA category: large = MTOW above 12,500 lb (5,670 kg)",
+        "status": "verified"
+      },
+      "RECAT (src/sim/performance.ts RECAT)": {
+        "value": "B",
+        "source": "JO 7110.126A TBL A-1 (page A1, read visually 2026-10-21)",
+        "status": "VERIFIED"
+      },
+      "takeoff/landing distance": {
+        "value": "9840 ft / 5910 ft",
+        "source": "ACD take-off distance 3000 m (at MTOW 351500 kg, ISA, sea level) and landing distance 1800 m, converted at 3.28084 ft/m and rounded to 10 ft",
+        "status": "verified (ACD figures are MTOW / indicative: the engine refuses a departure from a runway shorter than takeoffDistanceFt, so these are the heaviest-case need; KMHT types use typical-weight ESTIMATEs, see _meta)"
+      },
+      "rotate/climb/approach speeds": {
+        "value": "rotate 163, climb 200, approach 149, touchdown 144",
+        "source": "rotate = ACD V2 168 - 5 kt (A320 precedent: VR a few kt below V2); climb speed = ACD initial climb IAS 200 kt; approach = ACD Vat 149 kt; touchdown = Vat - 5 kt (A320 precedent)",
+        "status": "derived from ACD"
+      },
+      "climbRateFpm / descentRateFpm": {
+        "value": "3000 / 2000",
+        "source": "climb = ACD initial climb ROC 3000 ft/min; descent: DESIGN 2,000 ft/min as for A320/B738 (ACD descent to FL100 ROD 3000, approach ROD 1500 ft/min)",
+        "status": "climb verified; descent DESIGN where 2,000"
+      },
+      "cruiseSpeedKt / maxSpeedKt": {
+        "value": "250 / 330",
+        "source": "cruise: 14 CFR 91.117(a) 250 kt limit below 10,000 ft (as A320/B738); max: ACD max(climb IAS 300, descent IAS 300) + 30 kt rounded to 10 (A320 precedent: 290 -> 320), a sim cap not a VMO",
+        "status": "DESIGN / derived"
+      },
+      "accel/decel": {
+        "value": "2.8 / 5.5 kt/s",
+        "source": "accel: a = VR^2 / (2 x 0.8 x takeoffDistanceFt) with VR 163 kt (ground roll taken as 80 % of the 35 ft take-off distance; the A320 and B738 entries give 0.83 / 0.80); decel: DESIGN, as the class precedent (A320 6.0, B752 5.5)",
+        "status": "ESTIMATE (derived) / DESIGN"
+      },
+      "taxi/turn rates, min speed": {
+        "value": "taxi 20 kt, taxi turn 10 kt, turn 2.5 deg/s, ground turn 10 deg/s, min 134 kt",
+        "source": "none authoritative; gameplay simplifications as C172/A320/B752; min speed = Vat - 15 kt as A320 (120 vs 135) and B738 (125 vs 140)",
+        "status": "DESIGN value (UNVERIFIED simplification)"
+      },
+      "serviceCeilingFt / lengthM": {
+        "value": "43000 / 73.9",
+        "source": "ACD ceiling FL430; ACD length 73.9 m",
+        "status": "verified"
+      },
+      "_not_in_type_shape": {
+        "wingspan_m": 64.8,
+        "height_m": 18.5,
+        "mtow_kg": 351500,
+        "wingspan_source": "ACD technical data (wing span 64.8 m, height 18.5 m)",
+        "wake_srs_category": "FAA JO 7110.65 3-9-6 NOTE (derived: Category I small single-engine propeller <= 12,500 lb; II small twin-engine propeller <= 12,500 lb; III all other)",
+        "engine": "L2J; 2 x General Electric GE90-115B 115,000 lbF (510 kN).",
+        "radio_wake_word": "heavy"
+      }
+    }
+  },
+  "B788": {
+    "type": "B788",
+    "category": "heavy",
+    "wakeCategory": "heavy",
+    "taxiSpeedKt": 20,
+    "taxiTurnSpeedKt": 10,
+    "accelKtPerSec": 2.9,
+    "decelKtPerSec": 5.5,
+    "rotateSpeedKt": 160,
+    "climbSpeedKt": 190,
+    "cruiseSpeedKt": 250,
+    "approachSpeedKt": 140,
+    "touchdownSpeedKt": 135,
+    "climbRateFpm": 2700,
+    "descentRateFpm": 2000,
+    "turnRateDegPerSec": 2.5,
+    "groundTurnRateDegPerSec": 10,
+    "minSpeedKt": 125,
+    "maxSpeedKt": 330,
+    "serviceCeilingFt": 43000,
+    "takeoffDistanceFt": 9250,
+    "landingDistanceFt": 4990,
+    "lengthM": 56.7,
+    "_sources": {
+      "_summary": {
+        "value": "Boeing 787-8",
+        "source": "EUROCONTROL_ACD (page B788); FAA_JO_7110_126A; CFR91.117",
+        "status": "SOURCED (ACD, retrieved 2026-10-21) with the derivations noted per field; gameplay values marked DESIGN"
+      },
+      "ACD row read": {
+        "value": "ACD B788 'Show performance table': V2 165 kt, take-off distance 2820 m, WTC H, RECAT-EU Upper Heavy, MTOW 228000 kg; initial climb IAS 190 kt ROC 2700 ft/min; climb to FL150 IAS 290 kt ROC 2000; cruise TAS 470 kt, ceiling FL430; descent to FL100 IAS 300 kt ROD 2800; approach IAS 240 kt ROD 1500; landing Vat 140 kt, distance 1520 m, APC C; technical: wing span 52 m, length 56.7 m, height 16.9 m; type L2J",
+        "source": "https://learningzone.eurocontrol.int/ilp/customs/ATCPFDB/details.aspx?ICAO=B788 (retrieved 2026-10-21, HTTP 200; raw/realism/eurocontrol_acd_B788.html)",
+        "status": "verified transcription"
+      },
+      "category/wakeCategory": {
+        "value": "heavy / heavy",
+        "source": "ACD WTC H (ICAO wake turbulence category L/M/H/J) and MTOW 228000 kg; FAA category: large = MTOW above 12,500 lb (5,670 kg)",
+        "status": "verified"
+      },
+      "RECAT (src/sim/performance.ts RECAT)": {
+        "value": "B",
+        "source": "JO 7110.126A TBL A-1 (page A1, read visually 2026-10-21)",
+        "status": "VERIFIED"
+      },
+      "takeoff/landing distance": {
+        "value": "9250 ft / 4990 ft",
+        "source": "ACD take-off distance 2820 m (at MTOW 228000 kg, ISA, sea level) and landing distance 1520 m, converted at 3.28084 ft/m and rounded to 10 ft",
+        "status": "verified (ACD figures are MTOW / indicative: the engine refuses a departure from a runway shorter than takeoffDistanceFt, so these are the heaviest-case need; KMHT types use typical-weight ESTIMATEs, see _meta)"
+      },
+      "rotate/climb/approach speeds": {
+        "value": "rotate 160, climb 190, approach 140, touchdown 135",
+        "source": "rotate = ACD V2 165 - 5 kt (A320 precedent: VR a few kt below V2); climb speed = ACD initial climb IAS 190 kt; approach = ACD Vat 140 kt; touchdown = Vat - 5 kt (A320 precedent)",
+        "status": "derived from ACD"
+      },
+      "climbRateFpm / descentRateFpm": {
+        "value": "2700 / 2000",
+        "source": "climb = ACD initial climb ROC 2700 ft/min; descent: DESIGN 2,000 ft/min as for A320/B738 (ACD descent to FL100 ROD 2800, approach ROD 1500 ft/min)",
+        "status": "climb verified; descent DESIGN where 2,000"
+      },
+      "cruiseSpeedKt / maxSpeedKt": {
+        "value": "250 / 330",
+        "source": "cruise: 14 CFR 91.117(a) 250 kt limit below 10,000 ft (as A320/B738); max: ACD max(climb IAS 290, descent IAS 300) + 30 kt rounded to 10 (A320 precedent: 290 -> 320), a sim cap not a VMO",
+        "status": "DESIGN / derived"
+      },
+      "accel/decel": {
+        "value": "2.9 / 5.5 kt/s",
+        "source": "accel: a = VR^2 / (2 x 0.8 x takeoffDistanceFt) with VR 160 kt (ground roll taken as 80 % of the 35 ft take-off distance; the A320 and B738 entries give 0.83 / 0.80); decel: DESIGN, as the class precedent (A320 6.0, B752 5.5)",
+        "status": "ESTIMATE (derived) / DESIGN"
+      },
+      "taxi/turn rates, min speed": {
+        "value": "taxi 20 kt, taxi turn 10 kt, turn 2.5 deg/s, ground turn 10 deg/s, min 125 kt",
+        "source": "none authoritative; gameplay simplifications as C172/A320/B752; min speed = Vat - 15 kt as A320 (120 vs 135) and B738 (125 vs 140)",
+        "status": "DESIGN value (UNVERIFIED simplification)"
+      },
+      "serviceCeilingFt / lengthM": {
+        "value": "43000 / 56.7",
+        "source": "ACD ceiling FL430; ACD length 56.7 m",
+        "status": "verified"
+      },
+      "_not_in_type_shape": {
+        "wingspan_m": 52.0,
+        "height_m": 16.9,
+        "mtow_kg": 228000,
+        "wingspan_source": "ACD technical data (wing span 52 m, height 16.9 m)",
+        "wake_srs_category": "FAA JO 7110.65 3-9-6 NOTE (derived: Category I small single-engine propeller <= 12,500 lb; II small twin-engine propeller <= 12,500 lb; III all other)",
+        "engine": "L2J; 2x 280kN General Electric GEnx or 2x 280kN Rolls-Royce Trent 1000",
+        "radio_wake_word": "heavy"
+      }
+    }
+  },
+  "B789": {
+    "type": "B789",
+    "category": "heavy",
+    "wakeCategory": "heavy",
+    "taxiSpeedKt": 20,
+    "taxiTurnSpeedKt": 10,
+    "accelKtPerSec": 2.9,
+    "decelKtPerSec": 5.5,
+    "rotateSpeedKt": 160,
+    "climbSpeedKt": 190,
+    "cruiseSpeedKt": 250,
+    "approachSpeedKt": 150,
+    "touchdownSpeedKt": 145,
+    "climbRateFpm": 2700,
+    "descentRateFpm": 2000,
+    "turnRateDegPerSec": 2.5,
+    "groundTurnRateDegPerSec": 10,
+    "minSpeedKt": 135,
+    "maxSpeedKt": 330,
+    "serviceCeilingFt": 43000,
+    "takeoffDistanceFt": 9190,
+    "landingDistanceFt": 4990,
+    "lengthM": 62.8,
+    "_sources": {
+      "_summary": {
+        "value": "Boeing 787-9",
+        "source": "EUROCONTROL_ACD (page B789); FAA_JO_7110_126A; CFR91.117",
+        "status": "SOURCED (ACD, retrieved 2026-10-21) with the derivations noted per field; gameplay values marked DESIGN"
+      },
+      "ACD row read": {
+        "value": "ACD B789 'Show performance table': V2 165 kt, take-off distance 2800 m, WTC H, RECAT-EU Upper Heavy, MTOW 254011 kg; initial climb IAS 190 kt ROC 2700 ft/min; climb to FL150 IAS 290 kt ROC 2000; cruise TAS 490 kt, ceiling FL430; descent to FL100 IAS 300 kt ROD 2500; approach IAS 240 kt ROD 1500; landing Vat 150 kt, distance 1520 m, APC C; technical: wing span 60.12 m, length 62.8 m, height 16.9 m; type L2J",
+        "source": "https://learningzone.eurocontrol.int/ilp/customs/ATCPFDB/details.aspx?ICAO=B789 (retrieved 2026-10-21, HTTP 200; raw/realism/eurocontrol_acd_B789.html)",
+        "status": "verified transcription"
+      },
+      "category/wakeCategory": {
+        "value": "heavy / heavy",
+        "source": "ACD WTC H (ICAO wake turbulence category L/M/H/J) and MTOW 254011 kg; FAA category: large = MTOW above 12,500 lb (5,670 kg)",
+        "status": "verified"
+      },
+      "RECAT (src/sim/performance.ts RECAT)": {
+        "value": "B",
+        "source": "JO 7110.126A TBL A-1 (page A1, read visually 2026-10-21)",
+        "status": "VERIFIED"
+      },
+      "takeoff/landing distance": {
+        "value": "9190 ft / 4990 ft",
+        "source": "ACD take-off distance 2800 m (at MTOW 254011 kg, ISA, sea level) and landing distance 1520 m, converted at 3.28084 ft/m and rounded to 10 ft",
+        "status": "verified (ACD figures are MTOW / indicative: the engine refuses a departure from a runway shorter than takeoffDistanceFt, so these are the heaviest-case need; KMHT types use typical-weight ESTIMATEs, see _meta)"
+      },
+      "rotate/climb/approach speeds": {
+        "value": "rotate 160, climb 190, approach 150, touchdown 145",
+        "source": "rotate = ACD V2 165 - 5 kt (A320 precedent: VR a few kt below V2); climb speed = ACD initial climb IAS 190 kt; approach = ACD Vat 150 kt; touchdown = Vat - 5 kt (A320 precedent)",
+        "status": "derived from ACD"
+      },
+      "climbRateFpm / descentRateFpm": {
+        "value": "2700 / 2000",
+        "source": "climb = ACD initial climb ROC 2700 ft/min; descent: DESIGN 2,000 ft/min as for A320/B738 (ACD descent to FL100 ROD 2500, approach ROD 1500 ft/min)",
+        "status": "climb verified; descent DESIGN where 2,000"
+      },
+      "cruiseSpeedKt / maxSpeedKt": {
+        "value": "250 / 330",
+        "source": "cruise: 14 CFR 91.117(a) 250 kt limit below 10,000 ft (as A320/B738); max: ACD max(climb IAS 290, descent IAS 300) + 30 kt rounded to 10 (A320 precedent: 290 -> 320), a sim cap not a VMO",
+        "status": "DESIGN / derived"
+      },
+      "accel/decel": {
+        "value": "2.9 / 5.5 kt/s",
+        "source": "accel: a = VR^2 / (2 x 0.8 x takeoffDistanceFt) with VR 160 kt (ground roll taken as 80 % of the 35 ft take-off distance; the A320 and B738 entries give 0.83 / 0.80); decel: DESIGN, as the class precedent (A320 6.0, B752 5.5)",
+        "status": "ESTIMATE (derived) / DESIGN"
+      },
+      "taxi/turn rates, min speed": {
+        "value": "taxi 20 kt, taxi turn 10 kt, turn 2.5 deg/s, ground turn 10 deg/s, min 135 kt",
+        "source": "none authoritative; gameplay simplifications as C172/A320/B752; min speed = Vat - 15 kt as A320 (120 vs 135) and B738 (125 vs 140)",
+        "status": "DESIGN value (UNVERIFIED simplification)"
+      },
+      "serviceCeilingFt / lengthM": {
+        "value": "43000 / 62.8",
+        "source": "ACD ceiling FL430; ACD length 62.8 m",
+        "status": "verified"
+      },
+      "_not_in_type_shape": {
+        "wingspan_m": 60.12,
+        "height_m": 16.9,
+        "mtow_kg": 254011,
+        "wingspan_source": "ACD technical data (wing span 60.12 m, height 16.9 m)",
+        "wake_srs_category": "FAA JO 7110.65 3-9-6 NOTE (derived: Category I small single-engine propeller <= 12,500 lb; II small twin-engine propeller <= 12,500 lb; III all other)",
+        "engine": "L2J; 2x 320kN GEnx-1B or 2x 320kN RR Trent 1000 TEN turbofans (newer productions with",
+        "radio_wake_word": "heavy"
+      }
+    }
+  },
+  "A332": {
+    "type": "A332",
+    "category": "heavy",
+    "wakeCategory": "heavy",
+    "taxiSpeedKt": 20,
+    "taxiTurnSpeedKt": 10,
+    "accelKtPerSec": 2.7,
+    "decelKtPerSec": 5.5,
+    "rotateSpeedKt": 140,
+    "climbSpeedKt": 175,
+    "cruiseSpeedKt": 250,
+    "approachSpeedKt": 140,
+    "touchdownSpeedKt": 135,
+    "climbRateFpm": 2000,
+    "descentRateFpm": 2000,
+    "turnRateDegPerSec": 2.5,
+    "groundTurnRateDegPerSec": 10,
+    "minSpeedKt": 125,
+    "maxSpeedKt": 320,
+    "serviceCeilingFt": 41000,
+    "takeoffDistanceFt": 7550,
+    "landingDistanceFt": 5910,
+    "lengthM": 58.8,
+    "_sources": {
+      "_summary": {
+        "value": "Airbus A330-200",
+        "source": "EUROCONTROL_ACD (page A332); FAA_JO_7110_126A; CFR91.117",
+        "status": "SOURCED (ACD, retrieved 2026-10-21) with the derivations noted per field; gameplay values marked DESIGN"
+      },
+      "ACD row read": {
+        "value": "ACD A332 'Show performance table': V2 145 kt, take-off distance 2300 m, WTC H, RECAT-EU Upper Heavy, MTOW 230000 kg; initial climb IAS 175 kt ROC 2000 ft/min; climb to FL150 IAS 290 kt ROC 2500; cruise TAS 470 kt, ceiling FL410; descent to FL100 IAS 290 kt ROD 3000; approach IAS 230 kt ROD 1600; landing Vat 140 kt, distance 1800 m, APC C; technical: wing span 60.3 m, length 58.8 m, height 17.4 m; type L2J",
+        "source": "https://learningzone.eurocontrol.int/ilp/customs/ATCPFDB/details.aspx?ICAO=A332 (retrieved 2026-10-21, HTTP 200; raw/realism/eurocontrol_acd_A332.html)",
+        "status": "verified transcription"
+      },
+      "category/wakeCategory": {
+        "value": "heavy / heavy",
+        "source": "ACD WTC H (ICAO wake turbulence category L/M/H/J) and MTOW 230000 kg; FAA category: large = MTOW above 12,500 lb (5,670 kg)",
+        "status": "verified"
+      },
+      "RECAT (src/sim/performance.ts RECAT)": {
+        "value": "B",
+        "source": "JO 7110.126A TBL A-1 (page A1, read visually 2026-10-21)",
+        "status": "VERIFIED"
+      },
+      "takeoff/landing distance": {
+        "value": "7550 ft / 5910 ft",
+        "source": "ACD take-off distance 2300 m (at MTOW 230000 kg, ISA, sea level) and landing distance 1800 m, converted at 3.28084 ft/m and rounded to 10 ft",
+        "status": "verified (ACD figures are MTOW / indicative: the engine refuses a departure from a runway shorter than takeoffDistanceFt, so these are the heaviest-case need; KMHT types use typical-weight ESTIMATEs, see _meta)"
+      },
+      "rotate/climb/approach speeds": {
+        "value": "rotate 140, climb 175, approach 140, touchdown 135",
+        "source": "rotate = ACD V2 145 - 5 kt (A320 precedent: VR a few kt below V2); climb speed = ACD initial climb IAS 175 kt; approach = ACD Vat 140 kt; touchdown = Vat - 5 kt (A320 precedent)",
+        "status": "derived from ACD"
+      },
+      "climbRateFpm / descentRateFpm": {
+        "value": "2000 / 2000",
+        "source": "climb = ACD initial climb ROC 2000 ft/min; descent: DESIGN 2,000 ft/min as for A320/B738 (ACD descent to FL100 ROD 3000, approach ROD 1600 ft/min)",
+        "status": "climb verified; descent DESIGN where 2,000"
+      },
+      "cruiseSpeedKt / maxSpeedKt": {
+        "value": "250 / 320",
+        "source": "cruise: 14 CFR 91.117(a) 250 kt limit below 10,000 ft (as A320/B738); max: ACD max(climb IAS 290, descent IAS 290) + 30 kt rounded to 10 (A320 precedent: 290 -> 320), a sim cap not a VMO",
+        "status": "DESIGN / derived"
+      },
+      "accel/decel": {
+        "value": "2.7 / 5.5 kt/s",
+        "source": "accel: a = VR^2 / (2 x 0.8 x takeoffDistanceFt) with VR 140 kt (ground roll taken as 80 % of the 35 ft take-off distance; the A320 and B738 entries give 0.83 / 0.80); decel: DESIGN, as the class precedent (A320 6.0, B752 5.5)",
+        "status": "ESTIMATE (derived) / DESIGN"
+      },
+      "taxi/turn rates, min speed": {
+        "value": "taxi 20 kt, taxi turn 10 kt, turn 2.5 deg/s, ground turn 10 deg/s, min 125 kt",
+        "source": "none authoritative; gameplay simplifications as C172/A320/B752; min speed = Vat - 15 kt as A320 (120 vs 135) and B738 (125 vs 140)",
+        "status": "DESIGN value (UNVERIFIED simplification)"
+      },
+      "serviceCeilingFt / lengthM": {
+        "value": "41000 / 58.8",
+        "source": "ACD ceiling FL410; ACD length 58.8 m",
+        "status": "verified"
+      },
+      "_not_in_type_shape": {
+        "wingspan_m": 60.3,
+        "height_m": 17.4,
+        "mtow_kg": 230000,
+        "wingspan_source": "ACD technical data (wing span 60.3 m, height 17.4 m)",
+        "wake_srs_category": "FAA JO 7110.65 3-9-6 NOTE (derived: Category I small single-engine propeller <= 12,500 lb; II small twin-engine propeller <= 12,500 lb; III all other)",
+        "engine": "L2J; 2 x 306kN  GE CF6-80E1 or 2 x 300kN R-R Trent 772 or 2 x 308kN PW 4173 turbofans",
+        "radio_wake_word": "heavy"
+      }
+    }
+  },
+  "A333": {
+    "type": "A333",
+    "category": "heavy",
+    "wakeCategory": "heavy",
+    "taxiSpeedKt": 20,
+    "taxiTurnSpeedKt": 10,
+    "accelKtPerSec": 2.7,
+    "decelKtPerSec": 5.5,
+    "rotateSpeedKt": 140,
+    "climbSpeedKt": 175,
+    "cruiseSpeedKt": 250,
+    "approachSpeedKt": 140,
+    "touchdownSpeedKt": 135,
+    "climbRateFpm": 2000,
+    "descentRateFpm": 2000,
+    "turnRateDegPerSec": 2.5,
+    "groundTurnRateDegPerSec": 10,
+    "minSpeedKt": 125,
+    "maxSpeedKt": 320,
+    "serviceCeilingFt": 41000,
+    "takeoffDistanceFt": 7550,
+    "landingDistanceFt": 5580,
+    "lengthM": 63.6,
+    "_sources": {
+      "_summary": {
+        "value": "Airbus A330-300",
+        "source": "EUROCONTROL_ACD (page A333); FAA_JO_7110_126A; CFR91.117",
+        "status": "SOURCED (ACD, retrieved 2026-10-21) with the derivations noted per field; gameplay values marked DESIGN"
+      },
+      "ACD row read": {
+        "value": "ACD A333 'Show performance table': V2 145 kt, take-off distance 2300 m, WTC H, RECAT-EU Upper Heavy, MTOW 230000 kg; initial climb IAS 175 kt ROC 2000 ft/min; climb to FL150 IAS 290 kt ROC 2000; cruise TAS 475 kt, ceiling FL410; descent to FL100 IAS 290 kt ROD 3000; approach IAS 220 kt ROD 1500; landing Vat 140 kt, distance 1700 m, APC C; technical: wing span 60.3 m, length 63.6 m, height 16.85 m; type L2J",
+        "source": "https://learningzone.eurocontrol.int/ilp/customs/ATCPFDB/details.aspx?ICAO=A333 (retrieved 2026-10-21, HTTP 200; raw/realism/eurocontrol_acd_A333.html)",
+        "status": "verified transcription"
+      },
+      "category/wakeCategory": {
+        "value": "heavy / heavy",
+        "source": "ACD WTC H (ICAO wake turbulence category L/M/H/J) and MTOW 230000 kg; FAA category: large = MTOW above 12,500 lb (5,670 kg)",
+        "status": "verified"
+      },
+      "RECAT (src/sim/performance.ts RECAT)": {
+        "value": "B",
+        "source": "JO 7110.126A TBL A-1 (page A1, read visually 2026-10-21)",
+        "status": "VERIFIED"
+      },
+      "takeoff/landing distance": {
+        "value": "7550 ft / 5580 ft",
+        "source": "ACD take-off distance 2300 m (at MTOW 230000 kg, ISA, sea level) and landing distance 1700 m, converted at 3.28084 ft/m and rounded to 10 ft",
+        "status": "verified (ACD figures are MTOW / indicative: the engine refuses a departure from a runway shorter than takeoffDistanceFt, so these are the heaviest-case need; KMHT types use typical-weight ESTIMATEs, see _meta)"
+      },
+      "rotate/climb/approach speeds": {
+        "value": "rotate 140, climb 175, approach 140, touchdown 135",
+        "source": "rotate = ACD V2 145 - 5 kt (A320 precedent: VR a few kt below V2); climb speed = ACD initial climb IAS 175 kt; approach = ACD Vat 140 kt; touchdown = Vat - 5 kt (A320 precedent)",
+        "status": "derived from ACD"
+      },
+      "climbRateFpm / descentRateFpm": {
+        "value": "2000 / 2000",
+        "source": "climb = ACD initial climb ROC 2000 ft/min; descent: DESIGN 2,000 ft/min as for A320/B738 (ACD descent to FL100 ROD 3000, approach ROD 1500 ft/min)",
+        "status": "climb verified; descent DESIGN where 2,000"
+      },
+      "cruiseSpeedKt / maxSpeedKt": {
+        "value": "250 / 320",
+        "source": "cruise: 14 CFR 91.117(a) 250 kt limit below 10,000 ft (as A320/B738); max: ACD max(climb IAS 290, descent IAS 290) + 30 kt rounded to 10 (A320 precedent: 290 -> 320), a sim cap not a VMO",
+        "status": "DESIGN / derived"
+      },
+      "accel/decel": {
+        "value": "2.7 / 5.5 kt/s",
+        "source": "accel: a = VR^2 / (2 x 0.8 x takeoffDistanceFt) with VR 140 kt (ground roll taken as 80 % of the 35 ft take-off distance; the A320 and B738 entries give 0.83 / 0.80); decel: DESIGN, as the class precedent (A320 6.0, B752 5.5)",
+        "status": "ESTIMATE (derived) / DESIGN"
+      },
+      "taxi/turn rates, min speed": {
+        "value": "taxi 20 kt, taxi turn 10 kt, turn 2.5 deg/s, ground turn 10 deg/s, min 125 kt",
+        "source": "none authoritative; gameplay simplifications as C172/A320/B752; min speed = Vat - 15 kt as A320 (120 vs 135) and B738 (125 vs 140)",
+        "status": "DESIGN value (UNVERIFIED simplification)"
+      },
+      "serviceCeilingFt / lengthM": {
+        "value": "41000 / 63.6",
+        "source": "ACD ceiling FL410; ACD length 63.6 m",
+        "status": "verified"
+      },
+      "_not_in_type_shape": {
+        "wingspan_m": 60.3,
+        "height_m": 16.85,
+        "mtow_kg": 230000,
+        "wingspan_source": "ACD technical data (wing span 60.3 m, height 16.85 m)",
+        "wake_srs_category": "FAA JO 7110.65 3-9-6 NOTE (derived: Category I small single-engine propeller <= 12,500 lb; II small twin-engine propeller <= 12,500 lb; III all other)",
+        "engine": "L2J; 2 x 306kN  GE CF6-80E1 or 2 x 300kN R-R Trent 772 or 2 x 308kN PW 4000 turbofans",
+        "radio_wake_word": "heavy"
+      }
+    }
+  },
+  "A339": {
+    "type": "A339",
+    "category": "heavy",
+    "wakeCategory": "heavy",
+    "taxiSpeedKt": 20,
+    "taxiTurnSpeedKt": 10,
+    "accelKtPerSec": 2.7,
+    "decelKtPerSec": 5.5,
+    "rotateSpeedKt": 140,
+    "climbSpeedKt": 175,
+    "cruiseSpeedKt": 250,
+    "approachSpeedKt": 140,
+    "touchdownSpeedKt": 135,
+    "climbRateFpm": 2000,
+    "descentRateFpm": 2000,
+    "turnRateDegPerSec": 2.5,
+    "groundTurnRateDegPerSec": 10,
+    "minSpeedKt": 125,
+    "maxSpeedKt": 320,
+    "serviceCeilingFt": 41000,
+    "takeoffDistanceFt": 7710,
+    "landingDistanceFt": 6070,
+    "lengthM": 63.7,
+    "_sources": {
+      "_summary": {
+        "value": "Airbus A330-900",
+        "source": "EUROCONTROL_ACD (page A339); FAA_JO_7110_126A; CFR91.117",
+        "status": "SOURCED (ACD, retrieved 2026-10-21) with the derivations noted per field; gameplay values marked DESIGN"
+      },
+      "ACD row read": {
+        "value": "ACD A339 'Show performance table': V2 145 kt, take-off distance 2350 m, WTC H, RECAT-EU Upper Heavy, MTOW 251000 kg; initial climb IAS 175 kt ROC 2000 ft/min; climb to FL150 IAS 290 kt ROC 1500; cruise TAS 475 kt, ceiling FL410; descent to FL100 IAS 290 kt ROD 3000; approach IAS 220 kt ROD 1500; landing Vat 140 kt, distance 1850 m, APC D; technical: wing span 64 m, length 63.66 m, height 16.79 m; type L2J",
+        "source": "https://learningzone.eurocontrol.int/ilp/customs/ATCPFDB/details.aspx?ICAO=A339 (retrieved 2026-10-21, HTTP 200; raw/realism/eurocontrol_acd_A339.html)",
+        "status": "verified transcription"
+      },
+      "category/wakeCategory": {
+        "value": "heavy / heavy",
+        "source": "ACD WTC H (ICAO wake turbulence category L/M/H/J) and MTOW 251000 kg; FAA category: large = MTOW above 12,500 lb (5,670 kg)",
+        "status": "verified"
+      },
+      "RECAT (src/sim/performance.ts RECAT)": {
+        "value": "D",
+        "source": "JO 7110.126A TBL A-1 (page A1, read visually 2026-10-21)",
+        "status": "VERIFIED"
+      },
+      "takeoff/landing distance": {
+        "value": "7710 ft / 6070 ft",
+        "source": "ACD take-off distance 2350 m (at MTOW 251000 kg, ISA, sea level) and landing distance 1850 m, converted at 3.28084 ft/m and rounded to 10 ft",
+        "status": "verified (ACD figures are MTOW / indicative: the engine refuses a departure from a runway shorter than takeoffDistanceFt, so these are the heaviest-case need; KMHT types use typical-weight ESTIMATEs, see _meta)"
+      },
+      "rotate/climb/approach speeds": {
+        "value": "rotate 140, climb 175, approach 140, touchdown 135",
+        "source": "rotate = ACD V2 145 - 5 kt (A320 precedent: VR a few kt below V2); climb speed = ACD initial climb IAS 175 kt; approach = ACD Vat 140 kt; touchdown = Vat - 5 kt (A320 precedent)",
+        "status": "derived from ACD"
+      },
+      "climbRateFpm / descentRateFpm": {
+        "value": "2000 / 2000",
+        "source": "climb = ACD initial climb ROC 2000 ft/min; descent: DESIGN 2,000 ft/min as for A320/B738 (ACD descent to FL100 ROD 3000, approach ROD 1500 ft/min)",
+        "status": "climb verified; descent DESIGN where 2,000"
+      },
+      "cruiseSpeedKt / maxSpeedKt": {
+        "value": "250 / 320",
+        "source": "cruise: 14 CFR 91.117(a) 250 kt limit below 10,000 ft (as A320/B738); max: ACD max(climb IAS 290, descent IAS 290) + 30 kt rounded to 10 (A320 precedent: 290 -> 320), a sim cap not a VMO",
+        "status": "DESIGN / derived"
+      },
+      "accel/decel": {
+        "value": "2.7 / 5.5 kt/s",
+        "source": "accel: a = VR^2 / (2 x 0.8 x takeoffDistanceFt) with VR 140 kt (ground roll taken as 80 % of the 35 ft take-off distance; the A320 and B738 entries give 0.83 / 0.80); decel: DESIGN, as the class precedent (A320 6.0, B752 5.5)",
+        "status": "ESTIMATE (derived) / DESIGN"
+      },
+      "taxi/turn rates, min speed": {
+        "value": "taxi 20 kt, taxi turn 10 kt, turn 2.5 deg/s, ground turn 10 deg/s, min 125 kt",
+        "source": "none authoritative; gameplay simplifications as C172/A320/B752; min speed = Vat - 15 kt as A320 (120 vs 135) and B738 (125 vs 140)",
+        "status": "DESIGN value (UNVERIFIED simplification)"
+      },
+      "serviceCeilingFt / lengthM": {
+        "value": "41000 / 63.7",
+        "source": "ACD ceiling FL410; ACD length 63.66 m",
+        "status": "verified"
+      },
+      "_not_in_type_shape": {
+        "wingspan_m": 64.0,
+        "height_m": 16.79,
+        "mtow_kg": 251000,
+        "wingspan_source": "ACD technical data (wing span 64 m, height 16.79 m)",
+        "wake_srs_category": "FAA JO 7110.65 3-9-6 NOTE (derived: Category I small single-engine propeller <= 12,500 lb; II small twin-engine propeller <= 12,500 lb; III all other)",
+        "engine": "L2J; 2 x 324kN Rolls-Royce Trent 7000",
+        "radio_wake_word": "heavy"
+      }
+    }
+  },
+  "A359": {
+    "type": "A359",
+    "category": "heavy",
+    "wakeCategory": "heavy",
+    "taxiSpeedKt": 20,
+    "taxiTurnSpeedKt": 10,
+    "accelKtPerSec": 2.6,
+    "decelKtPerSec": 5.5,
+    "rotateSpeedKt": 145,
+    "climbSpeedKt": 220,
+    "cruiseSpeedKt": 250,
+    "approachSpeedKt": 140,
+    "touchdownSpeedKt": 135,
+    "climbRateFpm": 3000,
+    "descentRateFpm": 2000,
+    "turnRateDegPerSec": 2.5,
+    "groundTurnRateDegPerSec": 10,
+    "minSpeedKt": 125,
+    "maxSpeedKt": 330,
+    "serviceCeilingFt": 43000,
+    "takeoffDistanceFt": 8370,
+    "landingDistanceFt": 6400,
+    "lengthM": 66.9,
+    "_sources": {
+      "_summary": {
+        "value": "Airbus A350-900",
+        "source": "EUROCONTROL_ACD (page A359); FAA_JO_7110_126A; CFR91.117",
+        "status": "SOURCED (ACD, retrieved 2026-10-21) with the derivations noted per field; gameplay values marked DESIGN"
+      },
+      "ACD row read": {
+        "value": "ACD A359 'Show performance table': V2 150 kt, take-off distance 888 m, WTC H, RECAT-EU Upper Heavy, MTOW 268000 kg; initial climb IAS 220 kt ROC 3000 ft/min; climb to FL150 IAS 300 kt ROC 2300; cruise TAS 490 kt, ceiling FL430; descent to FL100 IAS 250 kt ROD 3000; approach IAS 240 kt ROD 1500; landing Vat 140 kt, distance 888 m, APC C; technical: wing span 64.8 m, length 66.9 m, height 17.05 m; type L2J",
+        "source": "https://learningzone.eurocontrol.int/ilp/customs/ATCPFDB/details.aspx?ICAO=A359 (retrieved 2026-10-21, HTTP 200; raw/realism/eurocontrol_acd_A359.html)",
+        "status": "verified transcription"
+      },
+      "category/wakeCategory": {
+        "value": "heavy / heavy",
+        "source": "ACD WTC H (ICAO wake turbulence category L/M/H/J) and MTOW 268000 kg; FAA category: large = MTOW above 12,500 lb (5,670 kg)",
+        "status": "verified"
+      },
+      "RECAT (src/sim/performance.ts RECAT)": {
+        "value": "B",
+        "source": "JO 7110.126A TBL A-1 (page A1, read visually 2026-10-21)",
+        "status": "VERIFIED"
+      },
+      "takeoff/landing distance": {
+        "value": "8370 ft / 6400 ft",
+        "source": "ACD lists 888 m for both take-off and landing (identical, implausible: data error). Replaced by the Airbus A350 AC (Jul 01/26) charts 3-3-0 fig -991-001-A01 (A350-900, ISA, 0 ft: about 2,550 m at 268 t) and 3-4-0 (landing field length about 1,950 m at the maximum landing weight); both chart-read, about +/-150 m.",
+        "status": "chart-read from the Airbus AC (+/-150 m)"
+      },
+      "rotate/climb/approach speeds": {
+        "value": "rotate 145, climb 220, approach 140, touchdown 135",
+        "source": "rotate = ACD V2 150 - 5 kt (A320 precedent: VR a few kt below V2); climb speed = ACD initial climb IAS 220 kt; approach = ACD Vat 140 kt; touchdown = Vat - 5 kt (A320 precedent)",
+        "status": "derived from ACD"
+      },
+      "climbRateFpm / descentRateFpm": {
+        "value": "3000 / 2000",
+        "source": "climb = ACD initial climb ROC 3000 ft/min; descent: DESIGN 2,000 ft/min as for A320/B738 (ACD descent to FL100 ROD 3000, approach ROD 1500 ft/min)",
+        "status": "climb verified; descent DESIGN where 2,000"
+      },
+      "cruiseSpeedKt / maxSpeedKt": {
+        "value": "250 / 330",
+        "source": "cruise: 14 CFR 91.117(a) 250 kt limit below 10,000 ft (as A320/B738); max: ACD max(climb IAS 300, descent IAS 250) + 30 kt rounded to 10 (A320 precedent: 290 -> 320), a sim cap not a VMO",
+        "status": "DESIGN / derived"
+      },
+      "accel/decel": {
+        "value": "2.6 / 5.5 kt/s",
+        "source": "accel: a = VR^2 / (2 x 0.8 x takeoffDistanceFt) with VR 145 kt (ground roll taken as 80 % of the 35 ft take-off distance; the A320 and B738 entries give 0.83 / 0.80); decel: DESIGN, as the class precedent (A320 6.0, B752 5.5)",
+        "status": "ESTIMATE (derived) / DESIGN"
+      },
+      "taxi/turn rates, min speed": {
+        "value": "taxi 20 kt, taxi turn 10 kt, turn 2.5 deg/s, ground turn 10 deg/s, min 125 kt",
+        "source": "none authoritative; gameplay simplifications as C172/A320/B752; min speed = Vat - 15 kt as A320 (120 vs 135) and B738 (125 vs 140)",
+        "status": "DESIGN value (UNVERIFIED simplification)"
+      },
+      "serviceCeilingFt / lengthM": {
+        "value": "43000 / 66.9",
+        "source": "ACD ceiling FL430; ACD length 66.9 m",
+        "status": "verified"
+      },
+      "_not_in_type_shape": {
+        "wingspan_m": 64.8,
+        "height_m": 17.05,
+        "mtow_kg": 268000,
+        "wingspan_source": "ACD technical data (wing span 64.8 m, height 17.05 m)",
+        "wake_srs_category": "FAA JO 7110.65 3-9-6 NOTE (derived: Category I small single-engine propeller <= 12,500 lb; II small twin-engine propeller <= 12,500 lb; III all other)",
+        "engine": "L2J; 2x RR Trent XWB delivering 374kN each.",
+        "radio_wake_word": "heavy"
+      }
+    }
+  },
+  "A35K": {
+    "type": "A35K",
+    "category": "heavy",
+    "wakeCategory": "heavy",
+    "taxiSpeedKt": 20,
+    "taxiTurnSpeedKt": 10,
+    "accelKtPerSec": 2.8,
+    "decelKtPerSec": 5.5,
+    "rotateSpeedKt": 150,
+    "climbSpeedKt": 220,
+    "cruiseSpeedKt": 250,
+    "approachSpeedKt": 150,
+    "touchdownSpeedKt": 145,
+    "climbRateFpm": 2500,
+    "descentRateFpm": 2000,
+    "turnRateDegPerSec": 2.5,
+    "groundTurnRateDegPerSec": 10,
+    "minSpeedKt": 135,
+    "maxSpeedKt": 330,
+    "serviceCeilingFt": 41000,
+    "takeoffDistanceFt": 8530,
+    "landingDistanceFt": 6560,
+    "lengthM": 73.8,
+    "_sources": {
+      "_summary": {
+        "value": "Airbus A350-1000",
+        "source": "EUROCONTROL_ACD (page A35K); FAA_JO_7110_126A; CFR91.117",
+        "status": "SOURCED (ACD, retrieved 2026-10-21) with the derivations noted per field; gameplay values marked DESIGN"
+      },
+      "ACD row read": {
+        "value": "ACD A35K 'Show performance table': V2 155 kt, take-off distance 2600 m, WTC H, RECAT-EU Upper Heavy, MTOW 319000 kg; initial climb IAS 220 kt ROC 2500 ft/min; climb to FL150 IAS 300 kt ROC 2000; cruise TAS 490 kt, ceiling FL410; descent to FL100 IAS 270 kt ROD 2500; approach IAS 240 kt ROD 1500; landing Vat 150 kt, distance 2000 m, APC D; technical: wing span 64.75 m, length 73.79 m, height 17.08 m; type L2J",
+        "source": "https://learningzone.eurocontrol.int/ilp/customs/ATCPFDB/details.aspx?ICAO=A35K (retrieved 2026-10-21, HTTP 200; raw/realism/eurocontrol_acd_A35K.html)",
+        "status": "verified transcription"
+      },
+      "category/wakeCategory": {
+        "value": "heavy / heavy",
+        "source": "ACD WTC H (ICAO wake turbulence category L/M/H/J) and MTOW 319000 kg; FAA category: large = MTOW above 12,500 lb (5,670 kg)",
+        "status": "verified"
+      },
+      "RECAT (src/sim/performance.ts RECAT)": {
+        "value": "B",
+        "source": "DERIVED: not listed; the A350-900 (A359) is listed under B and the A350-1000 is the heavier stretch",
+        "status": "UNVERIFIED (type absent from TBL A-1)"
+      },
+      "takeoff/landing distance": {
+        "value": "8530 ft / 6560 ft",
+        "source": "ACD take-off distance 2600 m (at MTOW 319000 kg, ISA, sea level) and landing distance 2000 m, converted at 3.28084 ft/m and rounded to 10 ft",
+        "status": "verified (ACD figures are MTOW / indicative: the engine refuses a departure from a runway shorter than takeoffDistanceFt, so these are the heaviest-case need; KMHT types use typical-weight ESTIMATEs, see _meta)"
+      },
+      "rotate/climb/approach speeds": {
+        "value": "rotate 150, climb 220, approach 150, touchdown 145",
+        "source": "rotate = ACD V2 155 - 5 kt (A320 precedent: VR a few kt below V2); climb speed = ACD initial climb IAS 220 kt; approach = ACD Vat 150 kt; touchdown = Vat - 5 kt (A320 precedent)",
+        "status": "derived from ACD"
+      },
+      "climbRateFpm / descentRateFpm": {
+        "value": "2500 / 2000",
+        "source": "climb = ACD initial climb ROC 2500 ft/min; descent: DESIGN 2,000 ft/min as for A320/B738 (ACD descent to FL100 ROD 2500, approach ROD 1500 ft/min)",
+        "status": "climb verified; descent DESIGN where 2,000"
+      },
+      "cruiseSpeedKt / maxSpeedKt": {
+        "value": "250 / 330",
+        "source": "cruise: 14 CFR 91.117(a) 250 kt limit below 10,000 ft (as A320/B738); max: ACD max(climb IAS 300, descent IAS 270) + 30 kt rounded to 10 (A320 precedent: 290 -> 320), a sim cap not a VMO",
+        "status": "DESIGN / derived"
+      },
+      "accel/decel": {
+        "value": "2.8 / 5.5 kt/s",
+        "source": "accel: a = VR^2 / (2 x 0.8 x takeoffDistanceFt) with VR 150 kt (ground roll taken as 80 % of the 35 ft take-off distance; the A320 and B738 entries give 0.83 / 0.80); decel: DESIGN, as the class precedent (A320 6.0, B752 5.5)",
+        "status": "ESTIMATE (derived) / DESIGN"
+      },
+      "taxi/turn rates, min speed": {
+        "value": "taxi 20 kt, taxi turn 10 kt, turn 2.5 deg/s, ground turn 10 deg/s, min 135 kt",
+        "source": "none authoritative; gameplay simplifications as C172/A320/B752; min speed = Vat - 15 kt as A320 (120 vs 135) and B738 (125 vs 140)",
+        "status": "DESIGN value (UNVERIFIED simplification)"
+      },
+      "serviceCeilingFt / lengthM": {
+        "value": "41000 / 73.8",
+        "source": "ACD ceiling FL410; ACD length 73.79 m",
+        "status": "verified"
+      },
+      "_not_in_type_shape": {
+        "wingspan_m": 64.75,
+        "height_m": 17.08,
+        "mtow_kg": 319000,
+        "wingspan_source": "ACD technical data (wing span 64.75 m, height 17.08 m)",
+        "wake_srs_category": "FAA JO 7110.65 3-9-6 NOTE (derived: Category I small single-engine propeller <= 12,500 lb; II small twin-engine propeller <= 12,500 lb; III all other)",
+        "engine": "L2J; 2 x RR Trent XWB (430kN each)",
+        "radio_wake_word": "heavy"
+      }
+    }
+  },
+  "A388": {
+    "type": "A388",
+    "category": "heavy",
+    "wakeCategory": "super",
+    "taxiSpeedKt": 20,
+    "taxiTurnSpeedKt": 10,
+    "accelKtPerSec": 2.3,
+    "decelKtPerSec": 5.5,
+    "rotateSpeedKt": 145,
+    "climbSpeedKt": 190,
+    "cruiseSpeedKt": 250,
+    "approachSpeedKt": 140,
+    "touchdownSpeedKt": 135,
+    "climbRateFpm": 1500,
+    "descentRateFpm": 2000,
+    "turnRateDegPerSec": 2.5,
+    "groundTurnRateDegPerSec": 8,
+    "minSpeedKt": 125,
+    "maxSpeedKt": 350,
+    "serviceCeilingFt": 43000,
+    "takeoffDistanceFt": 9740,
+    "landingDistanceFt": 6590,
+    "lengthM": 73.0,
+    "_sources": {
+      "_summary": {
+        "value": "Airbus A380-800",
+        "source": "EUROCONTROL_ACD (page A388); FAA_JO_7110_126A; CFR91.117",
+        "status": "SOURCED (ACD, retrieved 2026-10-21) with the derivations noted per field; gameplay values marked DESIGN"
+      },
+      "ACD row read": {
+        "value": "ACD A388 'Show performance table': V2 150 kt, take-off distance 2970 m, WTC J, RECAT-EU Super Heavy, MTOW 560000 kg; initial climb IAS 190 kt ROC 1500 ft/min; climb to FL150 IAS 320 kt ROC 2500; cruise TAS 520 kt, ceiling FL430; descent to FL100 IAS 300 kt ROD 2000; approach IAS 250 kt ROD 1000; landing Vat 140 kt, distance 2010 m, APC C; technical: wing span 79.8 m, length 73 m, height 24.1 m; type L4J",
+        "source": "https://learningzone.eurocontrol.int/ilp/customs/ATCPFDB/details.aspx?ICAO=A388 (retrieved 2026-10-21, HTTP 200; raw/realism/eurocontrol_acd_A388.html)",
+        "status": "verified transcription"
+      },
+      "category/wakeCategory": {
+        "value": "heavy / super",
+        "source": "ACD WTC J (ICAO wake turbulence category L/M/H/J) and MTOW 560000 kg; FAA category: large = MTOW above 12,500 lb (5,670 kg)",
+        "status": "verified"
+      },
+      "RECAT (src/sim/performance.ts RECAT)": {
+        "value": "A",
+        "source": "JO 7110.126A TBL A-1 (page A1, read visually 2026-10-21)",
+        "status": "VERIFIED"
+      },
+      "takeoff/landing distance": {
+        "value": "9740 ft / 6590 ft",
+        "source": "ACD take-off distance 2970 m (at MTOW 560000 kg, ISA, sea level) and landing distance 2010 m, converted at 3.28084 ft/m and rounded to 10 ft",
+        "status": "verified (ACD figures are MTOW / indicative: the engine refuses a departure from a runway shorter than takeoffDistanceFt, so these are the heaviest-case need; KMHT types use typical-weight ESTIMATEs, see _meta)"
+      },
+      "rotate/climb/approach speeds": {
+        "value": "rotate 145, climb 190, approach 140, touchdown 135",
+        "source": "rotate = ACD V2 150 - 5 kt (A320 precedent: VR a few kt below V2); climb speed = ACD initial climb IAS 190 kt; approach = ACD Vat 140 kt; touchdown = Vat - 5 kt (A320 precedent)",
+        "status": "derived from ACD"
+      },
+      "climbRateFpm / descentRateFpm": {
+        "value": "1500 / 2000",
+        "source": "climb = ACD initial climb ROC 1500 ft/min; descent: ACD descent to FL100 ROD 2000 ft/min",
+        "status": "climb verified; descent DESIGN where 2,000"
+      },
+      "cruiseSpeedKt / maxSpeedKt": {
+        "value": "250 / 350",
+        "source": "cruise: 14 CFR 91.117(a) 250 kt limit below 10,000 ft (as A320/B738); max: ACD max(climb IAS 320, descent IAS 300) + 30 kt rounded to 10 (A320 precedent: 290 -> 320), a sim cap not a VMO",
+        "status": "DESIGN / derived"
+      },
+      "accel/decel": {
+        "value": "2.3 / 5.5 kt/s",
+        "source": "accel: a = VR^2 / (2 x 0.8 x takeoffDistanceFt) with VR 145 kt (ground roll taken as 80 % of the 35 ft take-off distance; the A320 and B738 entries give 0.83 / 0.80); decel: DESIGN, as the class precedent (A320 6.0, B752 5.5)",
+        "status": "ESTIMATE (derived) / DESIGN"
+      },
+      "taxi/turn rates, min speed": {
+        "value": "taxi 20 kt, taxi turn 10 kt, turn 2.5 deg/s, ground turn 8 deg/s, min 125 kt",
+        "source": "none authoritative; gameplay simplifications as C172/A320/B752; min speed = Vat - 15 kt as A320 (120 vs 135) and B738 (125 vs 140)",
+        "status": "DESIGN value (UNVERIFIED simplification)"
+      },
+      "serviceCeilingFt / lengthM": {
+        "value": "43000 / 73.0",
+        "source": "ACD ceiling FL430; ACD length 73 m",
+        "status": "verified"
+      },
+      "_not_in_type_shape": {
+        "wingspan_m": 79.8,
+        "height_m": 24.1,
+        "mtow_kg": 560000,
+        "wingspan_source": "ACD technical data (wing span 79.8 m, height 24.1 m)",
+        "wake_srs_category": "FAA JO 7110.65 3-9-6 NOTE (derived: Category I small single-engine propeller <= 12,500 lb; II small twin-engine propeller <= 12,500 lb; III all other)",
+        "engine": "L4J; 4 x 311kN R-R Trent 900 or GP7200",
+        "radio_wake_word": "super"
+      }
+    }
+  },
+  "B744": {
+    "type": "B744",
+    "category": "heavy",
+    "wakeCategory": "heavy",
+    "taxiSpeedKt": 20,
+    "taxiTurnSpeedKt": 10,
+    "accelKtPerSec": 3.2,
+    "decelKtPerSec": 5.5,
+    "rotateSpeedKt": 180,
+    "climbSpeedKt": 215,
+    "cruiseSpeedKt": 250,
+    "approachSpeedKt": 152,
+    "touchdownSpeedKt": 147,
+    "climbRateFpm": 1500,
+    "descentRateFpm": 2000,
+    "turnRateDegPerSec": 2.5,
+    "groundTurnRateDegPerSec": 10,
+    "minSpeedKt": 137,
+    "maxSpeedKt": 330,
+    "serviceCeilingFt": 45000,
+    "takeoffDistanceFt": 10830,
+    "landingDistanceFt": 6990,
+    "lengthM": 70.6,
+    "_sources": {
+      "_summary": {
+        "value": "Boeing 747-400",
+        "source": "EUROCONTROL_ACD (page B744); FAA_JO_7110_126A; CFR91.117",
+        "status": "SOURCED (ACD, retrieved 2026-10-21) with the derivations noted per field; gameplay values marked DESIGN"
+      },
+      "ACD row read": {
+        "value": "ACD B744 'Show performance table': V2 185 kt, take-off distance 3300 m, WTC H, RECAT-EU Upper Heavy, MTOW 396890 kg; initial climb IAS 215 kt ROC 1500 ft/min; climb to FL150 IAS 300 kt ROC 1500; cruise TAS 510 kt, ceiling FL450; descent to FL100 IAS 300 kt ROD 3000; approach IAS 250 kt ROD 1500; landing Vat 152 kt, distance 2130 m, APC D; technical: wing span 64.8 m, length 70.6 m, height 19.4 m; type L4J",
+        "source": "https://learningzone.eurocontrol.int/ilp/customs/ATCPFDB/details.aspx?ICAO=B744 (retrieved 2026-10-21, HTTP 200; raw/realism/eurocontrol_acd_B744.html)",
+        "status": "verified transcription"
+      },
+      "category/wakeCategory": {
+        "value": "heavy / heavy",
+        "source": "ACD WTC H (ICAO wake turbulence category L/M/H/J) and MTOW 396890 kg; FAA category: large = MTOW above 12,500 lb (5,670 kg)",
+        "status": "verified"
+      },
+      "RECAT (src/sim/performance.ts RECAT)": {
+        "value": "B",
+        "source": "JO 7110.126A TBL A-1 (page A1, read visually 2026-10-21)",
+        "status": "VERIFIED"
+      },
+      "takeoff/landing distance": {
+        "value": "10830 ft / 6990 ft",
+        "source": "ACD take-off distance 3300 m (at MTOW 396890 kg, ISA, sea level) and landing distance 2130 m, converted at 3.28084 ft/m and rounded to 10 ft",
+        "status": "verified (ACD figures are MTOW / indicative: the engine refuses a departure from a runway shorter than takeoffDistanceFt, so these are the heaviest-case need; KMHT types use typical-weight ESTIMATEs, see _meta)"
+      },
+      "rotate/climb/approach speeds": {
+        "value": "rotate 180, climb 215, approach 152, touchdown 147",
+        "source": "rotate = ACD V2 185 - 5 kt (A320 precedent: VR a few kt below V2); climb speed = ACD initial climb IAS 215 kt; approach = ACD Vat 152 kt; touchdown = Vat - 5 kt (A320 precedent)",
+        "status": "derived from ACD"
+      },
+      "climbRateFpm / descentRateFpm": {
+        "value": "1500 / 2000",
+        "source": "climb = ACD initial climb ROC 1500 ft/min; descent: DESIGN 2,000 ft/min as for A320/B738 (ACD descent to FL100 ROD 3000, approach ROD 1500 ft/min)",
+        "status": "climb verified; descent DESIGN where 2,000"
+      },
+      "cruiseSpeedKt / maxSpeedKt": {
+        "value": "250 / 330",
+        "source": "cruise: 14 CFR 91.117(a) 250 kt limit below 10,000 ft (as A320/B738); max: ACD max(climb IAS 300, descent IAS 300) + 30 kt rounded to 10 (A320 precedent: 290 -> 320), a sim cap not a VMO",
+        "status": "DESIGN / derived"
+      },
+      "accel/decel": {
+        "value": "3.2 / 5.5 kt/s",
+        "source": "accel: a = VR^2 / (2 x 0.8 x takeoffDistanceFt) with VR 180 kt (ground roll taken as 80 % of the 35 ft take-off distance; the A320 and B738 entries give 0.83 / 0.80); decel: DESIGN, as the class precedent (A320 6.0, B752 5.5)",
+        "status": "ESTIMATE (derived) / DESIGN"
+      },
+      "taxi/turn rates, min speed": {
+        "value": "taxi 20 kt, taxi turn 10 kt, turn 2.5 deg/s, ground turn 10 deg/s, min 137 kt",
+        "source": "none authoritative; gameplay simplifications as C172/A320/B752; min speed = Vat - 15 kt as A320 (120 vs 135) and B738 (125 vs 140)",
+        "status": "DESIGN value (UNVERIFIED simplification)"
+      },
+      "serviceCeilingFt / lengthM": {
+        "value": "45000 / 70.6",
+        "source": "ACD ceiling FL450; ACD length 70.6 m",
+        "status": "verified"
+      },
+      "_not_in_type_shape": {
+        "wingspan_m": 64.8,
+        "height_m": 19.4,
+        "mtow_kg": 396890,
+        "wingspan_source": "ACD technical data (wing span 64.8 m, height 19.4 m)",
+        "wake_srs_category": "FAA JO 7110.65 3-9-6 NOTE (derived: Category I small single-engine propeller <= 12,500 lb; II small twin-engine propeller <= 12,500 lb; III all other)",
+        "engine": "L4J; 4 x 258 kN R-R RB 211-524 G/H or 4 x 252.4 kN P&W PW 4056  or  4 x 257.5 kN GE C",
+        "radio_wake_word": "heavy"
+      }
+    }
+  },
+  "B748": {
+    "type": "B748",
+    "category": "heavy",
+    "wakeCategory": "heavy",
+    "taxiSpeedKt": 20,
+    "taxiTurnSpeedKt": 10,
+    "accelKtPerSec": 2.9,
+    "decelKtPerSec": 5.5,
+    "rotateSpeedKt": 170,
+    "climbSpeedKt": 230,
+    "cruiseSpeedKt": 250,
+    "approachSpeedKt": 145,
+    "touchdownSpeedKt": 140,
+    "climbRateFpm": 2500,
+    "descentRateFpm": 2000,
+    "turnRateDegPerSec": 2.5,
+    "groundTurnRateDegPerSec": 10,
+    "minSpeedKt": 130,
+    "maxSpeedKt": 290,
+    "serviceCeilingFt": 43000,
+    "takeoffDistanceFt": 10470,
+    "landingDistanceFt": 8790,
+    "lengthM": 76.3,
+    "_sources": {
+      "_summary": {
+        "value": "Boeing 747-8",
+        "source": "EUROCONTROL_ACD (page B748); FAA_JO_7110_126A; CFR91.117",
+        "status": "SOURCED (ACD, retrieved 2026-10-21) with the derivations noted per field; gameplay values marked DESIGN"
+      },
+      "ACD row read": {
+        "value": "ACD B748 'Show performance table': V2 175 kt, take-off distance 3190 m, WTC H, RECAT-EU Upper Heavy, MTOW 442250 kg; initial climb IAS 230 kt ROC 2500 ft/min; climb to FL150 IAS 260 kt ROC 2000; cruise TAS 510 kt, ceiling FL430; descent to FL100 IAS 250 kt ROD 3000; approach IAS 220 kt ROD 1500; landing Vat 145 kt, distance 2680 m, APC D; technical: wing span 68.5 m, length 76.3 m, height 19.4 m; type L4J",
+        "source": "https://learningzone.eurocontrol.int/ilp/customs/ATCPFDB/details.aspx?ICAO=B748 (retrieved 2026-10-21, HTTP 200; raw/realism/eurocontrol_acd_B748.html)",
+        "status": "verified transcription"
+      },
+      "category/wakeCategory": {
+        "value": "heavy / heavy",
+        "source": "ACD WTC H (ICAO wake turbulence category L/M/H/J) and MTOW 442250 kg; FAA category: large = MTOW above 12,500 lb (5,670 kg)",
+        "status": "verified"
+      },
+      "RECAT (src/sim/performance.ts RECAT)": {
+        "value": "B",
+        "source": "JO 7110.126A TBL A-1 (page A1, read visually 2026-10-21)",
+        "status": "VERIFIED"
+      },
+      "takeoff/landing distance": {
+        "value": "10470 ft / 8790 ft",
+        "source": "ACD take-off distance 3190 m (at MTOW 442250 kg, ISA, sea level) and landing distance 2680 m, converted at 3.28084 ft/m and rounded to 10 ft",
+        "status": "verified (ACD figures are MTOW / indicative: the engine refuses a departure from a runway shorter than takeoffDistanceFt, so these are the heaviest-case need; KMHT types use typical-weight ESTIMATEs, see _meta)"
+      },
+      "rotate/climb/approach speeds": {
+        "value": "rotate 170, climb 230, approach 145, touchdown 140",
+        "source": "rotate = ACD V2 175 - 5 kt (A320 precedent: VR a few kt below V2); climb speed = ACD initial climb IAS 230 kt; approach = ACD Vat 145 kt; touchdown = Vat - 5 kt (A320 precedent)",
+        "status": "derived from ACD"
+      },
+      "climbRateFpm / descentRateFpm": {
+        "value": "2500 / 2000",
+        "source": "climb = ACD initial climb ROC 2500 ft/min; descent: DESIGN 2,000 ft/min as for A320/B738 (ACD descent to FL100 ROD 3000, approach ROD 1500 ft/min)",
+        "status": "climb verified; descent DESIGN where 2,000"
+      },
+      "cruiseSpeedKt / maxSpeedKt": {
+        "value": "250 / 290",
+        "source": "cruise: 14 CFR 91.117(a) 250 kt limit below 10,000 ft (as A320/B738); max: ACD max(climb IAS 260, descent IAS 250) + 30 kt rounded to 10 (A320 precedent: 290 -> 320), a sim cap not a VMO",
+        "status": "DESIGN / derived"
+      },
+      "accel/decel": {
+        "value": "2.9 / 5.5 kt/s",
+        "source": "accel: a = VR^2 / (2 x 0.8 x takeoffDistanceFt) with VR 170 kt (ground roll taken as 80 % of the 35 ft take-off distance; the A320 and B738 entries give 0.83 / 0.80); decel: DESIGN, as the class precedent (A320 6.0, B752 5.5)",
+        "status": "ESTIMATE (derived) / DESIGN"
+      },
+      "taxi/turn rates, min speed": {
+        "value": "taxi 20 kt, taxi turn 10 kt, turn 2.5 deg/s, ground turn 10 deg/s, min 130 kt",
+        "source": "none authoritative; gameplay simplifications as C172/A320/B752; min speed = Vat - 15 kt as A320 (120 vs 135) and B738 (125 vs 140)",
+        "status": "DESIGN value (UNVERIFIED simplification)"
+      },
+      "serviceCeilingFt / lengthM": {
+        "value": "43000 / 76.3",
+        "source": "ACD ceiling FL430; ACD length 76.3 m",
+        "status": "verified"
+      },
+      "_not_in_type_shape": {
+        "wingspan_m": 68.5,
+        "height_m": 19.4,
+        "mtow_kg": 442250,
+        "wingspan_source": "ACD technical data (wing span 68.5 m, height 19.4 m)",
+        "wake_srs_category": "FAA JO 7110.65 3-9-6 NOTE (derived: Category I small single-engine propeller <= 12,500 lb; II small twin-engine propeller <= 12,500 lb; III all other)",
+        "engine": "L4J; 4x 66500 lbs GEnx-2B67",
+        "radio_wake_word": "heavy"
+      }
+    }
+  },
+  "MD11": {
+    "type": "MD11",
+    "category": "heavy",
+    "wakeCategory": "heavy",
+    "taxiSpeedKt": 20,
+    "taxiTurnSpeedKt": 10,
+    "accelKtPerSec": 2.5,
+    "decelKtPerSec": 5.5,
+    "rotateSpeedKt": 155,
+    "climbSpeedKt": 190,
+    "cruiseSpeedKt": 250,
+    "approachSpeedKt": 159,
+    "touchdownSpeedKt": 154,
+    "climbRateFpm": 2000,
+    "descentRateFpm": 2000,
+    "turnRateDegPerSec": 2.5,
+    "groundTurnRateDegPerSec": 10,
+    "minSpeedKt": 144,
+    "maxSpeedKt": 330,
+    "serviceCeilingFt": 41000,
+    "takeoffDistanceFt": 10170,
+    "landingDistanceFt": 6890,
+    "lengthM": 61.2,
+    "_sources": {
+      "_summary": {
+        "value": "McDonnell Douglas MD-11",
+        "source": "EUROCONTROL_ACD (page MD11); FAA_JO_7110_126A; CFR91.117",
+        "status": "SOURCED (ACD, retrieved 2026-10-21) with the derivations noted per field; gameplay values marked DESIGN"
+      },
+      "ACD row read": {
+        "value": "ACD MD11 'Show performance table': V2 160 kt, take-off distance 3100 m, WTC H, RECAT-EU Lower Heavy, MTOW 285990 kg; initial climb IAS 190 kt ROC 2000 ft/min; climb to FL150 IAS 300 kt ROC 2200; cruise TAS 500 kt, ceiling FL410; descent to FL100 IAS 300 kt ROD 3000; approach IAS 250 kt ROD 1500; landing Vat 159 kt, distance 2100 m, APC D; technical: wing span 51.7 m, length 61.2 m, height 17.6 m; type L3J",
+        "source": "https://learningzone.eurocontrol.int/ilp/customs/ATCPFDB/details.aspx?ICAO=MD11 (retrieved 2026-10-21, HTTP 200; raw/realism/eurocontrol_acd_MD11.html)",
+        "status": "verified transcription"
+      },
+      "category/wakeCategory": {
+        "value": "heavy / heavy",
+        "source": "ACD WTC H (ICAO wake turbulence category L/M/H/J) and MTOW 285990 kg; FAA category: large = MTOW above 12,500 lb (5,670 kg)",
+        "status": "verified"
+      },
+      "RECAT (src/sim/performance.ts RECAT)": {
+        "value": "C",
+        "source": "JO 7110.126A TBL A-1 (page A1, read visually 2026-10-21)",
+        "status": "VERIFIED"
+      },
+      "takeoff/landing distance": {
+        "value": "10170 ft / 6890 ft",
+        "source": "ACD take-off distance 3100 m (at MTOW 285990 kg, ISA, sea level) and landing distance 2100 m, converted at 3.28084 ft/m and rounded to 10 ft",
+        "status": "verified (ACD figures are MTOW / indicative: the engine refuses a departure from a runway shorter than takeoffDistanceFt, so these are the heaviest-case need; KMHT types use typical-weight ESTIMATEs, see _meta)"
+      },
+      "rotate/climb/approach speeds": {
+        "value": "rotate 155, climb 190, approach 159, touchdown 154",
+        "source": "rotate = ACD V2 160 - 5 kt (A320 precedent: VR a few kt below V2); climb speed = ACD initial climb IAS 190 kt; approach = ACD Vat 159 kt; touchdown = Vat - 5 kt (A320 precedent)",
+        "status": "derived from ACD"
+      },
+      "climbRateFpm / descentRateFpm": {
+        "value": "2000 / 2000",
+        "source": "climb = ACD initial climb ROC 2000 ft/min; descent: DESIGN 2,000 ft/min as for A320/B738 (ACD descent to FL100 ROD 3000, approach ROD 1500 ft/min)",
+        "status": "climb verified; descent DESIGN where 2,000"
+      },
+      "cruiseSpeedKt / maxSpeedKt": {
+        "value": "250 / 330",
+        "source": "cruise: 14 CFR 91.117(a) 250 kt limit below 10,000 ft (as A320/B738); max: ACD max(climb IAS 300, descent IAS 300) + 30 kt rounded to 10 (A320 precedent: 290 -> 320), a sim cap not a VMO",
+        "status": "DESIGN / derived"
+      },
+      "accel/decel": {
+        "value": "2.5 / 5.5 kt/s",
+        "source": "accel: a = VR^2 / (2 x 0.8 x takeoffDistanceFt) with VR 155 kt (ground roll taken as 80 % of the 35 ft take-off distance; the A320 and B738 entries give 0.83 / 0.80); decel: DESIGN, as the class precedent (A320 6.0, B752 5.5)",
+        "status": "ESTIMATE (derived) / DESIGN"
+      },
+      "taxi/turn rates, min speed": {
+        "value": "taxi 20 kt, taxi turn 10 kt, turn 2.5 deg/s, ground turn 10 deg/s, min 144 kt",
+        "source": "none authoritative; gameplay simplifications as C172/A320/B752; min speed = Vat - 15 kt as A320 (120 vs 135) and B738 (125 vs 140)",
+        "status": "DESIGN value (UNVERIFIED simplification)"
+      },
+      "serviceCeilingFt / lengthM": {
+        "value": "41000 / 61.2",
+        "source": "ACD ceiling FL410; ACD length 61.2 m",
+        "status": "verified"
+      },
+      "_not_in_type_shape": {
+        "wingspan_m": 51.7,
+        "height_m": 17.6,
+        "mtow_kg": 285990,
+        "wingspan_source": "ACD technical data (wing span 51.7 m, height 17.6 m)",
+        "wake_srs_category": "FAA JO 7110.65 3-9-6 NOTE (derived: Category I small single-engine propeller <= 12,500 lb; II small twin-engine propeller <= 12,500 lb; III all other)",
+        "engine": "L3J; 3 x 274 kN GE CF6-80C2 or 3 x 267 kN P&W PW 4460 or 4462 turbofans.",
+        "radio_wake_word": "heavy"
+      }
+    }
+  },
+  "DH8D": {
+    "type": "DH8D",
+    "category": "large",
+    "wakeCategory": "medium",
+    "taxiSpeedKt": 20,
+    "taxiTurnSpeedKt": 10,
+    "accelKtPerSec": 3.0,
+    "decelKtPerSec": 4.5,
+    "rotateSpeedKt": 110,
+    "climbSpeedKt": 150,
+    "cruiseSpeedKt": 210,
+    "approachSpeedKt": 121,
+    "touchdownSpeedKt": 116,
+    "climbRateFpm": 3500,
+    "descentRateFpm": 1500,
+    "turnRateDegPerSec": 3.0,
+    "groundTurnRateDegPerSec": 16,
+    "minSpeedKt": 106,
+    "maxSpeedKt": 270,
+    "serviceCeilingFt": 25000,
+    "takeoffDistanceFt": 4270,
+    "landingDistanceFt": 3610,
+    "lengthM": 32.8,
+    "_sources": {
+      "_summary": {
+        "value": "De Havilland Dash 8 Q400",
+        "source": "EUROCONTROL_ACD (page DH8D); FAA_JO_7110_126A; CFR91.117",
+        "status": "SOURCED (ACD, retrieved 2026-10-21) with the derivations noted per field; gameplay values marked DESIGN"
+      },
+      "ACD row read": {
+        "value": "ACD DH8D 'Show performance table': V2 115 kt, take-off distance 1300 m, WTC M, RECAT-EU Lower Medium, MTOW 28998 kg; initial climb IAS 150 kt ROC 3500 ft/min; climb to FL150 IAS 210 kt ROC 1500; cruise TAS 360 kt, ceiling FL250; descent to FL100 IAS 270 kt ROD 1500; approach IAS 245 kt ROD 1500; landing Vat 121 kt, distance 1100 m, APC C; technical: wing span 28.4 m, length 32.8 m, height 8.3 m; type L2T",
+        "source": "https://learningzone.eurocontrol.int/ilp/customs/ATCPFDB/details.aspx?ICAO=DH8D (retrieved 2026-10-21, HTTP 200; raw/realism/eurocontrol_acd_DH8D.html)",
+        "status": "verified transcription"
+      },
+      "category/wakeCategory": {
+        "value": "large / medium",
+        "source": "ACD WTC M (ICAO wake turbulence category L/M/H/J) and MTOW 28998 kg; FAA category: large = MTOW above 12,500 lb (5,670 kg)",
+        "status": "verified"
+      },
+      "RECAT (src/sim/performance.ts RECAT)": {
+        "value": "F",
+        "source": "JO 7110.126A TBL A-1 (page A1, read visually 2026-10-21)",
+        "status": "VERIFIED"
+      },
+      "takeoff/landing distance": {
+        "value": "4270 ft / 3610 ft",
+        "source": "ACD take-off distance 1300 m (at MTOW 28998 kg, ISA, sea level) and landing distance 1100 m, converted at 3.28084 ft/m and rounded to 10 ft",
+        "status": "verified (ACD figures are MTOW / indicative: the engine refuses a departure from a runway shorter than takeoffDistanceFt, so these are the heaviest-case need; KMHT types use typical-weight ESTIMATEs, see _meta)"
+      },
+      "rotate/climb/approach speeds": {
+        "value": "rotate 110, climb 150, approach 121, touchdown 116",
+        "source": "rotate = ACD V2 115 - 5 kt (A320 precedent: VR a few kt below V2); climb speed = ACD initial climb IAS 150 kt; approach = ACD Vat 121 kt; touchdown = Vat - 5 kt (A320 precedent)",
+        "status": "derived from ACD"
+      },
+      "climbRateFpm / descentRateFpm": {
+        "value": "3500 / 1500",
+        "source": "climb = ACD initial climb ROC 3500 ft/min; descent: ACD descent to FL100 ROD 1500 ft/min",
+        "status": "climb verified; descent DESIGN where 2,000"
+      },
+      "cruiseSpeedKt / maxSpeedKt": {
+        "value": "210 / 270",
+        "source": "cruise: ACD climb to FL150 IAS 210 kt; max: ACD descent to FL100 IAS 270 kt",
+        "status": "DESIGN / derived"
+      },
+      "accel/decel": {
+        "value": "3.0 / 4.5 kt/s",
+        "source": "accel: a = VR^2 / (2 x 0.8 x takeoffDistanceFt) with VR 110 kt (ground roll taken as 80 % of the 35 ft take-off distance; the A320 and B738 entries give 0.83 / 0.80); decel: DESIGN, as the class precedent (A320 6.0, B752 5.5)",
+        "status": "ESTIMATE (derived) / DESIGN"
+      },
+      "taxi/turn rates, min speed": {
+        "value": "taxi 20 kt, taxi turn 10 kt, turn 3.0 deg/s, ground turn 16 deg/s, min 106 kt",
+        "source": "none authoritative; gameplay simplifications as C172/A320/B752; min speed = Vat - 15 kt as A320 (120 vs 135) and B738 (125 vs 140)",
+        "status": "DESIGN value (UNVERIFIED simplification)"
+      },
+      "serviceCeilingFt / lengthM": {
+        "value": "25000 / 32.8",
+        "source": "ACD ceiling FL250; ACD length 32.8 m",
+        "status": "verified"
+      },
+      "_not_in_type_shape": {
+        "wingspan_m": 28.4,
+        "height_m": 8.3,
+        "mtow_kg": 28998,
+        "wingspan_source": "ACD technical data (wing span 28.4 m, height 8.3 m)",
+        "wake_srs_category": "FAA JO 7110.65 3-9-6 NOTE (derived: Category I small single-engine propeller <= 12,500 lb; II small twin-engine propeller <= 12,500 lb; III all other)",
+        "engine": "L2T; 2 x 5071 SHP P&W PW150A turboprops with 6 blade Dowty propellers - 4.11 meters i",
+        "radio_wake_word": "none"
+      }
+    }
+  },
+  "BE20": {
+    "type": "BE20",
+    "category": "light",
+    "wakeCategory": "light",
+    "taxiSpeedKt": 15,
+    "taxiTurnSpeedKt": 8,
+    "accelKtPerSec": 6.8,
+    "decelKtPerSec": 4.5,
+    "rotateSpeedKt": 110,
+    "climbSpeedKt": 145,
+    "cruiseSpeedKt": 230,
+    "approachSpeedKt": 100,
+    "touchdownSpeedKt": 95,
+    "climbRateFpm": 2000,
+    "descentRateFpm": 1500,
+    "turnRateDegPerSec": 3.0,
+    "groundTurnRateDegPerSec": 25,
+    "minSpeedKt": 85,
+    "maxSpeedKt": 250,
+    "serviceCeilingFt": 35000,
+    "takeoffDistanceFt": 1870,
+    "landingDistanceFt": 1770,
+    "lengthM": 13.4,
+    "_sources": {
+      "_summary": {
+        "value": "Beechcraft King Air 200",
+        "source": "EUROCONTROL_ACD (page BE20); FAA_JO_7110_126A; CFR91.117",
+        "status": "SOURCED (ACD, retrieved 2026-10-21) with the derivations noted per field; gameplay values marked DESIGN"
+      },
+      "ACD row read": {
+        "value": "ACD BE20 'Show performance table': V2 115 kt, take-off distance 570 m, WTC L, RECAT-EU Light, MTOW 5670 kg; initial climb IAS 145 kt ROC 2000 ft/min; climb to FL150 IAS 230 kt ROC 1000; cruise TAS 260 kt, ceiling FL350; descent to FL100 IAS 250 kt ROD 1500; approach IAS 180 kt ROD 1500; landing Vat 100 kt, distance 540 m, APC B; technical: wing span 16.6 m, length 13.4 m, height 4.5 m; type L2T",
+        "source": "https://learningzone.eurocontrol.int/ilp/customs/ATCPFDB/details.aspx?ICAO=BE20 (retrieved 2026-10-21, HTTP 200; raw/realism/eurocontrol_acd_BE20.html)",
+        "status": "verified transcription"
+      },
+      "category/wakeCategory": {
+        "value": "light / light",
+        "source": "ACD WTC L (ICAO wake turbulence category L/M/H/J) and MTOW 5670 kg; FAA category: large = MTOW above 12,500 lb (5,670 kg)",
+        "status": "verified"
+      },
+      "RECAT (src/sim/performance.ts RECAT)": {
+        "value": "I",
+        "source": "JO 7110.126A TBL A-1 (page A1, read visually 2026-10-21)",
+        "status": "VERIFIED"
+      },
+      "takeoff/landing distance": {
+        "value": "1870 ft / 1770 ft",
+        "source": "ACD take-off distance 570 m (at MTOW 5670 kg, ISA, sea level) and landing distance 540 m, converted at 3.28084 ft/m and rounded to 10 ft",
+        "status": "verified (ACD figures are MTOW / indicative: the engine refuses a departure from a runway shorter than takeoffDistanceFt, so these are the heaviest-case need; KMHT types use typical-weight ESTIMATEs, see _meta)"
+      },
+      "rotate/climb/approach speeds": {
+        "value": "rotate 110, climb 145, approach 100, touchdown 95",
+        "source": "rotate = ACD V2 115 - 5 kt (A320 precedent: VR a few kt below V2); climb speed = ACD initial climb IAS 145 kt; approach = ACD Vat 100 kt; touchdown = Vat - 5 kt (A320 precedent)",
+        "status": "derived from ACD"
+      },
+      "climbRateFpm / descentRateFpm": {
+        "value": "2000 / 1500",
+        "source": "climb = ACD initial climb ROC 2000 ft/min; descent: ACD descent to FL100 ROD 1500 ft/min",
+        "status": "climb verified; descent DESIGN where 2,000"
+      },
+      "cruiseSpeedKt / maxSpeedKt": {
+        "value": "230 / 250",
+        "source": "cruise: ACD climb to FL150 IAS 230 kt; max: ACD descent to FL100 IAS 250 kt",
+        "status": "DESIGN / derived"
+      },
+      "accel/decel": {
+        "value": "6.8 / 4.5 kt/s",
+        "source": "accel: a = VR^2 / (2 x 0.8 x takeoffDistanceFt) with VR 110 kt (ground roll taken as 80 % of the 35 ft take-off distance; the A320 and B738 entries give 0.83 / 0.80); decel: DESIGN, as the class precedent (A320 6.0, B752 5.5)",
+        "status": "ESTIMATE (derived) / DESIGN"
+      },
+      "taxi/turn rates, min speed": {
+        "value": "taxi 15 kt, taxi turn 8 kt, turn 3.0 deg/s, ground turn 25 deg/s, min 85 kt",
+        "source": "none authoritative; gameplay simplifications as C172/A320/B752; min speed = Vat - 15 kt as A320 (120 vs 135) and B738 (125 vs 140)",
+        "status": "DESIGN value (UNVERIFIED simplification)"
+      },
+      "serviceCeilingFt / lengthM": {
+        "value": "35000 / 13.4",
+        "source": "ACD ceiling FL350; ACD length 13.4 m",
+        "status": "verified"
+      },
+      "_not_in_type_shape": {
+        "wingspan_m": 16.6,
+        "height_m": 4.5,
+        "mtow_kg": 5670,
+        "wingspan_source": "ACD technical data (wing span 16.6 m, height 4.5 m)",
+        "wake_srs_category": "FAA JO 7110.65 3-9-6 NOTE (derived: Category I small single-engine propeller <= 12,500 lb; II small twin-engine propeller <= 12,500 lb; III all other)",
+        "engine": "L2T; 2 x 850 SHP P&W PT6A-42 turboprops with 3 blade propellers.",
+        "radio_wake_word": "none"
+      }
+    }
+  },
+  "BE9L": {
+    "type": "BE9L",
+    "category": "light",
+    "wakeCategory": "light",
+    "taxiSpeedKt": 15,
+    "taxiTurnSpeedKt": 8,
+    "accelKtPerSec": 4.1,
+    "decelKtPerSec": 4.5,
+    "rotateSpeedKt": 95,
+    "climbSpeedKt": 130,
+    "cruiseSpeedKt": 200,
+    "approachSpeedKt": 105,
+    "touchdownSpeedKt": 100,
+    "climbRateFpm": 1500,
+    "descentRateFpm": 1000,
+    "turnRateDegPerSec": 3.0,
+    "groundTurnRateDegPerSec": 25,
+    "minSpeedKt": 90,
+    "maxSpeedKt": 240,
+    "serviceCeilingFt": 29000,
+    "takeoffDistanceFt": 2300,
+    "landingDistanceFt": 1250,
+    "lengthM": 10.8,
+    "_sources": {
+      "_summary": {
+        "value": "Beechcraft King Air 90",
+        "source": "EUROCONTROL_ACD (page BE9L); FAA_JO_7110_126A; CFR91.117",
+        "status": "SOURCED (ACD, retrieved 2026-10-21) with the derivations noted per field; gameplay values marked DESIGN"
+      },
+      "ACD row read": {
+        "value": "ACD BE9L 'Show performance table': V2 100 kt, take-off distance 700 m, WTC L, RECAT-EU Light, MTOW 4581 kg; initial climb IAS 130 kt ROC 1500 ft/min; climb to FL150 IAS 200 kt ROC 1000; cruise TAS 220 kt, ceiling FL290; descent to FL100 IAS 240 kt ROD 1000; approach IAS 130 kt ROD 1000; landing Vat 105 kt, distance 380 m, APC B; technical: wing span 15.3 m, length 10.8 m, height 4.3 m; type L2T",
+        "source": "https://learningzone.eurocontrol.int/ilp/customs/ATCPFDB/details.aspx?ICAO=BE9L (retrieved 2026-10-21, HTTP 200; raw/realism/eurocontrol_acd_BE9L.html)",
+        "status": "verified transcription"
+      },
+      "category/wakeCategory": {
+        "value": "light / light",
+        "source": "ACD WTC L (ICAO wake turbulence category L/M/H/J) and MTOW 4581 kg; FAA category: large = MTOW above 12,500 lb (5,670 kg)",
+        "status": "verified"
+      },
+      "RECAT (src/sim/performance.ts RECAT)": {
+        "value": "I",
+        "source": "DERIVED: not listed; MTOW 4,581 kg = 10,100 lb is within the Category I definition (15,400 lb or less)",
+        "status": "UNVERIFIED (type absent from TBL A-1)"
+      },
+      "takeoff/landing distance": {
+        "value": "2300 ft / 1250 ft",
+        "source": "ACD take-off distance 700 m (at MTOW 4581 kg, ISA, sea level) and landing distance 380 m, converted at 3.28084 ft/m and rounded to 10 ft",
+        "status": "verified (ACD figures are MTOW / indicative: the engine refuses a departure from a runway shorter than takeoffDistanceFt, so these are the heaviest-case need; KMHT types use typical-weight ESTIMATEs, see _meta)"
+      },
+      "rotate/climb/approach speeds": {
+        "value": "rotate 95, climb 130, approach 105, touchdown 100",
+        "source": "rotate = ACD V2 100 - 5 kt (A320 precedent: VR a few kt below V2); climb speed = ACD initial climb IAS 130 kt; approach = ACD Vat 105 kt; touchdown = Vat - 5 kt (A320 precedent)",
+        "status": "derived from ACD"
+      },
+      "climbRateFpm / descentRateFpm": {
+        "value": "1500 / 1000",
+        "source": "climb = ACD initial climb ROC 1500 ft/min; descent: ACD descent to FL100 ROD 1000 ft/min",
+        "status": "climb verified; descent DESIGN where 2,000"
+      },
+      "cruiseSpeedKt / maxSpeedKt": {
+        "value": "200 / 240",
+        "source": "cruise: ACD climb to FL150 IAS 200 kt; max: ACD descent to FL100 IAS 240 kt",
+        "status": "DESIGN / derived"
+      },
+      "accel/decel": {
+        "value": "4.1 / 4.5 kt/s",
+        "source": "accel: a = VR^2 / (2 x 0.8 x takeoffDistanceFt) with VR 95 kt (ground roll taken as 80 % of the 35 ft take-off distance; the A320 and B738 entries give 0.83 / 0.80); decel: DESIGN, as the class precedent (A320 6.0, B752 5.5)",
+        "status": "ESTIMATE (derived) / DESIGN"
+      },
+      "taxi/turn rates, min speed": {
+        "value": "taxi 15 kt, taxi turn 8 kt, turn 3.0 deg/s, ground turn 25 deg/s, min 90 kt",
+        "source": "none authoritative; gameplay simplifications as C172/A320/B752; min speed = Vat - 15 kt as A320 (120 vs 135) and B738 (125 vs 140)",
+        "status": "DESIGN value (UNVERIFIED simplification)"
+      },
+      "serviceCeilingFt / lengthM": {
+        "value": "29000 / 10.8",
+        "source": "ACD ceiling FL290; ACD length 10.8 m",
+        "status": "verified"
+      },
+      "_not_in_type_shape": {
+        "wingspan_m": 15.3,
+        "height_m": 4.3,
+        "mtow_kg": 4581,
+        "wingspan_source": "ACD technical data (wing span 15.3 m, height 4.3 m)",
+        "wake_srs_category": "FAA JO 7110.65 3-9-6 NOTE (derived: Category I small single-engine propeller <= 12,500 lb; II small twin-engine propeller <= 12,500 lb; III all other)",
+        "engine": "L2T; 2 x 500 SHP P&W PT6A -6 or 2 x 530 SHP P&W PT6A -20  or 2 x 550 SHP P&W PT6A -21",
+        "radio_wake_word": "none"
+      }
+    }
+  },
+  "PC12": {
+    "type": "PC12",
+    "category": "light",
+    "wakeCategory": "light",
+    "taxiSpeedKt": 15,
+    "taxiTurnSpeedKt": 8,
+    "accelKtPerSec": 5.9,
+    "decelKtPerSec": 4.5,
+    "rotateSpeedKt": 105,
+    "climbSpeedKt": 130,
+    "cruiseSpeedKt": 180,
+    "approachSpeedKt": 85,
+    "touchdownSpeedKt": 80,
+    "climbRateFpm": 1700,
+    "descentRateFpm": 1500,
+    "turnRateDegPerSec": 3.0,
+    "groundTurnRateDegPerSec": 25,
+    "minSpeedKt": 70,
+    "maxSpeedKt": 210,
+    "serviceCeilingFt": 30000,
+    "takeoffDistanceFt": 1970,
+    "landingDistanceFt": 1800,
+    "lengthM": 14.4,
+    "_sources": {
+      "_summary": {
+        "value": "Pilatus PC-12",
+        "source": "EUROCONTROL_ACD (page PC12); FAA_JO_7110_126A; CFR91.117",
+        "status": "SOURCED (ACD, retrieved 2026-10-21) with the derivations noted per field; gameplay values marked DESIGN"
+      },
+      "ACD row read": {
+        "value": "ACD PC12 'Show performance table': V2 110 kt, take-off distance 600 m, WTC L, RECAT-EU Light, MTOW 4500 kg; initial climb IAS 130 kt ROC 1700 ft/min; climb to FL150 IAS 130 kt ROC 1000; cruise TAS 270 kt, ceiling FL300; descent to FL100 IAS 210 kt ROD 1500; approach IAS 180 kt ROD 1500; landing Vat 85 kt, distance 550 m, APC A; technical: wing span 16.2 m, length 14.4 m, height 4.3 m; type L1T",
+        "source": "https://learningzone.eurocontrol.int/ilp/customs/ATCPFDB/details.aspx?ICAO=PC12 (retrieved 2026-10-21, HTTP 200; raw/realism/eurocontrol_acd_PC12.html)",
+        "status": "verified transcription"
+      },
+      "category/wakeCategory": {
+        "value": "light / light",
+        "source": "ACD WTC L (ICAO wake turbulence category L/M/H/J) and MTOW 4500 kg; FAA category: large = MTOW above 12,500 lb (5,670 kg)",
+        "status": "verified"
+      },
+      "RECAT (src/sim/performance.ts RECAT)": {
+        "value": "I",
+        "source": "JO 7110.126A TBL A-1 (page A1, read visually 2026-10-21)",
+        "status": "VERIFIED"
+      },
+      "takeoff/landing distance": {
+        "value": "1970 ft / 1800 ft",
+        "source": "ACD take-off distance 600 m (at MTOW 4500 kg, ISA, sea level) and landing distance 550 m, converted at 3.28084 ft/m and rounded to 10 ft",
+        "status": "verified (ACD figures are MTOW / indicative: the engine refuses a departure from a runway shorter than takeoffDistanceFt, so these are the heaviest-case need; KMHT types use typical-weight ESTIMATEs, see _meta)"
+      },
+      "rotate/climb/approach speeds": {
+        "value": "rotate 105, climb 130, approach 85, touchdown 80",
+        "source": "rotate = ACD V2 110 - 5 kt (A320 precedent: VR a few kt below V2); climb speed = ACD initial climb IAS 130 kt; approach = ACD Vat 85 kt; touchdown = Vat - 5 kt (A320 precedent)",
+        "status": "derived from ACD"
+      },
+      "climbRateFpm / descentRateFpm": {
+        "value": "1700 / 1500",
+        "source": "climb = ACD initial climb ROC 1700 ft/min; descent: ACD descent to FL100 ROD 1500 ft/min",
+        "status": "climb verified; descent DESIGN where 2,000"
+      },
+      "cruiseSpeedKt / maxSpeedKt": {
+        "value": "180 / 210",
+        "source": "cruise: ACD approach-segment IAS 180 kt (the ACD climb IAS 130 kt is the same as its initial-climb IAS and below the 180 kt approach figure); max: ACD descent to FL100 IAS 210 kt",
+        "status": "DESIGN / derived"
+      },
+      "accel/decel": {
+        "value": "5.9 / 4.5 kt/s",
+        "source": "accel: a = VR^2 / (2 x 0.8 x takeoffDistanceFt) with VR 105 kt (ground roll taken as 80 % of the 35 ft take-off distance; the A320 and B738 entries give 0.83 / 0.80); decel: DESIGN, as the class precedent (A320 6.0, B752 5.5)",
+        "status": "ESTIMATE (derived) / DESIGN"
+      },
+      "taxi/turn rates, min speed": {
+        "value": "taxi 15 kt, taxi turn 8 kt, turn 3.0 deg/s, ground turn 25 deg/s, min 70 kt",
+        "source": "none authoritative; gameplay simplifications as C172/A320/B752; min speed = Vat - 15 kt as A320 (120 vs 135) and B738 (125 vs 140)",
+        "status": "DESIGN value (UNVERIFIED simplification)"
+      },
+      "serviceCeilingFt / lengthM": {
+        "value": "30000 / 14.4",
+        "source": "ACD ceiling FL300; ACD length 14.4 m",
+        "status": "verified"
+      },
+      "_not_in_type_shape": {
+        "wingspan_m": 16.2,
+        "height_m": 4.3,
+        "mtow_kg": 4500,
+        "wingspan_source": "ACD technical data (wing span 16.2 m, height 4.3 m)",
+        "wake_srs_category": "FAA JO 7110.65 3-9-6 NOTE (derived: Category I small single-engine propeller <= 12,500 lb; II small twin-engine propeller <= 12,500 lb; III all other)",
+        "engine": "L1T; 1 x 1.200 SHP P&W PT6A-67B turboprop with 4 bladed Hartzell propeller.",
+        "radio_wake_word": "none"
+      }
+    }
+  },
+  "C402": {
+    "type": "C402",
+    "category": "light",
+    "wakeCategory": "light",
+    "taxiSpeedKt": 15,
+    "taxiTurnSpeedKt": 8,
+    "accelKtPerSec": 3.8,
+    "decelKtPerSec": 4.4,
+    "rotateSpeedKt": 90,
+    "climbSpeedKt": 125,
+    "cruiseSpeedKt": 150,
+    "approachSpeedKt": 110,
+    "touchdownSpeedKt": 105,
+    "climbRateFpm": 1200,
+    "descentRateFpm": 800,
+    "turnRateDegPerSec": 3.0,
+    "groundTurnRateDegPerSec": 25,
+    "minSpeedKt": 95,
+    "maxSpeedKt": 220,
+    "serviceCeilingFt": 27000,
+    "takeoffDistanceFt": 2220,
+    "landingDistanceFt": 1770,
+    "lengthM": 11.1,
+    "_sources": {
+      "_summary": {
+        "value": "Cessna 402C",
+        "source": "EUROCONTROL_ACD (page C402); FAA_JO_7110_126A; CFR91.117",
+        "status": "SOURCED (ACD, retrieved 2026-10-21) with the derivations noted per field; gameplay values marked DESIGN"
+      },
+      "ACD row read": {
+        "value": "ACD C402 'Show performance table': V2 95 kt, take-off distance 677 m, WTC L, RECAT-EU Light, MTOW 2860 kg; initial climb IAS 125 kt ROC 1200 ft/min; climb to FL150 IAS 140 kt ROC 800; cruise TAS 230 kt, ceiling FL270; descent to FL100 IAS 220 kt ROD 800; approach IAS 150 kt ROD 500; landing Vat 110 kt, distance 538 m, APC B; technical: wing span 13.5 m, length 11.1 m, height 3.6 m; type L2P",
+        "source": "https://learningzone.eurocontrol.int/ilp/customs/ATCPFDB/details.aspx?ICAO=C402 (retrieved 2026-10-21, HTTP 200; raw/realism/eurocontrol_acd_C402.html)",
+        "status": "verified transcription"
+      },
+      "category/wakeCategory": {
+        "value": "light / light",
+        "source": "ACD WTC L (ICAO wake turbulence category L/M/H/J) and MTOW 2860 kg; FAA category: large = MTOW above 12,500 lb (5,670 kg)",
+        "status": "verified"
+      },
+      "RECAT (src/sim/performance.ts RECAT)": {
+        "value": "I",
+        "source": "JO 7110.126A TBL A-1 (page A1, read visually 2026-10-21)",
+        "status": "VERIFIED"
+      },
+      "takeoff/landing distance": {
+        "value": "2220 ft / 1770 ft",
+        "source": "ACD take-off distance 677 m (at MTOW 2860 kg, ISA, sea level) and landing distance 538 m, converted at 3.28084 ft/m and rounded to 10 ft",
+        "status": "verified (ACD figures are MTOW / indicative: the engine refuses a departure from a runway shorter than takeoffDistanceFt, so these are the heaviest-case need; KMHT types use typical-weight ESTIMATEs, see _meta)"
+      },
+      "rotate/climb/approach speeds": {
+        "value": "rotate 90, climb 125, approach 110, touchdown 105",
+        "source": "rotate = ACD V2 95 - 5 kt (A320 precedent: VR a few kt below V2); climb speed = ACD initial climb IAS 125 kt; approach = ACD Vat 110 kt; touchdown = Vat - 5 kt (A320 precedent)",
+        "status": "derived from ACD"
+      },
+      "climbRateFpm / descentRateFpm": {
+        "value": "1200 / 800",
+        "source": "climb = ACD initial climb ROC 1200 ft/min; descent: ACD descent to FL100 ROD 800 ft/min",
+        "status": "climb verified; descent DESIGN where 2,000"
+      },
+      "cruiseSpeedKt / maxSpeedKt": {
+        "value": "150 / 220",
+        "source": "cruise: ACD approach-segment IAS 150 kt (climb IAS 140 kt); max: ACD descent to FL100 IAS 220 kt",
+        "status": "DESIGN / derived"
+      },
+      "accel/decel": {
+        "value": "3.8 / 4.4 kt/s",
+        "source": "accel: a = VR^2 / (2 x 0.8 x takeoffDistanceFt) with VR 90 kt (ground roll taken as 80 % of the 35 ft take-off distance; the A320 and B738 entries give 0.83 / 0.80); decel: DESIGN, as the class precedent (A320 6.0, B752 5.5)",
+        "status": "ESTIMATE (derived) / DESIGN"
+      },
+      "taxi/turn rates, min speed": {
+        "value": "taxi 15 kt, taxi turn 8 kt, turn 3.0 deg/s, ground turn 25 deg/s, min 95 kt",
+        "source": "none authoritative; gameplay simplifications as C172/A320/B752; min speed = Vat - 15 kt as A320 (120 vs 135) and B738 (125 vs 140)",
+        "status": "DESIGN value (UNVERIFIED simplification)"
+      },
+      "serviceCeilingFt / lengthM": {
+        "value": "27000 / 11.1",
+        "source": "ACD ceiling FL270; ACD length 11.1 m",
+        "status": "verified"
+      },
+      "_not_in_type_shape": {
+        "wingspan_m": 13.5,
+        "height_m": 3.6,
+        "mtow_kg": 2860,
+        "wingspan_source": "ACD technical data (wing span 13.5 m, height 3.6 m)",
+        "wake_srs_category": "FAA JO 7110.65 3-9-6 NOTE (derived: Category I small single-engine propeller <= 12,500 lb; II small twin-engine propeller <= 12,500 lb; III all other)",
+        "engine": "L2P; 2 x 300 HP Continental TSIO-520-E or 2 x 325 HP Continental TSIO-520-VB turbocha",
+        "radio_wake_word": "none"
+      }
+    }
+  },
+  "C56X": {
+    "type": "C56X",
+    "category": "large",
+    "wakeCategory": "medium",
+    "taxiSpeedKt": 20,
+    "taxiTurnSpeedKt": 10,
+    "accelKtPerSec": 3.7,
+    "decelKtPerSec": 6.0,
+    "rotateSpeedKt": 110,
+    "climbSpeedKt": 145,
+    "cruiseSpeedKt": 250,
+    "approachSpeedKt": 117,
+    "touchdownSpeedKt": 112,
+    "climbRateFpm": 2500,
+    "descentRateFpm": 2000,
+    "turnRateDegPerSec": 3.0,
+    "groundTurnRateDegPerSec": 20,
+    "minSpeedKt": 102,
+    "maxSpeedKt": 300,
+    "serviceCeilingFt": 45000,
+    "takeoffDistanceFt": 3460,
+    "landingDistanceFt": 2920,
+    "lengthM": 15.8,
+    "_sources": {
+      "_summary": {
+        "value": "Cessna Citation Excel / XLS",
+        "source": "EUROCONTROL_ACD (page C56X); FAA_JO_7110_126A; CFR91.117",
+        "status": "SOURCED (ACD, retrieved 2026-10-21) with the derivations noted per field; gameplay values marked DESIGN"
+      },
+      "ACD row read": {
+        "value": "ACD C56X 'Show performance table': V2 115 kt, take-off distance 1055 m, WTC M, RECAT-EU Light, MTOW 8709 kg; initial climb IAS 145 kt ROC 2500 ft/min; climb to FL150 IAS 270 kt ROC 3000; cruise TAS 430 kt, ceiling FL450; descent to FL100 IAS 270 kt ROD 3000; approach IAS 210 kt ROD 1000; landing Vat 117 kt, distance 890 m, APC B; technical: wing span 17 m, length 15.8 m, height 5.2 m; type L2J",
+        "source": "https://learningzone.eurocontrol.int/ilp/customs/ATCPFDB/details.aspx?ICAO=C56X (retrieved 2026-10-21, HTTP 200; raw/realism/eurocontrol_acd_C56X.html)",
+        "status": "verified transcription"
+      },
+      "category/wakeCategory": {
+        "value": "large / medium",
+        "source": "ACD WTC M (ICAO wake turbulence category L/M/H/J) and MTOW 8709 kg; FAA category: large = MTOW above 12,500 lb (5,670 kg)",
+        "status": "verified"
+      },
+      "RECAT (src/sim/performance.ts RECAT)": {
+        "value": "H",
+        "source": "JO 7110.126A TBL A-1 (page A1, read visually 2026-10-21)",
+        "status": "VERIFIED"
+      },
+      "takeoff/landing distance": {
+        "value": "3460 ft / 2920 ft",
+        "source": "ACD take-off distance 1055 m (at MTOW 8709 kg, ISA, sea level) and landing distance 890 m, converted at 3.28084 ft/m and rounded to 10 ft",
+        "status": "verified (ACD figures are MTOW / indicative: the engine refuses a departure from a runway shorter than takeoffDistanceFt, so these are the heaviest-case need; KMHT types use typical-weight ESTIMATEs, see _meta)"
+      },
+      "rotate/climb/approach speeds": {
+        "value": "rotate 110, climb 145, approach 117, touchdown 112",
+        "source": "rotate = ACD V2 115 - 5 kt (A320 precedent: VR a few kt below V2); climb speed = ACD initial climb IAS 145 kt; approach = ACD Vat 117 kt; touchdown = Vat - 5 kt (A320 precedent)",
+        "status": "derived from ACD"
+      },
+      "climbRateFpm / descentRateFpm": {
+        "value": "2500 / 2000",
+        "source": "climb = ACD initial climb ROC 2500 ft/min; descent: DESIGN 2,000 ft/min as for A320/B738 (ACD descent to FL100 ROD 3000, approach ROD 1000 ft/min)",
+        "status": "climb verified; descent DESIGN where 2,000"
+      },
+      "cruiseSpeedKt / maxSpeedKt": {
+        "value": "250 / 300",
+        "source": "cruise: 14 CFR 91.117(a) 250 kt limit below 10,000 ft (as A320/B738); max: ACD max(climb IAS 270, descent IAS 270) + 30 kt rounded to 10 (A320 precedent: 290 -> 320), a sim cap not a VMO",
+        "status": "DESIGN / derived"
+      },
+      "accel/decel": {
+        "value": "3.7 / 6.0 kt/s",
+        "source": "accel: a = VR^2 / (2 x 0.8 x takeoffDistanceFt) with VR 110 kt (ground roll taken as 80 % of the 35 ft take-off distance; the A320 and B738 entries give 0.83 / 0.80); decel: DESIGN, as the class precedent (A320 6.0, B752 5.5)",
+        "status": "ESTIMATE (derived) / DESIGN"
+      },
+      "taxi/turn rates, min speed": {
+        "value": "taxi 20 kt, taxi turn 10 kt, turn 3.0 deg/s, ground turn 20 deg/s, min 102 kt",
+        "source": "none authoritative; gameplay simplifications as C172/A320/B752; min speed = Vat - 15 kt as A320 (120 vs 135) and B738 (125 vs 140)",
+        "status": "DESIGN value (UNVERIFIED simplification)"
+      },
+      "serviceCeilingFt / lengthM": {
+        "value": "45000 / 15.8",
+        "source": "ACD ceiling FL450; ACD length 15.8 m",
+        "status": "verified"
+      },
+      "_not_in_type_shape": {
+        "wingspan_m": 17.0,
+        "height_m": 5.2,
+        "mtow_kg": 8709,
+        "wingspan_source": "ACD technical data (wing span 17 m, height 5.2 m)",
+        "wake_srs_category": "FAA JO 7110.65 3-9-6 NOTE (derived: Category I small single-engine propeller <= 12,500 lb; II small twin-engine propeller <= 12,500 lb; III all other)",
+        "engine": "L2J; 2 x 16,2 kN P&W PW545A turbofans.",
+        "radio_wake_word": "none"
+      }
+    }
+  },
+  "CL35": {
+    "type": "CL35",
+    "category": "large",
+    "wakeCategory": "medium",
+    "taxiSpeedKt": 20,
+    "taxiTurnSpeedKt": 10,
+    "accelKtPerSec": 4.0,
+    "decelKtPerSec": 6.0,
+    "rotateSpeedKt": 135,
+    "climbSpeedKt": 160,
+    "cruiseSpeedKt": 250,
+    "approachSpeedKt": 125,
+    "touchdownSpeedKt": 120,
+    "climbRateFpm": 4500,
+    "descentRateFpm": 2000,
+    "turnRateDegPerSec": 3.0,
+    "groundTurnRateDegPerSec": 20,
+    "minSpeedKt": 110,
+    "maxSpeedKt": 290,
+    "serviceCeilingFt": 45000,
+    "takeoffDistanceFt": 4840,
+    "landingDistanceFt": 2710,
+    "lengthM": 20.9,
+    "_sources": {
+      "_summary": {
+        "value": "Bombardier Challenger 350",
+        "source": "EUROCONTROL_ACD (page CL35); FAA_JO_7110_126A; CFR91.117",
+        "status": "SOURCED (ACD, retrieved 2026-10-21) with the derivations noted per field; gameplay values marked DESIGN"
+      },
+      "ACD row read": {
+        "value": "ACD CL35 'Show performance table': V2 140 kt, take-off distance 1474 m, WTC M, RECAT-EU Lower Medium, MTOW 18416 kg; initial climb IAS 160 kt ROC 4500 ft/min; climb to FL150 IAS 260 kt ROC 3500; cruise TAS 455 kt, ceiling FL450; descent to FL100 IAS 250 kt ROD 2500; approach IAS 200 kt ROD 1500; landing Vat 125 kt, distance 826 m, APC C; technical: wing span 21 m, length 20.9 m, height 6.1 m; type L2J",
+        "source": "https://learningzone.eurocontrol.int/ilp/customs/ATCPFDB/details.aspx?ICAO=CL35 (retrieved 2026-10-21, HTTP 200; raw/realism/eurocontrol_acd_CL35.html)",
+        "status": "verified transcription"
+      },
+      "category/wakeCategory": {
+        "value": "large / medium",
+        "source": "ACD WTC M (ICAO wake turbulence category L/M/H/J) and MTOW 18416 kg; FAA category: large = MTOW above 12,500 lb (5,670 kg)",
+        "status": "verified"
+      },
+      "RECAT (src/sim/performance.ts RECAT)": {
+        "value": "H",
+        "source": "DERIVED: not listed; MTOW 18,416 kg = 40,600 lb is within the Category H definition (more than 15,400 up to 41,000 lb); CL30 is listed under H",
+        "status": "UNVERIFIED (type absent from TBL A-1)"
+      },
+      "takeoff/landing distance": {
+        "value": "4840 ft / 2710 ft",
+        "source": "ACD take-off distance 1474 m (at MTOW 18416 kg, ISA, sea level) and landing distance 826 m, converted at 3.28084 ft/m and rounded to 10 ft",
+        "status": "verified (ACD figures are MTOW / indicative: the engine refuses a departure from a runway shorter than takeoffDistanceFt, so these are the heaviest-case need; KMHT types use typical-weight ESTIMATEs, see _meta)"
+      },
+      "rotate/climb/approach speeds": {
+        "value": "rotate 135, climb 160, approach 125, touchdown 120",
+        "source": "rotate = ACD V2 140 - 5 kt (A320 precedent: VR a few kt below V2); climb speed = ACD initial climb IAS 160 kt; approach = ACD Vat 125 kt; touchdown = Vat - 5 kt (A320 precedent)",
+        "status": "derived from ACD"
+      },
+      "climbRateFpm / descentRateFpm": {
+        "value": "4500 / 2000",
+        "source": "climb = ACD initial climb ROC 4500 ft/min; descent: DESIGN 2,000 ft/min as for A320/B738 (ACD descent to FL100 ROD 2500, approach ROD 1500 ft/min)",
+        "status": "climb verified; descent DESIGN where 2,000"
+      },
+      "cruiseSpeedKt / maxSpeedKt": {
+        "value": "250 / 290",
+        "source": "cruise: 14 CFR 91.117(a) 250 kt limit below 10,000 ft (as A320/B738); max: ACD max(climb IAS 260, descent IAS 250) + 30 kt rounded to 10 (A320 precedent: 290 -> 320), a sim cap not a VMO",
+        "status": "DESIGN / derived"
+      },
+      "accel/decel": {
+        "value": "4.0 / 6.0 kt/s",
+        "source": "accel: a = VR^2 / (2 x 0.8 x takeoffDistanceFt) with VR 135 kt (ground roll taken as 80 % of the 35 ft take-off distance; the A320 and B738 entries give 0.83 / 0.80); decel: DESIGN, as the class precedent (A320 6.0, B752 5.5)",
+        "status": "ESTIMATE (derived) / DESIGN"
+      },
+      "taxi/turn rates, min speed": {
+        "value": "taxi 20 kt, taxi turn 10 kt, turn 3.0 deg/s, ground turn 20 deg/s, min 110 kt",
+        "source": "none authoritative; gameplay simplifications as C172/A320/B752; min speed = Vat - 15 kt as A320 (120 vs 135) and B738 (125 vs 140)",
+        "status": "DESIGN value (UNVERIFIED simplification)"
+      },
+      "serviceCeilingFt / lengthM": {
+        "value": "45000 / 20.9",
+        "source": "ACD ceiling FL450; ACD length 20.9 m",
+        "status": "verified"
+      },
+      "_not_in_type_shape": {
+        "wingspan_m": 21.0,
+        "height_m": 6.1,
+        "mtow_kg": 18416,
+        "wingspan_source": "ACD technical data (wing span 21 m, height 6.1 m)",
+        "wake_srs_category": "FAA JO 7110.65 3-9-6 NOTE (derived: Category I small single-engine propeller <= 12,500 lb; II small twin-engine propeller <= 12,500 lb; III all other)",
+        "engine": "L2J; 2 x Honeywell HTF7350 turbofans (33 kN)",
+        "radio_wake_word": "none"
+      }
+    }
+  },
+  "GLF5": {
+    "type": "GLF5",
+    "category": "large",
+    "wakeCategory": "medium",
+    "taxiSpeedKt": 20,
+    "taxiTurnSpeedKt": 10,
+    "accelKtPerSec": 4.0,
+    "decelKtPerSec": 6.0,
+    "rotateSpeedKt": 140,
+    "climbSpeedKt": 175,
+    "cruiseSpeedKt": 250,
+    "approachSpeedKt": 140,
+    "touchdownSpeedKt": 135,
+    "climbRateFpm": 4000,
+    "descentRateFpm": 2000,
+    "turnRateDegPerSec": 3.0,
+    "groundTurnRateDegPerSec": 20,
+    "minSpeedKt": 125,
+    "maxSpeedKt": 330,
+    "serviceCeilingFt": 51000,
+    "takeoffDistanceFt": 5150,
+    "landingDistanceFt": 2900,
+    "lengthM": 29.4,
+    "_sources": {
+      "_summary": {
+        "value": "Gulfstream V",
+        "source": "EUROCONTROL_ACD (page GLF5); FAA_JO_7110_126A; CFR91.117",
+        "status": "SOURCED (ACD, retrieved 2026-10-21) with the derivations noted per field; gameplay values marked DESIGN"
+      },
+      "ACD row read": {
+        "value": "ACD GLF5 'Show performance table': V2 145 kt, take-off distance 1570 m, WTC M, RECAT-EU Lower Medium, MTOW 41136 kg; initial climb IAS 175 kt ROC 4000 ft/min; climb to FL150 IAS 300 kt ROC 3000; cruise TAS 480 kt, ceiling FL510; descent to FL100 IAS 290 kt ROD 2500; approach IAS 250 kt ROD 1500; landing Vat 140 kt, distance 884 m, APC C; technical: wing span 28.5 m, length 29.4 m, height 7.9 m; type L2J",
+        "source": "https://learningzone.eurocontrol.int/ilp/customs/ATCPFDB/details.aspx?ICAO=GLF5 (retrieved 2026-10-21, HTTP 200; raw/realism/eurocontrol_acd_GLF5.html)",
+        "status": "verified transcription"
+      },
+      "category/wakeCategory": {
+        "value": "large / medium",
+        "source": "ACD WTC M (ICAO wake turbulence category L/M/H/J) and MTOW 41136 kg; FAA category: large = MTOW above 12,500 lb (5,670 kg)",
+        "status": "verified"
+      },
+      "RECAT (src/sim/performance.ts RECAT)": {
+        "value": "F",
+        "source": "JO 7110.126A TBL A-1 (page A1, read visually 2026-10-21)",
+        "status": "VERIFIED"
+      },
+      "takeoff/landing distance": {
+        "value": "5150 ft / 2900 ft",
+        "source": "ACD take-off distance 1570 m (at MTOW 41136 kg, ISA, sea level) and landing distance 884 m, converted at 3.28084 ft/m and rounded to 10 ft",
+        "status": "verified (ACD figures are MTOW / indicative: the engine refuses a departure from a runway shorter than takeoffDistanceFt, so these are the heaviest-case need; KMHT types use typical-weight ESTIMATEs, see _meta)"
+      },
+      "rotate/climb/approach speeds": {
+        "value": "rotate 140, climb 175, approach 140, touchdown 135",
+        "source": "rotate = ACD V2 145 - 5 kt (A320 precedent: VR a few kt below V2); climb speed = ACD initial climb IAS 175 kt; approach = ACD Vat 140 kt; touchdown = Vat - 5 kt (A320 precedent)",
+        "status": "derived from ACD"
+      },
+      "climbRateFpm / descentRateFpm": {
+        "value": "4000 / 2000",
+        "source": "climb = ACD initial climb ROC 4000 ft/min; descent: DESIGN 2,000 ft/min as for A320/B738 (ACD descent to FL100 ROD 2500, approach ROD 1500 ft/min)",
+        "status": "climb verified; descent DESIGN where 2,000"
+      },
+      "cruiseSpeedKt / maxSpeedKt": {
+        "value": "250 / 330",
+        "source": "cruise: 14 CFR 91.117(a) 250 kt limit below 10,000 ft (as A320/B738); max: ACD max(climb IAS 300, descent IAS 290) + 30 kt rounded to 10 (A320 precedent: 290 -> 320), a sim cap not a VMO",
+        "status": "DESIGN / derived"
+      },
+      "accel/decel": {
+        "value": "4.0 / 6.0 kt/s",
+        "source": "accel: a = VR^2 / (2 x 0.8 x takeoffDistanceFt) with VR 140 kt (ground roll taken as 80 % of the 35 ft take-off distance; the A320 and B738 entries give 0.83 / 0.80); decel: DESIGN, as the class precedent (A320 6.0, B752 5.5)",
+        "status": "ESTIMATE (derived) / DESIGN"
+      },
+      "taxi/turn rates, min speed": {
+        "value": "taxi 20 kt, taxi turn 10 kt, turn 3.0 deg/s, ground turn 20 deg/s, min 125 kt",
+        "source": "none authoritative; gameplay simplifications as C172/A320/B752; min speed = Vat - 15 kt as A320 (120 vs 135) and B738 (125 vs 140)",
+        "status": "DESIGN value (UNVERIFIED simplification)"
+      },
+      "serviceCeilingFt / lengthM": {
+        "value": "51000 / 29.4",
+        "source": "ACD ceiling FL510; ACD length 29.4 m",
+        "status": "verified"
+      },
+      "_not_in_type_shape": {
+        "wingspan_m": 28.5,
+        "height_m": 7.9,
+        "mtow_kg": 41136,
+        "wingspan_source": "ACD technical data (wing span 28.5 m, height 7.9 m)",
+        "wake_srs_category": "FAA JO 7110.65 3-9-6 NOTE (derived: Category I small single-engine propeller <= 12,500 lb; II small twin-engine propeller <= 12,500 lb; III all other)",
+        "engine": "L2J; 2 x 65,3 kN Rolls-Royce BR710A1-10 turbofans.",
+        "radio_wake_word": "none"
+      }
+    }
+  },
+  "GLEX": {
+    "type": "GLEX",
+    "category": "large",
+    "wakeCategory": "medium",
+    "taxiSpeedKt": 20,
+    "taxiTurnSpeedKt": 10,
+    "accelKtPerSec": 2.3,
+    "decelKtPerSec": 6.0,
+    "rotateSpeedKt": 115,
+    "climbSpeedKt": 150,
+    "cruiseSpeedKt": 250,
+    "approachSpeedKt": 125,
+    "touchdownSpeedKt": 120,
+    "climbRateFpm": 4000,
+    "descentRateFpm": 2000,
+    "turnRateDegPerSec": 3.0,
+    "groundTurnRateDegPerSec": 20,
+    "minSpeedKt": 110,
+    "maxSpeedKt": 330,
+    "serviceCeilingFt": 51000,
+    "takeoffDistanceFt": 6140,
+    "landingDistanceFt": 2670,
+    "lengthM": 30.3,
+    "_sources": {
+      "_summary": {
+        "value": "Bombardier Global Express",
+        "source": "EUROCONTROL_ACD (page GLEX); FAA_JO_7110_126A; CFR91.117",
+        "status": "SOURCED (ACD, retrieved 2026-10-21) with the derivations noted per field; gameplay values marked DESIGN"
+      },
+      "ACD row read": {
+        "value": "ACD GLEX 'Show performance table': V2 120 kt, take-off distance 1870 m, WTC M, RECAT-EU Lower Medium, MTOW 44500 kg; initial climb IAS 150 kt ROC 4000 ft/min; climb to FL150 IAS 300 kt ROC 3000; cruise TAS 490 kt, ceiling FL510; descent to FL100 IAS 300 kt ROD 2000; approach IAS 250 kt ROD 1500; landing Vat 125 kt, distance 814 m, APC C; technical: wing span 28.6 m, length 30.3 m, height 7.6 m; type L2J",
+        "source": "https://learningzone.eurocontrol.int/ilp/customs/ATCPFDB/details.aspx?ICAO=GLEX (retrieved 2026-10-21, HTTP 200; raw/realism/eurocontrol_acd_GLEX.html)",
+        "status": "verified transcription"
+      },
+      "category/wakeCategory": {
+        "value": "large / medium",
+        "source": "ACD WTC M (ICAO wake turbulence category L/M/H/J) and MTOW 44500 kg; FAA category: large = MTOW above 12,500 lb (5,670 kg)",
+        "status": "verified"
+      },
+      "RECAT (src/sim/performance.ts RECAT)": {
+        "value": "F",
+        "source": "JO 7110.126A TBL A-1 (page A1, read visually 2026-10-21)",
+        "status": "VERIFIED"
+      },
+      "takeoff/landing distance": {
+        "value": "6140 ft / 2670 ft",
+        "source": "ACD take-off distance 1870 m (at MTOW 44500 kg, ISA, sea level) and landing distance 814 m, converted at 3.28084 ft/m and rounded to 10 ft",
+        "status": "verified (ACD figures are MTOW / indicative: the engine refuses a departure from a runway shorter than takeoffDistanceFt, so these are the heaviest-case need; KMHT types use typical-weight ESTIMATEs, see _meta)"
+      },
+      "rotate/climb/approach speeds": {
+        "value": "rotate 115, climb 150, approach 125, touchdown 120",
+        "source": "rotate = ACD V2 120 - 5 kt (A320 precedent: VR a few kt below V2); climb speed = ACD initial climb IAS 150 kt; approach = ACD Vat 125 kt; touchdown = Vat - 5 kt (A320 precedent)",
+        "status": "derived from ACD"
+      },
+      "climbRateFpm / descentRateFpm": {
+        "value": "4000 / 2000",
+        "source": "climb = ACD initial climb ROC 4000 ft/min; descent: ACD descent to FL100 ROD 2000 ft/min",
+        "status": "climb verified; descent DESIGN where 2,000"
+      },
+      "cruiseSpeedKt / maxSpeedKt": {
+        "value": "250 / 330",
+        "source": "cruise: 14 CFR 91.117(a) 250 kt limit below 10,000 ft (as A320/B738); max: ACD max(climb IAS 300, descent IAS 300) + 30 kt rounded to 10 (A320 precedent: 290 -> 320), a sim cap not a VMO",
+        "status": "DESIGN / derived"
+      },
+      "accel/decel": {
+        "value": "2.3 / 6.0 kt/s",
+        "source": "accel: a = VR^2 / (2 x 0.8 x takeoffDistanceFt) with VR 115 kt (ground roll taken as 80 % of the 35 ft take-off distance; the A320 and B738 entries give 0.83 / 0.80); decel: DESIGN, as the class precedent (A320 6.0, B752 5.5)",
+        "status": "ESTIMATE (derived) / DESIGN"
+      },
+      "taxi/turn rates, min speed": {
+        "value": "taxi 20 kt, taxi turn 10 kt, turn 3.0 deg/s, ground turn 20 deg/s, min 110 kt",
+        "source": "none authoritative; gameplay simplifications as C172/A320/B752; min speed = Vat - 15 kt as A320 (120 vs 135) and B738 (125 vs 140)",
+        "status": "DESIGN value (UNVERIFIED simplification)"
+      },
+      "serviceCeilingFt / lengthM": {
+        "value": "51000 / 30.3",
+        "source": "ACD ceiling FL510; ACD length 30.3 m",
+        "status": "verified"
+      },
+      "_not_in_type_shape": {
+        "wingspan_m": 28.6,
+        "height_m": 7.6,
+        "mtow_kg": 44500,
+        "wingspan_source": "ACD technical data (wing span 28.6 m, height 7.6 m)",
+        "wake_srs_category": "FAA JO 7110.65 3-9-6 NOTE (derived: Category I small single-engine propeller <= 12,500 lb; II small twin-engine propeller <= 12,500 lb; III all other)",
+        "engine": "L2J; 2 x 65,3 kN R-R BR710-48-C2 turbofans.",
+        "radio_wake_word": "none"
+      }
+    }
+  },
   "_meta_traffic_variety": {
     "added_2026-10-18": "H65 (USCG MH-65 Dolphin), F16 (F-16C Fighting Falcon) and VEH (airport vehicle) were added for the traffic-variety task. Values named in _sources with status VERIFIED were read on 2026-10-18 from the cited pages or, for the two fact sheets (dcms.uscg.mil MH-65E sheet, af.mil F-16 sheet), from web-search result text because those servers answered HTTP 403 / blocked scripted requests; everything else is UNVERIFIED design values. docs/REALISM-VERIFICATION.md section 9.",
     "source_keys": {

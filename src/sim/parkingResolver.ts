@@ -9,6 +9,7 @@
 import type { Aircraft, Airport, ParkingPosition, SimulationState } from './types';
 import { dist } from './geo';
 import { perfOf } from './context';
+import { isBusinessJetType } from './performance';
 
 export type ParkingCategory = ParkingPosition['category'];
 
@@ -69,6 +70,7 @@ export function naturalCategory(ac: Aircraft): ParkingCategory {
   // Freighters (UPS, FedEx) use the cargo apron; a light aircraft with an airline-style callsign (Wiggins' Caravan) parks on the GA ramp.
   if (perfOf(ac).category !== 'light' && /^(UPS|FDX)\d/.test(ac.callsign)) return 'cargo';
   if (perfOf(ac).category === 'light') return 'ga';
+  if (isBusinessJetType(ac.type)) return 'fbo'; // Citation, Challenger, Gulfstream, Global: the FBO ramp, not an airline gate
   return 'airline';
 }
 
@@ -89,7 +91,8 @@ export function freeParkingCandidates(
   const natural = naturalCategory(ac);
   // A GA<->airline mismatch (e.g. a jet spawned on a ramp spot) says nothing about preference.
   const home = homeCategory && (homeCategory === 'ga' || homeCategory === 'airline') && homeCategory !== natural ? undefined : homeCategory;
-  for (const c of [home, natural]) {
+  // An airport without an FBO ramp parks a business jet on the GA ramp.
+  for (const c of [home, natural, natural === 'fbo' ? 'ga' : undefined] as (ParkingCategory | undefined)[]) {
     if (!c) continue;
     // military types park in their own zone: helicopters at the USCG helipads, fighters on the ANG ramp
     const zone = c === 'military' ? (ac.type === 'H65' ? 'USCG-' : 'ANG-') : undefined;

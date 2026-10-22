@@ -258,3 +258,16 @@ Full inventory, every source with URL and retrieval date, and the outcome per va
 * **Jet and C208 crosswind limits: still undefined.** EASA TCDS EASA.A.064 Issue 62 and EASA.IM.A.226 Issue 15 searched for crosswind, tailwind and wind: no entry; no primary document found for B738, E175, CRJ9, B752, BCS3.
 * **Helicopter 400 ft AGL level: kept.** No primary figure better than AIM 4-3-3's 500 ft AGL helicopter pattern exists.
 * **F-16 and MH-65 fact sheets: still second-hand.** af.mil, the Air National Guard unit sites, nationalmuseum.af.mil and dcms.uscg.mil answered HTTP 403 again; the Lockheed Martin page carried no specification table.
+
+## 11. Types added for KBOS / KPHL / EGLL traffic (2026-10-21)
+
+Thirty-four types were added (the list, the retrieval record and every derivation are in `data/sources/README.md` "Aircraft performance: types added for KBOS, KPHL and EGLL" and in each type's `_sources` in `data/sources/aircraft-performance.json`). Unlike section 7, every figure comes from a page retrieved that day: the EUROCONTROL Aircraft Performance Database page of the type (V2, take-off and landing distance at MTOW, climb and descent rates and speeds, Vat, ceiling, WTC, MTOW, wing span, length), FAA JO 7110.126A TBL A-1 for RECAT, and the Airbus A350 airport-planning charts for the A359 distances (the ACD page has a data error there).
+
+| Item | Result |
+|---|---|
+| Speeds | rotate = V2 - 5; approach = Vat; touchdown = Vat - 5; climb speed = initial-climb IAS (A320 precedent) |
+| Distances | ACD MTOW figures; larger than the typical-weight ESTIMATEs of the KMHT types, so the engine's runway check (commandExecutor.ts, world.ts `runwayLongEnoughFor`) keeps B744 / B748 off every KBOS runway and B77W off all but the longest |
+| Wake | ICAO category from the ACD; RECAT from TBL A-1 (listed types) or derived and marked UNVERIFIED (A20N, A21N, B38M, A35K, BE9L, CL35) |
+| Callsign | "heavy" for RECAT B, C, D and "super" for A (`wakeCallsignWord`, `spokenCallsign`); test in `src/sim/performanceTypes.test.ts` |
+| Engine type | the Caravan C208 entry said `turbofan`; corrected to `turboprop` (a data error that had no effect before `isTurbojet` read `propulsion`) |
+| Tower view / glyphs | two new families (`widebody`, `widebodyQuad`) from the ACD length / span / height; the Citation Excel table entry (19.4 / 17.2 / 5.8 m) was not a Citation Excel and is replaced by the ACD 15.8 / 17.0 / 5.2 m |

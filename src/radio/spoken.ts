@@ -1,4 +1,5 @@
 /** Spoken-number and phonetic rendering for radio phraseology (US style: "niner", "point"). */
+import { wakeCallsignWord } from '../sim/performance';
 
 const DIGITS = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'niner'] as const;
 const NATO: Record<string, string> = {
@@ -107,13 +108,20 @@ const AIRLINES: Record<string, string> = {
   MXY: 'Moxy', PDT: 'Piedmont', GJS: 'Lindbergh', WIG: 'Wiggins', SCX: 'Sun Country',
 };
 
-const GA_PREFIX: Record<string, string> = { C172: 'Cessna', C182: 'Cessna', C152: 'Cessna', C210: 'Cessna', C208: 'Cessna', PA28: 'Piper', SR22: 'Cirrus', BE36: 'Bonanza' };
+const GA_PREFIX: Record<string, string> = {
+  C172: 'Cessna', C182: 'Cessna', C152: 'Cessna', C210: 'Cessna', C208: 'Cessna', PA28: 'Piper', SR22: 'Cirrus', BE36: 'Bonanza',
+  // AIM 4-2-4: the pilot states the type, model or manufacturer's name before the registration. Business / commuter types added 2026-10-21 (words in GA_PREFIXES, commands/lexicon.ts).
+  C402: 'Cessna', C56X: 'Citation', CL35: 'Challenger', GLF5: 'Gulfstream', GLEX: 'Global', BE20: 'King Air', BE9L: 'King Air', PC12: 'Pilatus',
+};
 
 /** How a pilot names the aircraft type in a call ("Boeing 737", "Airbus A220", "Embraer 175"); unknown types are read out by their code. */
 const TYPE_NAMES: Record<string, string> = {
   C172: 'Cessna', C182: 'Cessna', C152: 'Cessna', C210: 'Cessna', C208: 'Caravan', PA28: 'Piper', SR22: 'Cirrus', BE36: 'Bonanza',
   A320: 'Airbus', A319: 'Airbus', A321: 'Airbus', BCS3: 'Airbus A220', BCS1: 'Airbus A220', B737: 'Boeing 737', B738: 'Boeing 737', B739: 'Boeing 737',
   B38M: 'Boeing 737', B752: 'Boeing 757', B763: 'Boeing 767', E175: 'Embraer 175', E170: 'Embraer 170', E190: 'Embraer 190', CRJ9: 'CRJ-900', CRJ7: 'CRJ-700', CRJ2: 'CRJ-200',
+  A20N: 'Airbus', A21N: 'Airbus', A332: 'Airbus A330', A333: 'Airbus A330', A339: 'Airbus A330', A359: 'Airbus A350', A35K: 'Airbus A350', A388: 'Airbus A380', A306: 'Airbus A300',
+  B762: 'Boeing 767', B772: 'Boeing 777', B77W: 'Boeing 777', B788: 'Boeing 787', B789: 'Boeing 787', B744: 'Boeing 747', B748: 'Boeing 747', MD11: 'MD-11',
+  DH8D: 'Dash 8', BE20: 'King Air', BE9L: 'King Air', PC12: 'Pilatus', C402: 'Cessna', C56X: 'Citation', CL35: 'Challenger', GLF5: 'Gulfstream', GLEX: 'Global Express',
   H65: 'Dolphin', F16: 'Falcon', VEH: 'Vehicle',
 };
 export function spokenAircraftType(type: string): string {
@@ -144,7 +152,18 @@ export function flightNumberSpoken(num: string): string {
  */
 export const SERVICE_TELEPHONY: Readonly<Record<string, string>> = { CGD: 'Coast Guard', ANG: 'Air Guard', APT: 'Airport' };
 
+/**
+ * The spoken callsign, with "heavy" / "super" after it for a Category A-D aircraft (JO 7110.126A Appendix B, amended JO 7110.65 2-4-14: "the word heavy must
+ * be used as part of the identification in all communications with or about heavy aircraft"; the 2-4-14 NOTE: "most airlines will use the word super or heavy
+ * following the company prefix and flight number", example "United Fifty-Eight Heavy"). Needs the type; the service and vehicle forms never take it.
+ */
 export function spokenCallsign(callsign: string, type?: string): string {
+  const base = baseSpokenCallsign(callsign, type);
+  const word = type ? wakeCallsignWord(type.trim().toUpperCase()) : undefined;
+  return word && !/^(CGD|ANG|APT)\d/i.test(callsign.trim()) ? `${base} ${word}` : base;
+}
+
+function baseSpokenCallsign(callsign: string, type?: string): string {
   const cs = callsign.trim().toUpperCase();
   const svc = /^(CGD|ANG)(\d{5})$/.exec(cs);
   if (svc) return `${SERVICE_TELEPHONY[svc[1]]} ${digitsSpoken(svc[2])}`;
@@ -189,6 +208,13 @@ export function capitalize(s: string): string {
 
 /** How a pilot names another aircraft in a readback: "Cessna" for a GA registration with a type word, else the whole spoken callsign ("Spirit four fifty one"). */
 export function spokenTrafficLabel(a: { callsign: string; spokenCallsign: string }): string {
-  const first = a.spokenCallsign.split(' ')[0] ?? '';
-  return /^N\d/i.test(a.callsign) && first.toLowerCase() !== 'november' && a.spokenCallsign.split(' ').length > 1 ? first : a.spokenCallsign;
+  const first = gaPrefixWords(a.spokenCallsign);
+  return /^N\d/i.test(a.callsign) && first.toLowerCase() !== 'november' && first !== '' && first !== a.spokenCallsign ? first : a.spokenCallsign;
+}
+
+/** The type words in front of a registration's digits in a spoken GA callsign: "Cessna seven two three echo juliet" -> "Cessna", "King Air four five ..." -> "King Air". */
+export function gaPrefixWords(spoken: string): string {
+  const words = spoken.split(' ');
+  const i = words.findIndex((w) => (ONES as readonly string[]).includes(w) || w === 'niner');
+  return i > 0 ? words.slice(0, i).join(' ') : words[0] ?? '';
 }

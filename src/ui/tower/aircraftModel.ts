@@ -12,7 +12,7 @@ import type { FuselageStyle } from './liveries';
 export type AircraftClass = 'airliner' | 'bizjet' | 'ga' | 'rotorcraft' | 'fighter' | 'vehicle';
 
 /** Model families: each is built by its own recipe in aircraftMeshes.ts. */
-export type ModelFamily = 'narrowbody' | 'regionalJet' | 'bizjet' | 'gaHigh' | 'gaLow' | 'turboprop' | 'turbopropSingle' | 'helicopter' | 'fighter' | 'groundVehicle';
+export type ModelFamily = 'narrowbody' | 'widebody' | 'widebodyQuad' | 'regionalJet' | 'bizjet' | 'gaHigh' | 'gaLow' | 'turboprop' | 'turbopropSingle' | 'helicopter' | 'fighter' | 'groundVehicle';
 
 /** Families built from a parametric Recipe; the special-traffic families (helicopter, fighter, ground vehicle) have their own builders in specialModels.ts. */
 export type RecipeFamily = Exclude<ModelFamily, 'helicopter' | 'fighter' | 'groundVehicle'>;
@@ -44,6 +44,23 @@ const TYPES: Readonly<Record<string, TypeDims>> = {
   B752: { family: 'narrowbody', len: 47.3, span: 38.0, height: 13.6 },
   BCS1: { family: 'narrowbody', len: 35.0, span: 35.1, height: 11.5 }, // A220-100
   BCS3: { family: 'narrowbody', len: 38.7, span: 35.1, height: 11.5 }, // A220-300
+  // Wide-bodies (EUROCONTROL ACD technical data, retrieved 2026-10-21: length / wing span / height). The MD11 has a third engine in the fin that the twin model does not draw.
+  A306: { family: 'widebody', len: 54.1, span: 44.84, height: 16.54 },
+  A332: { family: 'widebody', len: 58.8, span: 60.3, height: 17.4 },
+  A333: { family: 'widebody', len: 63.6, span: 60.3, height: 16.85 },
+  A339: { family: 'widebody', len: 63.66, span: 64.0, height: 16.79 },
+  A359: { family: 'widebody', len: 66.9, span: 64.8, height: 17.05 },
+  A35K: { family: 'widebody', len: 73.79, span: 64.75, height: 17.08 },
+  B762: { family: 'widebody', len: 48.5, span: 47.6, height: 15.9 },
+  B763: { family: 'widebody', len: 54.9, span: 47.6, height: 15.9 },
+  B772: { family: 'widebody', len: 63.7, span: 60.9, height: 18.4 },
+  B77W: { family: 'widebody', len: 73.9, span: 64.8, height: 18.5 },
+  B788: { family: 'widebody', len: 56.7, span: 52.0, height: 16.9 },
+  B789: { family: 'widebody', len: 62.8, span: 60.12, height: 16.9 },
+  MD11: { family: 'widebody', len: 61.2, span: 51.7, height: 17.6 },
+  A388: { family: 'widebodyQuad', len: 73.0, span: 79.8, height: 24.1 },
+  B744: { family: 'widebodyQuad', len: 70.6, span: 64.8, height: 19.4 },
+  B748: { family: 'widebodyQuad', len: 76.3, span: 68.5, height: 19.4 },
   E170: { family: 'narrowbody', len: 29.9, span: 26.0, height: 9.7 },
   E75S: { family: 'narrowbody', len: 31.7, span: 26.0, height: 9.7 },
   E75L: { family: 'narrowbody', len: 31.7, span: 26.0, height: 9.7 },
@@ -64,7 +81,13 @@ const TYPES: Readonly<Record<string, TypeDims>> = {
   C25A: { family: 'bizjet', len: 13.0, span: 14.3, height: 4.2 },
   C25B: { family: 'bizjet', len: 14.4, span: 15.9, height: 4.6 },
   C510: { family: 'bizjet', len: 12.2, span: 13.2, height: 4.1 },
-  C56X: { family: 'bizjet', len: 19.4, span: 17.2, height: 5.8 },
+  C56X: { family: 'bizjet', len: 15.8, span: 17.0, height: 5.2 }, // ACD (was 19.4 / 17.2 / 5.8, which are not Citation Excel figures)
+  CL35: { family: 'bizjet', len: 20.9, span: 21.0, height: 6.1 },
+  GLEX: { family: 'bizjet', len: 30.3, span: 28.6, height: 7.6 },
+  // King Air 200 / 90: low-wing twin turboprops (drawn with the turboprop recipe, low wing). Cessna 402C: twin piston, drawn with the single-prop low-wing GA recipe (no twin-piston model).
+  BE20: { family: 'turboprop', len: 13.4, span: 16.6, height: 4.5, low: true },
+  BE9L: { family: 'turboprop', len: 10.8, span: 15.3, height: 4.3, low: true },
+  C402: { family: 'gaLow', len: 11.1, span: 13.5, height: 3.6 },
   LJ45: { family: 'bizjet', len: 17.7, span: 14.5, height: 4.3 },
   E50P: { family: 'bizjet', len: 12.8, span: 12.8, height: 4.3 },
   E55P: { family: 'bizjet', len: 15.9, span: 16.2, height: 5.0 },
@@ -97,12 +120,13 @@ export function familyOf(type: string): ModelFamily {
   if (BIZJET.test(type)) return 'bizjet';
   if (perf.category === 'light' || perf.lengthM < 14) return /^(PA|SR|DA|BE|M2|CH|RV)/.test(type) ? 'gaLow' : 'gaHigh';
   if (/^(DH8|AT7)/.test(type)) return 'turboprop';
+  if (perf.category === 'heavy') return perf.lengthM > 68 && /^(B74|A38)/.test(type) ? 'widebodyQuad' : 'widebody';
   if (/^CRJ/.test(type)) return 'regionalJet';
   return perf.lengthM < 22 && !/^(A3|B7|E1|E7)/.test(type) ? 'bizjet' : 'narrowbody';
 }
 
 const FAMILY_CLASS: Record<ModelFamily, AircraftClass> = {
-  narrowbody: 'airliner', regionalJet: 'airliner', turboprop: 'airliner', bizjet: 'bizjet', gaHigh: 'ga', gaLow: 'ga', turbopropSingle: 'ga',
+  narrowbody: 'airliner', widebody: 'airliner', widebodyQuad: 'airliner', regionalJet: 'airliner', turboprop: 'airliner', bizjet: 'bizjet', gaHigh: 'ga', gaLow: 'ga', turbopropSingle: 'ga',
   helicopter: 'rotorcraft', fighter: 'fighter', groundVehicle: 'vehicle',
 };
 
@@ -112,13 +136,13 @@ export function classifyAircraft(type: string): AircraftClass {
 
 /** Families whose gear retracts. GA singles and the Caravan keep fixed gear. */
 export const RETRACTABLE: Readonly<Record<ModelFamily, boolean>> = {
-  narrowbody: true, regionalJet: true, turboprop: true, bizjet: true, gaHigh: false, gaLow: false, turbopropSingle: false,
+  narrowbody: true, widebody: true, widebodyQuad: true, regionalJet: true, turboprop: true, bizjet: true, gaHigh: false, gaLow: false, turbopropSingle: false,
   helicopter: false, fighter: true, groundVehicle: false,
 };
 
 /** Default ratios for a family when the type has no table entry (wingspan / length, height / length). */
 const FAMILY_RATIOS: Record<ModelFamily, { span: number; height: number }> = {
-  narrowbody: { span: 0.95, height: 0.31 }, regionalJet: { span: 0.68, height: 0.205 }, turboprop: { span: 1.0, height: 0.27 },
+  narrowbody: { span: 0.95, height: 0.31 }, widebody: { span: 0.95, height: 0.28 }, widebodyQuad: { span: 0.95, height: 0.27 }, regionalJet: { span: 0.68, height: 0.205 }, turboprop: { span: 1.0, height: 0.27 },
   bizjet: { span: 1.0, height: 0.31 }, gaHigh: { span: 1.33, height: 0.33 }, gaLow: { span: 1.45, height: 0.3 }, turbopropSingle: { span: 1.38, height: 0.39 },
   helicopter: { span: 0.88, height: 0.295 }, fighter: { span: 0.66, height: 0.324 }, groundVehicle: { span: 0.36, height: 0.345 },
 };
@@ -137,7 +161,7 @@ export function aircraftDims(type: string): ModelDims {
   const lengthM = registered || !t ? perf.lengthM : t.len;
   const spanRatio = t ? t.span / t.len : FAMILY_RATIOS[family].span;
   const heightRatio = t ? t.height / t.len : FAMILY_RATIOS[family].height;
-  const lowWing = family === 'gaLow' || family === 'narrowbody' || family === 'regionalJet' || family === 'bizjet' || !!t?.low;
+  const lowWing = family === 'gaLow' || family === 'narrowbody' || family === 'widebody' || family === 'widebodyQuad' || family === 'regionalJet' || family === 'bizjet' || !!t?.low;
   return { lengthM, wingspanM: lengthM * spanRatio, heightM: lengthM * heightRatio, cls: FAMILY_CLASS[family], family, lowWing };
 }
 
@@ -156,7 +180,8 @@ export interface Recipe {
   fin: { rc: number; tc: number; sweep: number; zTE: number };
   stab: { span: number; rc: number; tc: number; sweep: number; zTE: number; tTail: boolean };
   engines: 'wing' | 'rear' | 'turboprop' | 'nose';
-  engine: { r: number; len: number; x: number };
+  /** `x2`: spanwise position (fraction of the semi-span) of a second, outboard engine on each wing (four-engine types). */
+  engine: { r: number; len: number; x: number; x2?: number };
   /** Main gear at this fraction of the length from the nose, half track (fraction of length), wheel radius (fraction of length). */
   gear: { nose: number; main: number; track: number; wheelR: number; pants: boolean; twin: boolean };
   prop?: { r: number; blades: number };
@@ -173,6 +198,26 @@ export const RECIPES: Record<RecipeFamily, Recipe> = {
     stab: { span: 0.35, rc: 0.075, tc: 0.03, sweep: 32, zTE: 0.03, tTail: false },
     engines: 'wing', engine: { r: 0.027, len: 0.105, x: 0.32 },
     gear: { nose: 0.12, main: 0.45, track: 0.1, wheelR: 0.0155, pants: false, twin: true },
+    windowsPerLen: 1.4, style: 'airliner',
+  },
+  // 777 / 787 / A330 / A350 / 767 / A300 / MD11: wide fuselage, long swept wing, two large underwing turbofans.
+  widebody: {
+    R: 0.048, sq: 1, clear: 0.04, nose: 2.9, tail: 5.6, up: 0.9,
+    wing: { t0: 0.37, rc: 0.15, tc: 0.04, sweep: 32, dih: 5, high: false, winglet: 0.03, thick: 0.12 },
+    fin: { rc: 0.15, tc: 0.06, sweep: 40, zTE: 0.04 },
+    stab: { span: 0.31, rc: 0.075, tc: 0.03, sweep: 35, zTE: 0.03, tTail: false },
+    engines: 'wing', engine: { r: 0.03, len: 0.095, x: 0.33 },
+    gear: { nose: 0.1, main: 0.5, track: 0.07, wheelR: 0.0165, pants: false, twin: true },
+    windowsPerLen: 1.4, style: 'airliner',
+  },
+  // 747 / A380: as the wide-body with four underwing engines.
+  widebodyQuad: {
+    R: 0.05, sq: 1.02, clear: 0.04, nose: 2.9, tail: 5.6, up: 0.9,
+    wing: { t0: 0.38, rc: 0.17, tc: 0.045, sweep: 37, dih: 5, high: false, winglet: 0.02, thick: 0.12 },
+    fin: { rc: 0.15, tc: 0.06, sweep: 40, zTE: 0.04 },
+    stab: { span: 0.32, rc: 0.08, tc: 0.03, sweep: 37, zTE: 0.03, tTail: false },
+    engines: 'wing', engine: { r: 0.026, len: 0.085, x: 0.3, x2: 0.6 },
+    gear: { nose: 0.1, main: 0.5, track: 0.075, wheelR: 0.0155, pants: false, twin: true },
     windowsPerLen: 1.4, style: 'airliner',
   },
   // CRJ: low wing with winglets, aft-mounted engines, T-tail.

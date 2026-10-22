@@ -238,7 +238,8 @@ export type AircraftTypeCode = 'C172' | 'A320' | string;
 export interface AircraftPerformance {
   type: AircraftTypeCode;
   category: 'light' | 'large' | 'heavy';
-  wakeCategory: 'light' | 'medium' | 'heavy';
+  /** ICAO wake turbulence category: L light, M medium, H heavy, J super (A388). */
+  wakeCategory: 'light' | 'medium' | 'heavy' | 'super';
   /** Simplified, believable limits — not flight-sim physics. */
   taxiSpeedKt: number;
   taxiTurnSpeedKt: number;

@@ -260,6 +260,7 @@ describe('aircraft glyphs', () => {
   const FAMILIES: [string, string][] = [
     ['A320', 'narrowbody'], ['B738', 'narrowbody'], ['CRJ9', 'regionalJet'], ['E175', 'narrowbody'], ['DH8D', 'turboprop'], ['C208', 'turbopropSingle'],
     ['C25B', 'bizjet'], ['GLF4', 'bizjet'], ['C172', 'gaHigh'], ['PA28', 'gaLow'],
+    ['B772', 'widebody'], ['A359', 'widebody'], ['A388', 'widebodyQuad'], ['B748', 'widebodyQuad'], ['BE20', 'turboprop'], ['C402', 'gaLow'], ['GLEX', 'bizjet'],
   ];
   it('has a closed path for every family, starting at the nose and ending closed', () => {
     for (const [type, family] of FAMILIES) {

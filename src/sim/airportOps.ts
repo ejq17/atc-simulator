@@ -193,8 +193,14 @@ export function latestBrakingReport(state: Pick<SimulationState, 'ops' | 'clock'
 const SPOKEN_TYPE: Record<string, string> = {
   C172: 'a Cessna one seventy two', C182: 'a Cessna one eighty two', C152: 'a Cessna one fifty two', C208: 'a Cessna Caravan', PA28: 'a Piper Cherokee', SR22: 'a Cirrus S R twenty two',
   A319: 'an Airbus three nineteen', A320: 'an Airbus three twenty', A321: 'an Airbus three twenty one', BCS3: 'an Airbus A two twenty',
-  B737: 'a Boeing seven thirty seven', B738: 'a Boeing seven thirty seven', B739: 'a Boeing seven thirty seven', B38M: 'a Boeing seven thirty seven', B752: 'a Boeing seven fifty seven', B763: 'a Boeing seven sixty seven',
+  B737: 'a Boeing seven thirty seven', B738: 'a Boeing seven thirty seven', B739: 'a Boeing seven thirty seven', B38M: 'a Boeing seven thirty seven', B752: 'a Boeing seven fifty seven',
   E175: 'an Embraer one seventy five', E170: 'an Embraer one seventy', E190: 'an Embraer one ninety', CRJ9: 'a C R J nine hundred', CRJ7: 'a C R J seven hundred', CRJ2: 'a C R J two hundred',
+  A20N: 'an Airbus three twenty', A21N: 'an Airbus three twenty one', B762: 'a heavy Boeing seven sixty seven', B763: 'a heavy Boeing seven sixty seven',
+  A306: 'a heavy Airbus three hundred', MD11: 'a heavy M D eleven', B772: 'a heavy Boeing seven seventy seven', B77W: 'a heavy Boeing seven seventy seven',
+  B788: 'a heavy Boeing seven eighty seven', B789: 'a heavy Boeing seven eighty seven', A332: 'a heavy Airbus three thirty', A333: 'a heavy Airbus three thirty',
+  A339: 'a heavy Airbus three thirty', A359: 'a heavy Airbus three fifty', A35K: 'a heavy Airbus three fifty', A388: 'a super Airbus three eighty',
+  B744: 'a heavy Boeing seven forty seven', B748: 'a heavy Boeing seven forty seven', DH8D: 'a Dash eight', BE20: 'a King Air', BE9L: 'a King Air', PC12: 'a Pilatus',
+  C402: 'a Cessna four oh two', C56X: 'a Citation', CL35: 'a Challenger', GLF5: 'a Gulfstream', GLEX: 'a Global Express',
 };
 
 /** "a Boeing seven thirty seven": the aircraft description of a braking report (JO 7110.65 3-3-4: "Include type of aircraft from which the report is received"). */

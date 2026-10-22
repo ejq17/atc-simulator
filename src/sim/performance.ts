@@ -127,7 +127,356 @@ export const C208: AircraftPerformance = {
   rotateSpeedKt: 75, climbSpeedKt: 95, cruiseSpeedKt: 175, approachSpeedKt: 85, touchdownSpeedKt: 70,
   climbRateFpm: 900, descentRateFpm: 1000, turnRateDegPerSec: 3, groundTurnRateDegPerSec: 25,
   minSpeedKt: 60, maxSpeedKt: 175, serviceCeilingFt: 25000,
-  takeoffDistanceFt: 2300, landingDistanceFt: 1900, lengthM: 11.5, propulsion: 'turbofan', // ESTIMATE: Textron 208B/208 specifications, POH Section 5, typical weight
+  takeoffDistanceFt: 2300, landingDistanceFt: 1900, lengthM: 11.5, propulsion: 'turboprop', // (was 'turbofan', a data error: the Caravan is a single PT6A turboprop) ESTIMATE: Textron 208B/208 specifications, POH Section 5, typical weight
+};
+
+// ---------------------------------------------------------------------------------------------------------------------------------
+// Types added for the KBOS / KPHL / EGLL traffic (2026-10-21). Every figure is read from the EUROCONTROL Aircraft Performance Database
+// (ACD) page of the type, retrieved 2026-10-21, or derived from it by the formula stated per field in data/sources/aircraft-performance.json
+// (_sources of each type): rotate = V2 - 5 kt, approach = Vat, touchdown = Vat - 5, climb speed / rate = initial climb IAS / ROC, take-off and
+// landing distance = the ACD figures at MTOW (A359: Airbus AC chart-read), cruise = 14 CFR 91.117(a) 250 kt for jets. Taxi, turn, descent
+// (jets) and braking values are DESIGN values as for A320 / B738. Take-off distances are MTOW-basis, so they are larger than the typical-weight
+// ESTIMATEs of the KMHT types: `runwayLongEnoughFor` therefore keeps the heaviest types off short runways.
+// ---------------------------------------------------------------------------------------------------------------------------------
+
+/** Airbus A319. EUROCONTROL ACD page A319 (retrieved 2026-10-21); derivations and gameplay values per field in data/sources/aircraft-performance.json A319._sources. RECAT F. */
+export const A319: AircraftPerformance = {
+  type: 'A319', category: 'large', wakeCategory: 'medium',
+  taxiSpeedKt: 20, taxiTurnSpeedKt: 10, accelKtPerSec: 3.1, decelKtPerSec: 6.0,
+  rotateSpeedKt: 130, climbSpeedKt: 165, cruiseSpeedKt: 250, approachSpeedKt: 130, touchdownSpeedKt: 125,
+  climbRateFpm: 2500, descentRateFpm: 2000, turnRateDegPerSec: 2.5, groundTurnRateDegPerSec: 15,
+  minSpeedKt: 115, maxSpeedKt: 320, serviceCeilingFt: 39000,
+  takeoffDistanceFt: 5740, landingDistanceFt: 4430, lengthM: 33.8, propulsion: 'turbofan',
+};
+
+/** Airbus A320neo. EUROCONTROL ACD page A20N (retrieved 2026-10-21); derivations and gameplay values per field in data/sources/aircraft-performance.json A20N._sources. RECAT F (UNVERIFIED: not in TBL A-1). */
+export const A20N: AircraftPerformance = {
+  type: 'A20N', category: 'large', wakeCategory: 'medium',
+  taxiSpeedKt: 20, taxiTurnSpeedKt: 10, accelKtPerSec: 3.2, decelKtPerSec: 6.0,
+  rotateSpeedKt: 140, climbSpeedKt: 175, cruiseSpeedKt: 250, approachSpeedKt: 135, touchdownSpeedKt: 130,
+  climbRateFpm: 2200, descentRateFpm: 2000, turnRateDegPerSec: 2.5, groundTurnRateDegPerSec: 15,
+  minSpeedKt: 120, maxSpeedKt: 320, serviceCeilingFt: 39000,
+  takeoffDistanceFt: 6400, landingDistanceFt: 5410, lengthM: 37.6, propulsion: 'turbofan',
+};
+
+/** Airbus A321neo. EUROCONTROL ACD page A21N (retrieved 2026-10-21); derivations and gameplay values per field in data/sources/aircraft-performance.json A21N._sources. RECAT F (UNVERIFIED: not in TBL A-1). */
+export const A21N: AircraftPerformance = {
+  type: 'A21N', category: 'large', wakeCategory: 'medium',
+  taxiSpeedKt: 20, taxiTurnSpeedKt: 10, accelKtPerSec: 2.9, decelKtPerSec: 6.0,
+  rotateSpeedKt: 140, climbSpeedKt: 175, cruiseSpeedKt: 250, approachSpeedKt: 140, touchdownSpeedKt: 135,
+  climbRateFpm: 2000, descentRateFpm: 2000, turnRateDegPerSec: 2.5, groundTurnRateDegPerSec: 15,
+  minSpeedKt: 125, maxSpeedKt: 320, serviceCeilingFt: 39000,
+  takeoffDistanceFt: 7050, landingDistanceFt: 6070, lengthM: 44.5, propulsion: 'turbofan',
+};
+
+/** Airbus A321. EUROCONTROL ACD page A321 (retrieved 2026-10-21); derivations and gameplay values per field in data/sources/aircraft-performance.json A321._sources. RECAT F. */
+export const A321: AircraftPerformance = {
+  type: 'A321', category: 'large', wakeCategory: 'medium',
+  taxiSpeedKt: 20, taxiTurnSpeedKt: 10, accelKtPerSec: 2.9, decelKtPerSec: 6.0,
+  rotateSpeedKt: 140, climbSpeedKt: 175, cruiseSpeedKt: 250, approachSpeedKt: 141, touchdownSpeedKt: 136,
+  climbRateFpm: 2500, descentRateFpm: 2000, turnRateDegPerSec: 2.5, groundTurnRateDegPerSec: 15,
+  minSpeedKt: 126, maxSpeedKt: 320, serviceCeilingFt: 41000,
+  takeoffDistanceFt: 7250, landingDistanceFt: 5250, lengthM: 44.5, propulsion: 'turbofan',
+};
+
+/** Boeing 737-700. EUROCONTROL ACD page B737 (retrieved 2026-10-21); derivations and gameplay values per field in data/sources/aircraft-performance.json B737._sources. RECAT F. */
+export const B737: AircraftPerformance = {
+  type: 'B737', category: 'large', wakeCategory: 'medium',
+  taxiSpeedKt: 20, taxiTurnSpeedKt: 10, accelKtPerSec: 3.8, decelKtPerSec: 6.0,
+  rotateSpeedKt: 145, climbSpeedKt: 165, cruiseSpeedKt: 250, approachSpeedKt: 137, touchdownSpeedKt: 132,
+  climbRateFpm: 3000, descentRateFpm: 2000, turnRateDegPerSec: 2.5, groundTurnRateDegPerSec: 15,
+  minSpeedKt: 122, maxSpeedKt: 310, serviceCeilingFt: 41000,
+  takeoffDistanceFt: 5910, landingDistanceFt: 4590, lengthM: 33.6, propulsion: 'turbofan',
+};
+
+/** Boeing 737 MAX 8. EUROCONTROL ACD page B38M (retrieved 2026-10-21); derivations and gameplay values per field in data/sources/aircraft-performance.json B38M._sources. RECAT F (UNVERIFIED: not in TBL A-1). */
+export const B38M: AircraftPerformance = {
+  type: 'B38M', category: 'large', wakeCategory: 'medium',
+  taxiSpeedKt: 20, taxiTurnSpeedKt: 10, accelKtPerSec: 2.5, decelKtPerSec: 6.0,
+  rotateSpeedKt: 140, climbSpeedKt: 165, cruiseSpeedKt: 250, approachSpeedKt: 145, touchdownSpeedKt: 140,
+  climbRateFpm: 2500, descentRateFpm: 2000, turnRateDegPerSec: 2.5, groundTurnRateDegPerSec: 15,
+  minSpeedKt: 130, maxSpeedKt: 320, serviceCeilingFt: 41000,
+  takeoffDistanceFt: 8200, landingDistanceFt: 4920, lengthM: 39.5, propulsion: 'turbofan',
+};
+
+/** Boeing 737-900. EUROCONTROL ACD page B739 (retrieved 2026-10-21); derivations and gameplay values per field in data/sources/aircraft-performance.json B739._sources. RECAT F. */
+export const B739: AircraftPerformance = {
+  type: 'B739', category: 'large', wakeCategory: 'medium',
+  taxiSpeedKt: 20, taxiTurnSpeedKt: 10, accelKtPerSec: 2.9, decelKtPerSec: 6.0,
+  rotateSpeedKt: 144, climbSpeedKt: 165, cruiseSpeedKt: 250, approachSpeedKt: 150, touchdownSpeedKt: 145,
+  climbRateFpm: 3000, descentRateFpm: 2000, turnRateDegPerSec: 2.5, groundTurnRateDegPerSec: 15,
+  minSpeedKt: 135, maxSpeedKt: 320, serviceCeilingFt: 41000,
+  takeoffDistanceFt: 7550, landingDistanceFt: 5580, lengthM: 42.1, propulsion: 'turbofan',
+};
+
+/** Embraer 190. EUROCONTROL ACD page E190 (retrieved 2026-10-21); derivations and gameplay values per field in data/sources/aircraft-performance.json E190._sources. RECAT F. */
+export const E190: AircraftPerformance = {
+  type: 'E190', category: 'large', wakeCategory: 'medium',
+  taxiSpeedKt: 20, taxiTurnSpeedKt: 10, accelKtPerSec: 2.8, decelKtPerSec: 6.0,
+  rotateSpeedKt: 133, climbSpeedKt: 190, cruiseSpeedKt: 250, approachSpeedKt: 131, touchdownSpeedKt: 126,
+  climbRateFpm: 3400, descentRateFpm: 2000, turnRateDegPerSec: 3.0, groundTurnRateDegPerSec: 16,
+  minSpeedKt: 116, maxSpeedKt: 330, serviceCeilingFt: 41000,
+  takeoffDistanceFt: 6750, landingDistanceFt: 4340, lengthM: 36.2, propulsion: 'turbofan',
+};
+
+/** Bombardier CRJ-700. EUROCONTROL ACD page CRJ7 (retrieved 2026-10-21); derivations and gameplay values per field in data/sources/aircraft-performance.json CRJ7._sources. RECAT G. */
+export const CRJ7: AircraftPerformance = {
+  type: 'CRJ7', category: 'large', wakeCategory: 'medium',
+  taxiSpeedKt: 20, taxiTurnSpeedKt: 10, accelKtPerSec: 3.4, decelKtPerSec: 6.0,
+  rotateSpeedKt: 130, climbSpeedKt: 165, cruiseSpeedKt: 250, approachSpeedKt: 135, touchdownSpeedKt: 130,
+  climbRateFpm: 3000, descentRateFpm: 2000, turnRateDegPerSec: 3.0, groundTurnRateDegPerSec: 16,
+  minSpeedKt: 120, maxSpeedKt: 320, serviceCeilingFt: 41000,
+  takeoffDistanceFt: 5250, landingDistanceFt: 4850, lengthM: 32.5, propulsion: 'turbofan',
+};
+
+/** Boeing 767-200. EUROCONTROL ACD page B762 (retrieved 2026-10-21); derivations and gameplay values per field in data/sources/aircraft-performance.json B762._sources. RECAT C. */
+export const B762: AircraftPerformance = {
+  type: 'B762', category: 'heavy', wakeCategory: 'heavy',
+  taxiSpeedKt: 20, taxiTurnSpeedKt: 10, accelKtPerSec: 2.9, decelKtPerSec: 5.5,
+  rotateSpeedKt: 155, climbSpeedKt: 190, cruiseSpeedKt: 250, approachSpeedKt: 135, touchdownSpeedKt: 130,
+  climbRateFpm: 2000, descentRateFpm: 2000, turnRateDegPerSec: 2.5, groundTurnRateDegPerSec: 10,
+  minSpeedKt: 120, maxSpeedKt: 320, serviceCeilingFt: 45000,
+  takeoffDistanceFt: 8860, landingDistanceFt: 4920, lengthM: 48.5, propulsion: 'turbofan',
+};
+
+/** Boeing 767-300. EUROCONTROL ACD page B763 (retrieved 2026-10-21); derivations and gameplay values per field in data/sources/aircraft-performance.json B763._sources. RECAT C. */
+export const B763: AircraftPerformance = {
+  type: 'B763', category: 'heavy', wakeCategory: 'heavy',
+  taxiSpeedKt: 20, taxiTurnSpeedKt: 10, accelKtPerSec: 2.7, decelKtPerSec: 5.5,
+  rotateSpeedKt: 155, climbSpeedKt: 190, cruiseSpeedKt: 250, approachSpeedKt: 140, touchdownSpeedKt: 135,
+  climbRateFpm: 3000, descentRateFpm: 2000, turnRateDegPerSec: 2.5, groundTurnRateDegPerSec: 10,
+  minSpeedKt: 125, maxSpeedKt: 320, serviceCeilingFt: 45000,
+  takeoffDistanceFt: 9510, landingDistanceFt: 5910, lengthM: 54.9, propulsion: 'turbofan',
+};
+
+/** Airbus A300-600. EUROCONTROL ACD page A306 (retrieved 2026-10-21); derivations and gameplay values per field in data/sources/aircraft-performance.json A306._sources. RECAT C. */
+export const A306: AircraftPerformance = {
+  type: 'A306', category: 'heavy', wakeCategory: 'heavy',
+  taxiSpeedKt: 20, taxiTurnSpeedKt: 10, accelKtPerSec: 3.4, decelKtPerSec: 5.5,
+  rotateSpeedKt: 155, climbSpeedKt: 190, cruiseSpeedKt: 250, approachSpeedKt: 139, touchdownSpeedKt: 134,
+  climbRateFpm: 3000, descentRateFpm: 2000, turnRateDegPerSec: 2.5, groundTurnRateDegPerSec: 10,
+  minSpeedKt: 124, maxSpeedKt: 320, serviceCeilingFt: 37000,
+  takeoffDistanceFt: 7350, landingDistanceFt: 5030, lengthM: 54.1, propulsion: 'turbofan',
+};
+
+/** Boeing 777-200. EUROCONTROL ACD page B772 (retrieved 2026-10-21); derivations and gameplay values per field in data/sources/aircraft-performance.json B772._sources. RECAT B. */
+export const B772: AircraftPerformance = {
+  type: 'B772', category: 'heavy', wakeCategory: 'heavy',
+  taxiSpeedKt: 20, taxiTurnSpeedKt: 10, accelKtPerSec: 3.0, decelKtPerSec: 5.5,
+  rotateSpeedKt: 165, climbSpeedKt: 200, cruiseSpeedKt: 250, approachSpeedKt: 140, touchdownSpeedKt: 135,
+  climbRateFpm: 3000, descentRateFpm: 2000, turnRateDegPerSec: 2.5, groundTurnRateDegPerSec: 10,
+  minSpeedKt: 125, maxSpeedKt: 330, serviceCeilingFt: 43000,
+  takeoffDistanceFt: 9510, landingDistanceFt: 5580, lengthM: 63.7, propulsion: 'turbofan',
+};
+
+/** Boeing 777-300ER. EUROCONTROL ACD page B77W (retrieved 2026-10-21); derivations and gameplay values per field in data/sources/aircraft-performance.json B77W._sources. RECAT B. */
+export const B77W: AircraftPerformance = {
+  type: 'B77W', category: 'heavy', wakeCategory: 'heavy',
+  taxiSpeedKt: 20, taxiTurnSpeedKt: 10, accelKtPerSec: 2.8, decelKtPerSec: 5.5,
+  rotateSpeedKt: 163, climbSpeedKt: 200, cruiseSpeedKt: 250, approachSpeedKt: 149, touchdownSpeedKt: 144,
+  climbRateFpm: 3000, descentRateFpm: 2000, turnRateDegPerSec: 2.5, groundTurnRateDegPerSec: 10,
+  minSpeedKt: 134, maxSpeedKt: 330, serviceCeilingFt: 43000,
+  takeoffDistanceFt: 9840, landingDistanceFt: 5910, lengthM: 73.9, propulsion: 'turbofan',
+};
+
+/** Boeing 787-8. EUROCONTROL ACD page B788 (retrieved 2026-10-21); derivations and gameplay values per field in data/sources/aircraft-performance.json B788._sources. RECAT B. */
+export const B788: AircraftPerformance = {
+  type: 'B788', category: 'heavy', wakeCategory: 'heavy',
+  taxiSpeedKt: 20, taxiTurnSpeedKt: 10, accelKtPerSec: 2.9, decelKtPerSec: 5.5,
+  rotateSpeedKt: 160, climbSpeedKt: 190, cruiseSpeedKt: 250, approachSpeedKt: 140, touchdownSpeedKt: 135,
+  climbRateFpm: 2700, descentRateFpm: 2000, turnRateDegPerSec: 2.5, groundTurnRateDegPerSec: 10,
+  minSpeedKt: 125, maxSpeedKt: 330, serviceCeilingFt: 43000,
+  takeoffDistanceFt: 9250, landingDistanceFt: 4990, lengthM: 56.7, propulsion: 'turbofan',
+};
+
+/** Boeing 787-9. EUROCONTROL ACD page B789 (retrieved 2026-10-21); derivations and gameplay values per field in data/sources/aircraft-performance.json B789._sources. RECAT B. */
+export const B789: AircraftPerformance = {
+  type: 'B789', category: 'heavy', wakeCategory: 'heavy',
+  taxiSpeedKt: 20, taxiTurnSpeedKt: 10, accelKtPerSec: 2.9, decelKtPerSec: 5.5,
+  rotateSpeedKt: 160, climbSpeedKt: 190, cruiseSpeedKt: 250, approachSpeedKt: 150, touchdownSpeedKt: 145,
+  climbRateFpm: 2700, descentRateFpm: 2000, turnRateDegPerSec: 2.5, groundTurnRateDegPerSec: 10,
+  minSpeedKt: 135, maxSpeedKt: 330, serviceCeilingFt: 43000,
+  takeoffDistanceFt: 9190, landingDistanceFt: 4990, lengthM: 62.8, propulsion: 'turbofan',
+};
+
+/** Airbus A330-200. EUROCONTROL ACD page A332 (retrieved 2026-10-21); derivations and gameplay values per field in data/sources/aircraft-performance.json A332._sources. RECAT B. */
+export const A332: AircraftPerformance = {
+  type: 'A332', category: 'heavy', wakeCategory: 'heavy',
+  taxiSpeedKt: 20, taxiTurnSpeedKt: 10, accelKtPerSec: 2.7, decelKtPerSec: 5.5,
+  rotateSpeedKt: 140, climbSpeedKt: 175, cruiseSpeedKt: 250, approachSpeedKt: 140, touchdownSpeedKt: 135,
+  climbRateFpm: 2000, descentRateFpm: 2000, turnRateDegPerSec: 2.5, groundTurnRateDegPerSec: 10,
+  minSpeedKt: 125, maxSpeedKt: 320, serviceCeilingFt: 41000,
+  takeoffDistanceFt: 7550, landingDistanceFt: 5910, lengthM: 58.8, propulsion: 'turbofan',
+};
+
+/** Airbus A330-300. EUROCONTROL ACD page A333 (retrieved 2026-10-21); derivations and gameplay values per field in data/sources/aircraft-performance.json A333._sources. RECAT B. */
+export const A333: AircraftPerformance = {
+  type: 'A333', category: 'heavy', wakeCategory: 'heavy',
+  taxiSpeedKt: 20, taxiTurnSpeedKt: 10, accelKtPerSec: 2.7, decelKtPerSec: 5.5,
+  rotateSpeedKt: 140, climbSpeedKt: 175, cruiseSpeedKt: 250, approachSpeedKt: 140, touchdownSpeedKt: 135,
+  climbRateFpm: 2000, descentRateFpm: 2000, turnRateDegPerSec: 2.5, groundTurnRateDegPerSec: 10,
+  minSpeedKt: 125, maxSpeedKt: 320, serviceCeilingFt: 41000,
+  takeoffDistanceFt: 7550, landingDistanceFt: 5580, lengthM: 63.6, propulsion: 'turbofan',
+};
+
+/** Airbus A330-900. EUROCONTROL ACD page A339 (retrieved 2026-10-21); derivations and gameplay values per field in data/sources/aircraft-performance.json A339._sources. RECAT D. */
+export const A339: AircraftPerformance = {
+  type: 'A339', category: 'heavy', wakeCategory: 'heavy',
+  taxiSpeedKt: 20, taxiTurnSpeedKt: 10, accelKtPerSec: 2.7, decelKtPerSec: 5.5,
+  rotateSpeedKt: 140, climbSpeedKt: 175, cruiseSpeedKt: 250, approachSpeedKt: 140, touchdownSpeedKt: 135,
+  climbRateFpm: 2000, descentRateFpm: 2000, turnRateDegPerSec: 2.5, groundTurnRateDegPerSec: 10,
+  minSpeedKt: 125, maxSpeedKt: 320, serviceCeilingFt: 41000,
+  takeoffDistanceFt: 7710, landingDistanceFt: 6070, lengthM: 63.7, propulsion: 'turbofan',
+};
+
+/** Airbus A350-900. EUROCONTROL ACD page A359 (retrieved 2026-10-21); derivations and gameplay values per field in data/sources/aircraft-performance.json A359._sources. RECAT B. */
+export const A359: AircraftPerformance = {
+  type: 'A359', category: 'heavy', wakeCategory: 'heavy',
+  taxiSpeedKt: 20, taxiTurnSpeedKt: 10, accelKtPerSec: 2.6, decelKtPerSec: 5.5,
+  rotateSpeedKt: 145, climbSpeedKt: 220, cruiseSpeedKt: 250, approachSpeedKt: 140, touchdownSpeedKt: 135,
+  climbRateFpm: 3000, descentRateFpm: 2000, turnRateDegPerSec: 2.5, groundTurnRateDegPerSec: 10,
+  minSpeedKt: 125, maxSpeedKt: 330, serviceCeilingFt: 43000,
+  takeoffDistanceFt: 8370, landingDistanceFt: 6400, lengthM: 66.9, propulsion: 'turbofan',
+};
+
+/** Airbus A350-1000. EUROCONTROL ACD page A35K (retrieved 2026-10-21); derivations and gameplay values per field in data/sources/aircraft-performance.json A35K._sources. RECAT B (UNVERIFIED: not in TBL A-1). */
+export const A35K: AircraftPerformance = {
+  type: 'A35K', category: 'heavy', wakeCategory: 'heavy',
+  taxiSpeedKt: 20, taxiTurnSpeedKt: 10, accelKtPerSec: 2.8, decelKtPerSec: 5.5,
+  rotateSpeedKt: 150, climbSpeedKt: 220, cruiseSpeedKt: 250, approachSpeedKt: 150, touchdownSpeedKt: 145,
+  climbRateFpm: 2500, descentRateFpm: 2000, turnRateDegPerSec: 2.5, groundTurnRateDegPerSec: 10,
+  minSpeedKt: 135, maxSpeedKt: 330, serviceCeilingFt: 41000,
+  takeoffDistanceFt: 8530, landingDistanceFt: 6560, lengthM: 73.8, propulsion: 'turbofan',
+};
+
+/** Airbus A380-800. EUROCONTROL ACD page A388 (retrieved 2026-10-21); derivations and gameplay values per field in data/sources/aircraft-performance.json A388._sources. RECAT A. */
+export const A388: AircraftPerformance = {
+  type: 'A388', category: 'heavy', wakeCategory: 'super',
+  taxiSpeedKt: 20, taxiTurnSpeedKt: 10, accelKtPerSec: 2.3, decelKtPerSec: 5.5,
+  rotateSpeedKt: 145, climbSpeedKt: 190, cruiseSpeedKt: 250, approachSpeedKt: 140, touchdownSpeedKt: 135,
+  climbRateFpm: 1500, descentRateFpm: 2000, turnRateDegPerSec: 2.5, groundTurnRateDegPerSec: 8,
+  minSpeedKt: 125, maxSpeedKt: 350, serviceCeilingFt: 43000,
+  takeoffDistanceFt: 9740, landingDistanceFt: 6590, lengthM: 73.0, propulsion: 'turbofan',
+};
+
+/** Boeing 747-400. EUROCONTROL ACD page B744 (retrieved 2026-10-21); derivations and gameplay values per field in data/sources/aircraft-performance.json B744._sources. RECAT B. */
+export const B744: AircraftPerformance = {
+  type: 'B744', category: 'heavy', wakeCategory: 'heavy',
+  taxiSpeedKt: 20, taxiTurnSpeedKt: 10, accelKtPerSec: 3.2, decelKtPerSec: 5.5,
+  rotateSpeedKt: 180, climbSpeedKt: 215, cruiseSpeedKt: 250, approachSpeedKt: 152, touchdownSpeedKt: 147,
+  climbRateFpm: 1500, descentRateFpm: 2000, turnRateDegPerSec: 2.5, groundTurnRateDegPerSec: 10,
+  minSpeedKt: 137, maxSpeedKt: 330, serviceCeilingFt: 45000,
+  takeoffDistanceFt: 10830, landingDistanceFt: 6990, lengthM: 70.6, propulsion: 'turbofan',
+};
+
+/** Boeing 747-8. EUROCONTROL ACD page B748 (retrieved 2026-10-21); derivations and gameplay values per field in data/sources/aircraft-performance.json B748._sources. RECAT B. */
+export const B748: AircraftPerformance = {
+  type: 'B748', category: 'heavy', wakeCategory: 'heavy',
+  taxiSpeedKt: 20, taxiTurnSpeedKt: 10, accelKtPerSec: 2.9, decelKtPerSec: 5.5,
+  rotateSpeedKt: 170, climbSpeedKt: 230, cruiseSpeedKt: 250, approachSpeedKt: 145, touchdownSpeedKt: 140,
+  climbRateFpm: 2500, descentRateFpm: 2000, turnRateDegPerSec: 2.5, groundTurnRateDegPerSec: 10,
+  minSpeedKt: 130, maxSpeedKt: 290, serviceCeilingFt: 43000,
+  takeoffDistanceFt: 10470, landingDistanceFt: 8790, lengthM: 76.3, propulsion: 'turbofan',
+};
+
+/** McDonnell Douglas MD-11. EUROCONTROL ACD page MD11 (retrieved 2026-10-21); derivations and gameplay values per field in data/sources/aircraft-performance.json MD11._sources. RECAT C. */
+export const MD11: AircraftPerformance = {
+  type: 'MD11', category: 'heavy', wakeCategory: 'heavy',
+  taxiSpeedKt: 20, taxiTurnSpeedKt: 10, accelKtPerSec: 2.5, decelKtPerSec: 5.5,
+  rotateSpeedKt: 155, climbSpeedKt: 190, cruiseSpeedKt: 250, approachSpeedKt: 159, touchdownSpeedKt: 154,
+  climbRateFpm: 2000, descentRateFpm: 2000, turnRateDegPerSec: 2.5, groundTurnRateDegPerSec: 10,
+  minSpeedKt: 144, maxSpeedKt: 330, serviceCeilingFt: 41000,
+  takeoffDistanceFt: 10170, landingDistanceFt: 6890, lengthM: 61.2, propulsion: 'turbofan',
+};
+
+/** De Havilland Dash 8 Q400. EUROCONTROL ACD page DH8D (retrieved 2026-10-21); derivations and gameplay values per field in data/sources/aircraft-performance.json DH8D._sources. RECAT F. */
+export const DH8D: AircraftPerformance = {
+  type: 'DH8D', category: 'large', wakeCategory: 'medium',
+  taxiSpeedKt: 20, taxiTurnSpeedKt: 10, accelKtPerSec: 3.0, decelKtPerSec: 4.5,
+  rotateSpeedKt: 110, climbSpeedKt: 150, cruiseSpeedKt: 210, approachSpeedKt: 121, touchdownSpeedKt: 116,
+  climbRateFpm: 3500, descentRateFpm: 1500, turnRateDegPerSec: 3.0, groundTurnRateDegPerSec: 16,
+  minSpeedKt: 106, maxSpeedKt: 270, serviceCeilingFt: 25000,
+  takeoffDistanceFt: 4270, landingDistanceFt: 3610, lengthM: 32.8, propulsion: 'turboprop',
+};
+
+/** Beechcraft King Air 200. EUROCONTROL ACD page BE20 (retrieved 2026-10-21); derivations and gameplay values per field in data/sources/aircraft-performance.json BE20._sources. RECAT I. */
+export const BE20: AircraftPerformance = {
+  type: 'BE20', category: 'light', wakeCategory: 'light',
+  taxiSpeedKt: 15, taxiTurnSpeedKt: 8, accelKtPerSec: 6.8, decelKtPerSec: 4.5,
+  rotateSpeedKt: 110, climbSpeedKt: 145, cruiseSpeedKt: 230, approachSpeedKt: 100, touchdownSpeedKt: 95,
+  climbRateFpm: 2000, descentRateFpm: 1500, turnRateDegPerSec: 3.0, groundTurnRateDegPerSec: 25,
+  minSpeedKt: 85, maxSpeedKt: 250, serviceCeilingFt: 35000,
+  takeoffDistanceFt: 1870, landingDistanceFt: 1770, lengthM: 13.4, propulsion: 'turboprop',
+};
+
+/** Beechcraft King Air 90. EUROCONTROL ACD page BE9L (retrieved 2026-10-21); derivations and gameplay values per field in data/sources/aircraft-performance.json BE9L._sources. RECAT I (UNVERIFIED: not in TBL A-1). */
+export const BE9L: AircraftPerformance = {
+  type: 'BE9L', category: 'light', wakeCategory: 'light',
+  taxiSpeedKt: 15, taxiTurnSpeedKt: 8, accelKtPerSec: 4.1, decelKtPerSec: 4.5,
+  rotateSpeedKt: 95, climbSpeedKt: 130, cruiseSpeedKt: 200, approachSpeedKt: 105, touchdownSpeedKt: 100,
+  climbRateFpm: 1500, descentRateFpm: 1000, turnRateDegPerSec: 3.0, groundTurnRateDegPerSec: 25,
+  minSpeedKt: 90, maxSpeedKt: 240, serviceCeilingFt: 29000,
+  takeoffDistanceFt: 2300, landingDistanceFt: 1250, lengthM: 10.8, propulsion: 'turboprop',
+};
+
+/** Pilatus PC-12. EUROCONTROL ACD page PC12 (retrieved 2026-10-21); derivations and gameplay values per field in data/sources/aircraft-performance.json PC12._sources. RECAT I. */
+export const PC12: AircraftPerformance = {
+  type: 'PC12', category: 'light', wakeCategory: 'light',
+  taxiSpeedKt: 15, taxiTurnSpeedKt: 8, accelKtPerSec: 5.9, decelKtPerSec: 4.5,
+  rotateSpeedKt: 105, climbSpeedKt: 130, cruiseSpeedKt: 180, approachSpeedKt: 85, touchdownSpeedKt: 80,
+  climbRateFpm: 1700, descentRateFpm: 1500, turnRateDegPerSec: 3.0, groundTurnRateDegPerSec: 25,
+  minSpeedKt: 70, maxSpeedKt: 210, serviceCeilingFt: 30000,
+  takeoffDistanceFt: 1970, landingDistanceFt: 1800, lengthM: 14.4, propulsion: 'turboprop',
+};
+
+/** Cessna 402C. EUROCONTROL ACD page C402 (retrieved 2026-10-21); derivations and gameplay values per field in data/sources/aircraft-performance.json C402._sources. RECAT I. */
+export const C402: AircraftPerformance = {
+  type: 'C402', category: 'light', wakeCategory: 'light',
+  taxiSpeedKt: 15, taxiTurnSpeedKt: 8, accelKtPerSec: 3.8, decelKtPerSec: 4.4,
+  rotateSpeedKt: 90, climbSpeedKt: 125, cruiseSpeedKt: 150, approachSpeedKt: 110, touchdownSpeedKt: 105,
+  climbRateFpm: 1200, descentRateFpm: 800, turnRateDegPerSec: 3.0, groundTurnRateDegPerSec: 25,
+  minSpeedKt: 95, maxSpeedKt: 220, serviceCeilingFt: 27000,
+  takeoffDistanceFt: 2220, landingDistanceFt: 1770, lengthM: 11.1, propulsion: 'piston',
+};
+
+/** Cessna Citation Excel / XLS. EUROCONTROL ACD page C56X (retrieved 2026-10-21); derivations and gameplay values per field in data/sources/aircraft-performance.json C56X._sources. RECAT H. */
+export const C56X: AircraftPerformance = {
+  type: 'C56X', category: 'large', wakeCategory: 'medium',
+  taxiSpeedKt: 20, taxiTurnSpeedKt: 10, accelKtPerSec: 3.7, decelKtPerSec: 6.0,
+  rotateSpeedKt: 110, climbSpeedKt: 145, cruiseSpeedKt: 250, approachSpeedKt: 117, touchdownSpeedKt: 112,
+  climbRateFpm: 2500, descentRateFpm: 2000, turnRateDegPerSec: 3.0, groundTurnRateDegPerSec: 20,
+  minSpeedKt: 102, maxSpeedKt: 300, serviceCeilingFt: 45000,
+  takeoffDistanceFt: 3460, landingDistanceFt: 2920, lengthM: 15.8, propulsion: 'turbofan',
+};
+
+/** Bombardier Challenger 350. EUROCONTROL ACD page CL35 (retrieved 2026-10-21); derivations and gameplay values per field in data/sources/aircraft-performance.json CL35._sources. RECAT H (UNVERIFIED: not in TBL A-1). */
+export const CL35: AircraftPerformance = {
+  type: 'CL35', category: 'large', wakeCategory: 'medium',
+  taxiSpeedKt: 20, taxiTurnSpeedKt: 10, accelKtPerSec: 4.0, decelKtPerSec: 6.0,
+  rotateSpeedKt: 135, climbSpeedKt: 160, cruiseSpeedKt: 250, approachSpeedKt: 125, touchdownSpeedKt: 120,
+  climbRateFpm: 4500, descentRateFpm: 2000, turnRateDegPerSec: 3.0, groundTurnRateDegPerSec: 20,
+  minSpeedKt: 110, maxSpeedKt: 290, serviceCeilingFt: 45000,
+  takeoffDistanceFt: 4840, landingDistanceFt: 2710, lengthM: 20.9, propulsion: 'turbofan',
+};
+
+/** Gulfstream V. EUROCONTROL ACD page GLF5 (retrieved 2026-10-21); derivations and gameplay values per field in data/sources/aircraft-performance.json GLF5._sources. RECAT F. */
+export const GLF5: AircraftPerformance = {
+  type: 'GLF5', category: 'large', wakeCategory: 'medium',
+  taxiSpeedKt: 20, taxiTurnSpeedKt: 10, accelKtPerSec: 4.0, decelKtPerSec: 6.0,
+  rotateSpeedKt: 140, climbSpeedKt: 175, cruiseSpeedKt: 250, approachSpeedKt: 140, touchdownSpeedKt: 135,
+  climbRateFpm: 4000, descentRateFpm: 2000, turnRateDegPerSec: 3.0, groundTurnRateDegPerSec: 20,
+  minSpeedKt: 125, maxSpeedKt: 330, serviceCeilingFt: 51000,
+  takeoffDistanceFt: 5150, landingDistanceFt: 2900, lengthM: 29.4, propulsion: 'turbofan',
+};
+
+/** Bombardier Global Express. EUROCONTROL ACD page GLEX (retrieved 2026-10-21); derivations and gameplay values per field in data/sources/aircraft-performance.json GLEX._sources. RECAT F. */
+export const GLEX: AircraftPerformance = {
+  type: 'GLEX', category: 'large', wakeCategory: 'medium',
+  taxiSpeedKt: 20, taxiTurnSpeedKt: 10, accelKtPerSec: 2.3, decelKtPerSec: 6.0,
+  rotateSpeedKt: 115, climbSpeedKt: 150, cruiseSpeedKt: 250, approachSpeedKt: 125, touchdownSpeedKt: 120,
+  climbRateFpm: 4000, descentRateFpm: 2000, turnRateDegPerSec: 3.0, groundTurnRateDegPerSec: 20,
+  minSpeedKt: 110, maxSpeedKt: 330, serviceCeilingFt: 51000,
+  takeoffDistanceFt: 6140, landingDistanceFt: 2670, lengthM: 30.3, propulsion: 'turbofan',
 };
 
 // ---------------------------------------------------------------------------------------------------------------------------------
@@ -210,20 +559,32 @@ export function isRotorcraftType(type: string): boolean {
 export function isVehicleType(type: string): boolean {
   return getPerformance(type).craft === 'vehicle';
 }
+/** Business jets of the registry (FAA large by weight, but they park on the FBO ramp, not at an airline gate): Citation Excel, Challenger 350, Gulfstream V, Global Express. */
+const BUSINESS_JETS: ReadonlySet<string> = new Set(['C56X', 'CL35', 'GLF5', 'GLEX']);
+export function isBusinessJetType(type: string): boolean {
+  return BUSINESS_JETS.has(type);
+}
 /** True for military types (Air Guard / Coast Guard callsign forms of JO 7110.65 2-4-20). */
 export function isMilitaryType(type: string): boolean {
   return getPerformance(type).military === true;
 }
 
 import type { WakeCategory } from './wake';
-const registry: Record<string, AircraftPerformance> = { C172, A320, B738, BCS3, E175, CRJ9, B752, C208, H65, F16, VEH };
+const registry: Record<string, AircraftPerformance> = {
+  C172, A320, B738, BCS3, E175, CRJ9, B752, C208, A319, A20N, A21N, A321,
+  B737, B38M, B739, E190, CRJ7, B762, B763, A306, B772, B77W, B788, B789,
+  A332, A333, A339, A359, A35K, A388, B744, B748, MD11, DH8D, BE20, BE9L,
+  PC12, C402, C56X, CL35, GLF5, GLEX, H65, F16, VEH,
+};
 
 /**
  * Same-runway-separation (SRS) category, FAA JO 7110.65 3-9-6 NOTE (aircraft types per JO 7360.1):
  * I = small single-engine propeller-driven <= 12,500 lb and all helicopters; II = small twin-engine propeller-driven <= 12,500 lb;
  * III = all other aircraft. Derived here from the type code; unknown types are I when `category === 'light'`, else III.
  */
-const SRS: Record<string, 1 | 2 | 3> = { C172: 1, C182: 1, C152: 1, C210: 1, PA28: 1, SR22: 1, BE36: 1, PA34: 2, BE58: 2, C310: 2, C208: 1, H65: 1, A320: 3, B738: 3, BCS3: 3, E175: 3, CRJ9: 3, B752: 3, F16: 3 };
+const SRS: Record<string, 1 | 2 | 3> = { C172: 1, C182: 1, C152: 1, C210: 1, PA28: 1, SR22: 1, BE36: 1, PA34: 2, BE58: 2, C310: 2, C208: 1, H65: 1, A320: 3, B738: 3, BCS3: 3, E175: 3, CRJ9: 3, B752: 3, F16: 3,
+  // Added 2026-10-21: PC12 single-engine turboprop <= 12,500 lb = I; C402 and King Air 90 / 200 twin-engine propeller-driven <= 12,500 lb = II; every other added type (jets, DH8D, heavies) = III.
+  PC12: 1, C402: 2, BE20: 2, BE9L: 2 };
 export function srsCategory(type: string): 1 | 2 | 3 {
   return SRS[type] ?? (getPerformance(type).category === 'light' ? 1 : 3);
 }
@@ -231,14 +592,31 @@ export function srsCategory(type: string): 1 | 2 | 3 {
 /**
  * Wake RECAT category, FAA JO 7110.126A Appendix A (verified by the accuracy review): A320 = F ("other aircraft over 41,000 lb"),
  * C172 = I ("41,000 lb and under"); B757 = E; heavies B / D. Added types follow the same convention: B738 = F (TBL A-1 Upper Large), E175 and CRJ9 = G (TBL A-1 Lower Large: E75L / E75S / CRJ9 read visually on the rendered page A1, 2026-10-18), BCS3 = F
- * (NOT listed in TBL A-1: kept F by the over-41,000-lb convention, UNVERIFIED); B752 = E (TBL A-1 lists B752 / B753 under E); C208 = I (MTOW 8,750 lb). Types not listed: `wakeCategory` light -> I, medium -> F, heavy -> D.
+ * (NOT listed in TBL A-1: kept F by the over-41,000-lb convention, UNVERIFIED); B752 = E (TBL A-1 lists B752 / B753 under E); C208 = I (MTOW 8,750 lb). Types not listed: `wakeCategory` light -> I, medium -> F, heavy -> D, super -> A.
  */
-const RECAT: Record<string, WakeCategory> = { C172: 'I', C182: 'I', C152: 'I', C210: 'I', PA28: 'I', SR22: 'I', BE36: 'I', PA34: 'I', BE58: 'I', C310: 'I', C208: 'I', F16: 'G', A320: 'F', B738: 'F', BCS3: 'F', E175: 'G', CRJ9: 'G', B752: 'E' };
+const RECAT: Record<string, WakeCategory> = { C172: 'I', C182: 'I', C152: 'I', C210: 'I', PA28: 'I', SR22: 'I', BE36: 'I', PA34: 'I', BE58: 'I', C310: 'I', C208: 'I', F16: 'G', A320: 'F', B738: 'F', BCS3: 'F', E175: 'G', CRJ9: 'G', B752: 'E',
+  // Added 2026-10-21, JO 7110.126A TBL A-1 (page A1, read visually 2026-10-21). A = A388; B = A332 A333 A359 B744 B748 B772 B77W B788 B789; C = A306 B762 B763 MD11; D = A339;
+  // F = A319 A321 B737 B739 DH8D E190 GLEX GLF5; G = CRJ7; H = C56X; I = C402 PC12 BE20. NOT in TBL A-1 (derived, UNVERIFIED as listings): A20N, A21N, B38M = F (sibling types
+  // are F), A35K = B (A359 is B), BE9L = I (10,100 lb MTOW is within the Category I definition, 15,400 lb or less), CL35 = H (40,600 lb is within the Category H definition).
+  A319: 'F', A20N: 'F', A21N: 'F', A321: 'F', B737: 'F', B38M: 'F', B739: 'F', E190: 'F', CRJ7: 'G', B762: 'C', B763: 'C', A306: 'C', B772: 'B', B77W: 'B', B788: 'B', B789: 'B',
+  A332: 'B', A333: 'B', A339: 'D', A359: 'B', A35K: 'B', A388: 'A', B744: 'B', B748: 'B', MD11: 'C', DH8D: 'F', BE20: 'I', BE9L: 'I', PC12: 'I', C402: 'I', C56X: 'H', CL35: 'H',
+  GLF5: 'F', GLEX: 'F' };
 export function wakeRecatCategory(type: string): WakeCategory {
   const known = RECAT[type];
   if (known) return known;
   const w = getPerformance(type).wakeCategory;
-  return w === 'light' ? 'I' : w === 'medium' ? 'F' : 'D';
+  return w === 'light' ? 'I' : w === 'medium' ? 'F' : w === 'super' ? 'A' : 'D';
+}
+
+/**
+ * The word a pilot and the controller add to the callsign: "super" for RECAT Category A (the A388), "heavy" for Categories B, C and D, none otherwise.
+ * FAA JO 7110.126A Appendix B (amended JO 7110.65 2-4-14 and 2-1-20): "the word Super must be used as part of the identification in all communications
+ * with or about Category A aircraft", "Heavy" likewise for B, C and D. ICAO Doc 4444 / Doc 4444 wake category H ("Heavy") and J ("Super") give the same
+ * words (the A388 is J, the B744 / B772 / B788 H). The B757 (Category E) is neither. `wakeCategory` 'heavy' / 'super' follow the ICAO category in the ACD.
+ */
+export function wakeCallsignWord(type: string): 'super' | 'heavy' | undefined {
+  const c = wakeRecatCategory(type);
+  return c === 'A' ? 'super' : c === 'B' || c === 'C' || c === 'D' ? 'heavy' : undefined;
 }
 
 /**

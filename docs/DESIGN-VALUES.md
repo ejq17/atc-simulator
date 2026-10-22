@@ -96,6 +96,10 @@ conservative "busy frequency"). The factors 0.5 and 2 are design scaling; the mo
 | A11 | `accelKtPerSec`, `decelKtPerSec` of airliners (3.3-4.0 / 5.5-6.0) | design | Airbus / Boeing airport planning documents give no taxi acceleration | DESIGN |
 | A12 | B752 RECAT E, `wakeCategory` fallback, "NOT listed in TBL A-1: kept F by the over-41,000-lb convention" for B738 | JO 7110.126A | already sourced; the convention remains | DESIGN (the type is absent from TBL A-1) |
 | A13 | `TAXI_ACCEL_MPS2` 1.0, `TAXI_DECEL_CAP_MPS2` 1.2, `TAXI_DECEL_PLAN_MPS2` 0.9 (`groundMovement.ts`) | design | none | DESIGN |
+| A14 | Added types (2026-10-21): taxi 20 / 10 kt (15 / 8 for the light turboprops and the C402), turn rate 2.5-3 deg/s, ground turn 8-25 deg/s, `decelKtPerSec` 6.0 jets / 5.5 heavies / 4.4-4.5 props, `descentRateFpm` 2,000 for jets (ACD descent ROD 1,500-3,500) | design | the ACD gives descent rates but no taxi, turn or braking figure | DESIGN |
+| A15 | Added types: `accelKtPerSec` = VR^2 / (2 x 0.8 x `takeoffDistanceFt`) (ground roll taken as 80 % of the ACD 35 ft take-off distance; A320 and B738 give 0.83 / 0.80); `maxSpeedKt` = max(climb IAS, descent IAS) + 30 kt; minimum speed = Vat - 15 kt | derived | no source for the ground roll or the minimum manoeuvring speed | ESTIMATE |
+| A16 | Added types: `cruiseSpeedKt` 250 kt for jets (14 CFR 91.117(a)); for the DH8D, BE20, BE9L, PC12 and C402 an ACD climb or approach IAS (210 / 230 / 200 / 180 / 150 kt) | SOURCED / derived | a published cruise IAS per type (POH / AFM) | the 250 kt is regulatory; the others ESTIMATE |
+| A17 | RECAT of A20N, A21N, B38M (F), A35K (B), BE9L (I), CL35 (H): not in JO 7110.126A TBL A-1 | derived from siblings / weight definitions | an FAA aircraft-type database (`aircraft automation databases list all aircraft`, TBL A-1 note 2) | DESIGN (type absent from TBL A-1) |
 
 ## 4. Helicopter separation and rotorcraft (`helicopterSeparation.ts`, `rotorcraft.ts`)
 

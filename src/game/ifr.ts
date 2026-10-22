@@ -203,7 +203,9 @@ export function starArrival(airport: Airport, runwayEnd: string): StarArrival | 
 
 /** The ROZZE TWO arrival is "turbojet aircraft only" (chart note): a turboprop or piston aircraft does not use it. */
 export function isTurbojet(type: string): boolean {
-  return getPerformance(type).category !== 'light';
+  const perf = getPerformance(type);
+  // A large turboprop (DH8D) is not a turbojet; light types stay excluded whatever their engine entry says.
+  return perf.category !== 'light' && (perf.propulsion ? perf.propulsion === 'turbofan' : true);
 }
 
 /** An altitude in the entry window, in whole thousands (seeded). */

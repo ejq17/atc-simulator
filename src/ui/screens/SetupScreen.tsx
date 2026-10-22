@@ -46,6 +46,40 @@ const TYPES = [
   { id: 'CRJ9', label: 'CRJ-900 (regional jet)' },
   { id: 'B752', label: 'Boeing 757-200 (cargo)' },
   { id: 'C208', label: 'Cessna 208 Caravan (feeder)' },
+  { id: 'A319', label: 'Airbus A319 (airline)' },
+  { id: 'A321', label: 'Airbus A321 (airline)' },
+  { id: 'A20N', label: 'Airbus A320neo (airline)' },
+  { id: 'A21N', label: 'Airbus A321neo (airline)' },
+  { id: 'B737', label: 'Boeing 737-700 (airline)' },
+  { id: 'B38M', label: 'Boeing 737 MAX 8 (airline)' },
+  { id: 'B739', label: 'Boeing 737-900 (airline)' },
+  { id: 'E190', label: 'Embraer 190 (regional jet)' },
+  { id: 'CRJ7', label: 'CRJ-700 (regional jet)' },
+  { id: 'DH8D', label: 'Dash 8 Q400 (regional turboprop)' },
+  { id: 'B762', label: 'Boeing 767-200 (heavy)' },
+  { id: 'B763', label: 'Boeing 767-300 (heavy)' },
+  { id: 'A306', label: 'Airbus A300-600 (cargo, heavy)' },
+  { id: 'B772', label: 'Boeing 777-200 (heavy)' },
+  { id: 'B77W', label: 'Boeing 777-300ER (heavy)' },
+  { id: 'B788', label: 'Boeing 787-8 (heavy)' },
+  { id: 'B789', label: 'Boeing 787-9 (heavy)' },
+  { id: 'A332', label: 'Airbus A330-200 (heavy)' },
+  { id: 'A333', label: 'Airbus A330-300 (heavy)' },
+  { id: 'A339', label: 'Airbus A330-900 (heavy)' },
+  { id: 'A359', label: 'Airbus A350-900 (heavy)' },
+  { id: 'A35K', label: 'Airbus A350-1000 (heavy)' },
+  { id: 'A388', label: 'Airbus A380-800 (super)' },
+  { id: 'B744', label: 'Boeing 747-400 (heavy)' },
+  { id: 'B748', label: 'Boeing 747-8 (heavy)' },
+  { id: 'MD11', label: 'McDonnell Douglas MD-11 (cargo, heavy)' },
+  { id: 'C402', label: 'Cessna 402C (commuter piston twin)' },
+  { id: 'BE20', label: 'King Air 200 (turboprop twin)' },
+  { id: 'BE9L', label: 'King Air 90 (turboprop twin)' },
+  { id: 'PC12', label: 'Pilatus PC-12 (turboprop single)' },
+  { id: 'C56X', label: 'Citation Excel (business jet)' },
+  { id: 'CL35', label: 'Challenger 350 (business jet)' },
+  { id: 'GLF5', label: 'Gulfstream V (business jet)' },
+  { id: 'GLEX', label: 'Global Express (business jet)' },
 ];
 
 function Dots({ n, max = 5 }: { n: number; max?: number }) {
@@ -70,7 +104,7 @@ export function SetupScreen() {
   const [icao, setIcao] = useState<string>(prev?.icao ?? DEFAULT_AIRPORT_ICAO);
   const airport = useMemo(() => airportOrDefault(icao), [icao]);
   const callName = airportCallName(airport);
-  /** Aircraft types the airport's traffic profile can generate (KACY: C172, A320; KMHT adds B738, BCS3, E175, CRJ9, B752, C208). */
+  /** Aircraft types the airport's traffic profile can generate (KACY: C172, A320; KMHT adds B738, BCS3, E175, CRJ9, B752, C208; the registry also holds the KBOS / KPHL / EGLL types). */
   const offeredTypes = useMemo(() => profileTypes(airport.icao), [airport]);
   /** Special traffic kinds the airport's profile has (KACY: all five; KMHT: VFR transitions and vehicles). Only these are offered. */
   const offeredSpecial = useMemo(() => availableSpecialKinds(airport.icao), [airport]);

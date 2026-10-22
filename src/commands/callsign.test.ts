@@ -125,3 +125,22 @@ describe('resolveCallsign', () => {
     expect(r.otherCallsigns.length).toBe(1);
   });
 });
+
+describe('business / commuter type words and heavy callsigns (types added 2026-10-21)', () => {
+  const list = [
+    ...AIRCRAFT,
+    { callsign: 'N421KA', spokenCallsign: 'King Air four two one kilo alpha', type: 'BE20' },
+    { callsign: 'N88GX', spokenCallsign: 'Challenger eight eight golf x-ray', type: 'CL35' },
+    { callsign: 'N512PC', spokenCallsign: 'Pilatus five twelve papa charlie', type: 'PC12' },
+    { callsign: 'UPS451', spokenCallsign: 'U P S four fifty one heavy', type: 'MD11' },
+  ];
+  const res = (say: string) => resolveCallsign(normalize(say).tokens, list).callsign;
+  it('resolves them from the spoken type word, with and without the heavy word', () => {
+    expect(res('king air four two one kilo alpha')).toBe('N421KA');
+    expect(res('king air one kilo alpha')).toBe('N421KA');
+    expect(res('challenger eight eight golf x-ray')).toBe('N88GX');
+    expect(res('pilatus five twelve papa charlie')).toBe('N512PC');
+    expect(res('ups four fifty one')).toBe('UPS451');
+    expect(res('ups four fifty one heavy')).toBe('UPS451');
+  });
+});
