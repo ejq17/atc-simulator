@@ -52,9 +52,7 @@ describe('AI controllers on a multi-runway configuration', () => {
           const r = runFreePlaySoak(seed, 'off', 0.5, {}, { airport: loadEgll(), activeRunways: config, arrivalsPerHour: 20, departuresPerHour: 20 });
           if (process.env.FREEPLAY_REPORT_FILE) appendFileSync(process.env.FREEPLAY_REPORT_FILE, `EGLL ${name} seed ${seed}: spawned ${r.spawnedArrivals}+${r.spawnedDepartures} landed ${r.landed.at(-1)} departed ${r.departed.at(-1)} go-arounds ${r.goArounds} airborne alerts ${r.airborneAlerts.length} incursions ${r.incursions.length}\n${r.airborneAlerts.concat(r.incursions).join('\n')}\n`);
           expect(r.airborneAlerts).toEqual([]);
-          // W-ALT-27R seeds 1 and 2 each end with a departure whose crossing of 27L is revoked while a B772 / B77W is still on the runway (AAL59 at 1068 s on seed 1,
-          // identical on main before this branch): a Ground crossing fault of the EGLL taxi graph, not a separation one, so only the clean mode asserts it.
-          if (name === 'E-SEG-09L') expect(r.incursions).toEqual([]);
+          expect(r.incursions).toEqual([]);
         }, 600000);
       }
     }

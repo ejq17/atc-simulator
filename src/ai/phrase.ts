@@ -122,6 +122,9 @@ export function headOnPullAside(ac: Aircraft, other: Pick<Aircraft, 'spokenCalls
   return clauses(callsign(ac), words('pull off', where), words('let', callsign(other), 'pass'));
 }
 
+/** "N1AA, hold position, expect delay": the answer to a taxi or crossing request that cannot be served yet (JO 7110.65 3-7-2: "HOLD POSITION" and "HOLD SHORT" are Ground's means of holding an aircraft on the movement area). */
+export const expectDelay = (ac: Aircraft): Phrase => clauses(callsign(ac), 'hold position', 'expect delay');
+
 /** "N1AA, make a one eighty, let Cessna N2BB pass" (NON-STANDARD: common usage, the parser flags it too). */
 export const headOnTurnAround = (ac: Aircraft, other: Pick<Aircraft, 'spokenCallsign'>): Phrase => clauses(callsign(ac), 'make a one eighty', words('let', callsign(other), 'pass'));
 

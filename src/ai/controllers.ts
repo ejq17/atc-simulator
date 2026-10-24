@@ -35,6 +35,11 @@ export const MIN_TRANSMISSION_GAP_SEC = 3;
  * like two pilots (the engine's collision rule).
  */
 export const CORRECTION_PATIENCE_SEC = 5;
+/**
+ * A controller whose transmission is due waits for a busy frequency this long (s), then keys up anyway: a pilot who repeats a call back to back (soak, KPGD seed 1: "nose to nose"
+ * every 17 s for 2,000 s, each call as long as the gap) would keep the controller off the air for good, and every other aircraft on the frequency with it. DESIGN VALUE.
+ */
+export const BUSY_FREQUENCY_PATIENCE_SEC = 20;
 const CORRECTION_PRIORITY = 95;
 /** After a refused command the same action is not tried again for this long (longer after repeated refusals). */
 export const REJECT_BACKOFF_SEC = 10;
@@ -217,7 +222,7 @@ export function createAiControllers(opts: AiControllerOptions): AiControllers {
         return;
       }
       if (now + 1e-9 < sch.at) return;
-      if (anyTransmitting(v) && !(sch.priority >= CORRECTION_PRIORITY && now - (sch.since ?? now) >= CORRECTION_PATIENCE_SEC)) {
+      if (anyTransmitting(v) && now - (sch.since ?? now) < BUSY_FREQUENCY_PATIENCE_SEC && !(sch.priority >= CORRECTION_PRIORITY && now - (sch.since ?? now) >= CORRECTION_PATIENCE_SEC)) {
         sch.at = now + 1;
         return;
       }

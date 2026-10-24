@@ -13,7 +13,7 @@
  */
 import type { Aircraft, SimulationState, TaxiNode, Vec2 } from '../sim/types';
 import type { SimContext } from '../sim/context';
-import { findHeadOnIn, pathOf } from '../sim/headOn';
+import { findHeadOnIn, headOnMarginM, pathOf } from '../sim/headOn';
 import { turnAroundCheck } from '../sim/turnAround';
 import { perfOf } from '../sim/context';
 
@@ -65,8 +65,12 @@ function branchesFrom(state: SimulationState, junction: TaxiNode, lane: Readonly
 export function resolveHeadOn(state: SimulationState, caller: Aircraft, other: Aircraft, onFrequency: ReadonlySet<string>): HeadOnResolution | undefined {
   const ho = findHeadOnIn(state, caller);
   const graph = state.airport.taxiwayGraph;
-  if (!ho || ho.role !== 'meet' || ho.other.id !== other.id) return undefined; // not nose to nose any more
-  {
+  const ctx = { state } as SimContext;
+  // A pair that stands face to face with no shared lane in the route data (two aircraft at the hold lines on either side of a runway crossing, each waiting for the other's
+  // lane; the engine's own `traffic.ts` 1e0 turns that into a nose-to-nose call): only the turn applies. Soak, KPGD seed 1: the call was repeated for the rest of the run and kept
+  // Ground off its own frequency.
+  if ((!ho || ho.role !== 'meet' || ho.other.id !== other.id) && !facingEachOther(caller, other)) return undefined; // not nose to nose any more
+  if (ho && ho.role === 'meet' && ho.other.id === other.id) {
     const cp = pathOf(graph, caller);
     const op = pathOf(graph, other);
     if (cp && op) {
@@ -97,7 +101,6 @@ export function resolveHeadOn(state: SimulationState, caller: Aircraft, other: A
       }
     }
   }
-  const ctx = { state } as SimContext;
   // A departure is turned around rather than an arrival: it goes back to its stand end of the lane and is routed to another hold (a departure bound for the
   // hold at the end of an exit stub and an arrival coming off it cannot both be satisfied), while the arrival goes on to its stand. Same kind: the caller first.
   const order: (readonly [Aircraft, Aircraft])[] = caller.isDeparture !== other.isDeparture && other.isDeparture ? [[other, caller], [caller, other]] : [[caller, other], [other, caller]];
@@ -105,6 +108,16 @@ export function resolveHeadOn(state: SimulationState, caller: Aircraft, other: A
     if (onFrequency.has(mover.id) && turnAroundCheck(ctx, mover).ok) return { kind: 'turn', mover, other: o };
   }
   return undefined;
+}
+
+/** Both stopped on the ground, nose to nose within 2.5 head-on margins (the test `traffic.ts` 1e0 applies before it makes the stand-off a head-on request). */
+function facingEachOther(a: Aircraft, b: Aircraft): boolean {
+  if (!a.onGround || !b.onGround || a.groundSpeedKt >= 0.5 || b.groundSpeedKt >= 0.5) return false;
+  const dx = b.pos.x - a.pos.x;
+  const dy = b.pos.y - a.pos.y;
+  const d = Math.hypot(dx, dy);
+  const h = (a.headingDeg * Math.PI) / 180;
+  return d < 2.5 * headOnMarginM(a, b) && Math.abs(((b.headingDeg - a.headingDeg + 540) % 360) - 180) > 100 && Math.sin(h) * dx + Math.cos(h) * dy > 0.5 * d;
 }
 
 function distToSegment(p: Vec2, a: Vec2, b: Vec2): number {

@@ -26,7 +26,7 @@ const MAX_WAIT_MIN = Number(process.env.FREEPLAY_MAX_WAIT_MIN ?? 20);
 const WALL_BOUND_SEC = Number(process.env.FREEPLAY_WALL_SEC ?? 900);
 const BLOCKED_MAX_SHARE = 0.02;
 const DISCARD_SEC = 300;
-/** A landed aircraft not on its stand this long after touchdown, a departure not airborne this long after it appeared, is stuck. */
+/** A landed aircraft not on its stand this long after touchdown (an aircraft that taxied back and took off again, a pattern aircraft doing stop-and-go work, is not stuck), a departure not airborne this long after it appeared, is stuck. */
 const PARK_BY_SEC = 1500;
 const DEPART_BY_SEC = 2400;
 
@@ -75,7 +75,7 @@ function run(label: string, airport: Airport, seed: number, simHours: number, ac
   }
   const keyed = transmitted + blocked;
   const all = [...tracked.values()];
-  const stuckLanded = all.filter((t) => !t.dep && t.landedSec !== undefined && !t.parked && endSec - t.landedSec > PARK_BY_SEC).map((t) => `${t.callsign} landed t=${Math.round(t.landedSec!)}`);
+  const stuckLanded = all.filter((t) => !t.dep && t.landedSec !== undefined && !t.parked && !t.departed && endSec - t.landedSec > PARK_BY_SEC).map((t) => `${t.callsign} landed t=${Math.round(t.landedSec!)}`);
   const stuckDepartures = all.filter((t) => t.dep && !t.departed && endSec - t.firstSec > DEPART_BY_SEC).map((t) => `${t.callsign} appeared t=${Math.round(t.firstSec)}`);
   return { ...r, label, wallSec, blockedShare: keyed ? blocked / keyed : 0, blocked, keyed, airborneAlerts, incursions, stuckLanded, stuckDepartures };
 }

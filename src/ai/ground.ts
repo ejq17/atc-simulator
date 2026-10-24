@@ -20,13 +20,36 @@ import { createClearanceAgent } from './clnc';
 import type { ClearanceStore } from './clnc';
 import { closedTaxiways } from '../sim/airportOps';
 import { HOLD_START_SNAP_M } from '../sim/groundMovement';
-import { DEPARTURE_WAIT_BOUND_SEC, aheadInCrossingQueue, blockedBeforeHold, busyHoldIds, landingExitHoldIds, pushbackBlockedBy, etaToThresholdSec, holdNodeAt, interactingRunways, nextProgressiveSegment, opposingTraffic, outranks, pendingIntermediateStops, planDeparture, planParking, remainingRouteM, routePassesNear, starvingDeparture, taxiStartNode } from './world';
+import { pathOf } from '../sim/headOn';
+import { DEPARTURE_WAIT_BOUND_SEC, aheadInCrossingQueue, blockedBeforeHold, busyHoldIds, edgesNear, landingExitHoldIds, pushbackBlockedBy, etaToThresholdSec, holdNodeAt, interactingRunways, nextProgressiveSegment, opposingTraffic, outranks, pendingIntermediateStops, planDeparture, planParking, remainingRouteM, retreatNode, routePassesNear, sharedEdgeIds, starvingDeparture, taxiStartNode } from './world';
 import { holdTooShort } from '../sim/holdSelection';
 import { resolveHeadOn } from './headOn';
 import * as say from './phrase';
 import { isRotorcraftType, isVehicleType } from '../sim/performance';
 
 const HANDOFF_WITHIN_M = 400;
+/**
+ * A taxi request that has been held back this long (s) by traffic on its route is planned again around the lane that traffic uses (`planDeparture` / `planParking` with
+ * `avoidEdges`), when the airport has another way: one controller keeps the aircraft on a path that does not meet the other (JO 7110.65 3-7-2, 3-7-3: taxi instructions are
+ * the controller's means of keeping aircraft apart). DESIGN VALUE.
+ */
+export const ALT_ROUTE_AFTER_SEC = 300;
+/** The replanned route may be this many times the original length plus `ALT_ROUTE_EXTRA_M` (a sane detour, not a tour of the airport). DESIGN VALUE. */
+export const ALT_ROUTE_MAX_FACTOR = 3;
+export const ALT_ROUTE_EXTRA_M = 500;
+/** A pilot whose taxi or crossing request has gone this long (s) without an instruction is told to hold position and expect a delay, and again every `DELAY_CALL_EVERY_SEC`. DESIGN VALUE. */
+export const DELAY_CALL_AFTER_SEC = 180;
+export const DELAY_CALL_EVERY_SEC = 300;
+/** How long (s) Ground remembers which aircraft an aircraft it turned around or pulled aside was meeting. DESIGN VALUE. */
+const PARTNER_MEMORY_SEC = 900;
+/**
+ * A "nose to nose" request is remembered this long (s) after the pilot's call. The engine withdraws the request again a moment later when the stand-off flickers (a stopped aircraft
+ * creeps and the two no longer face each other for a second), and the pilot calls again some seconds on: the answer, with the reaction delay and a busy frequency, would never
+ * be on the air while the request exists (soak, KPGD seed 1: 2,000 s of the same call, Ground silent). DESIGN VALUE.
+ */
+const HEAD_ON_LATCH_SEC = 45;
+/** After a head-on resolution, an aircraft that cannot be routed around the aircraft it met waits this long (s) for the lane to clear, then gets the original route again. DESIGN VALUE. */
+const PARTNER_PATIENCE_SEC = 240;
 /** A taxi request waits at most this long (s) for traffic on the route to clear before Ground stops checking (the engine's spacing and the nose-to-nose resolution take over). DESIGN VALUE. */
 export const GROUND_PATIENCE_SEC = Infinity;
 /** A taxi request that has waited this long (s) is answered although an aircraft stands still on the route (the nose-to-nose resolution takes over if they meet). DESIGN VALUE. */
@@ -105,6 +128,10 @@ function taxiFollowOk(v: AgentView, ac: Aircraft): boolean {
 
 export function createGroundAgent(store: ClearanceStore): Agent {
   const clearanceAgent = createClearanceAgent(store);
+  const partner = new Map<string, { otherId: string; since: number }>();
+  const headOnCalls = new Map<string, { otherId: string; at: number }>();
+  /** Aircraft sent out of another's way (`retreatNode`) that Ground routes on again by itself: they have no request open. */
+  const retreated = new Map<string, { otherId: string; at: number }>();
   return (v) => {
     const plans: Plan[] = [];
     const { airport, state } = v;
@@ -117,10 +144,102 @@ export function createGroundAgent(store: ClearanceStore): Agent {
       // after STOPPED_PATIENCE_SEC an aircraft that merely stands on the route is no reason to go on waiting: it is stuck too (see `opposingTraffic`, ignoreStopped)
       return opposingTraffic(state, nodeIds, ac.id, { ignoreStopped: opts.ignoreStopped ?? (waited >= STOPPED_PATIENCE_SEC || (ac.isDeparture && waited >= OVERDUE_IGNORE_STOPPED_SEC)), ignoreStoppedAhead: opts.ignoreStoppedAhead ?? true });
     };
+    // The aircraft Ground turned around (or pulled aside) for another one, and when: the route it is given afterwards must not meet that aircraft on the same lane again.
+    for (const [id, m] of partner) if (v.now - m.since > PARTNER_MEMORY_SEC || !state.aircraft[id]) partner.delete(id);
+    for (const ac of v.onFrequency) if (ac.pendingRequest?.headOnWith) headOnCalls.set(ac.id, { otherId: ac.pendingRequest.headOnWith, at: ac.pendingRequest.sinceSec });
+    for (const [id, c] of headOnCalls) if (v.now - c.at > HEAD_ON_LATCH_SEC || !state.aircraft[id]) headOnCalls.delete(id);
+    const waitedSec = (ac: Aircraft) => v.now - (ac.pendingRequest?.sinceSec ?? v.now);
+    /** The edges `nodeIds` shares with the path of the aircraft that blocks it: the lane to plan around. */
+    const aroundBlocker = (nodeIds: string[], blocker: Aircraft): Set<string> => {
+      const op = pathOf(airport.taxiwayGraph, blocker);
+      const shared = op ? sharedEdgeIds(airport, nodeIds, op.ids) : new Set<string>();
+      return shared.size ? shared : edgesNear(airport, nodeIds, blocker.pos, 30);
+    };
+    /**
+     * The aircraft stands at the hold line of a runway its route crosses, with no crossing clearance yet: whatever else it asks for (a pilot who stood nose to nose with an
+     * aircraft across the runway replaces his crossing request with "request instructions"), what it needs is the crossing (soak, KPHL seed 1: N58MK at the 17/35 hold line, 2,300 s).
+     */
+    const waitsAtCrossingHold = (ac: Aircraft): boolean => {
+      const r = ac.route;
+      if (!r || ac.groundSpeedKt >= 1 || (ac.phase !== 'TAXIING' && ac.phase !== 'TAXI_TO_PARKING' && ac.phase !== 'HOLDING_SHORT')) return false;
+      const hold = holdNodeAt(airport, ac, HOLD_START_SNAP_M + 5);
+      if (!hold?.runwayId || !r.stopAtNodeIds.includes(hold.id) || ac.runwayAuthorizations.includes(hold.runwayId)) return false;
+      const i = r.nodeIds.indexOf(hold.id);
+      return i >= 0 && i < r.nodeIds.length - 1;
+    };
+    const saneDetour = (alt: { lengthM: number }, orig: { lengthM: number }) => alt.lengthM <= orig.lengthM * ALT_ROUTE_MAX_FACTOR + ALT_ROUTE_EXTRA_M;
+    /** A departure's route around `blocker` (another way to the same kind of hold), when the original one is blocked. */
+    const departureAround = (ac: Aircraft, orig: NonNullable<ReturnType<typeof planDeparture>>, blocker: Aircraft) => {
+      const avoid = aroundBlocker(orig.nodeIds, blocker);
+      if (!avoid.size) return undefined;
+      const alt = planDeparture(airport, ac, state.activeRunways.departing, busyHoldIds(state, ac.id), closedTaxiways(state), avoid);
+      return alt && saneDetour(alt, orig) && !opposing(ac, alt.nodeIds) ? alt : undefined;
+    };
+    const parkingAround = (ac: Aircraft, orig: NonNullable<ReturnType<typeof planParking>>, blocker: Aircraft) => {
+      const avoid = aroundBlocker(orig.nodeIds, blocker);
+      if (!avoid.size) return undefined;
+      const alt = planParking(state, ac, avoid);
+      return alt && saneDetour(alt, orig) && !opposing(ac, alt.nodeIds, { ignoreStoppedAhead: true }) ? alt : undefined;
+    };
+    /**
+     * The taxi instruction that takes an aircraft on after a head-on (it was turned around or pulled aside, or sent out of the way): to the runway hold for a departure, to
+     * a stand for an arrival. The aircraft it met is checked strictly (no stopped-aircraft exemption): when the route would meet it on the same lane again, another way if the
+     * airport has one (`departureAround`, `parkingAround`), else a place out of its way (`retreatNode`), else the lane clears first - after PARTNER_PATIENCE_SEC the original
+     * route is issued after all. 'wait' = nothing yet.
+     */
+    const resumeAfterHeadOn = (ac: Aircraft, at: number): Plan | 'wait' | undefined => {
+      const m = partner.get(ac.id);
+      const other = m && state.aircraft[m.otherId];
+      const blockedBy = (nodeIds: string[]) => !!other && other.onGround && !!opposingTraffic(state, nodeIds, ac.id, { only: other.id });
+      const retreat = (): Plan | 'wait' => {
+        if (!other || v.now - m!.since >= PARTNER_PATIENCE_SEC) return 'wait';
+        const n = retreatNode(state, ac, other);
+        if (!n) return 'wait';
+        retreated.set(ac.id, { otherId: other.id, at: retreated.get(ac.id)?.at ?? at });
+        return {
+          key: `${ac.id}:retreat:${at}`, aircraftId: ac.id, callsign: ac.callsign, priority: 52, once: true,
+          cmds: [mkCmd('TAXI', ac, { destination: `TWY${n.taxiways[0]}`, toNodeId: n.id })],
+          phrase: say.headOnPullAside(ac, other, n.taxiways[0]), summary: `${ac.callsign} taxied out of the way of ${other.callsign} to ${n.taxiways[0]}`,
+        };
+      };
+      const retreating = retreated.get(ac.id);
+      if (ac.isDeparture) {
+        // (no queue limit here: the aircraft stands in somebody's way and has to go somewhere - every hold "full" because of the arrival that waits for it
+        // to move was a deadlock, soak seed 3)
+        // An exit hold of the landing runway is not a way out of a head-on with an arrival (the queue limit lets a light aircraft use it when the end entry is full): the
+        // full-length entry, whatever its queue.
+        const queued = planDeparture(airport, ac, state.activeRunways.departing, busyHoldIds(state, ac.id), closedTaxiways(state));
+        let dep = (queued && !landingExitHoldIds(state).has(queued.holdId) ? queued : undefined) ?? planDeparture(airport, ac, state.activeRunways.departing, new Map(), closedTaxiways(state));
+        if (dep && blockedBy(dep.nodeIds)) {
+          const alt = departureAround(ac, dep, other!);
+          if (alt) dep = alt;
+          else if (v.now - m!.since < PARTNER_PATIENCE_SEC) return retreating ? 'wait' : retreat();
+        }
+        if (!dep || opposing(ac, dep.nodeIds)) return undefined;
+        return {
+          key: `${ac.id}:resume:${at}`, aircraftId: ac.id, callsign: ac.callsign, priority: 52, once: true,
+          cmds: [mkCmd('TAXI', ac, { destination: `RWY${dep.runwayEnd}`, runwayEnd: dep.runwayEnd, route: dep.via, holdShort: dep.holdShort })],
+          phrase: say.taxiToRunway(ac, dep.runwayEnd, dep.via, dep.holdShort), summary: `${ac.callsign} routed again to runway ${dep.runwayEnd} after a head-on`,
+        };
+      }
+      let p = planParking(state, ac);
+      if (p && blockedBy(p.nodeIds)) {
+        const alt = parkingAround(ac, p, other!);
+        if (alt) p = alt;
+        else if (v.now - m!.since < PARTNER_PATIENCE_SEC) return retreating ? 'wait' : retreat();
+      }
+      if (!p || opposing(ac, p.nodeIds)) return undefined;
+      return {
+        key: `${ac.id}:resume:${at}`, aircraftId: ac.id, callsign: ac.callsign, priority: 52, once: true,
+        cmds: [mkCmd('TAXI_TO_PARKING', ac, { destination: p.spot.id, route: p.via, holdShort: p.holdShort })],
+        phrase: say.taxiToParking(ac, p.spot, p.via, p.holdShort), summary: `${ac.callsign} routed again to ${p.spot.name} after a head-on`,
+      };
+    };
     // Delivery closed (nobody works CLNC): Ground issues the clearance too.
     if (!v.staffed.has('CLNC')) plans.push(...clearanceAgent(v));
     for (const ac of v.onFrequency) {
-      if (!ac.onGround || ac.radioState === 'TRANSMITTING') continue;
+      // (a pilot in the middle of a call is left alone, except one who keeps repeating a nose-to-nose call: that request is answered)
+      if (!ac.onGround || (ac.radioState === 'TRANSMITTING' && !headOnCalls.has(ac.id))) continue;
       const pending = ac.pendingRequest?.kind;
 
       // 0. Airliner at its gate asking for pushback (not FAA phraseology; the sim lets Ground approve it): approve, tail toward the lane that leads to the runway.
@@ -140,11 +259,13 @@ export function createGroundAgent(store: ClearanceStore): Agent {
       }
 
       // 0a. Nose to nose on a shared lane (sim/headOn.ts): resolve it (ai/headOn.ts), or once the pair is apart route the aircraft again from where it stands.
-      if (pending === 'TAXI' && ac.groundSpeedKt < 1 && v.settled(ac) >= 2 && !isVehicleType(ac.type)) {
-        const req = ac.pendingRequest!;
+      const latched = pending !== 'TAXI' ? headOnCalls.get(ac.id) : undefined;
+      if ((pending === 'TAXI' || latched) && ac.groundSpeedKt < 1 && v.settled(ac) >= 2 && !isVehicleType(ac.type)) {
+        const req = ac.pendingRequest ?? { kind: 'TAXI' as const, text: '', sinceSec: latched!.at, headOnWith: latched!.otherId, resume: undefined };
         if (req.headOnWith) {
           const other = state.aircraft[req.headOnWith];
           const res = other ? resolveHeadOn(state, ac, other, new Set(v.onFrequency.map((x) => x.id))) : undefined;
+          if (res) { const m = partner.get(res.mover.id); if (!m || m.otherId !== res.other.id) partner.set(res.mover.id, { otherId: res.other.id, since: v.now }); }
           if (res?.kind === 'pull') {
             plans.push({
               key: `${res.mover.id}:headon-pull:${res.junctionId}`, aircraftId: res.mover.id, callsign: res.mover.callsign, priority: 56, cooldownSec: 45,
@@ -159,34 +280,25 @@ export function createGroundAgent(store: ClearanceStore): Agent {
               summary: `${res.mover.callsign} turned around for ${res.other.callsign}`,
             });
           }
-          continue;
+          // (nothing to resolve and the aircraft waits at a runway hold line for its crossing: the crossing below answers it)
+          if (res || !waitsAtCrossingHold(ac)) continue;
         }
         if (req.resume && !(ac.phase === 'PARKED' || ac.phase === 'READY')) {
-          if (ac.isDeparture) {
-            // (no queue limit here: the aircraft stands in somebody's way and has to go somewhere - every hold "full" because of the arrival that waits for it
-            // to move was a deadlock, soak seed 3)
-            // An exit hold of the landing runway is not a way out of a head-on with an arrival (the queue limit lets a light aircraft use it when the end entry is full): the
-            // full-length entry, whatever its queue.
-            const queued = planDeparture(airport, ac, state.activeRunways.departing, busyHoldIds(state, ac.id), closedTaxiways(state));
-            const dep = (queued && !landingExitHoldIds(state).has(queued.holdId) ? queued : undefined) ?? planDeparture(airport, ac, state.activeRunways.departing, new Map(), closedTaxiways(state));
-            if (dep && !opposing(ac, dep.nodeIds)) {
-              plans.push({
-                key: `${ac.id}:resume:${req.sinceSec}`, aircraftId: ac.id, callsign: ac.callsign, priority: 52, once: true,
-                cmds: [mkCmd('TAXI', ac, { destination: `RWY${dep.runwayEnd}`, runwayEnd: dep.runwayEnd, route: dep.via, holdShort: dep.holdShort })],
-                phrase: say.taxiToRunway(ac, dep.runwayEnd, dep.via, dep.holdShort), summary: `${ac.callsign} routed again to runway ${dep.runwayEnd} after a head-on`,
-              });
-            }
-          } else {
-            const p = planParking(state, ac);
-            if (p && !opposing(ac, p.nodeIds)) {
-              plans.push({
-                key: `${ac.id}:resume:${req.sinceSec}`, aircraftId: ac.id, callsign: ac.callsign, priority: 52, once: true,
-                cmds: [mkCmd('TAXI_TO_PARKING', ac, { destination: p.spot.id, route: p.via, holdShort: p.holdShort })],
-                phrase: say.taxiToParking(ac, p.spot, p.via, p.holdShort), summary: `${ac.callsign} routed again to ${p.spot.name} after a head-on`,
-              });
-            }
-          }
+          const r = resumeAfterHeadOn(ac, req.sinceSec);
+          if (r && r !== 'wait') plans.push(r);
           continue;
+        }
+      }
+      // 0a2. Sent out of another aircraft's way: once it stands at the node it was sent to, Ground routes it on by itself (the pilot has nothing open to ask).
+      {
+        const rt = retreated.get(ac.id);
+        if (rt) {
+          if (v.mem.done.has(`${ac.id}:resume:${rt.at}`) || v.now - rt.at > PARTNER_MEMORY_SEC) retreated.delete(ac.id);
+          else if (!pending && ac.groundSpeedKt < 1 && v.settled(ac) >= 2 && (!ac.route || ac.route.progressIndex >= ac.route.nodeIds.length) && v.now - rt.at >= 10 && (ac.phase === 'TAXIING' || ac.phase === 'TAXI_TO_PARKING')) {
+            const r = resumeAfterHeadOn(ac, rt.at);
+            if (r && r !== 'wait') plans.push(r);
+            continue;
+          }
         }
       }
 
@@ -255,8 +367,15 @@ export function createGroundAgent(store: ClearanceStore): Agent {
           && !hasActive(o, 'TAXI') && starvingDeparture(state, o) && outranks(state, o, ac) && !(o.flightPlan?.flightRules === 'IFR' && !o.flightPlan.ifrClearance)
           && (() => { const od = planDeparture(airport, o, state.activeRunways.departing, busyHoldIds(state, o.id), closedTaxiways(state)); return !!od && !opposing(o, od.nodeIds); })());
         if (overdueFirst) continue;
-        const dep = planDeparture(airport, ac, state.activeRunways.departing, busyHoldIds(state, ac.id), closedTaxiways(state));
-        if (!dep || opposing(ac, dep.nodeIds)) continue;
+        let dep = planDeparture(airport, ac, state.activeRunways.departing, busyHoldIds(state, ac.id), closedTaxiways(state));
+        if (!dep) continue;
+        const blocker = opposing(ac, dep.nodeIds);
+        if (blocker) {
+          // held back by traffic on the route: after ALT_ROUTE_AFTER_SEC another way, when there is one
+          const alt = waitedSec(ac) >= ALT_ROUTE_AFTER_SEC ? departureAround(ac, dep, blocker) : undefined;
+          if (!alt) continue;
+          dep = alt;
+        }
         plans.push({
           key: `${ac.id}:taxi`, aircraftId: ac.id, callsign: ac.callsign, priority: 50,
           cmds: [mkCmd('TAXI', ac, { destination: `RWY${dep.runwayEnd}`, runwayEnd: dep.runwayEnd, route: dep.via, holdShort: dep.holdShort })],
@@ -327,7 +446,7 @@ export function createGroundAgent(store: ClearanceStore): Agent {
       }
 
       // 2. Holding short of a runway on the taxi route: cross when the runway is not in use.
-      if (pending === 'CROSSING' && ac.groundSpeedKt < 1) {
+      if ((pending === 'CROSSING' || (pending === 'TAXI' && waitsAtCrossingHold(ac))) && ac.groundSpeedKt < 1) {
         const hold = holdNodeAt(airport, ac, HOLD_START_SNAP_M + 5);
         const rid = hold?.runwayId;
         if (!rid) continue;
@@ -401,8 +520,14 @@ export function createGroundAgent(store: ClearanceStore): Agent {
 
       // 4. Arrival that left the runway and asks to taxi to parking.
       if (!ac.isDeparture && !isRotorcraftType(ac.type) && ac.phase === 'RUNWAY_EXIT' && pending === 'TAXI' && !hasActive(ac, 'TAXI_TO_PARKING')) {
-        const p = planParking(state, ac);
-        if (!p || opposing(ac, p.nodeIds, { ignoreStoppedAhead: true })) continue;
+        let p = planParking(state, ac);
+        if (!p) continue;
+        const blocker = opposing(ac, p.nodeIds, { ignoreStoppedAhead: true });
+        if (blocker) {
+          const alt = waitedSec(ac) >= ALT_ROUTE_AFTER_SEC ? parkingAround(ac, p, blocker) : undefined;
+          if (!alt) continue;
+          p = alt;
+        }
         plans.push({
           key: `${ac.id}:to-parking`, aircraftId: ac.id, callsign: ac.callsign, priority: 50,
           cmds: [mkCmd('TAXI_TO_PARKING', ac, { destination: p.spot.id, route: p.via, holdShort: p.holdShort })],
@@ -410,6 +535,21 @@ export function createGroundAgent(store: ClearanceStore): Agent {
           summary: `${ac.callsign} taxi to ${p.spot.name}`,
         });
       }
+    }
+    // A taxi or crossing request that has gone unanswered this long gets a "hold position, expect delay" (no state change: the request stays open and is answered when the way is
+    // clear). A pilot is never left without a word from the controller for more than DELAY_CALL_AFTER_SEC (then every DELAY_CALL_EVERY_SEC).
+    const planned = new Set(plans.map((p) => p.aircraftId));
+    for (const ac of v.onFrequency) {
+      const req = ac.pendingRequest;
+      if (!req || (req.kind !== 'TAXI' && req.kind !== 'CROSSING') || !ac.onGround || ac.groundSpeedKt >= 1 || ac.radioState === 'TRANSMITTING' || planned.has(ac.id) || req.unheard || isVehicleType(ac.type) || isRotorcraftType(ac.type)) continue; // (vehicles and helicopters are answered by the special-traffic agent)
+      if (ac.flightPlan?.flightRules === 'IFR' && !ac.flightPlan.ifrClearance && ac.isDeparture) continue; // waits for its clearance from Delivery
+      const waited = v.now - req.sinceSec;
+      if (waited < DELAY_CALL_AFTER_SEC) continue;
+      const n = Math.floor((waited - DELAY_CALL_AFTER_SEC) / DELAY_CALL_EVERY_SEC);
+      plans.push({
+        key: `${ac.id}:delay:${req.sinceSec}:${n}`, aircraftId: ac.id, callsign: ac.callsign, priority: 30, cmds: [], once: true,
+        phrase: say.expectDelay(ac), summary: `${ac.callsign} hold position, expect delay (${req.kind === 'CROSSING' ? 'crossing' : 'taxi'} request waiting ${Math.round(waited)} s)`,
+      });
     }
     return plans;
   };

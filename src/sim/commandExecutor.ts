@@ -972,7 +972,9 @@ function planTaxi(env: Env): PlanResult {
         for (const rid of cmd.holdShort ?? []) {
           const rw = findRunway(airport, rid);
           if (rw) {
-            const holds = route.nodeIds.filter((id) => graph.nodes[id].kind === 'holding_position' && graph.nodes[id].runwayId === rw.id);
+            // (a route that starts at a hold line of this runway and leads away from it does not cross there: the stop belongs to the later hold line that does)
+            const leavesStartHold = (i: number) => i === 0 && route.nodeIds.length > 1 && !runwayCrossingsAlong(graph, route.nodeIds.slice(0, 2)).includes(rw.id) && graph.nodes[route.nodeIds[1]]?.kind !== 'runway';
+            const holds = route.nodeIds.filter((id, i) => graph.nodes[id].kind === 'holding_position' && graph.nodes[id].runwayId === rw.id && !leavesStartHold(i));
             if (holds.length && !holds.some((id) => stops.has(id))) stops.add(holds[0]);
             continue;
           }

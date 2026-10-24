@@ -25,6 +25,11 @@ export interface RouteOptions {
    * that runway taxis along it to a turnoff (JO 7110.65 3-7-2 allows runway use as part of a taxi route; the route still avoids every other runway).
    */
   runwayTravelIds?: string[];
+  /**
+   * Edge ids the route must not use (Ground's replan around a lane another aircraft stands on or comes along, ai/ground.ts): never used, like a closed taxiway,
+   * but only for the one search.
+   */
+  avoidEdgeIds?: ReadonlySet<string>;
 }
 
 export interface TaxiRoute {
@@ -128,6 +133,7 @@ class MinHeap<T> {
 
 function edgeAllowed(edge: TaxiEdge, opts: RouteOptions, viaSet: Set<string>, avoid?: ReadonlySet<string>): boolean {
   if (avoid && avoid.has(up(edge.taxiway))) return false;
+  if (opts.avoidEdgeIds?.has(edge.id)) return false;
   if (edge.onRunwayId) {
     const avoid = opts.avoidRunways ?? true;
     if (avoid && !(opts.allowedRunwayIds ?? []).some((r) => up(r) === up(edge.onRunwayId!))) return false;
@@ -352,6 +358,11 @@ export function routeSegmentTaxiways(graph: TaxiwayGraph, nodeIds: readonly stri
   return nodeIds.map((id, i) => (i === 0 ? undefined : (adj.get(nodeIds[i - 1]) ?? []).find((a) => a.to === id)?.edge.taxiway));
 }
 
+/** The edge joining two consecutive nodes of a path (undefined when they are not adjacent or the edge is one-way the other way). */
+export function edgeBetween(graph: TaxiwayGraph, fromId: string, toId: string): TaxiEdge | undefined {
+  return (adjacency(graph).get(fromId) ?? []).find((a) => a.to === toId)?.edge;
+}
+
 /** Runway ids whose surface the node path traverses (via edge.onRunwayId), in order. */
 export function runwayCrossingsAlong(graph: TaxiwayGraph, nodeIds: string[]): string[] {
   const adj = adjacency(graph);
@@ -364,7 +375,7 @@ export function runwayCrossingsAlong(graph: TaxiwayGraph, nodeIds: string[]): st
 }
 
 /** Shortest distances (m) from a node to every reachable node, not using runway surfaces. */
-export function shortestDistances(graph: TaxiwayGraph, fromId: string, opts: { allowedRunwayIds?: string[]; avoidTaxiways?: Iterable<string> } = {}): Map<string, number> {
+export function shortestDistances(graph: TaxiwayGraph, fromId: string, opts: { allowedRunwayIds?: string[]; avoidTaxiways?: Iterable<string>; avoidEdgeIds?: ReadonlySet<string> } = {}): Map<string, number> {
   const adj = adjacency(graph);
   const avoid = opts.avoidTaxiways ? new Set([...opts.avoidTaxiways].map(up)) : undefined;
   const distMap = new Map<string, number>([[fromId, 0]]);
@@ -374,7 +385,7 @@ export function shortestDistances(graph: TaxiwayGraph, fromId: string, opts: { a
     const top = heap.pop()!;
     if (top.p > (distMap.get(top.v) ?? Infinity)) continue;
     for (const arc of adj.get(top.v) ?? []) {
-      if (!edgeAllowed(arc.edge, { avoidRunways: true, allowedRunwayIds: opts.allowedRunwayIds }, new Set(), avoid)) continue;
+      if (!edgeAllowed(arc.edge, { avoidRunways: true, allowedRunwayIds: opts.allowedRunwayIds, avoidEdgeIds: opts.avoidEdgeIds }, new Set(), avoid)) continue;
       const c = top.p + arc.edge.lengthM;
       if (c < (distMap.get(arc.to) ?? Infinity)) {
         distMap.set(arc.to, c);
