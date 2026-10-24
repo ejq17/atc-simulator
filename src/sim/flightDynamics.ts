@@ -338,7 +338,20 @@ const EXIT_MAX_ANGLE_DEG = 100;
  * taxiway (the data has no hold node touching the runway node there, e.g. taxiway A at the 22 end of KACY runway 4) are included too, if the
  * turnoff leads forward. They are a second choice for a landing rollout (`chooseExit`) and are what a stopped aircraft can still reach.
  */
+/** Memo of `runwayExits` per taxiway graph (immutable per airport) and runway end: the scan is O(nodes x edges) and is called every tick for every rolling aircraft; at KPHL it took most of a 2-hour all-AI run. */
+const EXITS_MEMO = new WeakMap<object, Map<string, RunwayExit[]>>();
 export function runwayExits(ctx: SimContext, g: RunwayEndGeom, extended = false): RunwayExit[] {
+  const graph = ctx.state.airport.taxiwayGraph;
+  let tm = EXITS_MEMO.get(graph);
+  if (!tm) EXITS_MEMO.set(graph, (tm = new Map()));
+  const tk = `${g.end.id}|${extended}`;
+  const hit = tm.get(tk);
+  if (hit) return hit;
+  const res = runwayExits0(ctx, g, extended);
+  tm.set(tk, res);
+  return res;
+}
+function runwayExits0(ctx: SimContext, g: RunwayEndGeom, extended = false): RunwayExit[] {
   const graph = ctx.state.airport.taxiwayGraph;
   const out: RunwayExit[] = [];
   for (const id of Object.keys(graph.nodes)) {
