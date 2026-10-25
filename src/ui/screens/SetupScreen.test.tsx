@@ -198,3 +198,55 @@ describe('<SetupScreen /> special traffic', () => {
     expect(screen.getByTestId('special-vehicles')).not.toBeChecked();
   });
 });
+
+describe('<SetupScreen /> traffic defaults follow the airport profile', () => {
+  const start = () => {
+    const fn = vi.fn((_o: StartOptions) => Promise.resolve(true));
+    useSimStore.setState({ startSession: fn });
+    return () => {
+      fireEvent.click(screen.getByTestId('start-session'));
+      return fn.mock.calls[0][0].freePlay;
+    };
+  };
+  const choose = (icao: string) => fireEvent.change(screen.getByTestId('airport-select'), { target: { value: icao } });
+
+  it('KACY keeps 50 % GA, pattern work on and the 10 per hour moderate rate', () => {
+    const press = start();
+    render(<SetupScreen />);
+    expect(screen.getByLabelText('General aviation share')).toHaveValue('50');
+    expect(screen.getByTestId('pattern-work')).toBeChecked();
+    expect(press()).toMatchObject({ gaFraction: 0.5, patternWork: true, arrivalsPerHour: 10, departuresPerHour: 10 });
+  });
+
+  it('KBOS: 2 % GA, no pattern work; switching back to KACY restores the defaults', () => {
+    const press = start();
+    render(<SetupScreen />);
+    choose('KBOS');
+    expect(screen.getByLabelText('General aviation share')).toHaveValue('2');
+    expect(screen.getByTestId('pattern-work')).not.toBeChecked();
+    choose('KACY');
+    expect(screen.getByLabelText('General aviation share')).toHaveValue('50');
+    expect(screen.getByTestId('pattern-work')).toBeChecked();
+    choose('KBOS');
+    expect(press()).toMatchObject({ gaFraction: 0.02, patternWork: false, arrivalsPerHour: 10 });
+  });
+
+  it('KPGD: 80 % GA, pattern work and flight training on, lighter rates; the player can still override', () => {
+    const press = start();
+    render(<SetupScreen />);
+    choose('KPGD');
+    expect(screen.getByLabelText('General aviation share')).toHaveValue('80');
+    expect(screen.getByTestId('pattern-work')).toBeChecked();
+    expect(screen.getByTestId('special-training')).toBeChecked();
+    fireEvent.change(screen.getByLabelText('General aviation share'), { target: { value: '30' } });
+    fireEvent.click(screen.getByTestId('pattern-work'));
+    expect(press()).toMatchObject({ gaFraction: 0.3, patternWork: false, arrivalsPerHour: 4, departuresPerHour: 4 });
+  });
+
+  it('EGLL: no GA at all, nothing to choose about pattern work', () => {
+    render(<SetupScreen />);
+    choose('EGLL');
+    expect(screen.getByLabelText('General aviation share')).toHaveValue('0');
+    expect(screen.queryByTestId('pattern-work')).toBeNull(); // no GA type offered, so no pattern-work choice
+  });
+});

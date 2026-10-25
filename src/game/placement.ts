@@ -5,6 +5,7 @@
 import type { Airport, ParkingPosition, ScenarioAircraftSpawn, Vec2 } from '../sim/types';
 import { getPerformance } from '../sim/performance';
 import { alongCross, findRunwayEnd } from '../sim/runways';
+import { glideAltitudeFt, glidePathFor } from '../sim/flightDynamics';
 import { dependentMates, dependentPairClear } from '../ai/world';
 import { endOf, finalPosition, NM, norm360, parkingPoolFor } from './world';
 import type { Rng } from '../sim/rng';
@@ -78,7 +79,12 @@ export function pickArrivalStart(
   const speedKt = light ? 100 : 170;
   for (let i = 0; i < (o.tries ?? 24); i++) {
     const nm = minNm + rng() * (maxNm - minNm);
-    const altitudeFt = Math.round((2500 + rng() * 500) / 100) * 100;
+    const randomAlt = Math.round((2500 + rng() * 500) / 100) * 100;
+    // The altitude follows the distance: ON the glide path of the final (the plate's angle and TCH, else the visual path / 3 degrees: the path the engine flies) when
+    // placed on the extended centreline, and no higher than that path on a base-leg start (a start above it floated down the runway or went around, see
+    // `cannotTouchDownInZone`). Farther out the old 2,500-3,000 ft is already below the path and is kept.
+    const rg = findRunwayEnd(airport, endId)!;
+    const pathFt = glideAltitudeFt(rg.elevationFt, nm * NM, glidePathFor(airport, undefined, rg, getPerformance(type)));
     // (an arrival for a runway with a parallel neighbour is placed on its final: a base-leg start is offset from the course and its along-course speed is lower than
     // the neighbour's traffic, so the stagger of `dependentPairClear` would not hold)
     const dependent = dependentMates(airport, findRunwayEnd(airport, endId)!).length > 0;
@@ -86,7 +92,7 @@ export function pickArrivalStart(
     if (onFinalLine) {
       const pos = finalPosition(airport, endId, nm);
       if (!arrivalPositionOk(airport, pos, type, endId, others)) continue;
-      return { kind: 'airborne', pos, altitudeFt, headingDeg: e.trueHeadingDeg, speedKt, runwayEnd: endId, distanceNm: nm };
+      return { kind: 'airborne', pos, altitudeFt: Math.round(pathFt / 100) * 100, headingDeg: e.trueHeadingDeg, speedKt, runwayEnd: endId, distanceNm: nm };
     }
     const sign = rng() < 0.5 ? -1 : 1;
     const off = sign * (20 + rng() * 30);
@@ -96,7 +102,7 @@ export function pickArrivalStart(
     // Head for a point on the final 4 nm out; the engine re-aims every tick anyway.
     const aim = finalPosition(airport, endId, 4);
     const headingDeg = norm360((Math.atan2(aim.x - pos.x, aim.y - pos.y) * 180) / Math.PI);
-    return { kind: 'airborne', pos, altitudeFt, headingDeg, speedKt, runwayEnd: endId };
+    return { kind: 'airborne', pos, altitudeFt: Math.min(randomAlt, Math.round(pathFt / 100) * 100), headingDeg, speedKt, runwayEnd: endId };
   }
   return undefined;
 }

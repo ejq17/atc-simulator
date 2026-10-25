@@ -6,7 +6,8 @@
  *                   or a full Weather object.
  *  activeRunways    explicit config, else `recommendRunways` on the weather (A320-capable ends only when jets are in play).
  *  aircraftCount    initial aircraft: parked departures + inbound arrivals that do not conflict at spawn.
- *  arrivalsPerHour / departuresPerHour / gaFraction / maxAircraft   continuous traffic (see ../traffic.ts).
+ *  arrivalsPerHour / departuresPerHour / gaFraction / maxAircraft   continuous traffic (see ../traffic.ts). Unset rates and gaFraction follow the airport profile
+ *                   (airportProfile.ts `defaults`: ATADS / CAA based GA share, quieter airports scale the generic rates); patternWork false = no closed traffic.
  *  difficulty       easy | normal | hard: default rates, max aircraft and the intensity ramp over time.
  *  pilotRealism     off | light | moderate | heavy (default moderate): readback errors, response timing, blocked calls, callsign habits, students and
  *                   pilot requests (src/sim/pilotBehaviour.ts). Career steps override it (ramp), training lessons are off.
@@ -30,7 +31,7 @@ import { preferredEndOrder, recommendRunways } from '../../weather/runwaySelecti
 import { selectRunwayConfiguration } from '../../weather/runwayConfigurations';
 import type { GameScenario } from '../types';
 import { randomNNumber, runwayIdOf, runwayLongEnoughFor, callsignTail } from '../world';
-import { pickFlight, pickGaType, pickLeg, profileFor, profileTypes, resolveTypeSelection, usableAirlines } from '../airportProfile';
+import { pickFlight, pickGaType, pickLeg, profileFor, profileTypes, rateScaleFor, resolveTypeSelection, trafficDefaultsFor, usableAirlines } from '../airportProfile';
 import type { Flight } from '../airportProfile';
 import { landingEndPool } from '../arrivalRunways';
 import { pickArrivalStart, pickParking } from '../placement';
@@ -105,15 +106,17 @@ export function buildFreePlay(airport: Airport, options: FreePlayOptions = {}, i
   const types = sel.allowed ? [...new Set(options.aircraftTypes)] : profileTypes(airport.icao);
   const jets = sel.jets;
   const ga = sel.ga;
-  const gaFraction = ga && jets ? Math.min(1, Math.max(0, options.gaFraction ?? 0.5)) : ga ? 1 : 0;
+  const gaFraction = ga && jets ? Math.min(1, Math.max(0, options.gaFraction ?? trafficDefaultsFor(airport.icao).gaFraction)) : ga ? 1 : 0;
+  const patternWork = options.patternWork ?? trafficDefaultsFor(airport.icao).patternWork;
+  const rateScale = rateScaleFor(airport.icao);
 
   const weather = resolveWeather(options.weather, seed);
   const closedEnds = closedEndsOf(airport, options.closures ?? []);
   const requested = options.activeRunways;
   const active = requested && ![...requested.landing, ...requested.departing].some((e) => closedEnds.includes(e)) ? requested : recommendConfig(airport, weather, jets, closedEnds);
   const maxAircraft = Math.max(1, Math.round(options.maxAircraft ?? dprof.max));
-  const arrivalsPerHour = Math.max(0, options.arrivalsPerHour ?? Math.round(prof.arr * dprof.rate));
-  const departuresPerHour = Math.max(0, options.departuresPerHour ?? Math.round(prof.dep * dprof.rate));
+  const arrivalsPerHour = Math.max(0, options.arrivalsPerHour ?? Math.round(prof.arr * dprof.rate * rateScale));
+  const departuresPerHour = Math.max(0, options.departuresPerHour ?? Math.round(prof.dep * dprof.rate * rateScale));
   const count = Math.max(0, Math.min(maxAircraft, Math.round(options.aircraftCount ?? prof.count)));
 
   const ifrArrivals = internal.ifrArrivals ?? options.ifrFlows === true;
@@ -136,7 +139,7 @@ export function buildFreePlay(airport: Airport, options: FreePlayOptions = {}, i
     controllerPositions: positions,
     ...(options.playerPositions?.length ? { playerPositions: [...new Set(options.playerPositions)] } : {}),
     spawns,
-    traffic: { enabled: true, arrivalsPerHour, departuresPerHour, gaFraction, maxAircraft },
+    traffic: { enabled: true, arrivalsPerHour, departuresPerHour, gaFraction, maxAircraft, ...(patternWork ? {} : { patternWork: false }) },
     difficulty,
     pilotRealism: options.pilotRealism ?? 'moderate',
     aircraftTypes: types,

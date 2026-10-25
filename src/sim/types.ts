@@ -860,7 +860,7 @@ export interface Scenario {
   coordination?: { crossingApprovalRequired?: boolean; releasesRequired?: boolean };
   spawns: ScenarioAircraftSpawn[];
   /** Continuous traffic generation settings (free play). */
-  traffic?: { enabled: boolean; arrivalsPerHour: number; departuresPerHour: number; gaFraction: number; maxAircraft: number; /** false = no arrival slots / departure cap in the generator (stress tests of the raw clocks); default on, see src/game/README.md "Flow control". */ flowControl?: boolean };
+  traffic?: { enabled: boolean; arrivalsPerHour: number; departuresPerHour: number; gaFraction: number; maxAircraft: number; /** false = no arrival slots / departure cap in the generator (stress tests of the raw clocks); default on, see src/game/README.md "Flow control". */ flowControl?: boolean; /** false = no closed traffic: GA pilots do not ask for the option or to stay in the pattern, no training circuits (airports with no local operations, src/game/airportProfile.ts). Default true. */ patternWork?: boolean };
   /** Runway / taxiway closures in force from the start of the session (setup-screen options, scenario scripts). See `Closure`. */
   closures?: ClosureSpec[];
   /** Pilot-initiated requests beyond the basic calls (free play): `lights` = arrivals at night / in low visibility may ask for the runway lights up or down. Off by default. */

@@ -6,7 +6,7 @@ import { closedEndsOf } from '../../sim/airportOps';
 import { DEFAULT_AIRPORT_ICAO, airportOrDefault, isAirportLoaded, listAirportOptions, preloadAirport } from '../../airport';
 import { airportCallName } from '../../radio/frequencies';
 import { towerClosedNotice, towerHoursLabel } from '../../game/towerHours';
-import { profileTypes } from '../../game/airportProfile';
+import { profileTypes, rateScaleFor, trafficDefaultsFor } from '../../game/airportProfile';
 import { SPECIAL_TRAFFIC_KINDS, SPECIAL_TRAFFIC_LABELS, availableSpecialKinds, defaultSpecialTraffic, resolveSpecialTraffic } from '../../game/specialTraffic';
 import type { SpecialTrafficSelection } from '../../game/specialTraffic';
 import type { ControllerPositionId, GameMode, Weather } from '../../sim/types';
@@ -32,6 +32,10 @@ const DENSITY = {
   busy: { label: 'Busy', arrivalsPerHour: 18, departuresPerHour: 18 },
 } as const;
 type Density = keyof typeof DENSITY;
+/** Setup-screen hourly rate of a density level at an airport: the generic level scaled by how busy the real airport is (profile `rateScaleFor`; KACY and KMHT 1). */
+function densityRate(level: Density, icao: string, kind: 'arrivalsPerHour' | 'departuresPerHour'): number {
+  return Math.max(1, Math.round(DENSITY[level][kind] * rateScaleFor(icao)));
+}
 
 const STARTS: { value: NonNullable<FreePlayOptions['startingScenario']>; label: string }[] = [
   { value: 'quiet', label: 'Quiet ramp' }, { value: 'busy_departures', label: 'Busy departures' },
@@ -178,7 +182,8 @@ function SetupForm({ nowMs, initialIcao }: { nowMs?: number; initialIcao: string
   const [scenarioId, setScenarioId] = useState<string>(prev?.scenarioId ?? CUSTOM);
   const [aircraftCount, setAircraftCount] = useState(prev?.freePlay.aircraftCount ?? 3);
   const [density, setDensity] = useState<Density>('moderate');
-  const [gaPct, setGaPct] = useState(Math.round((prev?.freePlay.gaFraction ?? 0.5) * 100));
+  const [gaPct, setGaPct] = useState(Math.round((prev?.freePlay.gaFraction ?? trafficDefaultsFor(prev?.icao ?? initialIcao).gaFraction) * 100));
+  const [patternWork, setPatternWork] = useState<boolean>(prev?.freePlay.patternWork ?? trafficDefaultsFor(prev?.icao ?? initialIcao).patternWork);
   const [maxAircraft, setMaxAircraft] = useState(prev?.freePlay.maxAircraft ?? 8);
   const [types, setTypes] = useState<string[]>(prev?.freePlay.aircraftTypes ?? TYPES.map((t) => t.id));
   const [special, setSpecial] = useState<SpecialTrafficSelection>(() => resolveSpecialTraffic(prev?.icao ?? DEFAULT_AIRPORT_ICAO, prev?.freePlay.specialTraffic ?? defaultSpecialTraffic(prev?.icao ?? DEFAULT_AIRPORT_ICAO)));
@@ -219,6 +224,8 @@ function SetupForm({ nowMs, initialIcao }: { nowMs?: number; initialIcao: string
     setScenarioId(CUSTOM);
     setMode('free_play');
     setSpecial(defaultSpecialTraffic(icao));
+    setGaPct(Math.round(trafficDefaultsFor(icao).gaFraction * 100));
+    setPatternWork(trafficDefaultsFor(icao).patternWork);
   }, [icao]);
 
   const isCustom = mode === 'free_play' && scenarioId === CUSTOM;
@@ -291,9 +298,10 @@ function SetupForm({ nowMs, initialIcao }: { nowMs?: number; initialIcao: string
       difficulty,
       pilotRealism,
       aircraftCount,
-      arrivalsPerHour: DENSITY[density].arrivalsPerHour,
-      departuresPerHour: DENSITY[density].departuresPerHour,
+      arrivalsPerHour: densityRate(density, airport.icao, 'arrivalsPerHour'),
+      departuresPerHour: densityRate(density, airport.icao, 'departuresPerHour'),
       gaFraction: gaPct / 100,
+      patternWork,
       maxAircraft,
       aircraftTypes: offeredTypes.filter((t) => types.includes(t)).length ? offeredTypes.filter((t) => types.includes(t)) : ['C172'],
       specialTraffic: resolveSpecialTraffic(airport.icao, special),
@@ -446,8 +454,17 @@ function SetupForm({ nowMs, initialIcao }: { nowMs?: number; initialIcao: string
                     <Segmented<Density> value={density} onChange={setDensity} options={(Object.keys(DENSITY) as Density[]).map((d) => ({ value: d, label: DENSITY[d].label }))} />
                   </Field>
                   <Field label={`General aviation share: ${gaPct}%`}>
-                    <input type="range" min={0} max={100} step={5} value={gaPct} onChange={(e) => setGaPct(Number(e.target.value))} className="accent-[#39c5e8]" aria-label="General aviation share" />
+                    <input type="range" min={0} max={100} step={1} value={gaPct} onChange={(e) => setGaPct(Number(e.target.value))} className="accent-[#39c5e8]" aria-label="General aviation share" />
                   </Field>
+                  {offeredTypes.includes('C172') && (
+                    <label className="col-span-2 flex cursor-pointer items-start gap-2 text-xs">
+                      <input type="checkbox" data-testid="pattern-work" className="mt-0.5 accent-[#39c5e8]" checked={patternWork} onChange={(e) => setPatternWork(e.target.checked)} />
+                      <span>
+                        Pattern work
+                        <span className="block text-[11px] leading-snug text-atc-muted">Touch-and-go requests and closed traffic. Off by default where the airport has none (Class B hubs).</span>
+                      </span>
+                    </label>
+                  )}
                   <Field label="Starting situation">
                     <select className={SELECT} value={starting_} onChange={(e) => setStarting_(e.target.value as typeof starting_)} aria-label="Starting situation">
                       {STARTS.map((s) => (<option key={s.value} value={s.value}>{s.label}</option>))}

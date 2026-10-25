@@ -28,7 +28,9 @@ export interface FreePlayOptions {
   aircraftCount?: number;                      // initial aircraft
   arrivalsPerHour?: number;
   departuresPerHour?: number;
-  gaFraction?: number;                         // 0..1
+  gaFraction?: number;                         // 0..1; default: the airport's own GA share (airportProfile.ts `defaults`)
+  /** Closed traffic (option, stay in the pattern, training circuits). Default: the airport's own (`defaults.patternWork`). */
+  patternWork?: boolean;
   maxAircraft?: number;
   difficulty?: 'easy' | 'normal' | 'hard';
   /** How imperfect the pilots are: off / light / moderate / heavy (src/sim/pilotBehaviour.ts). Free play only (career steps ramp with the step, training lessons are off); default moderate. */

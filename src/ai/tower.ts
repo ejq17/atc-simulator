@@ -10,18 +10,21 @@ import type { Aircraft, Airport, SimulationState } from '../sim/types';
 import { AIRBORNE_PROXIMITY_NM, assessClearanceSafety, departureTrailConflict, landedDistanceExceptionApplies, precedingArrivalBlockers, srsMinimumFt } from '../sim/conflicts';
 import { projectArrival, timeToThreshold } from '../sim/runwayTiming';
 import { COORDINATION_DESIGN, findOpenRequest, releaseNeeded, sameController, validApproval } from '../sim/coordination';
-import { defaultPatternSide, findRunwayEnd, isOnFinal, parallelNeighbours } from '../sim/runways';
+import { alongCross, defaultPatternSide, findRunwayEnd, isOnFinal, parallelNeighbours } from '../sim/runways';
 import type { RunwayEndGeom } from '../sim/runways';
 import { frequencyForPosition } from '../radio/frequencies';
 import { KT_TO_MPS, ftToM, nmToM, trueToMagnetic } from '../sim/geo';
-import { predictedExit } from '../sim/flightDynamics';
+import { glideAltitudeFt, predictedExit } from '../sim/flightDynamics';
 import { describeTraffic, luawTraffic } from '../sim/towerCommands';
 import { stoppedExitOptionsFor } from '../sim/runwayStop';
 import { getPerformance } from '../sim/performance';
 import { holdTooShort } from '../sim/holdSelection';
 import { hasActive, landingHoldShort, lastClearance, mkCmd } from './core';
-import { departureProjectedConflict, divergenceOptions } from './airbornePath';
-import { GAP_REQUEST_WAIT_SEC, GAP_USABLE_WITHIN_SEC, usableWindowSec } from './gap';
+import { clearSpacingTurn } from './pathWorld';
+import { DEPARTURE_CLEAR_RATIO, DEPARTURE_CLEAR_RATIO_PATIENT, DEPARTURE_COMFORT_RATIO, DEPARTURE_PATIENCE_SEC, departurePath, departureSeparationRatio, divergenceOptions } from './airbornePath';
+import type { Path } from './airbornePath';
+import { circleRemainingSec, GAP_REQUEST_WAIT_SEC, GAP_USABLE_WITHIN_SEC, usableWindowSec } from './gap';
+import { crossingPairClear, INTERSECTION_PASS_MARGIN_M, intersectionAlongM, intersectionPassSec } from './crossing';
 import { arrivalWindow, isSequenceable, patternLeg, sequenceDownwind, turnsBaseSoon } from './sequence';
 import type { SeqWindow } from './sequence';
 import type { Agent, AgentView, Plan } from './core';
@@ -56,6 +59,8 @@ export function landingInfo(v: AgentView, g: RunwayEndGeom): say.Phrase[] {
 /** Seconds between a takeoff clearance and the pilot starting the roll when the aircraft is still at the hold line (turn onto the runway and align). */
 const LINE_UP_DELAY_SEC = 20;
 const RELEASE_MARGIN_SEC = 30;
+/** After this many seconds a "we need a minute" is over whatever the pilot says next (the engine's longest is 75 s). DESIGN VALUE. */
+const NEED_MINUTE_WAIT_SEC = 100;
 /** A departure waiting longer than this at the hold for a gap makes the pattern traffic that can be delayed leave one. DESIGN VALUE. */
 const DEPARTURE_PRIORITY_WAIT_SEC = 30;
 /** A crossing request that has waited this long (s) makes the delayable pattern traffic leave a gap of CROSSING_WINDOW_SEC. DESIGN VALUES. */
@@ -80,21 +85,31 @@ export function divergingDeparture(airport: Airport, g: RunwayEndGeom): { headin
 }
 
 /**
- * The departure instruction for the aircraft at the head of a runway's queue: the runway heading when its projected path stays clear of the other airborne
- * traffic (`departureProjectedConflict`: the near-miss alert) and of a slower departure on its track (the engine's 3 nm rule, `departureTrailConflict`), else the
- * first divergence of 30 or 60 degrees (JO 7110.65 5-8-2 / 5-8-3), away from a parallel runway first, whose projected path is clear; `blocked` when none is.
+ * The departure instruction for the aircraft at the head of a runway's queue: the runway heading when its projected path keeps `DEPARTURE_COMFORT_RATIO` from the near-miss
+ * alert against the other airborne traffic (departures, go-arounds, the pattern, arrivals to other runways: `departureSeparationRatio`) and clear of a slower departure on its
+ * track (the engine's 3 nm rule, `departureTrailConflict`), else the first divergence of 30 or 60 degrees (JO 7110.65 5-8-2 / 5-8-3), away from a parallel runway first, that
+ * does; failing that the one that comes nearest while still `DEPARTURE_CLEAR_RATIO` from the alert; `blocked` when none is.
  */
-export function departureInstruction(state: SimulationState, airport: Airport, ac: Aircraft, g: RunwayEndGeom, lined: boolean): { heading?: { headingMag: number; turn: 'left' | 'right' }; blocked: boolean } {
+export function departureInstruction(state: SimulationState, airport: Airport, ac: Aircraft, g: RunwayEndGeom, lined: boolean, waitedSec = 0): { heading?: { headingMag: number; turn: 'left' | 'right' }; blocked: boolean } {
+  const clearRatio = waitedSec >= DEPARTURE_PATIENCE_SEC ? DEPARTURE_CLEAR_RATIO_PATIENT : DEPARTURE_CLEAR_RATIO;
   const trail = !!departureTrailConflict(state, ac, g);
-  if (!trail && !departureProjectedConflict(state, ac, g, lined)) return { blocked: false };
+  const straight = departureSeparationRatio(state, ac, g, lined).ratio;
+  if (!trail && straight >= DEPARTURE_COMFORT_RATIO) return { blocked: false };
   const rwyMag = trueToMagnetic(g.headingDeg, airport.magneticVariationDeg);
+  const headingFor = (o: { turn: 'left' | 'right'; deg: number }): { headingMag: number; turn: 'left' | 'right' } => {
+    const mag = rwyMag + (o.turn === 'right' ? o.deg : -o.deg);
+    return { headingMag: ((Math.round(mag / 10) * 10) % 360 + 360) % 360 || 360, turn: o.turn };
+  };
+  // the first heading with the margin; else the one that comes nearest to the alert while still clear of it (the runway heading when it is clear and nothing else is, unless a follower would overtake)
+  let best: { ratio: number; heading?: { headingMag: number; turn: 'left' | 'right' } } | undefined = !trail && straight >= clearRatio ? { ratio: straight } : undefined;
   for (const o of divergenceOptions(state, g)) {
     const trueHdg = g.headingDeg + (o.turn === 'right' ? o.deg : -o.deg);
-    if (departureProjectedConflict(state, ac, g, lined, ((trueHdg % 360) + 360) % 360, o.turn)) continue;
-    const mag = rwyMag + (o.turn === 'right' ? o.deg : -o.deg);
-    return { heading: { headingMag: ((Math.round(mag / 10) * 10) % 360 + 360) % 360 || 360, turn: o.turn }, blocked: false };
+    const r = departureSeparationRatio(state, ac, g, lined, ((trueHdg % 360) + 360) % 360, o.turn).ratio;
+    if (r >= DEPARTURE_COMFORT_RATIO) return { heading: headingFor(o), blocked: false };
+    if (r >= clearRatio && (!best || r > best.ratio)) best = { ratio: r, heading: headingFor(o) };
   }
-  return { blocked: true };
+  if (!best) return { blocked: true };
+  return best.heading ? { heading: best.heading, blocked: false } : { blocked: false };
 }
 
 /** Times (seconds after the clearance) at which a released departure lifts off and is 6,000 ft from the threshold (the engine's categorical distance). */
@@ -133,6 +148,9 @@ const TOUCHDOWN_AFTER_THRESHOLD_SEC = 8;
 /** Lateral margin (nm) added to the near-miss alert distance when the gap to an arrival is projected (the departure's speed between lift-off and climb speed is not modelled). DESIGN VALUE. */
 const ALERT_PROJECTION_MARGIN_NM = 0.2;
 
+/** Seconds added to the lift-off time of a departure cleared from the hold line when the alert against an arrival on a parallel runway is judged. DESIGN VALUE (see `neededEtaSec`). */
+export const LINE_UP_LATE_MARGIN_SEC = 40;
+
 /** Distance (m) a departure has rolled at lift-off, and its climb speed (m/s). */
 function departureProfile(ac: Aircraft): { rollM: number; climbMps: number } {
   const perf = getPerformance(ac.type);
@@ -165,8 +183,11 @@ export function neededEtaSec(dep: Aircraft, lined: boolean, arrType: string, arr
   const needSrs = lateralNm > 0 ? 0 : t.liftoff + dClimb / climbMps + goAroundSec;
   const alertNm = AIRBORNE_PROXIMITY_NM + ALERT_PROJECTION_MARGIN_NM;
   const alertM = nmToM(Math.sqrt(Math.max(0, alertNm * alertNm - lateralNm * lateralNm))); // distance along the course that keeps the diagonal at the alert distance
-  const needLiftoff = t.liftoff + Math.max(0, alertM - rollM) / vA;
-  const needTouchdown = t.liftoff - TOUCHDOWN_AFTER_THRESHOLD_SEC + Math.max(0, alertM - rollM + vA * TOUCHDOWN_AFTER_THRESHOLD_SEC) / climbMps;
+  // (a departure cleared from the hold line lines up and starts its roll later than the nominal figure now and then: 28 to 33 s against 22.5 s at EGLL, 58 s once, and then it
+  // lifted off with an A380 on the parallel runway still in its flare, 1.3 nm and 20 ft: for the alert against a parallel final the late start is part of the need)
+  const liftoff = t.liftoff + (!lined && lateralNm > 0 ? LINE_UP_LATE_MARGIN_SEC : 0);
+  const needLiftoff = liftoff + Math.max(0, alertM - rollM) / vA;
+  const needTouchdown = liftoff - TOUCHDOWN_AFTER_THRESHOLD_SEC + Math.max(0, alertM - rollM + vA * TOUCHDOWN_AFTER_THRESHOLD_SEC) / climbMps;
   return Math.max(needSrs, needLiftoff, needTouchdown);
 }
 
@@ -216,14 +237,20 @@ export const PRIORITY_GO_AROUNDS = 2;
 export const JET_WAIT_PRIORITY_SEC = 300;
 /** ... those whose threshold time is within this many seconds of the jet's (wake turbulence: 4 nm behind an A320 at 65-70 kt is about 210-250 s, 5-5-4 TBL on approach F to I). */
 export const JET_CLEAR_WINDOW_SEC = 240;
+/** An IFR light aircraft counts as the waiting "jet" when its approach speed is this many knots above the straight-in's (it cannot be slowed behind it). DESIGN VALUE. */
+const LIGHT_SPEED_EDGE_KT = 25;
 /** A straight-in light aircraft closer than this to the threshold (nm) is not moved to the pattern for a jet. DESIGN VALUE. */
 const STRAIGHT_IN_TO_PATTERN_MIN_NM = 4;
+/** A straight-in VFR aircraft is given a 360 for spacing only this far out (nm; the engine needs `SPACING_TURN_MIN_NM`). DESIGN VALUE. */
+const STRAIGHT_IN_TURN_MIN_NM = 4.5;
 
 /** The jet (IFR, not light) waiting for its approach clearance that this light straight-in aircraft stands in the way of (within `JET_CLEAR_WINDOW_SEC` of its threshold time). */
 export function jetWaitingBehind(v: AgentView, ac: Aircraft, g: RunwayEndGeom): Aircraft | undefined {
   const mine = arrivalWindow(v.state, ac, g).start;
   for (const j of Object.values(v.state.aircraft)) {
-    if (j.id === ac.id || j.onGround || j.isDeparture || j.flightRules !== 'IFR' || getPerformance(j.type).category === 'light') continue;
+    if (j.id === ac.id || j.onGround || j.isDeparture || j.flightRules !== 'IFR') continue;
+    // (a jet, or an IFR twin that cannot slow to the straight-in's speed: soak KBOS SE, a C402 behind a C172 flew round its initial fix for 40 minutes)
+    if (getPerformance(j.type).category === 'light' && getPerformance(j.type).approachSpeedKt < getPerformance(ac.type).approachSpeedKt + LIGHT_SPEED_EDGE_KT) continue;
     if (j.phase !== 'APPROACH' && j.phase !== 'INBOUND') continue;
     if (j.assignedRunwayEnd !== g.end.id || j.clearances.some((c) => c.kind === 'APPROACH' && c.completedAtSec === undefined)) continue;
     if (v.now - Math.max(j.spawnedAtSec, j.lastGoAroundSec ?? 0) < JET_WAIT_PRIORITY_SEC) continue;
@@ -253,8 +280,21 @@ export function blockedByLeader(v: AgentView, ac: Aircraft, g: RunwayEndGeom): A
     if (o.id === ac.id || o.isDeparture) continue;
     const og = assignedEnd(v.airport, o);
     if (!og || !rws.includes(og.runway.id)) continue;
+    const crossing = og.runway.id !== g.runway.id;
     if (o.onGround) {
-      if (o.occupyingRunways.some((r) => rws.includes(r)) && ['LANDING', 'ROLLOUT', 'RUNWAY_EXIT'].includes(o.phase)) return o;
+      if (o.occupyingRunways.some((r) => rws.includes(r)) && ['LANDING', 'ROLLOUT', 'RUNWAY_EXIT'].includes(o.phase)) {
+        // (on the crossing runway the roll only blocks until the aircraft has passed the intersection, 3-10-4)
+        const sInt = crossing ? intersectionAlongM(v.airport, og, g.runway.id) : undefined;
+        if (sInt !== undefined && alongCross(og, o.pos).along > sInt + INTERSECTION_PASS_MARGIN_M) continue;
+        return o;
+      }
+    } else if (crossing) {
+      // an arrival to a runway that crosses this one: the first to reach its threshold must have passed the intersection when the second reaches its own (the engine's rule)
+      if (!isInboundArrival(o) || (o.phase === 'PATTERN' && !['BASE', 'FINAL'].includes(patternLeg(o, og)))) continue;
+      const tO = etaToThresholdSec(o, og);
+      const passO = intersectionPassSec(v.airport, o.type, og, g.runway.id);
+      const passMine = intersectionPassSec(v.airport, ac.type, g, og.runway.id);
+      if (passO !== undefined && passMine !== undefined && tO <= myEta && !crossingPairClear(tO, passO, myEta, passMine)) return o;
     } else if (isInboundArrival(o) && o.phase !== 'PATTERN' && distToThresholdNm(o, og) < distToThresholdNm(ac, g)) {
       if (myEta - etaToThresholdSec(o, og) < ARRIVAL_RUNWAY_GAP_SEC) return o;
     }
@@ -298,6 +338,9 @@ export function earlyGoAroundReason(v: AgentView, ac: Aircraft, g: RunwayEndGeom
   const blockers = precedingArrivalBlockers(v.state, ac, g);
   if (blockers.length) return `${blockers[0].other.callsign} will not be clear of the runway`;
   const mine = distToThresholdNm(ac, g);
+  // Established on final far above the path (the engine cannot recover more than 400 fpm over the path rate): a doomed final is flown round now, not at the threshold.
+  const high = ac.altitudeFt - glideAltitudeFt(g.elevationFt, nmToM(mine));
+  if (high > HIGH_FINAL_BAND_FT && mine <= HIGH_FINAL_CHECK_NM) return `${Math.round(high)} ft above the glidepath at ${mine.toFixed(1)} nm`;
   // the adjacent final of a parallel runway: the diagonal to a leader there is projected to its threshold crossing and kept above the alert distance
   for (const m of dependentMates(v.airport, g)) {
     for (const o of Object.values(v.state.aircraft)) {
@@ -322,6 +365,10 @@ export function earlyGoAroundReason(v: AgentView, ac: Aircraft, g: RunwayEndGeom
   return undefined;
 }
 
+/** An arrival on final more than this far (ft) above the 3 degree path inside `HIGH_FINAL_CHECK_NM` goes around (stable approach band; DESIGN VALUES). */
+const HIGH_FINAL_BAND_FT = 700;
+const HIGH_FINAL_CHECK_NM = 4;
+
 /** Landing clearances are held back (down to this distance, nm) while an aircraft has been waiting at a hold line to cross the runway. */
 const CROSSING_WINDOW_NM = 1.3;
 const CROSSING_WAIT_SEC = 15;
@@ -340,6 +387,17 @@ export function crossingWaiting(v: AgentView, g: RunwayEndGeom, exceptId: string
 }
 
 const stationary = (ac: Aircraft): boolean => ac.groundSpeedKt < 1;
+
+/**
+ * Another departure is lined up, cleared or rolling on a runway that intersects `g`'s. The engine counts an aircraft in position as a departure that has not passed
+ * the intersection (3-9-8), so two aircraft lined up on intersecting runways each wait for the other for ever (soak KBOS SE: JBU2223 on 9, N8645T on 15R, 30 minutes).
+ * A controller does not line up an aircraft on a runway that intersects one already in use for a departure.
+ */
+function intersectingDepartureActive(state: SimulationState, g: RunwayEndGeom, ac: Aircraft): boolean {
+  const cross = new Set(interactingRunways(state.airport, g.runway.id).filter((r) => r !== g.runway.id));
+  return Object.values(state.aircraft).some((o) => o.id !== ac.id && o.isDeparture && o.onGround && ['LINE_UP_AND_WAIT', 'CLEARED_FOR_TAKEOFF', 'TAKEOFF_ROLL'].includes(o.phase)
+    && cross.has(findRunwayEnd(state.airport, o.assignedRunwayEnd)?.runway.id ?? ''));
+}
 /** A departure that rejected its takeoff and stands on the runway asking what to do (JO 7110.65 3-9-11). */
 const stoppedAfterReject = (ac: Aircraft): boolean =>
   ac.isDeparture && ac.onGround && ac.groundSpeedKt < 1 && ac.occupyingRunways.length > 0 && ac.pendingRequest?.kind === 'DEPARTURE' && /rejected takeoff/.test(ac.pendingRequest.text);
@@ -402,7 +460,9 @@ export function createTowerAgent(): Agent {
         }
         continue;
       }
-      if (ac.pendingRequest?.request === 'NEED_MINUTE') continue; // "we need a minute": the pilot calls ready again
+      // "we need a minute": the pilot calls ready again (at the hold). One that is lined up already, or whose minute is long over (the longest is 75 s), is cleared again
+      // when the runway allows: a lined-up pilot who never repeats the call otherwise stood on the runway for an hour and every arrival behind it went around.
+      if (ac.pendingRequest?.request === 'NEED_MINUTE' && !lined && v.now - ac.pendingRequest.sinceSec < NEED_MINUTE_WAIT_SEC) continue;
       const ready = ac.pendingRequest?.kind === 'DEPARTURE' || v.settled(ac) >= 8 || lined;
       if (!ready) continue;
       const k = `hold:${ac.id}`;
@@ -416,7 +476,7 @@ export function createTowerAgent(): Agent {
       firstPerRunway.add(g.runway.id);
       // A follower that would overtake a slower departure on the same track (5-8-3) is given a departure heading that diverges from it (5-8-2, DIVERGE_TURN_DEG), as a
       // controller does, instead of waiting until the leader is 10 nm out (soak: 13-18 % of the time a departure stood at the hold was this).
-      const departure = departureInstruction(state, airport, ac, g, isLinedUp(ac));
+      const departure = departureInstruction(state, airport, ac, g, isLinedUp(ac), v.now - since);
       const heading = departure.heading;
       const takeoff = mkCmd('TAKEOFF', ac, { runwayEnd: g.end.id, runwayId: g.runway.id, ...(heading ? { departureHeading: heading.headingMag, turnDirection: heading.turn } : {}) });
       const slack = releaseSlackSec(v, g, ac, isLinedUp(ac));
@@ -480,7 +540,7 @@ export function createTowerAgent(): Agent {
           phrase: heading ? say.clearedForTakeoffHeading(ac, g.end.id, heading.headingMag, heading.turn) : say.clearedForTakeoff(ac, g.end.id, ifr), cooldownSec: 20,
           summary: `${ac.callsign} cleared for takeoff runway ${g.end.id}${heading ? `, turn ${heading.turn} heading ${heading.headingMag} (diverging from the departure ahead)` : ''}`,
         });
-      } else if (ac.phase === 'HOLDING_SHORT' && slack >= LINEUP_EXTRA_SEC && !(relPos && !validApproval(state, 'RELEASE', ac.id))) {
+      } else if (ac.phase === 'HOLDING_SHORT' && slack >= LINEUP_EXTRA_SEC && !(relPos && !validApproval(state, 'RELEASE', ac.id)) && !intersectingDepartureActive(state, g, ac) && !departure.blocked) {
         // JO 7110.65 3-9-4: the aircraft authorised to line up and wait is told about the closest traffic within 6 miles for the same runway.
         const near = luawTraffic({ state }, ac, g);
         const luaw = mkCmd('LINE_UP_AND_WAIT', ac, { runwayEnd: g.end.id, runwayId: g.runway.id, ...(near ? { trafficAdvised: true } : {}) });
@@ -495,9 +555,15 @@ export function createTowerAgent(): Agent {
     }
 
     // ---- pattern sequence: extend downwind / turn base (sequence.ts) -------------------------------------------------------
-    for (const endId of state.activeRunways.landing) {
-      const g = findRunwayEnd(airport, endId);
-      if (!g) continue;
+    // The climb-out (runway heading) of the first departure at each runway that has waited for its turn: the pattern traffic is sequenced around it.
+    const waitingDeparturePaths = new Map<string, Path>();
+    for (const { ac, g } of queue) {
+      if (waitingDeparturePaths.has(`rwy:${g.runway.id}`)) continue;
+      const since = mem.notes.get(`hold:${ac.id}`);
+      if (!validApproval(state, 'RELEASE', ac.id) && !validApproval(state, 'GAP', ac.id) && (since === undefined || v.now - since < DEPARTURE_PRIORITY_WAIT_SEC)) continue;
+      waitingDeparturePaths.set(`rwy:${g.runway.id}`, departurePath(ac, g, isLinedUp(ac)));
+    }
+    const departureWindowsFor = (g: RunwayEndGeom): SeqWindow[] => {
       const rws = interactingRunways(airport, g.runway.id);
       const depWindows: SeqWindow[] = [];
       for (const o of Object.values(state.aircraft)) {
@@ -528,7 +594,12 @@ export function createTowerAgent(): Agent {
         depWindows.push({ start: 0, end: Math.max(departureTimes(o, lined).beyond6000 + RELEASE_MARGIN_SEC, neededEtaSec(o, lined, 'C172', getPerformance('C172').approachSpeedKt)) });
         break;
       }
-      for (const dec of sequenceDownwind(state, g, depWindows)) {
+      return depWindows;
+    };
+    for (const endId of state.activeRunways.landing) {
+      const g = findRunwayEnd(airport, endId);
+      if (!g) continue;
+      for (const dec of sequenceDownwind(state, g, departureWindowsFor, waitingDeparturePaths)) {
         const ac = dec.ac;
         if (!v.onFrequency.some((o) => o.id === ac.id) || ac.radioState === 'TRANSMITTING') continue;
         if (dec.action === 'extend') {
@@ -536,6 +607,15 @@ export function createTowerAgent(): Agent {
             key: `${ac.id}:extend:${ac.spawnedAtSec}:${ac.lastGoAroundSec ?? 0}`, aircraftId: ac.id, callsign: ac.callsign, priority: 70, once: true,
             cmds: [mkCmd('PATTERN_INSTRUCTION', ac, { destination: 'EXTEND_DOWNWIND' })], phrase: say.extendDownwind(ac),
             summary: `${ac.callsign} extend downwind runway ${g.end.id} (landing sequence)`,
+          });
+        } else if (dec.action === 'circle' && dec.circleDir) {
+          const n = ac.clearances.filter((c) => c.kind === 'PATTERN_INSTRUCTION' && c.destination === 'CIRCLE').length;
+          const turns = dec.circles ?? 1;
+          plans.push({
+            key: `${ac.id}:seq-circle:${n}`, aircraftId: ac.id, callsign: ac.callsign, priority: 72, once: true,
+            cmds: [mkCmd('PATTERN_INSTRUCTION', ac, { destination: 'CIRCLE', turnDirection: dec.circleDir, turnDegrees: 360 * turns })],
+            phrase: say.clauses(say.callsign(ac), turns > 1 ? `make two ${dec.circleDir} three sixties for spacing` : `make ${dec.circleDir} three sixty for spacing`),
+            summary: `${ac.callsign} make ${turns > 1 ? 'two ' : 'a '}${dec.circleDir} 360${turns > 1 ? 's' : ''} on downwind runway ${g.end.id} for spacing (landing sequence${dec.why ? ', ' + dec.why : ''})`,
           });
         } else if (dec.action === 'release') {
           plans.push({
@@ -731,7 +811,7 @@ export function createTowerAgent(): Agent {
       // A pattern aircraft is cleared to land once it is on base or final: on downwind its place in the landing sequence is not settled (sequence.ts).
       if (isSequenceable(ac)) {
         const leg = patternLeg(ac, g);
-        if (leg !== 'BASE' && leg !== 'FINAL') continue;
+        if ((leg !== 'BASE' && leg !== 'FINAL') || circleRemainingSec(state, ac) > 0) continue; // (the heading of an aircraft in a 360 reads as every leg in turn)
       }
       // The landing runway left the configuration (the runway configuration was changed, a wind shift): an arrival that is not established on final and not cleared to land
       // is sent to a landing runway now in use (a straight-in, the one nearest to it). One already cleared or established keeps its runway.
@@ -785,6 +865,23 @@ export function createTowerAgent(): Agent {
           summary: `${ac.callsign} make a ${patternSideAt(airport, g.end.id)} 360 for spacing (${why})`,
         });
         continue;
+      }
+      // The same for a VFR straight-in aircraft still well out (3-8-1: the sequence is made by requiring aircraft to adjust flight): it is behind an arrival whose
+      // landing (or passing of the intersection of a crossing runway, 3-10-4) it cannot wait for, so it turns 360 now instead of being sent around at 1 nm.
+      // (only behind an arrival to a runway that INTERSECTS this one (3-10-4): behind one on its own runway the spacing is made by Approach and the sequence)
+      if (ahead && (() => { const rid = assignedEnd(airport, ahead)?.runway.id; return rid !== undefined && rid !== g.runway.id && interactingRunways(airport, g.runway.id).includes(rid); })() && !cleared && !inRange && !early && !isSequenceable(ac) && (ac.phase === 'INBOUND' || ac.phase === 'APPROACH') && ac.flightRules !== 'IFR' && !ac.flags.training
+        && d >= STRAIGHT_IN_TURN_MIN_NM && !priorityArrival(ac) && spacingCircles(ac) < PRIORITY_GO_AROUNDS && circleRemainingSec(state, ac) <= 0 && !mem.done.has(`${ac.id}:circle:${spacingCircles(ac)}`)) {
+        // the turn is made in the direction that keeps the loop clear of the other traffic (the pattern side first)
+        const side = patternSideAt(airport, g.end.id);
+        const turnDir = clearSpacingTurn(state, ac, side);
+        if (turnDir) {
+          plans.push({
+            key: `${ac.id}:circle:${spacingCircles(ac)}`, aircraftId: ac.id, callsign: ac.callsign, priority: 90, once: true,
+            cmds: [mkCmd('PATTERN_INSTRUCTION', ac, { destination: 'CIRCLE', turnDirection: turnDir, turnDegrees: 360 })], phrase: say.clauses(say.callsign(ac), `make ${turnDir} three sixty for spacing`),
+            summary: `${ac.callsign} make a ${turnDir} 360 for spacing (traffic ahead: ${ahead.callsign}, straight-in ${d.toFixed(1)} nm out)`,
+          });
+          continue;
+        }
       }
       if ((inRange && !landSafe) || early) {
         plans.push({

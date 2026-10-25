@@ -16,6 +16,9 @@ export interface SoakResult {
   msPerSimSec: number[];
   maxWaitSec: number;
   maxWaitText: string;
+  /** The longest an arrival was in the INBOUND / APPROACH phase without flying an arrival route or a cleared approach (held, vectored, holding), seconds, and who. */
+  maxHeldSec: number;
+  maxHeldText: string;
   stallDump?: string;
   safety: string[];
   /** The engine's airborne near-miss alerts (1.5 nm and 500 ft) and the runway incursions of the run: "time text". */
@@ -95,7 +98,14 @@ export function runFreePlaySoak(seed: number, realism: Realism, simHours: number
   const landedIds = new Set<string>();
   const departedIds = new Set<string>();
   const phaseSince = new Map<string, { phase: string; since: number }>();
-  const res: SoakResult = { rows: [], landed: [], departed: [], msPerSimSec: [], maxWaitSec: 0, maxWaitText: '', safety: [], airborneAlerts: [], incursions: [], finalCount: 0, events, stubPairs: [], noseToNose: 0, holdWaitsSec: [], towerWaitsSec: [], goArounds: 0, maxGoArounds: { count: 0, callsign: '' }, spawnedArrivals: 0, spawnedDepartures: 0, longWaits: [], exitHolds: {} };
+  /**
+   * The last second an arrival in the INBOUND / APPROACH phase was flying a published procedure (an arrival route, or a cleared approach). Time in those phases
+   * is only a wait when the aircraft is held, vectored or on a hold without such a procedure: SWA482 flew the 70 nm ROBUC THREE arrival at 258 kt for 18 minutes
+   * in the APPROACH phase and was counted as "APPROACH 1096 s" by the first soak.
+   */
+  const onProcedure = new Map<string, number>();
+  const sinceHeld = (a: Aircraft, since: number): number => Math.max(since, a.phase === 'INBOUND' || a.phase === 'APPROACH' ? onProcedure.get(a.id) ?? since : since);
+  const res: SoakResult = { rows: [], landed: [], departed: [], msPerSimSec: [], maxWaitSec: 0, maxWaitText: '', maxHeldSec: 0, maxHeldText: '', safety: [], airborneAlerts: [], incursions: [], finalCount: 0, events, stubPairs: [], noseToNose: 0, holdWaitsSec: [], towerWaitsSec: [], goArounds: 0, maxGoArounds: { count: 0, callsign: '' }, spawnedArrivals: 0, spawnedDepartures: 0, longWaits: [], exitHolds: {} };
   const pairs = new Map<string, string>();
   const pairSince = new Map<string, number>();
   const waitLog: { sec: number; text: string }[] = [];
@@ -145,9 +155,10 @@ export function runFreePlaySoak(seed: number, realism: Realism, simHours: number
         }
       }
       if (!spawnedIds.has(a.id)) { spawnedIds.add(a.id); if (a.isDeparture) res.spawnedDepartures++; else res.spawnedArrivals++; }
+      if ((a.phase === 'INBOUND' || a.phase === 'APPROACH') && (a.star || a.clearances.some((c) => c.kind === 'APPROACH' && c.completedAtSec === undefined))) onProcedure.set(a.id, now);
       const ps = phaseSince.get(a.id);
       if (!ps || ps.phase !== a.phase) {
-        if (ps && now - ps.since >= 600 && WAIT_PHASES.includes(ps.phase) && ps.phase !== 'PARKED') waitLog.push({ sec: now - ps.since, text: `${a.callsign} ${ps.phase} ${Math.round(now - ps.since)}s (ended t=${Math.round(now)})` });
+        if (ps && now - sinceHeld(a, ps.since) >= 600 && WAIT_PHASES.includes(ps.phase) && ps.phase !== 'PARKED') waitLog.push({ sec: now - sinceHeld(a, ps.since), text: `${a.callsign} ${ps.phase} ${Math.round(now - sinceHeld(a, ps.since))}s (ended t=${Math.round(now)})` });
         if (ps && a.isDeparture && ps.phase === 'HOLDING_SHORT') res.holdWaitsSec.push(now - ps.since);
         if (!a.isDeparture && a.phase === 'RUNWAY_EXIT' && a.route) { const h = a.route.nodeIds[a.route.nodeIds.length - 1]; res.exitHolds[h] = (res.exitHolds[h] ?? 0) + 1; }
         phaseSince.set(a.id, { phase: a.phase, since: now });
@@ -155,7 +166,8 @@ export function runFreePlaySoak(seed: number, realism: Realism, simHours: number
       if (a.isDeparture ? ['TAKEOFF_ROLL', 'INITIAL_CLIMB', 'DEPARTURE'].includes(a.phase) : ['ROLLOUT', 'RUNWAY_EXIT', 'TAXI_TO_PARKING', 'ARRIVED'].includes(a.phase)) {
         (a.isDeparture ? departedIds : landedIds).add(a.id);
       }
-      const waited = now - (phaseSince.get(a.id)?.since ?? now);
+      const waited = now - sinceHeld(a, phaseSince.get(a.id)?.since ?? now);
+      if ((a.phase === 'INBOUND' || a.phase === 'APPROACH') && waited > res.maxHeldSec) { res.maxHeldSec = waited; res.maxHeldText = `${a.callsign} ${a.phase} ${Math.round(waited)}s at t=${Math.round(now)}`; }
       const waiting = ['PARKED', 'PUSHBACK', 'READY', 'HOLDING_SHORT', 'LINE_UP_AND_WAIT', 'INBOUND', 'APPROACH', 'HOLDING'].includes(a.phase) || (a.phase === 'TAXIING' && a.groundSpeedKt < 0.5);
       if (waiting && waited > res.maxWaitSec && a.phase !== 'PARKED') { res.maxWaitSec = waited; res.maxWaitText = `${a.callsign} ${a.phase} ${Math.round(waited)}s at t=${Math.round(now)}`; }
     }
@@ -183,7 +195,7 @@ export function runFreePlaySoak(seed: number, realism: Realism, simHours: number
   for (const a of Object.values(engine.getState().aircraft)) {
     const ps = phaseSince.get(a.id);
     const now = engine.getState().clock.timeSec;
-    if (ps && now - ps.since >= 600 && WAIT_PHASES.includes(ps.phase) && ps.phase !== 'PARKED') waitLog.push({ sec: now - ps.since, text: `${a.callsign} ${ps.phase} ${Math.round(now - ps.since)}s (still waiting at t=${Math.round(now)})` });
+    if (ps && now - sinceHeld(a, ps.since) >= 600 && WAIT_PHASES.includes(ps.phase) && ps.phase !== 'PARKED') waitLog.push({ sec: now - sinceHeld(a, ps.since), text: `${a.callsign} ${ps.phase} ${Math.round(now - sinceHeld(a, ps.since))}s (still waiting at t=${Math.round(now)})` });
   }
   res.longWaits = waitLog.sort((x, y) => y.sec - x.sec).map((w) => w.text);
   res.stubPairs = [...pairs.values()];

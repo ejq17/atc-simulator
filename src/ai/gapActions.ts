@@ -19,6 +19,7 @@ import { getPerformance } from '../sim/performance';
 import { CIRCLE_CLEAR_FT, CIRCLE_CLEAR_NM, delayOption, gapPlan, gapReach } from './gap';
 import type { DelayOption, GapPlan } from './gap';
 import { publishedHoldFor } from './approach';
+import { clearSpacingTurn } from './pathWorld';
 import * as say from './phrase';
 
 /** `GapOptions.optionOf` for the position of this view. */
@@ -27,7 +28,10 @@ export function gapOptionOf(v: AgentView): (ac: Aircraft, og: RunwayEndGeom) => 
   // a 360 is not given to an aircraft with other traffic close to the loop (the turn is not separated from it)
   // (and none while a fighter flight or an overhead maneuver is airborne: they fly their own fast pattern across the approach)
   const crowded = (ac: Aircraft) => Object.values(v.state.aircraft).some((o) => o.id !== ac.id && !o.onGround && (getPerformance(o.type).military || o.flags.overhead || Math.abs(o.altitudeFt - ac.altitudeFt) < CIRCLE_CLEAR_FT && Math.hypot(o.pos.x - ac.pos.x, o.pos.y - ac.pos.y) < nmToM(CIRCLE_CLEAR_NM)));
-  return (ac, og) => delayOption(ac, og, reach, { state: v.state, holdAvailable: (a) => publishedHoldFor(v, a) !== undefined, crowded });
+  // ... nor when neither direction of the loop stays outside the near-miss alert of the projected paths of the others (pathWorld.ts; soak: a 360 for a gap that came back
+  // across the final of the parallel runway under a straight-in aircraft descending through its altitude, 1.3 nm and 499 ft)
+  const loopBlocked = (ac: Aircraft) => clearSpacingTurn(v.state, ac) === undefined;
+  return (ac, og) => delayOption(ac, og, reach, { state: v.state, holdAvailable: (a) => publishedHoldFor(v, a) !== undefined, crowded: (a) => crowded(a) || loopBlocked(a) });
 }
 
 /** The plan for the departure of a GAP request (undefined when the departure is no longer at the hold). */
@@ -74,10 +78,12 @@ export function gapPlans(v: AgentView): Plan[] {
         }
       } else if (opt.circles > 0) {
         const n = ac.clearances.filter((c) => c.kind === 'PATTERN_INSTRUCTION' && c.destination === 'CIRCLE').length;
+        const dir = clearSpacingTurn(v.state, ac);
+        if (!dir) continue;
         out.push({
           key: `${ac.id}:gap-360:${n}`, aircraftId: ac.id, callsign: ac.callsign, priority: 52, once: true,
-          cmds: [mkCmd('PATTERN_INSTRUCTION', ac, { destination: 'CIRCLE', turnDirection: 'left', turnDegrees: 360 })], phrase: say.clauses(say.callsign(ac), 'make left three sixty for spacing'),
-          summary: `${ac.callsign} make a left 360, ${why}`,
+          cmds: [mkCmd('PATTERN_INSTRUCTION', ac, { destination: 'CIRCLE', turnDirection: dir, turnDegrees: 360 })], phrase: say.clauses(say.callsign(ac), `make ${dir} three sixty for spacing`),
+          summary: `${ac.callsign} make a ${dir} 360, ${why}`,
         });
       }
     }

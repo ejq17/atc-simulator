@@ -167,3 +167,18 @@ describe('IFR visual approach request', () => {
     expect(h.atc('APP').some((e) => /cleared visual approach runway one three/.test(e.text))).toBe(true);
   });
 });
+
+describe('the correction of a misread runway repeats the runway the controller gave', () => {
+  it('a landing clearance read back with the wrong runway is re-issued with the runway the controller gave, and the aircraft keeps it (corrections use the command as sent)', () => {
+    const h = createHarness({
+      player: [], mode: 'career', seed: 31, readbackErrorRate: 1,
+      spawns: [{ atSec: 0, callsign: 'N31LA', type: 'C172', flightRules: 'VFR', isDeparture: false, initialFrequencyId: 'TWR', start: { kind: 'airborne', pos: { x: 0, y: 0 }, altitudeFt: 1500, headingDeg: 0, speedKt: 70, runwayEnd: '13', distanceNm: 4 } }],
+    });
+    h.run(240);
+    expect(h.events.some((e) => e.data?.readbackError && e.data?.errorKind === 'runway')).toBe(true); // (the pilot misread the runway)
+    const land = h.transmissions.filter((t) => t.callsign === 'N31LA' && /cleared to land/.test(t.text));
+    expect(land.length).toBeGreaterThan(1); // the clearance and its correction
+    for (const t of land) expect(t.text).toMatch(/runway (13|one three)/i);
+    expect(h.find('N31LA')?.assignedRunwayEnd ?? '13').toBe('13');
+  }, 60_000);
+});

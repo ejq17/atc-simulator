@@ -9,7 +9,7 @@ import { HOLDING } from '../sim/__fixtures__/testHelpers';
 import { ALL, createHarness } from './testkit';
 import type { Harness } from './testkit';
 import { departureInstruction } from './tower';
-import { departureProjectedConflict } from './airbornePath';
+import { DEPARTURE_CLEAR_RATIO, DEPARTURE_COMFORT_RATIO, departureProjectedConflict, departureSeparationRatio } from './airbornePath';
 import { findRunwayEnd } from '../sim/runways';
 import type { ScenarioAircraftSpawn } from '../sim/types';
 
@@ -75,8 +75,17 @@ describe('the projection that decides the release', () => {
     expect(inst.blocked || inst.heading !== undefined).toBe(true);
   });
 
+  it('the separation ratio says the same: below the comfort ratio on the runway heading with the Cessna just airborne, above it long after (1 = the alert)', () => {
+    const r = departureSeparationRatio(state(), airliner(), gEnd, false);
+    expect(r.other?.callsign).toBe('N31PA');
+    expect(r.ratio).toBeLessThan(DEPARTURE_COMFORT_RATIO);
+    expect(DEPARTURE_CLEAR_RATIO).toBeGreaterThan(1);
+    expect(DEPARTURE_COMFORT_RATIO).toBeGreaterThan(DEPARTURE_CLEAR_RATIO);
+  });
+
   it('many minutes later, with the Cessna far away, the airliner is released on the runway heading', () => {
     h.run(240);
+    expect(departureSeparationRatio(state(), airliner(), gEnd, false).ratio).toBeGreaterThanOrEqual(DEPARTURE_COMFORT_RATIO);
     expect(departureProjectedConflict(state(), airliner(), gEnd, false)).toBeUndefined();
     expect(departureInstruction(state(), airport, airliner(), gEnd, false)).toEqual({ blocked: false });
   });

@@ -41,8 +41,40 @@ export interface Neighbour {
   spoken: string;
 }
 
+/** Annual operations by category as the national statistics return them (data/sources/traffic-volumes.json carries the same figures with their provenance). */
+export interface TrafficVolumes {
+  source: 'FAA ATADS' | 'UK CAA';
+  year: number;
+  retrieved: string;
+  /** ATADS "AirCarrier" (UK CAA: air transport movements). */
+  airCarrier: number;
+  airTaxi: number;
+  /** General aviation itinerant (UK CAA: private + aero club + business aviation). */
+  gaItinerant: number;
+  militaryItinerant: number;
+  /** Local operations (aircraft staying in the traffic pattern or practice area): pattern work. */
+  localCivil: number;
+  localMilitary: number;
+  total: number;
+}
+
+/** What free play starts with at the airport; the setup screen shows these and the player can override each. */
+export interface TrafficDefaults {
+  /** Share (0..1) of generated flights that are general aviation (the rest are airline flights). */
+  gaFraction: number;
+  /** Closed traffic allowed: GA pilots may ask for the option / to stay in the pattern, training flights fly circuits. False at hubs with no local operations. */
+  patternWork: boolean;
+  /** Peak-hour arrivals / departures (DESIGN VALUE derived from `volumes`); undefined = the generic free-play rates (START_PROFILE). */
+  peakArrivalsPerHour?: number;
+  peakDeparturesPerHour?: number;
+  /** The generator keeps the GA / airline draw of a due flight until it is created (see `createTrafficGenerator`); unset for KACY and KMHT, whose seeded behaviour stays as tuned. */
+  keepKindOnRetry?: boolean;
+}
+
 export interface AirportTrafficProfile {
   icao: string;
+  volumes: TrafficVolumes;
+  defaults: TrafficDefaults;
   airlines: readonly AirlineEntry[];
   /** VFR neighbours: approximate reference coordinates (~0.01 deg is plenty for choosing an inbound bearing). */
   neighbours: Readonly<Record<string, Neighbour>>;
@@ -111,6 +143,10 @@ const KACY: AirportTrafficProfile = {
   },
   gaTypes: [['C172', 1]],
   referenceJet: 'A320',
+  // FAA ATADS calendar year 2025, retrieved 2026-10-22 (https://www.aspm.faa.gov/opsnet/sys/Airport.asp; data/sources/traffic-volumes.json).
+  volumes: { source: 'FAA ATADS', year: 2025, retrieved: '2026-10-22', airCarrier: 6306, airTaxi: 4156, gaItinerant: 14394, militaryItinerant: 9590, localCivil: 9282, localMilitary: 7225, total: 50953 },
+  // Unchanged behaviour: the 50 % GA share and the START_PROFILE rates are what this airport was tuned to (ATADS 2025 GA, itinerant + local, is 23,676 of 50,953 operations = 46.5 %, docs/DESIGN-VALUES.md).
+  defaults: { gaFraction: 0.5, patternWork: true },
   // Existence: NJ ANG 177th Fighter Wing (F-16C) and Coast Guard Air Station Atlantic City (helipads USCG-1..4 from OSM), Class C airport (NASR);
   // FAA ops frequency 123.4 and ANG ops 140.7 are in the dataset. Rates are design values.
   special: {
@@ -172,6 +208,10 @@ const KMHT: AirportTrafficProfile = {
   gaRemote: ['KASH', 'KCON', 'KLCI', 'KPSM', 'KLWM', 'KBVY', 'KEEN', 'KBED', 'KFIT'],
   gaTypes: [['C172', 0.75], ['PA28', 0.25]],
   referenceJet: 'B738',
+  // FAA ATADS calendar year 2025, retrieved 2026-10-22 (https://www.aspm.faa.gov/opsnet/sys/Airport.asp; data/sources/traffic-volumes.json).
+  volumes: { source: 'FAA ATADS', year: 2025, retrieved: '2026-10-22', airCarrier: 18008, airTaxi: 11640, gaItinerant: 10991, militaryItinerant: 409, localCivil: 2725, localMilitary: 142, total: 43915 },
+  // Unchanged behaviour: the 50 % GA share and the START_PROFILE rates are what this airport was tuned to (ATADS 2025 GA, itinerant + local, is 13,716 of 43,915 operations = 31.2 %, docs/DESIGN-VALUES.md).
+  defaults: { gaFraction: 0.5, patternWork: true },
   // KMHT is a Class C airport (NASR) so VFR transitions apply; vehicles exist at every towered airport. No USCG or ANG unit, no flight-training
   // source: those kinds are left out (data/sources/README.md "Traffic variety").
   special: {
@@ -233,6 +273,11 @@ const KBOS: AirportTrafficProfile = {
   gaRemote: ['KBED', 'KOWD', 'KBVY', 'KLWM', 'KPYM', 'KORH', 'KFIT', 'KPSM'],
   gaTypes: [['C172', 0.75], ['PA28', 0.25]],
   referenceJet: 'A320',
+  // FAA ATADS calendar year 2025, retrieved 2026-10-22 (https://www.aspm.faa.gov/opsnet/sys/Airport.asp; data/sources/traffic-volumes.json).
+  volumes: { source: 'FAA ATADS', year: 2025, retrieved: '2026-10-22', airCarrier: 350190, airTaxi: 60940, gaItinerant: 7753, militaryItinerant: 199, localCivil: 0, localMilitary: 0, total: 419082 },
+  // gaFraction = GA itinerant / (air carrier + air taxi + GA itinerant) = 7,753 / 418,883; no local operations are counted, so no pattern work.
+  // Peak-hour arrivals and departures: DESIGN VALUE, 419,082 / 365 / 13.25 (density-curve day integral) / 2.
+  defaults: { gaFraction: 0.019, patternWork: false, peakArrivalsPerHour: 43, peakDeparturesPerHour: 43, keepKindOnRetry: true },
   // Boston is Class B (NASR CLS_ARSP): VFR transitions need an ATC clearance and are rare, so a low design rate; airport vehicles exist at every
   // towered airport. No USCG or ANG unit was sourced (data/sources/README.md "Traffic variety").
   special: {
@@ -308,6 +353,10 @@ const KPHL: AirportTrafficProfile = {
   gaRemote: ['KPNE', 'KLOM', 'KILG', 'KTTN', 'KVAY', 'KMIV', 'KMQS', 'KOQN', 'KDYL', 'KPTW'],
   gaTypes: [['C172', 0.75], ['PA28', 0.25]],
   referenceJet: 'A320',
+  // FAA ATADS calendar year 2025, retrieved 2026-10-22 (https://www.aspm.faa.gov/opsnet/sys/Airport.asp; data/sources/traffic-volumes.json).
+  volumes: { source: 'FAA ATADS', year: 2025, retrieved: '2026-10-22', airCarrier: 237832, airTaxi: 73921, gaItinerant: 10181, militaryItinerant: 165, localCivil: 0, localMilitary: 0, total: 322099 },
+  // gaFraction = 10,181 / (237,832 + 73,921 + 10,181); no local operations. Peak: DESIGN VALUE, 322,099 / 365 / 13.25 / 2.
+  defaults: { gaFraction: 0.032, patternWork: false, peakArrivalsPerHour: 33, peakDeparturesPerHour: 33, keepKindOnRetry: true },
   // KPHL is a Class B airport (NASR). The engine's VFR-transition flow is Class C service (7110.65 7-8); Class B transitions need an explicit
   // Class B clearance (7-9) that is not modelled, so there are none. Vehicles exist at every towered airport. No military or Coast Guard unit,
   // no flight-training source (data/sources/README.md "Traffic variety").
@@ -348,10 +397,18 @@ const KPGD: AirportTrafficProfile = {
   gaRemote: ['KFMY', 'KVNC', 'KSRQ', 'KAPF', 'KIMM', 'KLAL'],
   gaTypes: [['C172', 0.75], ['PA28', 0.25]],
   referenceJet: 'A320',
-  // Class D (NASR CLS_ARSP): VFR transitions (JO 7110.65 7-6) and vehicles. No flight-training share: no source names a flight school at PGD
-  // (flypgd.com only mentions Charlotte Technical College's aviation training facility, not flight operations).
+  // FAA ATADS calendar year 2025, retrieved 2026-10-22 (https://www.aspm.faa.gov/opsnet/sys/Airport.asp; data/sources/traffic-volumes.json).
+  volumes: { source: 'FAA ATADS', year: 2025, retrieved: '2026-10-22', airCarrier: 13258, airTaxi: 2034, gaItinerant: 61942, militaryItinerant: 376, localCivil: 55011, localMilitary: 226, total: 132847 },
+  // gaFraction = GA itinerant / (air carrier + air taxi + GA itinerant) = 61,942 / 77,234. The 55,011 civil local operations are the pattern work
+  // (flight training share below). Peak: DESIGN VALUE, itinerant 77,610 / 365 / 13.25 / 2.
+  defaults: { gaFraction: 0.802, patternWork: true, peakArrivalsPerHour: 8, peakDeparturesPerHour: 8, keepKindOnRetry: true },
+  // Class D (NASR CLS_ARSP): VFR transitions (JO 7110.65 7-6) and vehicles. Flight training: ATADS counts 55,011 civil local operations at PGD
+  // in 2025 (pattern work and practice), 41 % of all its operations; no flight school is named by a source, the share is a conversion of that count.
   special: {
     transition: { perHour: 3 },
+    // 55,011 civil local operations in ATADS 2025 against 61,942 itinerant GA operations: a training flight flies 2 to 4 circuits (trainingCircuits),
+    // about 6 local operations each, so 55,011 / 6 = 9,170 flights against 61,942 / 2 = 30,970 GA arrivals = 0.30. DESIGN VALUE conversion.
+    training: { gaShare: 0.3 },
     vehicles: { perHour: 3 },
   },
 };
@@ -389,6 +446,11 @@ const EGLL: AirportTrafficProfile = {
   neighbours: {},
   gaTypes: [],
   referenceJet: 'A320',
+  // UK CAA UK Airport Data 2025 table 03.1 (https://www.caa.co.uk/data-and-analysis/uk-aviation-market/airports/uk-airport-data/uk-airport-data-2025/annual-2025/,
+  // retrieved 2026-10-22): 479,996 movements, 477,917 air transport, 47 air taxi, 310 private, 2 military. Light aircraft are not permitted (AD 2.20).
+  volumes: { source: 'UK CAA', year: 2025, retrieved: '2026-10-22', airCarrier: 477917, airTaxi: 47, gaItinerant: 310, militaryItinerant: 2, localCivil: 0, localMilitary: 0, total: 479996 },
+  // Peak: DESIGN VALUE, 479,996 / 365 / 13.25 / 2.
+  defaults: { gaFraction: 0, patternWork: false, peakArrivalsPerHour: 50, peakDeparturesPerHour: 50, keepKindOnRetry: true },
   special: { vehicles: { perHour: 3 } },
 };
 
@@ -537,4 +599,21 @@ export function resolveTypeSelection(icao: string | undefined, requested?: reado
 export function profileTypes(icao: string | undefined): string[] {
   const p = profileFor(icao);
   return [...new Set([...(p.gaTypes.length ? ['C172'] : []), ...p.airlines.flatMap((e) => e.types)])];
+}
+
+/** The free-play defaults of an airport (unknown ICAO: KACY's). */
+export function trafficDefaultsFor(icao: string | undefined): TrafficDefaults {
+  return profileFor(icao).defaults;
+}
+
+/** Arrivals per hour the Tower and player can work on the busiest airports (src/game/README.md ARRIVAL_SLOT_SEC): DESIGN VALUE, equal to the setup screen's "Busy". */
+export const PLAYABLE_RATE_CAP = 18;
+
+/**
+ * Factor on the generic free-play rates (the setup screen's 5 / 10 / 18 per hour, START_PROFILE): 1 for KACY and KMHT and for every airport whose peak hour
+ * is at least `PLAYABLE_RATE_CAP`, below 1 for a quieter airport (KPGD peak 8 per hour -> 0.44). DESIGN VALUE.
+ */
+export function rateScaleFor(icao: string | undefined): number {
+  const peak = trafficDefaultsFor(icao).peakArrivalsPerHour;
+  return peak === undefined ? 1 : Math.min(1, peak / PLAYABLE_RATE_CAP);
 }

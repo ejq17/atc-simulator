@@ -76,6 +76,10 @@ fly runway heading, cleared for takeoff".
 | `clnc.ts` `ground.ts` `tower.ts` `approach.ts` (APP and DEP) `corrections.ts` | The agents. |
 | `coordination.ts` | Landline answers, rescinds, announcements and point outs (see "Coordination"). |
 | `airbornePath.ts` | Kinematic projection of a departure's path (roll, lift-off, climb, departure heading from 400 ft AGL) against the other airborne traffic, judged by the engine's near-miss alert; used by Tower (`departureInstruction`). |
+| `crossing.ts` | Arrivals to intersecting runways (3-10-4): the engine's passing time at the intersection (`intersectionPassSec`) and `crossingPairClear`; used by `sequence.ts`, `tower.blockedByLeader` and `approach.leaderOf`. |
+| `patternPath.ts` | Second-by-second projection of an arrival in the pattern, on a go-around or on final, with the engine's legs, speeds, turn rate, wind and 3 degree path (`patternProjection`); options: base turn at a given second, extension, 360s. Validated against the engine in `patternPath.test.ts` (within 30 m). |
+| `pathWorld.ts` | Default projected paths of every airborne aircraft (`defaultPaths`, cached per tick) and the separation ratio of a path against the near-miss alert (`pathSeparation`; 1 = the alert, `COMFORT_RATIO` 1.07, `CLEAR_RATIO` 1.01). |
+| `approachSeparation.ts` | Approach keeps its arrivals apart in the vectoring phase: no descent into traffic, a hold at the level or a 1,000 / 2,000 ft climb (`separationAltitude`, `safeDescentAltitude`). |
 | `world.ts` | Read-only world queries: ETA, taxi planning (mirrors `commandExecutor.planTaxi`), hold queues, opposing traffic. |
 | `phrase.ts` | ATC phraseology, each phrase as `text` (digits) and `spokenText` (words); callsign first. |
 | `testkit.ts`, `ai.test.ts` | Harness (real engine + KACY, seeded) and the scenarios below. |
@@ -159,6 +163,36 @@ stricter than a legal parallel operation, so the AI keeps that distance (plus ma
   incursions). Known limits: the fixture has three stands, so at 20 + 20 per hour the apron fills and departures leave at about a third of the offered rate; a jet that goes
   around is flown in the pattern like a light aircraft (its wide circuit regularly ends in another go-around); IFR flows (`ifrArrivalSpawn`) do not apply the stagger at spawn.
 
+## Pattern, straight-in and departure separation against the near-miss alert (KBOS / KPHL / KPGD round)
+
+The simulator's alert (1.5 nm and 500 ft, both airborne) is stricter than a visual traffic pattern: the downwind leg is 0.8 nm from the final course, so an aircraft on downwind
+is inside the alert box of one on final whenever the pair is abeam and the final is between about 1.6 and 4.7 nm from the threshold (500 to 1,500 ft). With the landing windows of
+`sequence.ts` (at least the runway occupancy, 140 s for a light aircraft) the pair is never abeam while the leader is airborne; the free-play soak at the new airports showed the cases
+where the windows alone did not keep them apart: an extended downwind passing abeam a straight-in, go-arounds and re-entries, 360s inside another aircraft's path. The sequence
+therefore weighs options with projected paths:
+
+* `sequence.sequenceDownwind` (one order for the downwind aircraft of all the interacting runways, by the time they reach the base turn, with the windows of the earlier ones counting for the
+  later ones; an arrival to a crossing runway takes the passing window of `crossing.ts`): for each aircraft, in preference order, turn base where it normally does (`ok`), turn base now
+  (`release`), extend downwind and turn base at the first second that suits (`extend` / `hold`, steps of 10 s up to 200 s), 360 away from the runway once or twice, also followed by a
+  later base turn (`circle`; one instruction for the whole number of turns, a turn in progress cannot be changed, and a turn toward the runway would cross the final course and
+  establish the aircraft on final, `circleDirectionFor`). The first option whose threshold window is free (3-10-3, 3-10-4) and whose path keeps `COMFORT_RATIO` from the alert wins; else
+  the first with a free window that is at least `CLEAR_RATIO`; else the best ratio among the free windows. A choice is kept for 60 s while an option of its kind still serves (a
+  transmission takes seconds; the pick must not flip). The first departure waiting at a runway (30 s at the hold, or a release or gap in hand) takes its climb-out path into the
+  picture: the pattern traffic yields to it (`waitingDeparturePaths`).
+* `tower.departureInstruction`: the runway heading when the projected path (including the pattern traffic, go-arounds and arrivals to other runways: `airbornePath.departureObstacles`)
+  keeps `DEPARTURE_COMFORT_RATIO` (1.08), else the first of 30 / 60 degrees (away from a parallel runway first) that does, else the one that comes nearest while at least
+  `DEPARTURE_CLEAR_RATIO` (1.02), else the departure is held.
+* A VFR straight-in 4.5 nm or more out, behind an arrival to a runway that INTERSECTS its own, gets a 360 for spacing (in the direction whose loop keeps clear of the other traffic) instead of
+  a go-around at 1 nm. Behind an arrival to its own runway the spacing is Approach's and the sequence's.
+* Approach (`approachSeparation.ts`): the descent given at radar contact is the lowest safe altitude *that keeps the separation*; an arrival whose course meets another aircraft's is
+  held at its level or climbed 1,000 / 2,000 ft (the aircraft descending into the other acts; between level aircraft the follower); a cleared arrival that is closing on its leader is
+  slowed (speed 160, 140, outside 6 nm); an arrival on a STAR whose restrictions would keep it too high for the final approach fix is given the descent.
+* Tower does not line up a departure on a runway that intersects one where another is lined up, cleared or rolling (the engine counts an aircraft in position as a departure that has not passed
+  the intersection: KBOS SE had two lined up on 9 and 15R for 30 minutes), nor while the projected climb-out is blocked; an old "we need a minute" is over after 100 s.
+
+Measured with `newAirportSoak` (2 h, moderate realism, all AI): see docs/PROGRESS.md for the table. Not solved by the AI side: a Ground controller that leaves an arrival stopped on an exit (KBOS NW
+DAL714, KPHL EAST RPA4766 with a runway authorization that is never cleared) blocks every landing on that runway ("cleared to cross runway"), and the generator's spawn altitudes on some STARs.
+
 ## Known simplifications
 
 * Coordination covers runway crossings, IFR departure releases, point outs and the "rolling" / "going around" calls only (see "Coordination"
@@ -170,7 +204,7 @@ stricter than a legal parallel operation, so the AI keeps that distance (plus ma
   the pilot reports and waits.
 * Approach never vectors with `HEADING` (it uses direct-to-fix, speed and published holds), so there are no intercept-geometry or
   approach-gate issues; spacing target is 5 nm (the engine minimum is 3 nm, 4 nm light behind jet).
-* VFR straight-in arrivals cannot be held in the air (no orbit or hold instruction): only the generator's arrival slots and go-arounds protect them. Pattern traffic is sequenced by `sequence.ts` (below); a pattern entry from a straight-in far out becomes a base turn at once.
+* VFR straight-in arrivals are held only by a 360 for spacing (behind an arrival to an INTERSECTING runway, 4.5 nm or more out, `tower.ts`), a pattern entry (a waiting jet or IFR twin is number one) and the generator's arrival slots; behind one on their own runway only the go-around protects them. Pattern traffic is sequenced by `sequence.ts` (below); a pattern entry from a straight-in far out becomes a base turn at once.
 * `LINE_UP_AND_WAIT` is used rarely on purpose (there is no "exit the runway" command).
 * Combined transmissions are read back command by command by the engine's pilots.
 

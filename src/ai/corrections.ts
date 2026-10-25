@@ -2,13 +2,28 @@
  * Faulty readbacks. When a pilot reads back a clearance wrongly (`flags.readbackErrorPending`), the position that issued it
  * re-issues the same clearance ("negative, runway one three, cleared for takeoff"); the engine then lets the pilot correct it.
  */
-import type { Aircraft, Clearance } from '../sim/types';
+import type { Aircraft, Clearance, ParsedCommand } from '../sim/types';
 import { mkCmd } from './core';
 import type { Agent, AgentView, Plan } from './core';
 import * as say from './phrase';
 import { findStar } from '../sim/star';
 
 const RETRY_COOLDOWN_SEC = 8;
+
+/** The recorded clearance with the runway, altitude, speed, fix and frequency fields the controller really gave (the pilot's mistake is in the recorded ones). */
+function repair(clr: Clearance, sent: ParsedCommand): Clearance {
+  return {
+    ...clr,
+    ...(sent.runwayEnd !== undefined ? { runwayEnd: sent.runwayEnd } : {}),
+    ...(sent.runwayId !== undefined ? { runwayId: sent.runwayId } : {}),
+    ...(sent.altitudeFt !== undefined ? { altitudeFt: sent.altitudeFt } : {}),
+    ...(sent.speedKt !== undefined ? { speedKt: sent.speedKt } : {}),
+    ...(sent.fix !== undefined ? { fix: sent.fix } : {}),
+    ...(sent.frequencyId !== undefined ? { frequencyId: sent.frequencyId } : {}),
+    ...(sent.frequencyMhz !== undefined ? { frequencyMhz: sent.frequencyMhz } : {}),
+    ...(sent.patternLeg !== undefined ? { patternLeg: sent.patternLeg } : {}),
+  };
+}
 
 function planFor(v: AgentView, ac: Aircraft, clr: Clearance, parking: (id: string) => { id: string; category: string } | undefined): Pick<Plan, 'cmds' | 'phrase'> | undefined {
   switch (clr.kind) {
@@ -70,9 +85,11 @@ function planFor(v: AgentView, ac: Aircraft, clr: Clearance, parking: (id: strin
     // Approach / Departure / Tower / Ground instructions that had no case here were never repeated when the pilot gave no readback (soak seed 8: "hold at CARYL
     // as published"; the pilot did not receive it, the 20 s window dropped it and nothing was said for 190 s).
     case 'HOLD_AT_FIX':
-      return clr.hold?.fix && clr.hold.asPublished
-        ? { cmds: [mkCmd('HOLD_AT_FIX', ac, { hold: clr.hold })], phrase: say.negative(say.clauses(say.callsign(ac), say.holdAsPublished(v.airport, clr.hold.fix))) }
-        : undefined;
+      if (!clr.hold?.fix) return undefined;
+      return {
+        cmds: [mkCmd('HOLD_AT_FIX', ac, { hold: clr.hold })],
+        phrase: say.negative(say.clauses(say.callsign(ac), clr.hold.asPublished || clr.hold.inboundCourseDeg === undefined ? say.holdAsPublished(v.airport, clr.hold.fix) : say.holdAtFix(v.airport, clr.hold.fix, clr.hold.inboundCourseDeg, clr.hold.turns))),
+      };
     case 'STAR':
       return clr.starName
         ? { cmds: [mkCmd('STAR', ac, { starName: clr.starName, descendVia: clr.descendVia })], phrase: say.negative(say.clauses(say.callsign(ac), say.descendViaArrival(findStar(v.airport, clr.starName)?.star.spokenName ?? clr.starName))) }
@@ -104,7 +121,11 @@ export const correctionAgent: Agent = (v) => {
     const clr = (ac.flags.readbackErrorClearanceId ? ac.clearances.find((c) => c.id === ac.flags.readbackErrorClearanceId && c.byPosition === v.position) : undefined)
       ?? [...ac.clearances].reverse().find((c) => c.byPosition === v.position);
     if (!clr) continue;
-    const p = planFor(v, ac, clr, (id) => v.airport.parking.find((x) => x.id === id));
+    // The clearance recorded in the aircraft is what the pilot flew: after a misread runway ("runway 33" for 22) it names the wrong runway, and re-issuing it made the
+    // controller clear the aircraft to land on 33 ("negative, runway three three, cleared to land": soak KPGD seed 3, ten minutes on the wrong final). The command as this
+    // position sent it is what is repeated.
+    const sent = v.mem.sent.get(`${ac.callsign}:${clr.kind}`);
+    const p = planFor(v, ac, sent ? repair(clr, sent) : clr, (id) => v.airport.parking.find((x) => x.id === id));
     if (!p) continue;
     if (PLAIN_REPEAT.has(ac.flags.readbackErrorKind ?? '')) p.phrase = { text: p.phrase.text.replace(/^negative, /, ''), spoken: p.phrase.spoken.replace(/^negative, /, '') };
     plans.push({

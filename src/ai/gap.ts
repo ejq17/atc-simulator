@@ -49,7 +49,7 @@ export const GAP_MAX_CIRCLES = 2;
 /** A speed assignment must save at least this long (s) to be worth a transmission. DESIGN VALUE. */
 const MIN_SPEED_GAIN_SEC = 15;
 /** Seconds a turn takes beyond its 360 degrees (the bank builds and the aircraft rolls out on its track). DESIGN VALUE. */
-const CIRCLE_ROLL_IN_SEC = 6;
+
 
 /** What Approach can still do to one arrival. */
 export interface DelayOption {
@@ -118,17 +118,8 @@ export function delayOption(ac: Aircraft, g: RunwayEndGeom, reach: (ac: Aircraft
 export const CIRCLE_CLEAR_NM = 2.5;
 export const CIRCLE_CLEAR_FT = 1500;
 
-/** Seconds a 360 given for spacing still has to run (the aircraft's own turn rate; the turn is not yet part of its position and speed). */
-export function circleRemainingSec(state: SimulationState, ac: Aircraft): number {
-  for (let i = ac.clearances.length - 1; i >= 0; i--) {
-    const c = ac.clearances[i];
-    if (c.kind !== 'PATTERN_INSTRUCTION') continue;
-    if (c.destination !== 'CIRCLE') return 0;
-    const total = (c.turnDegrees ?? 360) / Math.max(1, getPerformance(ac.type).turnRateDegPerSec) + CIRCLE_ROLL_IN_SEC;
-    return Math.max(0, total - (state.clock.timeSec - c.issuedAtSec));
-  }
-  return 0;
-}
+export { circleRemainingSec } from './patternPath';
+import { CIRCLE_ROLL_IN_SEC, circleRemainingSec } from './patternPath';
 
 /** Everything on the runways that interact with `g` that Tower cannot move, as windows in seconds from now, sorted by threshold time. `dep` is the waiting departure (never a slot). */
 export function arrivalSlots(state: SimulationState, airport: Airport, g: RunwayEndGeom, dep: Aircraft, optionOf: (ac: Aircraft, og: RunwayEndGeom) => DelayOption | undefined): ArrivalSlot[] {

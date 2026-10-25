@@ -13,7 +13,7 @@ import { NOMINAL_APPROACH_JET_KT, NOMINAL_APPROACH_LIGHT_KT, pickArrivalStart } 
 import { landingEndPool } from '../game/arrivalRunways';
 import { ALL, cmd, createHarness } from './testkit';
 import { dependentMates, dependentPairClear, planDeparture, QUEUE_PENALTY_M } from './world';
-import { neededEtaSec, patternSideAt } from './tower';
+import { LINE_UP_LATE_MARGIN_SEC, neededEtaSec, patternSideAt } from './tower';
 import { getPerformance } from '../sim/performance';
 import type { Aircraft } from '../sim/types';
 
@@ -103,7 +103,8 @@ describe('arrival to departure on a parallel runway: the alert, not the categori
     const sameRunway = neededEtaSec(dep, false, 'A320', getPerformance('A320').approachSpeedKt, 0);
     const parallel = neededEtaSec(dep, false, 'A320', getPerformance('A320').approachSpeedKt, 4003 * 0.3048 / 1852);
     expect(parallel).toBeGreaterThan(30);
-    expect(parallel).toBeLessThan(sameRunway);
+    // (the parallel figure carries the late line-up margin of a departure cleared from the hold line, `LINE_UP_LATE_MARGIN_SEC`; without it the alert needs less than the categorical distance)
+    expect(parallel - LINE_UP_LATE_MARGIN_SEC).toBeLessThan(sameRunway);
   });
 });
 

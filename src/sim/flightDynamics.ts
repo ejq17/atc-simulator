@@ -71,6 +71,12 @@ export const TCH_FT = 50;
 export const DECISION_POINT_M = nmToM(0.5);
 /** Inside this distance a cleared arrival that is still high goes around if the runway is occupied. */
 const LAST_CHANCE_M = nmToM(0.25);
+/** Touchdown zone: the first 3,000 ft of the runway (FAA Pilot/Controller Glossary "Touchdown Zone"), not beyond the first third of the runway (FAA AC 91-79A Chg 1, definitions). */
+export const TDZ_LENGTH_FT = 3000;
+/** Latitude (m) beyond the zone end for the flare and the touchdown itself before the pilot goes around. DESIGN VALUE. */
+export const TDZ_TOLERANCE_M = 150;
+/** The guidance limits the descent to this multiple of the type's `descentRateFpm` (see `approachGuidance`). */
+const MAX_SINK_FACTOR = 1.3;
 const ROLL_ACCEL_DEG_PER_SEC2 = 6;
 const VS_ACCEL_FPM_PER_SEC = 600;
 const APPROACH_RANGE_NM = 25;
@@ -149,6 +155,24 @@ function goAroundAltitudeFt(ctx: SimContext, ac: Aircraft, elevFt: number, g: Ru
     return Math.max(floor, Math.floor(ac.altitudeFt / 100) * 100);
   }
   return Math.round((elevFt + (perf.category === 'light' ? 1500 : 3000)) / 100) * 100;
+}
+
+/** End of the touchdown zone in metres from the LANDING threshold: 3,000 ft or one third of the usable length, whichever is less. */
+export function touchdownZoneEndM(g: RunwayEndGeom): number {
+  return Math.min(ftToM(TDZ_LENGTH_FT), (g.lengthM - g.displacedM) / 3);
+}
+
+/**
+ * True when a landing in progress cannot touch down in the touchdown zone: already past its end (plus `TDZ_TOLERANCE_M`) and still flying, or - while
+ * still above 40 ft - unable to reach the ground before it even at the fastest descent the guidance allows (`maxSinkFpm`) at the present ground speed.
+ * The pilot goes around instead of floating down the runway (AC 91-79A Chg 1: a go-around is the mitigation when the approach is not stabilized).
+ */
+export function cannotTouchDownInZone(g: RunwayEndGeom, alongPavementM: number, aglFt: number, maxSinkFpm: number, groundSpeedKt: number): boolean {
+  const limit = touchdownZoneEndM(g) + TDZ_TOLERANCE_M;
+  const fromThr = alongPavementM - g.displacedM;
+  if (fromThr > limit) return true;
+  if (aglFt <= 40) return false;
+  return fromThr + ktToMps(groundSpeedKt) * (aglFt / (Math.max(maxSinkFpm, 1) / 60)) > limit;
 }
 
 export function updateFlightDynamics(ctx: SimContext, dt: number): void {
@@ -1020,7 +1044,8 @@ function approachGuidance(ctx: SimContext, ac: Aircraft, rt: AircraftRuntime, g:
       rt.decisionDone = true;
       const cleared = rt.landingEnd === g.end.id && !!activeClearance(ac, 'LAND');
       const blocker = cleared ? runwayBlocker(ctx, ac, g) : undefined;
-      const unstable = Math.abs(cross) > 250 || Math.abs(headingDiff(ac.headingDeg, g.headingDeg)) > 25;
+      const unstable = Math.abs(cross) > 250 || Math.abs(headingDiff(ac.headingDeg, g.headingDeg)) > 25
+        || cannotTouchDownInZone(g, along, aglFt, perf.descentRateFpm * MAX_SINK_FACTOR, ac.groundSpeedKt);
       const reason = !cleared ? 'no landing clearance' : blocker ? 'traffic on the runway' : unstable ? 'unstable approach' : undefined;
       if (reason) initiateGoAround(ctx, ac, { reason, announce: true });
       else setPhase(ctx, ac, 'LANDING', 'cleared to land');
@@ -1035,6 +1060,12 @@ function approachGuidance(ctx: SimContext, ac: Aircraft, rt: AircraftRuntime, g:
         initiateGoAround(ctx, ac, { reason: 'traffic on the runway', announce: true });
         return { desiredHeading: g.headingDeg, altTargetFt: ac.target.altitudeFt, speedKt: perf.climbSpeedKt };
       }
+    }
+    // Touchdown zone: a landing that will not touch down in the first 3,000 ft / third of the runway (too high or too fast to get down, or floating past
+    // the zone) is a go-around, never a touchdown further down the runway.
+    if (ac.phase === 'LANDING' && !ac.onGround && cannotTouchDownInZone(g, along, aglFt, perf.descentRateFpm * MAX_SINK_FACTOR, ac.groundSpeedKt)) {
+      initiateGoAround(ctx, ac, { reason: 'unable to land in the touchdown zone', announce: true });
+      return { desiredHeading: g.headingDeg, altTargetFt: ac.target.altitudeFt, speedKt: perf.climbSpeedKt };
     }
     // Wind limits of the type (cited figures only). DESIGN DECISION: a demonstrated value is not a limitation, so the go-around needs the
     // instantaneous gusted component to exceed it by WIND_GOAROUND_MARGIN_KT for WIND_LIMIT_GOAROUND_SEC.
@@ -1053,7 +1084,7 @@ function approachGuidance(ctx: SimContext, ac: Aircraft, rt: AircraftRuntime, g:
     const glide = glideAltitudeFt(g.elevationFt, d, gp);
     const err = glide - ac.altitudeFt;
     let vs = Math.min(0, vsGp + clamp(err * 5, -400, 400));
-    vs = Math.max(vs, -perf.descentRateFpm * 1.3);
+    vs = Math.max(vs, -perf.descentRateFpm * MAX_SINK_FACTOR);
     // Cleared approach: intercept the glidepath from below (hold level until it arrives).
     if (rt.approach && err > 50 && d > nmToM(2)) vs = 0;
     if (aglFt < 30) vs = -(100 + (Math.abs(vsGp) - 100) * clamp(aglFt / 30, 0, 1));
@@ -1079,7 +1110,12 @@ function approachGuidance(ctx: SimContext, ac: Aircraft, rt: AircraftRuntime, g:
   }
   let altTarget = ac.target.altitudeFt;
   if (altTarget === undefined) {
-    if (ac.phase === 'PATTERN') altTarget = interceptAlt;
+    if (ac.phase === 'PATTERN') {
+      altTarget = interceptAlt;
+      // A fighter's overhead pattern ends in a descending turn: on the base leg it comes down to the glide path of the final it is about to join
+      // (it would otherwise roll out 800 ft high and fast, float down the runway and go around, `cannotTouchDownInZone`). 200 ft above the path.
+      if (rt.pattern?.leg === 'BASE' && perf.military && !perf.craft) altTarget = Math.min(interceptAlt, Math.ceil((glideAltitudeFt(g.elevationFt, Math.max(d, 0), gp) + 200) / 100) * 100);
+    }
     else if (ac.phase === 'INBOUND') altTarget = undefined;
     else {
       const want = Math.max(interceptAlt, glideAltitudeFt(g.elevationFt, Math.max(distThr, startM), gp) + 100);
@@ -1529,7 +1565,13 @@ function stepAirborne(ctx: SimContext, ac: Aircraft, dt: number): void {
     continueInPattern(ctx, ac, rt, g, 'low approach');
   }
   // Touchdown.
-  if (g && ac.phase === 'LANDING' && ac.altitudeFt <= g.elevationFt + 0.5) touchdown(ctx, ac, rt, g);
+  if (g && ac.phase === 'LANDING' && ac.altitudeFt <= g.elevationFt + 0.5) {
+    // Never touch down beyond the pavement end (guidance has gone around long before; this is the last guard).
+    if (alongCross(g, ac.pos).along > g.lengthM) {
+      ac.altitudeFt = g.elevationFt + 1;
+      initiateGoAround(ctx, ac, { reason: 'unable to land, past the end of the runway', announce: true });
+    } else touchdown(ctx, ac, rt, g);
+  }
   if (g && ac.phase === 'FINAL' && ac.altitudeFt <= g.elevationFt + 0.5) {
     // Never reached in normal flow (decision point precedes), but never go below the runway.
     ac.altitudeFt = g.elevationFt + 0.5;

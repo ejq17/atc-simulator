@@ -31,6 +31,20 @@ export const DENSITY_CURVE: ReadonlyArray<readonly [number, number]> = [
   [0, 0.1], [5, 0.1], [7.5, 1.0], [9, 0.85], [10.5, 0.65], [15, 0.65], [16.5, 1.0], [19, 0.9], [21, 0.5], [23, 0.25], [24, 0.1],
 ];
 
+/** Integral of the curve over one day (hours at full density): daily movements / this = movements in a full-density (peak) hour. */
+export const DENSITY_DAY_INTEGRAL: number = DENSITY_CURVE.slice(1).reduce((sum, [h1, d1], i) => {
+  const [h0, d0] = DENSITY_CURVE[i];
+  return sum + ((h1 - h0) * (d0 + d1)) / 2;
+}, 0);
+
+/**
+ * DESIGN VALUE conversion: annual movements -> movements in a peak (density 1.0) hour, assuming the airport's daily total (annual / 365) is
+ * spread over the day as this curve. The ATADS / CAA annual counts are sourced (data/sources/README.md "Traffic volumes and mix"); the shape is the curve above.
+ */
+export function peakHourMovements(annualMovements: number): number {
+  return annualMovements / 365 / DENSITY_DAY_INTEGRAL;
+}
+
 /** Density factor 0..1 for a local hour (fractional; values outside 0..24 wrap). */
 export function trafficDensityForLocalHour(hour: number): number {
   const h = ((hour % 24) + 24) % 24;

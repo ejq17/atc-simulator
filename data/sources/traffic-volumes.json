@@ -1,0 +1,30 @@
+{
+  "_provenance": {
+    "atads": {
+      "source": "FAA Air Traffic Activity System (ATADS), Airport Operations, Standard Report (tower operations counted by FAA and contract towers)",
+      "url": "https://www.aspm.faa.gov/opsnet/sys/Airport.asp",
+      "query": "report server https://www.aspm.faa.gov/opsnet/sys/opsnet-server-x.asp, command air_bas, calendar years 2024 and 2025, facilities ACY MHT BOS PHL PGD, all days, IFR + VFR itinerant and local columns (the same table the Airport.asp form returns)",
+      "retrieved": "2026-10-22",
+      "http": "POST 200 for 2024 and 2025 (aspm.faa.gov answers 301 to www.aspm.faa.gov)",
+      "years": [2024, 2025],
+      "note": "ATADS 'AirCarrier' = scheduled large carrier operations, 'AirTaxi' = commuter / on-demand, 'GeneralAviation' and 'Military' as reported. itinerant = IFR + VFR itinerant; local = operations by aircraft that stay in the local area (pattern work, practice), civil and military."
+    },
+    "uk": {
+      "source": "UK Civil Aviation Authority, UK Airport Data 2025, Table 03.1 Aircraft Movements (annual 2025)",
+      "url": "https://www.caa.co.uk/data-and-analysis/uk-aviation-market/airports/uk-airport-data/uk-airport-data-2025/annual-2025/",
+      "file": "https://www.caa.co.uk/Documents/Download/24007/87fb7670-4e10-4aeb-942d-509238aa25a1/17535 (CSV, rundate 25/02/2026 16:31)",
+      "retrieved": "2026-10-22",
+      "http": "200",
+      "note": "Heathrow Airport Limited publishes the same totals on its traffic pages; the CAA table is the official return."
+    },
+    "derivation": "DESIGN VALUE conversions are made in src/game/airportProfile.ts and src/game/trafficDensity.ts and checked by src/game/trafficRealism.test.ts"
+  },
+  "airports": {
+    "KACY": { "atads": { "2025": { "airCarrier": 6306, "airTaxi": 4156, "gaItinerant": 14394, "militaryItinerant": 9590, "localCivil": 9282, "localMilitary": 7225, "total": 50953 }, "2024": { "airCarrier": 7128, "airTaxi": 5338, "gaItinerant": 19467, "militaryItinerant": 11274, "localCivil": 6580, "localMilitary": 6825, "total": 56612 } } },
+    "KMHT": { "atads": { "2025": { "airCarrier": 18008, "airTaxi": 11640, "gaItinerant": 10991, "militaryItinerant": 409, "localCivil": 2725, "localMilitary": 142, "total": 43915 }, "2024": { "airCarrier": 17824, "airTaxi": 10717, "gaItinerant": 10894, "militaryItinerant": 558, "localCivil": 2899, "localMilitary": 235, "total": 43127 } } },
+    "KBOS": { "atads": { "2025": { "airCarrier": 350190, "airTaxi": 60940, "gaItinerant": 7753, "militaryItinerant": 199, "localCivil": 0, "localMilitary": 0, "total": 419082 }, "2024": { "airCarrier": 348549, "airTaxi": 59651, "gaItinerant": 8598, "militaryItinerant": 296, "localCivil": 0, "localMilitary": 0, "total": 417094 } } },
+    "KPHL": { "atads": { "2025": { "airCarrier": 237832, "airTaxi": 73921, "gaItinerant": 10181, "militaryItinerant": 165, "localCivil": 0, "localMilitary": 0, "total": 322099 }, "2024": { "airCarrier": 240570, "airTaxi": 67476, "gaItinerant": 11352, "militaryItinerant": 540, "localCivil": 0, "localMilitary": 0, "total": 319938 } } },
+    "KPGD": { "atads": { "2025": { "airCarrier": 13258, "airTaxi": 2034, "gaItinerant": 61942, "militaryItinerant": 376, "localCivil": 55011, "localMilitary": 226, "total": 132847 }, "2024": { "airCarrier": 10539, "airTaxi": 1596, "gaItinerant": 59817, "militaryItinerant": 1354, "localCivil": 56752, "localMilitary": 1282, "total": 131340 } } },
+    "EGLL": { "caa": { "2025": { "total": 479996, "airTransport": 477917, "airTaxi": 47, "positioning": 1453, "localMovements": 0, "testAndTraining": 105, "otherFlights": 58, "aeroClub": 0, "privateFlights": 310, "official": 151, "military": 2, "businessAviation": 0 } } }
+  }
+}

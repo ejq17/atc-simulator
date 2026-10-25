@@ -47,6 +47,8 @@ export interface AgentMemory {
   firstSeen: Map<string, number>;
   /** Free-form per-agent notes (e.g. when a speed restriction was issued). */
   notes: Map<string, number>;
+  /** `aircraft id:command kind` -> the command as this position sent it (the clearance recorded in the aircraft is what the pilot flew, which after a misread runway is the wrong one). */
+  sent: Map<string, ParsedCommand>;
   lastTxAt: number;
   lastSummary?: string;
   lastSummaryAt: number;
@@ -54,7 +56,7 @@ export interface AgentMemory {
 
 export function newMemory(): AgentMemory {
   return {
-    done: new Set(), recent: new Map(), backoff: new Map(), rejects: new Map(), firstSeen: new Map(), notes: new Map(),
+    done: new Set(), recent: new Map(), backoff: new Map(), rejects: new Map(), firstSeen: new Map(), notes: new Map(), sent: new Map(),
     lastTxAt: -Infinity, lastSummaryAt: -Infinity,
   };
 }

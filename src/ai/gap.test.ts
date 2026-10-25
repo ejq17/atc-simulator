@@ -241,3 +241,25 @@ describe('coordination bookkeeping for the gap', () => {
     expect(departureTimes(dep, false).liftoff).toBeGreaterThan(0);
   });
 });
+
+describe('the departure gap is per runway (multi-runway configuration)', () => {
+  it('a departure at the hold of the departing-only runway 27L is not held for the arrival stream of the parallel runway 27R, and asks Approach for nothing', async () => {
+    const { createMultiRunwayAirport } = await import('../sim/__fixtures__/multiRunwayAirport');
+    const { HOLDING, ARRIVING } = await import('../sim/__fixtures__/testHelpers');
+    const { ALL, createHarness } = await import('./testkit');
+    const airport = createMultiRunwayAirport();
+    const h = createHarness({
+      airport, player: [], ai: ALL, mode: 'free_play', activeRunways: { departing: ['27L'], landing: ['27R'] }, readbackErrorRate: 0, seed: 5,
+      spawns: [
+        { ...ARRIVING('N31AA', '27R', 6, 'C172'), atSec: 0 }, { ...ARRIVING('N32BB', '27R', 9, 'C172'), atSec: 0 }, { ...ARRIVING('N33CC', '27R', 12, 'C172'), atSec: 0 },
+        { ...HOLDING('NKS200', 'HSE2', '27L', 'A320'), atSec: 0 },
+      ],
+    });
+    let airborneAt = -1;
+    h.run(420, () => { const a = h.find('NKS200'); if (airborneAt < 0 && a && !a.onGround) airborneAt = h.now(); });
+    expect(airborneAt).toBeGreaterThan(0);
+    expect(airborneAt).toBeLessThan(240);
+    expect(h.events.filter((e) => e.kind === 'COORDINATION' && /need a gap/.test(e.text)).map((e) => e.text)).toEqual([]);
+    expect(h.events.filter((e) => e.kind === 'SEPARATION_VIOLATION').map((e) => e.text)).toEqual([]);
+  }, 120_000);
+});

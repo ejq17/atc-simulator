@@ -13,7 +13,7 @@ import type { SoakResult } from './freePlayHarness';
  * The short always-on smoke runs 20 simulated minutes at seed 1 per airport.
  *
  * Assertions: no stall (STALL_SEC without a landing or departure at 6+ aircraft), zero runway incursions, zero airborne proximity alerts,
- * every aircraft that landed more than PARK_BY_SEC ago reached its stand, every departure that appeared more than DEPART_BY_SEC before the end
+ * no arrival is held in the approach phase without a procedure for HELD_MAX_SEC (10 minutes), every aircraft that landed more than PARK_BY_SEC ago reached its stand, every departure that appeared more than DEPART_BY_SEC before the end
  * took off, blocked-call share under 2 % (protocol of blockedRate.ts: share = blocked / (transmitted + blocked), first 300 s discarded) and the
  * run finishes inside the wall-time bound.
  */
@@ -29,6 +29,8 @@ const DISCARD_SEC = 300;
 /** A landed aircraft not on its stand this long after touchdown (an aircraft that taxied back and took off again, a pattern aircraft doing stop-and-go work, is not stuck), a departure not airborne this long after it appeared, is stuck. */
 const PARK_BY_SEC = 1500;
 const DEPART_BY_SEC = 2400;
+/** An arrival in the INBOUND / APPROACH phase that is not flying an arrival route or a cleared approach is sequenced (cleared, slowed to a gap, sent to a hold that releases it) within this long. DESIGN VALUE. */
+const HELD_MAX_SEC = 600;
 
 interface Tracked { id: string; callsign: string; dep: boolean; firstSec: number; landedSec?: number; parked?: boolean; departed?: boolean }
 
@@ -82,7 +84,7 @@ function run(label: string, airport: Airport, seed: number, simHours: number, ac
 
 function line(x: RunSummary): string {
   const last = (a: number[]) => a[a.length - 1] ?? 0;
-  return `| ${x.label} | ${last(x.landed)} | ${last(x.departed)} | ${x.incursions.length + x.airborneAlerts.length}/${x.safety.length} | ${x.maxWaitText || '-'} | ${x.goArounds} | ${(100 * x.blockedShare).toFixed(2)} % (${x.blocked}/${x.keyed}) | ${x.stuckLanded.length}/${x.stuckDepartures.length} | ${x.wallSec.toFixed(0)} s |`;
+  return `| ${x.label} | ${last(x.landed)} | ${last(x.departed)} | ${x.incursions.length + x.airborneAlerts.length}/${x.safety.length} | ${x.maxWaitText || '-'} (held ${x.maxHeldText || '-'}) | ${x.goArounds} | ${(100 * x.blockedShare).toFixed(2)} % (${x.blocked}/${x.keyed}) | ${x.stuckLanded.length}/${x.stuckDepartures.length} | ${x.wallSec.toFixed(0)} s |`;
 }
 const HEADER = '| run | landings | departures | incursions+airborne / all safety | max wait | go-arounds | blocked | stuck landed/dep | wall |\n|---|---|---|---|---|---|---|---|---|';
 
@@ -94,6 +96,7 @@ function check(x: RunSummary, minutes: number, strict: boolean): void {
   expect(x.airborneAlerts, 'airborne proximity alerts').toEqual([]);
   expect(x.stuckLanded, 'landed but never parked').toEqual([]);
   expect(x.stuckDepartures, 'departures that never took off').toEqual([]);
+  expect(x.maxHeldSec, `an arrival was held in the approach phase without a procedure: ${x.maxHeldText}`).toBeLessThan(HELD_MAX_SEC);
   expect(x.wallSec).toBeLessThan(WALL_BOUND_SEC);
   if (!strict) return;
   const last = (a: number[]) => a[a.length - 1] ?? 0;

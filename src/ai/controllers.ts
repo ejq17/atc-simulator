@@ -175,6 +175,7 @@ export function createAiControllers(opts: AiControllerOptions): AiControllers {
     let accepted = true;
     for (let i = 0; i < cmds.length; i++) {
       const out = engine.applyCommand(cmds[i], o);
+      if (out.status === 'accepted') rt.mem.sent.set(`${cmds[i].callsign}:${cmds[i].kind}`, plan.cmds[i]);
       if (out.status !== 'accepted') {
         accepted = false;
         if (out.status === 'clarify' && cmds.length > 1) rt.mem.notes.set(`slow:${plan.key}`, t);

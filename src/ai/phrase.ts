@@ -250,6 +250,13 @@ export const holdAsPublished = (airport: Airport, fix: string): Phrase => {
   return { text: `hold at ${n} as published`, spoken: `hold at ${n} as published` };
 };
 
+/** "Hold at MILTT, two five five inbound, right turns, one minute legs" (JO 7110.65 4-6-4 holding instruction, not published). */
+export const holdAtFix = (airport: Airport, fix: string, inboundMag: number, turns: 'left' | 'right'): Phrase => {
+  const n = spokenFix(airport, fix);
+  const c = String(Math.round(inboundMag) || 360).padStart(3, '0');
+  return { text: `hold at ${n}, ${c} inbound, ${turns} turns, one minute legs`, spoken: `hold at ${n}, ${digitsSpoken(c)} inbound, ${turns} turns, one minute legs` };
+};
+
 /** Re-issue after a wrong readback: "negative, ..." (7110.65 2-4-3: have the pilot correct a faulty readback). */
 export const negative = (p: Phrase): Phrase => ({ text: `negative, ${p.text}`, spoken: `negative, ${p.spoken}` });
 

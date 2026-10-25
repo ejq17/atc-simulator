@@ -137,7 +137,7 @@ export function createTrafficGenerator(scenario: Scenario, airport: Airport, opt
   const profile = profileFor(icao);
   const similarRate = resolvePilotBehaviour(scenario.pilotBehaviour, scenario.mode, scenario.pilotRealism).realism.similarCallsignRate;
   const specialSel = resolveSpecialTraffic(icao, gs.specialTraffic);
-  const trainingShare = profileForSpecial(icao).special?.training?.gaShare ?? 0;
+  const trainingShare = cfg.patternWork === false ? 0 : (profileForSpecial(icao).special?.training?.gaShare ?? 0);
   const specialGen = createSpecialTrafficGenerator(gs, airport, options);
   let rng: Rng | undefined;
   let nextArr = Infinity;
@@ -153,6 +153,19 @@ export function createTrafficGenerator(scenario: Scenario, airport: Airport, opt
   /** parking id -> time reserved; released once an aircraft stands there or after 20 s. */
   const reserved = new Map<string, number>();
   let counter = 0;
+
+  /**
+   * GA or airline for the due arrival / departure. A due flight is retried every 10 s until it fits (spacing, slots, parking); drawing the kind anew on every
+   * retry makes the kind that fits more often (a GA aircraft) win, so a 2 % GA share came out near 12 % at KBOS. Airports with `defaults.keepKindOnRetry`
+   * keep the first draw until the flight is created (the random number is still drawn, so the seeded stream is the same); KACY and KMHT keep their old per-try draw.
+   */
+  const keepKind = profileFor(icao).defaults.keepKindOnRetry === true;
+  const pendingKind: { arr?: boolean; dep?: boolean } = {};
+  const drawKind = (drawn: boolean, kind: 'arr' | 'dep'): boolean => {
+    if (!keepKind) return drawn;
+    pendingKind[kind] ??= drawn;
+    return pendingKind[kind]!;
+  };
 
   const gap = (kind: 'arr' | 'dep', now: number): number => {
     const perHour = kind === 'arr' ? cfg.arrivalsPerHour : cfg.departuresPerHour;
@@ -278,7 +291,7 @@ export function createTrafficGenerator(scenario: Scenario, airport: Airport, opt
   const trySpawnArrival = (state: Readonly<SimulationState>): SpawnSpec | undefined => {
     const ends = state.activeRunways.landing.length ? state.activeRunways.landing : state.activeRunways.departing;
     if (!ends.length) return undefined;
-    const ga = rng!() < gaFraction;
+    const ga = drawKind(rng!() < gaFraction, 'arr');
     const flight = nextFlight(ga, state);
     if (!flight) return undefined;
     const type = flight.type;
@@ -369,7 +382,7 @@ export function createTrafficGenerator(scenario: Scenario, airport: Airport, opt
     for (const a of Object.values(state.aircraft)) if (a.isDeparture && a.onGround && !['TAKEOFF_ROLL', 'INITIAL_CLIMB', 'DEPARTURE'].includes(a.phase) && !a.flags.vehicleTask && a.type !== 'H65') waiting++;
     if (cfg.flowControl !== false && waiting >= MAX_DEPARTURES_ON_GROUND) return undefined;
     const depEnds = state.activeRunways.departing.length ? state.activeRunways.departing : state.activeRunways.landing;
-    let ga = rng!() < gaFraction;
+    let ga = drawKind(rng!() < gaFraction, 'dep');
     let flight: Flight | undefined;
     // An airliner needs a runway long enough for its type; fall back to a GA aircraft (if allowed) when the departure runway is short.
     if (!ga) {
@@ -442,6 +455,7 @@ export function createTrafficGenerator(scenario: Scenario, airport: Airport, opt
         if (spec) {
           if (kind === 'arr') dueArr--;
           else dueDep--;
+          pendingKind[kind] = undefined;
           lastKind = kind;
           lastSpawnAt = now;
           return [spec];

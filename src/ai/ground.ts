@@ -126,6 +126,20 @@ function taxiFollowOk(v: AgentView, ac: Aircraft): boolean {
   return true;
 }
 
+/** Another aircraft stands still at the hold line on the far side of runway `rid` on `ac`'s route (the first hold line of that runway after the one `ac` stands at). */
+function farHoldOccupied(state: SimulationState, ac: Aircraft, rid: string): boolean {
+  const r = ac.route;
+  if (!r) return false;
+  const nodes = state.airport.taxiwayGraph.nodes;
+  let far: string | undefined;
+  for (let i = Math.max(0, r.progressIndex - 1); i < r.nodeIds.length; i++) {
+    const n = nodes[r.nodeIds[i]];
+    if (n?.kind === 'holding_position' && n.runwayId === rid && Math.hypot(n.pos.x - ac.pos.x, n.pos.y - ac.pos.y) > 25) { far = n.id; break; }
+  }
+  if (!far) return false;
+  return Object.values(state.aircraft).some((o) => o.id !== ac.id && o.onGround && o.groundSpeedKt < 1 && o.occupyingRunways.length === 0 && holdNodeAt(state.airport, o)?.id === far);
+}
+
 export function createGroundAgent(store: ClearanceStore): Agent {
   const clearanceAgent = createClearanceAgent(store);
   const partner = new Map<string, { otherId: string; since: number }>();
@@ -456,6 +470,10 @@ export function createGroundAgent(store: ClearanceStore): Agent {
         // Not onto a taxiway where an aircraft waits head-on on the far side (a departure standing at the far hold line for the same runway):
         // the crossing aircraft would stop on the runway behind it, which cannot move until the runway is free.
         if (ac.route && opposing(ac, ac.route.nodeIds.slice(Math.max(0, ac.route.progressIndex - 1)))) continue;
+        // ... and never when an aircraft stands AT the far hold line, patience or not: it waits for its own takeoff clearance, not for this crossing, and a crossing
+        // aircraft that has left the runway can then neither reach the hold line nor turn back (soak seed 13, special traffic: a vehicle 32 m short of the far hold
+        // of 4/22 and a Cessna cleared for takeoff from that hold line stood nose to nose for 1,000 s, the landing runway blocked all that time).
+        if (ac.route && farHoldOccupied(state, ac, rid)) continue;
         const rw = findRunway(airport, rid);
         if (rw && crossingNeedsApproval(state, 'GND', rw)) {
           // JO 7110.65 3-1-3: ask local control, wait for the answer (the aircraft keeps holding short), cross inside the approval.

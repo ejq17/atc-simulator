@@ -40,7 +40,7 @@ describe('KPGD traffic profile (flypgd.com airlines; fleet types from the airlin
     expect(bearingTo(kpgd, 'KFMY')).toBeLessThan(200);
     expect(bearingTo(kpgd, 'KSRQ')).toBeGreaterThan(300); // Sarasota is northwest
   });
-  it('Class D: VFR transitions and vehicles only (no flight-training share: no source)', () => {
-    expect(profileFor('KPGD').special).toEqual({ transition: { perHour: 3 }, vehicles: { perHour: 3 } });
+  it('Class D: VFR transitions and vehicles, plus flight training from its ATADS local operations (share 0.3, a conversion)', () => {
+    expect(profileFor('KPGD').special).toEqual({ transition: { perHour: 3 }, training: { gaShare: 0.3 }, vehicles: { perHour: 3 } });
   });
 });

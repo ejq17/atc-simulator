@@ -45,6 +45,7 @@ function facility(ctx: SimContext, ac: Aircraft): string {
 
 function wants(ctx: SimContext, ac: Aircraft, rt: AircraftRuntime, code: Exclude<PilotRequestCode, 'PROGRESSIVE_TAXI' | 'LOWER'>): boolean {
   if (rt.requestsDone.has(code)) return false;
+  if ((code === 'OPTION' || code === 'STAY_IN_PATTERN') && ctx.state.scenario.traffic?.patternWork === false) return false;
   const rate = ctx.pilotBehaviour.realism.requests[code];
   return rate > 0 && seeded01(ac.seed, `req:${code}`) < rate;
 }

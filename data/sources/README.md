@@ -536,6 +536,35 @@ These sections were written next to the airport that prompted them but apply to 
 * **Fallbacks, labelled**: an instrument approach without a transcribed glidepath flies 3 deg / 50 ft (`glidePathFor(...).source === 'default'`); a missed approach without a published altitude climbs to 2,000 ft (`IFR_MISSED_APPROACH_FT`) with an INFO event.
 * **Not verified**: the plates are a human / extracted transcription, not checked against the FAA digital procedures data; the cycle is 2610 (expires 2026-10-29).
 
+## Traffic volumes and mix (added 2026-10-22; `data/sources/traffic-volumes.json`)
+
+What the generated traffic mix and default rates are based on. Gameplay data, but every input figure is a retrieved statistic; the conversions are labelled DESIGN VALUE.
+
+**Sources (all retrieved 2026-10-22).**
+
+* FAA Air Traffic Activity System (ATADS), Airport Operations, Standard Report, calendar years 2024 and 2025 (2025 is used), facilities ACY, MHT, BOS, PHL, PGD: https://www.aspm.faa.gov/opsnet/sys/Airport.asp (aspm.faa.gov answers 301 to www.aspm.faa.gov). The report is the form's own POST to `https://www.aspm.faa.gov/opsnet/sys/opsnet-server-x.asp` (command `air_bas`, `dstyle=y`, `dfld=cyear`, itinerant IFR/VFR and local columns on); HTTP 200 for both years. The category sums reproduce the facility totals exactly for all five airports (checked in `src/game/trafficRealism.test.ts`). "AirCarrier" = scheduled large carrier, "AirTaxi" = commuter / on-demand, "GeneralAviation" and "Military" as reported; local operations are aircraft that stay in the local area (pattern work, practice).
+* UK Civil Aviation Authority, UK Airport Data 2025, Table 03.1 Aircraft Movements (annual): https://www.caa.co.uk/data-and-analysis/uk-aviation-market/airports/uk-airport-data/uk-airport-data-2025/annual-2025/ , CSV `https://www.caa.co.uk/Documents/Download/24007/87fb7670-4e10-4aeb-942d-509238aa25a1/17535` (HTTP 200, run date 25/02/2026 16:31). Heathrow 2025: 479,996 movements, 477,917 air transport, 47 air taxi, 1,453 positioning, 310 private, 151 official, 105 test and training, 58 other, 2 military, 0 local, 0 aero club, 0 business aviation. Heathrow Airport Limited's own traffic statistics page (https://www.heathrow.com/company/investor-centre/results-and-reports/traffic-statistics) returned HTTP 404, so the CAA return is the only source.
+
+**2025 operations (ATADS).**
+
+| Airport | Air carrier | Air taxi | GA itinerant | Military itinerant | Local civil | Local military | Total |
+|---|---|---|---|---|---|---|---|
+| KACY | 6,306 | 4,156 | 14,394 | 9,590 | 9,282 | 7,225 | 50,953 |
+| KMHT | 18,008 | 11,640 | 10,991 | 409 | 2,725 | 142 | 43,915 |
+| KBOS | 350,190 | 60,940 | 7,753 | 199 | 0 | 0 | 419,082 |
+| KPHL | 237,832 | 73,921 | 10,181 | 165 | 0 | 0 | 322,099 |
+| KPGD | 13,258 | 2,034 | 61,942 | 376 | 55,011 | 226 | 132,847 |
+| EGLL (CAA) | 477,917 (air transport) | 47 | 310 (private) | 2 | 0 | 0 | 479,996 |
+
+2024 figures (same query) are in the JSON for comparison; they differ by under 12 % per category except KPGD military and KACY GA, and no conclusion below changes.
+
+**Derived defaults (`AirportTrafficProfile.defaults`, `src/game/airportProfile.ts`).**
+
+* `gaFraction` = GA itinerant / (air carrier + air taxi + GA itinerant), the share of generated flights that are general aviation. Air taxi counts as airline traffic (regional jets and commuter turboprops are generated as airline flights). KBOS 7,753 / 418,883 = 0.019; KPHL 10,181 / 321,934 = 0.032; KPGD 61,942 / 77,234 = 0.802; EGLL 0 (light aircraft are not permitted at Heathrow, AD 2.20; the 310 private movements are business jets). KACY and KMHT keep 0.5, the value they were tuned to (their ATADS GA shares of all operations are 46.5 % and 31.2 %); their behaviour is unchanged.
+* `patternWork` (closed traffic: pilots ask for the option or to stay in the pattern, training circuits): true where ATADS counts local operations or the airport was tuned with it (KPGD 55,011 civil local operations = 41 % of all its operations; KACY and KMHT as before), false at KBOS, KPHL and EGLL (zero local operations in the return). When false, `scenario.traffic.patternWork` is false: no OPTION / STAY_IN_PATTERN pilot requests and no training circuits.
+* KPGD flight-training share 0.30 (DESIGN VALUE conversion): 55,011 local operations / about 6 per training flight (2 to 4 circuits, `trainingCircuits`, two operations each) = 9,170 flights against 61,942 / 2 = 30,970 GA arrivals.
+* Peak-hour rates (DESIGN VALUE conversion): itinerant operations / 365 / 13.25 (the day integral of the diurnal curve in `trafficDensity.ts`, hours at full density) / 2 = arrivals (= departures) in a full-density hour: KBOS 43, KPHL 33, KPGD 8, EGLL 50 per hour (real peaks are higher; the average-day shape is the curve). The free-play defaults cannot go that high (one player and the arrival-slot spacing, `ARRIVAL_SLOT_SEC`), so the generic rates (setup screen Light / Moderate / Busy 5 / 10 / 18, start presets 4 / 9 / 16) are scaled by min(1, peak / 18): 1 for KBOS, KPHL, EGLL, KACY and KMHT, 0.44 for KPGD.
+
 ## Traffic variety (added 2026-10-18)
 
 No new geometry file: everything below is read from the datasets already in the repo plus the web sources listed. What exists, and why each kind is (not) generated:
@@ -547,7 +576,7 @@ No new geometry file: everything below is read from the datasets already in the 
 | Arresting gear BAK-14 / BAK-12B | `kacy-facility.json` (NASR). No source for the rigged / derigged state or its announcement: **informational only, no gameplay, no ATIS text**. | - |
 | FAA ops 123.4 / ANG ops 140.7 | recorded as "not ATC" frequencies (OTHER); not used. | - |
 | VFR transitions | Class C airspace flag of KACY (NASR, `airspaceClass` C) and KMHT (C); JO 7110.65 7-8, AIM 3-2-4. | KACY, KMHT |
-| Flight training | No dataset or source names a flight school at KACY or KMHT. The pattern-work behaviour is generic (touch-and-go circuits of GA arrivals, JO 7110.65 3-8-2); the share (40 %) is a design value, enabled for KACY only (the task named training at KACY; KMHT has no source and gets none). | KACY |
+| Flight training | No dataset or source names a flight school at KACY, KMHT or KPGD (KPGD gets a training share from its ATADS local operations, see "Traffic volumes and mix"). The pattern-work behaviour is generic (touch-and-go circuits of GA arrivals, JO 7110.65 3-8-2); the share (40 %) is a design value, enabled for KACY only (the task named training at KACY; KMHT has no source and gets none). | KACY |
 | Airport vehicles | Every towered airport has them (AC 150/5210-20A); they park at the `fbo` / `cargo` positions (KACY FBO-1/2, FAA-1/2/3; KMHT FBO-1..3 and CARGO-*). No published vehicle crossing points exist in the data (no `vehicle crossing` feature in OSM, NASR or the diagram notes searched), so vehicle crossings use the ordinary taxiway-runway crossings of the graph. | KACY, KMHT |
 | KMHT USCG / ANG | None found: no helipad or military ramp feature in the KMHT dataset and no unit sourced; KMHT gets neither kind. | - |
 

@@ -143,6 +143,25 @@ No paragraph of JO 7110.65, JO 7210.3 or the Pilot/Controller Glossary words a "
 
 Therefore the request ("Approach, Tower, need a gap for a departure runway two two" / "... for two departures ...") and the answers ("gap after <callsign>", "gap available now", "unable, <reason>", "stand by") are plain words, `standard: false`, and the parser gives them the non-standard factor. The numbers (150 s wait, 150 s usable window, 360 s horizon, 120 s retry, 360 s lifetime, 180 s hold, two 360s, 2.5 nm / 1,500 ft clearance for a loop) are design values (docs/DESIGN-VALUES.md C13).
 
+### Arrivals to intersecting runways, converging courses and radar separation (read 2026-10-22 from faa.gov with curl and a descriptive User-Agent; the web fetch tool is refused with 403)
+
+* **3-10-4 INTERSECTING RUNWAY/INTERSECTING FLIGHT PATH OPERATIONS** (chapter 3 section 10, edition dated 2021-06-09 in the page's interpretation line): "Issue traffic information to each
+  aircraft operating on intersecting runways. Separate an arriving aircraft using one runway from another aircraft using an intersecting runway or a nonintersecting runway when the
+  flight paths intersect by ensuring that the arriving aircraft does not cross the landing threshold or flight path of the other aircraft until one of the following conditions exists:
+  a. The preceding aircraft has departed and passed the intersection/flight path or is airborne and turning to avert any conflict. b. A preceding arriving aircraft is clear of the
+  landing runway, completed landing roll and will hold short of the intersection/flight path, or has passed the intersection/flight path." (Land and hold short follows in c.)
+  The engine's rule (`conflicts.intersectingIssues`) estimates "has passed the intersection" as `sInt + 60 m` at half the touchdown speed; `ai/crossing.ts` mirrors that figure
+  (up to 150 s at KBOS 9/27 against 4R/22L), plus an AI margin of 12 s (DESIGN VALUE). The sequence (`sequence.ts`), Tower's landing check (`tower.blockedByLeader`) and Approach
+  (`approach.leaderOf`) use it, so a landing clearance the engine refuses is no longer discovered at 1 nm.
+* **5-9-7** is not the converging-approach paragraph of the task brief: in the edition read it is "SIMULTANEOUS INDEPENDENT APPROACHES- DUAL & TRIPLE TERMINAL" (1,000 ft vertical or 3 nm radar
+  separation during turn-on to parallel finals; "no two aircraft will be assigned the same altitude during turn-on to final", example altitudes 3,000 / 4,000 / 5,000). Section 5-9 has no
+  paragraph on converging (non-parallel) approaches; 5-9-6 (dependent parallel, used since the multi-runway round) and 5-9-8 / 5-9-9 / 5-9-10 are the parallel ones. For arrivals whose
+  courses converge or cross the AI applies 3-10-4 at the thresholds (above) and the radar minimum of 5-5-4 (3 nm, or 1,000 ft vertical, 5-5-1) in the vectoring phase. The "stack" of 5-9-7's note
+  (1,000 ft between aircraft turning on to final) is the model for `ai/approachSeparation.ts`: an arrival is not descended into the level of traffic it would meet, and one brought
+  down to the level of an aircraft ahead is held or climbed 1,000 / 2,000 ft. The ratio used there (`APPROACH_SEP_RATIO` 1.7, 3 nm / 1,000 ft being 2.0 against the simulator's 1.5 nm / 500 ft alert) is a DESIGN VALUE.
+* 3-8-1 (extend downwind, 360s, follow) and 3-10-6 as in the table above (3-10-10 of the brief was not read); 7-2-1 visual separation is NOT assumed by the pattern sequence: the simulator's alert is stricter than a visual
+  pattern (the downwind leg is 0.8 nm from the final course, below the 1.5 nm alert), so `patternPath.ts` projects the legs and the sequence takes the option that stays outside the alert.
+
 ## Ground operations (read 2026-10-18 from the FAA HTML pages; quoted text is verbatim)
 
 JO 7110.65 section 3-7 (https://www.faa.gov/air_traffic/publications/atpubs/atc_html/chap3_section_7.html) and 2-4-3 (.../chap2_section_4.html); AIM 4-3-18 (.../aim_html/chap4_section_3.html); Pilot/Controller Glossary (.../pcg_html/glossary-p.html). The saved pages lose the sub-paragraph letters, so the rules are cited by paragraph and quoted text.

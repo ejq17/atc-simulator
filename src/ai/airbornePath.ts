@@ -17,6 +17,7 @@ import { alongCross, findRunwayEnd, parallelNeighbours } from '../sim/runways';
 import type { RunwayEndGeom } from '../sim/runways';
 import { getPerformance } from '../sim/performance';
 import { isInboundArrival } from './world';
+import { defaultPath } from './pathWorld';
 
 /** Seconds ahead that are projected. */
 export const HORIZON_SEC = 240;
@@ -31,9 +32,9 @@ const TURN_AGL_FT = 400;
 /** The arrival touches down this long after crossing the threshold (as tower.ts `TOUCHDOWN_AFTER_THRESHOLD_SEC`). */
 const TOUCHDOWN_AFTER_THRESHOLD_SEC = 8;
 
-interface Sample { x: number; y: number; altFt: number }
+export interface Sample { x: number; y: number; altFt: number }
 /** One position per second from now (index 0) to `HORIZON_SEC`; `undefined` = on the ground or gone (no alert can involve it then). */
-type Path = (Sample | undefined)[];
+export type Path = (Sample | undefined)[];
 
 const KT = KT_TO_MPS;
 
@@ -117,9 +118,9 @@ export interface ProjectedConflict {
 }
 
 /** First pair of samples of two paths inside the alert (with margins); the nearest approach among them. */
-function closest(a: Path, b: Path): { minNm: number; atSec: number } | undefined {
-  const limitM = (AIRBORNE_PROXIMITY_NM + PROJECTION_MARGIN_NM) * 1852;
-  const limitFt = AIRBORNE_PROXIMITY_FT + PROJECTION_MARGIN_FT;
+export function closest(a: Path, b: Path, marginNm = PROJECTION_MARGIN_NM, marginFt = PROJECTION_MARGIN_FT): { minNm: number; atSec: number } | undefined {
+  const limitM = (AIRBORNE_PROXIMITY_NM + marginNm) * 1852;
+  const limitFt = AIRBORNE_PROXIMITY_FT + marginFt;
   let best: { minNm: number; atSec: number } | undefined;
   for (let t = 0; t < a.length; t++) {
     const p = a[t];
@@ -132,19 +133,10 @@ function closest(a: Path, b: Path): { minNm: number; atSec: number } | undefined
   return best;
 }
 
-/**
- * Would releasing `ac` (a departure on the ground, at the hold line or lined up) on `g` with `headingTrue` after 400 ft AGL (undefined: runway heading) touch the
- * near-miss alert against another departure (airborne, or rolling or cleared on any runway) or an arrival on the final of a parallel runway of `g`? The
- * conflicting aircraft nearest in time, or undefined.
- */
-export function departureProjectedConflict(state: SimulationState, ac: Aircraft, g: RunwayEndGeom, lined: boolean, headingTrue?: number, turn?: 'left' | 'right'): ProjectedConflict | undefined {
-  const mine = departurePath(ac, g, lined, headingTrue, turn);
-  const parallel = new Set(parallelNeighbours(state.airport, g).map((n) => n.end.runway.id));
-  let worst: ProjectedConflict | undefined;
-  const consider = (o: Aircraft, path: Path): void => {
-    const c = closest(mine, path);
-    if (c && (!worst || c.atSec < worst.atSec)) worst = { other: o, ...c };
-  };
+/** The aircraft (with their projected paths) a departure released from `g` has to stay clear of. */
+function departureObstacles(state: SimulationState, ac: Aircraft, g: RunwayEndGeom): { other: Aircraft; path: Path }[] {
+  const out: { other: Aircraft; path: Path }[] = [];
+  const consider = (o: Aircraft, path: Path): void => { out.push({ other: o, path }); };
   for (const o of Object.values(state.aircraft)) {
     if (o.id === ac.id) continue;
     if (o.isDeparture) {
@@ -158,15 +150,61 @@ export function departureProjectedConflict(state: SimulationState, ac: Aircraft,
       continue;
     }
     if (o.onGround) continue;
-    if (o.phase === 'GO_AROUND') { consider(o, climbingPath(o)); continue; }
-    if (!isInboundArrival(o)) continue;
+    if (!isInboundArrival(o) && o.phase !== 'GO_AROUND') continue;
     const og = findRunwayEnd(state.airport, o.assignedRunwayEnd);
-    if (!og || !parallel.has(og.runway.id)) continue;
+    // Everything that flies the pattern or a go-around, and every arrival on the final of ANOTHER runway, is projected the way the sequence projects it (`pathWorld`): the
+    // departure's heading is chosen against it. (An arrival on the final of the departure's own runway is judged by the categorical distance, `neededEtaSec`.)
+    if (og && (o.phase === 'FINAL' || o.phase === 'LANDING') && og.runway.id === g.runway.id) continue;
+    if (o.phase === 'GO_AROUND' && !og) { consider(o, climbingPath(o)); continue; }
+    if (!og) continue;
     // only an arrival that reaches its threshold inside the horizon matters (the straight line to a threshold far away says nothing about its path)
     if (mToNm(Math.hypot(o.pos.x - og.end.threshold.x, o.pos.y - og.end.threshold.y)) > 7) continue;
-    consider(o, arrivalPath(o, og));
+    const dp = defaultPath(state, o);
+    if (dp) consider(o, dp);
+  }
+  return out;
+}
+
+/**
+ * Would releasing `ac` (a departure on the ground, at the hold line or lined up) on `g` with `headingTrue` after 400 ft AGL (undefined: runway heading) touch the
+ * near-miss alert (with the projection margins) against another departure (airborne, or rolling or cleared on any runway), a go-around, the pattern traffic or an
+ * arrival on the final of another runway? The conflicting aircraft nearest in time, or undefined.
+ */
+export function departureProjectedConflict(state: SimulationState, ac: Aircraft, g: RunwayEndGeom, lined: boolean, headingTrue?: number, turn?: 'left' | 'right'): ProjectedConflict | undefined {
+  const mine = departurePath(ac, g, lined, headingTrue, turn);
+  let worst: ProjectedConflict | undefined;
+  for (const { other, path } of departureObstacles(state, ac, g)) {
+    const c = closest(mine, path);
+    if (c && (!worst || c.atSec < worst.atSec)) worst = { other, ...c };
   }
   return worst;
+}
+
+/**
+ * How far the departure's path stays from the near-miss alert (1.5 nm and 500 ft): the smallest over time and over the other aircraft of max(distance / 1.5 nm,
+ * height difference / 500 ft). Below 1 the path touches the alert; the Tower wants `DEPARTURE_COMFORT_RATIO` (a margin for the wind and the projection) and settles
+ * for any ratio at or above `DEPARTURE_CLEAR_RATIO` when no heading gives the margin (a departure held for ever is a stall as well). DESIGN VALUES.
+ */
+export const DEPARTURE_COMFORT_RATIO = 1.1;
+// (1.02 let the soak through with a predicted 1.04 that was 1.0 in the flight: dual arrivals seed 3, a diverging A320 climbing through a level C172, 1.5 nm and 500 ft)
+export const DEPARTURE_CLEAR_RATIO = 1.06;
+/** ... after this long at the hold (s) the old, smaller margin (1.02) is accepted: a departure held for ever starves (soak seed 10, 3,200 s at the hold). DESIGN VALUES. */
+export const DEPARTURE_CLEAR_RATIO_PATIENT = 1.02;
+export const DEPARTURE_PATIENCE_SEC = 90;
+export function departureSeparationRatio(state: SimulationState, ac: Aircraft, g: RunwayEndGeom, lined: boolean, headingTrue?: number, turn?: 'left' | 'right'): { ratio: number; other?: Aircraft; atSec?: number } {
+  const mine = departurePath(ac, g, lined, headingTrue, turn);
+  const limitM = AIRBORNE_PROXIMITY_NM * 1852;
+  let best: { ratio: number; other?: Aircraft; atSec?: number } = { ratio: Infinity };
+  for (const { other, path } of departureObstacles(state, ac, g)) {
+    for (let t = 0; t < mine.length; t++) {
+      const p = mine[t];
+      const q = path[t];
+      if (!p || !q) continue;
+      const r = Math.max(Math.hypot(p.x - q.x, p.y - q.y) / limitM, Math.abs(p.altFt - q.altFt) / AIRBORNE_PROXIMITY_FT);
+      if (r < best.ratio) best = { ratio: r, other, atSec: t };
+    }
+  }
+  return best;
 }
 
 /** Ordered departure instructions the Tower tries: no heading (runway heading), then a divergence of 30 degrees and of 60 degrees, away from a parallel neighbour first. */

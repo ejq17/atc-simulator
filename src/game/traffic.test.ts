@@ -92,7 +92,7 @@ describe('traffic generator', () => {
     }
   });
 
-  it('places arrivals 10-12 nm out at 2,500-3,000 ft, 3 nm clear of other airborne traffic', () => {
+  it('places arrivals 10-12 nm out (2,500-3,000 ft off the centreline, on the glide path - 3,300 to 4,300 ft - on it), 3 nm clear of other airborne traffic', () => {
     const r = simulate(scenarioWith({ seed: 8, arrivalsPerHour: 40, departuresPerHour: 4, maxAircraft: 30 }), 1800);
     const arrivals = r.recs.filter((x) => !x.spec.isDeparture);
     expect(arrivals.length).toBeGreaterThan(8);
@@ -105,7 +105,7 @@ describe('traffic generator', () => {
       expect(d).toBeGreaterThanOrEqual(9.9);
       expect(d).toBeLessThanOrEqual(12.1);
       expect(st.altitudeFt).toBeGreaterThanOrEqual(2500);
-      expect(st.altitudeFt).toBeLessThanOrEqual(3000);
+      expect(st.altitudeFt).toBeLessThanOrEqual(st.distanceNm !== undefined ? 4300 : 3000);
       expect(st.speedKt).toBe(rec.spec.type === 'C172' ? 100 : 170);
       for (const o of rec.others.filter((x) => x.air)) expect(Math.hypot(o.pos.x - st.pos.x, o.pos.y - st.pos.y) / NM).toBeGreaterThanOrEqual(3);
       expect(rec.spec.initialFrequencyId).toBe('TWR');

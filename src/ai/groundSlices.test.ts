@@ -21,7 +21,8 @@ describe('soak slices: ground gridlock and starvation', () => {
     expect(r.maxWaitSec, r.maxWaitText).toBeLessThan(BAR_SEC);
     expect(r.longWaits.filter((w) => /N2276G/.test(w) && /still waiting/.test(w)), r.longWaits.slice(0, 4).join('; ')).toHaveLength(0);
     expect(r.stallDump).toBeUndefined();
-    expect(r.noseToNose).toBeGreaterThan(0); // the pilots do call
+    // (no call is asserted any more: with the Tower sequencing of this branch the departure order of the seed changed and the pair never meets nose to nose, which is the better
+    // outcome; the stop-and-call mechanism itself is covered by sim/headOn.test.ts, and what this slice guards, a stand-off that nobody resolves, is the two waits above)
   }, 300000);
   it('seed 10, off: the GA departure that waited past the fairness bound at the ramp leaves inside the bar, and the departures that called after it did not take its place for 20 minutes', () => {
     const r = runFreePlaySoak(10, 'off', 2);

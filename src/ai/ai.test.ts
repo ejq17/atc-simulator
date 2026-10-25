@@ -150,7 +150,7 @@ describe('(1) Ground-only player: AI Clearance, Tower, Approach and Departure wo
     const t = texts(h.atc().filter((e) => e.callsign === 'AAL212'));
     expect(t).toEqual([
       'American two twelve, Atlantic City Approach, radar contact, descend and maintain two thousand',
-      'American two twelve, cleared ILS runway one three approach',
+      'American two twelve, cleared ILS runway one three approach, descend and maintain one thousand six hundred',
       'American two twelve, contact tower one two zero point three',
       'American two twelve, continue approach',
       'American two twelve, runway one three, cleared to land',
@@ -332,7 +332,7 @@ describe('behaviour details', () => {
     expect(texts(t)).toEqual([
       'Delta ninety nine, Atlantic City Approach, radar contact, descend and maintain two thousand',
       'Delta ninety nine, hold at CARYL as published',
-      'Delta ninety nine, cleared ILS runway one three approach',
+      'Delta ninety nine, cleared ILS runway one three approach, descend and maintain one thousand six hundred',
       'Delta ninety nine, contact tower one two zero point three',
     ]);
     const approachOne = atcAi(h, 'AAL212', 'APP').find((e) => /cleared ILS/.test(e.text))!;
@@ -386,13 +386,13 @@ describe('behaviour details', () => {
     const t = h.atc().filter((e) => e.callsign === 'AAL212').map((e) => `${e.aiPosition}: ${e.text}`);
     expect(t).toEqual([
       'APP: American two twelve, Atlantic City Approach, radar contact, descend and maintain two thousand',
-      'APP: American two twelve, cleared ILS runway one three approach',
+      'APP: American two twelve, cleared ILS runway one three approach, descend and maintain one thousand six hundred',
       'APP: American two twelve, contact tower one two zero point three',
       'TWR: American two twelve, continue approach',
       'TWR: American two twelve, runway one three, cleared to land',
       'TWR: American two twelve, contact approach one two four point six',
       'APP: American two twelve, proceed direct CARYL',
-      'APP: American two twelve, cleared ILS runway one three approach',
+      'APP: American two twelve, cleared ILS runway one three approach, descend and maintain one thousand six hundred',
       'APP: American two twelve, contact tower one two zero point three',
       'TWR: American two twelve, runway one three, cleared to land',
       'TWR: American two twelve, turn right at alpha, contact ground point niner',
