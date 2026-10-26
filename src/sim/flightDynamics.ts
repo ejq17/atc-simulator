@@ -378,9 +378,13 @@ export function runwayExits(ctx: SimContext, g: RunwayEndGeom, extended = false)
 function runwayExits0(ctx: SimContext, g: RunwayEndGeom, extended = false): RunwayExit[] {
   const graph = ctx.state.airport.taxiwayGraph;
   const out: RunwayExit[] = [];
+  const crossing = crossingRunways(ctx.state.airport, g.runway.id);
   for (const id of Object.keys(graph.nodes)) {
     const n = graph.nodes[id];
     if (n.kind !== 'runway' || n.runwayId !== g.runway.id) continue;
+    // A turnoff that starts inside the surface of another runway is not an exit: the aircraft would be on that runway with no clearance to be there
+    // (JO 7110.65 3-7-2: a clearance is required to cross any runway, active or not). KBOS 15R/33L exit T and 9/27 exit K lie within 4R/22L.
+    if (crossing.some((o) => pointInPolygon(n.pos, o.polygon))) continue;
     const holds: RunwayExit['holds'] = neighborIds(graph, id)
       .filter((h) => graph.nodes[h].kind === 'holding_position' && graph.nodes[h].runwayId === g.runway.id)
       .map((h) => ({ id: h, side: (vDot(vSub(graph.nodes[h].pos, n.pos), g.right) > 0 ? 'right' : 'left') as 'left' | 'right', taxiways: graph.nodes[h].taxiways }));

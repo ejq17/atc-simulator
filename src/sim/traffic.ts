@@ -644,9 +644,12 @@ export function updatePilotRequests(ctx: SimContext): void {
     }
 
     // 1e0. Standing nose to nose with no head-on state (see HEAD_ON_STUCK_SEC): make it one, so that the pilot who must give way holds a live request.
-    if (ac.onGround && ac.groundSpeedKt < 0.1 && rt.stillSince !== undefined && now - rt.stillSince >= HEAD_ON_STUCK_SEC && (ac.phase === 'TAXIING' || ac.phase === 'TAXI_TO_PARKING') && ac.route) {
+    // (HOLDING_SHORT counts: two aircraft at the hold lines on either side of a runway crossing, each wanting the other's lane, stood 2,000 s and more in the hub soak - KBOS taxiway C
+    // across 4L/22R, a departure and an arrival - the departure's phase being HOLDING_SHORT and the crossing request being all either had open.)
+    const standing = (o: Aircraft) => o.phase === 'TAXIING' || o.phase === 'TAXI_TO_PARKING' || o.phase === 'HOLDING_SHORT';
+    if (ac.onGround && ac.groundSpeedKt < 0.1 && rt.stillSince !== undefined && now - rt.stillSince >= HEAD_ON_STUCK_SEC && standing(ac) && ac.route) {
       const facing = Object.values(state.aircraft).find((o) => {
-        if (o.id === ac.id || !o.onGround || o.groundSpeedKt >= 0.1 || (o.phase !== 'TAXIING' && o.phase !== 'TAXI_TO_PARKING')) return false;
+        if (o.id === ac.id || !o.onGround || o.groundSpeedKt >= 0.1 || !standing(o)) return false;
         const dx = o.pos.x - ac.pos.x;
         const dy = o.pos.y - ac.pos.y;
         const d = Math.hypot(dx, dy);

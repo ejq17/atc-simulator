@@ -37,6 +37,9 @@ export const ALT_ROUTE_AFTER_SEC = 300;
 /** The replanned route may be this many times the original length plus `ALT_ROUTE_EXTRA_M` (a sane detour, not a tour of the airport). DESIGN VALUE. */
 export const ALT_ROUTE_MAX_FACTOR = 3;
 export const ALT_ROUTE_EXTRA_M = 500;
+/** Two aircraft at the hold lines on either side of a crossing, each waiting for the other's lane, are left to sort it out for this long (s) (the crossing of the aircraft that has the right of way may be only seconds off), then the lower-ranked one is rerouted. DESIGN VALUE. */
+export const MUTUAL_CROSSING_AFTER_SEC = 90;
+const MUTUAL_CROSSING_RETRY_SEC = 15;
 /** A pilot whose taxi or crossing request has gone this long (s) without an instruction is told to hold position and expect a delay, and again every `DELAY_CALL_EVERY_SEC`. DESIGN VALUE. */
 export const DELAY_CALL_AFTER_SEC = 180;
 export const DELAY_CALL_EVERY_SEC = 300;
@@ -126,18 +129,36 @@ function taxiFollowOk(v: AgentView, ac: Aircraft): boolean {
   return true;
 }
 
-/** Another aircraft stands still at the hold line on the far side of runway `rid` on `ac`'s route (the first hold line of that runway after the one `ac` stands at). */
-function farHoldOccupied(state: SimulationState, ac: Aircraft, rid: string): boolean {
+/** The aircraft that stands still at the hold line on the far side of runway `rid` on `ac`'s route (the first hold line of that runway after the one `ac` stands at), if any. */
+function farHoldOccupant(state: SimulationState, ac: Aircraft, rid: string): Aircraft | undefined {
   const r = ac.route;
-  if (!r) return false;
+  if (!r) return undefined;
   const nodes = state.airport.taxiwayGraph.nodes;
   let far: string | undefined;
   for (let i = Math.max(0, r.progressIndex - 1); i < r.nodeIds.length; i++) {
     const n = nodes[r.nodeIds[i]];
     if (n?.kind === 'holding_position' && n.runwayId === rid && Math.hypot(n.pos.x - ac.pos.x, n.pos.y - ac.pos.y) > 25) { far = n.id; break; }
   }
-  if (!far) return false;
-  return Object.values(state.aircraft).some((o) => o.id !== ac.id && o.onGround && o.groundSpeedKt < 1 && o.occupyingRunways.length === 0 && holdNodeAt(state.airport, o)?.id === far);
+  if (!far) return undefined;
+  return Object.values(state.aircraft).find((o) => o.id !== ac.id && o.onGround && o.groundSpeedKt < 1 && o.occupyingRunways.length === 0 && holdNodeAt(state.airport, o)?.id === far);
+}
+
+/** Another aircraft stands still at the hold line on the far side of runway `rid` on `ac`'s route (the first hold line of that runway after the one `ac` stands at). */
+function farHoldOccupied(state: SimulationState, ac: Aircraft, rid: string): boolean {
+  return !!farHoldOccupant(state, ac, rid);
+}
+
+/**
+ * Two aircraft at the hold lines on either side of one runway crossing, each waiting to cross to the other's side (a departure and an arrival on the same taxiway, one lane): neither
+ * can be sent, the one that crosses would stop on the far side nose to nose with the other. The far-side aircraft when its own route leads to this side's hold line. Soak (hub
+ * configurations), KBOS taxiway C over 4L/22R, taxiway F over 4L/22R: the pair stood for 2,000 s and more. The sim's own nose-to-nose test (traffic.ts 1e0) only sees aircraft
+ * within 2.5 follow distances (about 80 m for two light aircraft), the hold lines are 150 m apart.
+ */
+function mutualCrossingPartner(state: SimulationState, ac: Aircraft, rid: string, hold: { id: string }): Aircraft | undefined {
+  const o = farHoldOccupant(state, ac, rid);
+  if (!o?.route || o.pendingRequest?.kind !== 'CROSSING') return undefined;
+  const rest = o.route.nodeIds.slice(Math.max(0, o.route.progressIndex - 1));
+  return rest.includes(hold.id) ? o : undefined;
 }
 
 export function createGroundAgent(store: ClearanceStore): Agent {
@@ -146,6 +167,8 @@ export function createGroundAgent(store: ClearanceStore): Agent {
   const headOnCalls = new Map<string, { otherId: string; at: number }>();
   /** Aircraft sent out of another's way (`retreatNode`) that Ground routes on again by itself: they have no request open. */
   const retreated = new Map<string, { otherId: string; at: number }>();
+  /** When Ground last looked for a way out of a mutual crossing wait for each aircraft (the search runs route plans: not every second). */
+  const mutualTried = new Map<string, number>();
   return (v) => {
     const plans: Plan[] = [];
     const { airport, state } = v;
@@ -473,7 +496,20 @@ export function createGroundAgent(store: ClearanceStore): Agent {
         // ... and never when an aircraft stands AT the far hold line, patience or not: it waits for its own takeoff clearance, not for this crossing, and a crossing
         // aircraft that has left the runway can then neither reach the hold line nor turn back (soak seed 13, special traffic: a vehicle 32 m short of the far hold
         // of 4/22 and a Cessna cleared for takeoff from that hold line stood nose to nose for 1,000 s, the landing runway blocked all that time).
-        if (ac.route && farHoldOccupied(state, ac, rid)) continue;
+        if (ac.route && farHoldOccupied(state, ac, rid)) {
+          // Each waits for the other's lane: the one that ranks lower (`outranks`: waited less, an arrival before a departure that is not overdue) is routed another way or out of the
+          // other's way (`resumeAfterHeadOn`, the same machinery as after a nose-to-nose), once it has waited MUTUAL_CROSSING_AFTER_SEC for the crossing.
+          const mate = hold ? mutualCrossingPartner(state, ac, rid, hold) : undefined;
+          if (mate && !outranks(state, ac, mate) && waitedSec(ac) >= MUTUAL_CROSSING_AFTER_SEC && v.now - (mutualTried.get(ac.id) ?? -Infinity) >= MUTUAL_CROSSING_RETRY_SEC) {
+            mutualTried.set(ac.id, v.now);
+            const at = ac.pendingRequest?.sinceSec ?? v.now;
+            const m = partner.get(ac.id);
+            if (!m || m.otherId !== mate.id) partner.set(ac.id, { otherId: mate.id, since: v.now });
+            const r = resumeAfterHeadOn(ac, at);
+            if (r && r !== 'wait') plans.push(r);
+          }
+          continue;
+        }
         const rw = findRunway(airport, rid);
         if (rw && crossingNeedsApproval(state, 'GND', rw)) {
           // JO 7110.65 3-1-3: ask local control, wait for the answer (the aircraft keeps holding short), cross inside the approval.

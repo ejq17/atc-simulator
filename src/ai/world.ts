@@ -227,13 +227,23 @@ export interface DeparturePlan {
  * hold, and a hold-short for every runway the route crosses, in order.
  */
 export function planDeparture(airport: Airport, ac: Aircraft, ends: string[], busyHolds: ReadonlyMap<string, number> = new Map(), closed?: ReadonlySet<string>, avoidEdges?: ReadonlySet<string>): DeparturePlan | undefined {
-  const strict = planDepartureOnce(airport, ac, ends, busyHolds, closed, avoidEdges);
-  if (strict || ![...busyHolds.values()].some((n) => n >= MAX_QUEUE + AVOID_EXTRA)) return strict;
-  // Every other entry is full: the exit holds are used after all (the queue is not allowed to grow without limit at the runway end).
-  const relaxed = new Map<string, number>();
-  for (const [id, n] of busyHolds) relaxed.set(id, n >= MAX_QUEUE + AVOID_EXTRA ? n - AVOID_EXTRA - 1 : n);
-  return planDepartureOnce(airport, ac, ends, relaxed, closed, avoidEdges);
+  // The margin first, then the book distance alone (the criterion the pilot and Tower apply, `holdSelection.holdTooShort`): a type whose book distance exceeds the margined
+  // length of every active runway (soak, KBOS NW: a B763 needs 2,899 m, 33L leaves 2,945 m from the full-length entry, 2,949 m with the margin) is not left at the gate.
+  for (const marginM of [TAKEOFF_MARGIN_M, 0]) {
+    const strict = planDepartureOnce(airport, ac, ends, busyHolds, closed, avoidEdges, marginM);
+    if (strict) return strict;
+    if (![...busyHolds.values()].some((n) => n >= MAX_QUEUE + AVOID_EXTRA)) continue;
+    // Every other entry is full: the exit holds are used after all (the queue is not allowed to grow without limit at the runway end).
+    const relaxed = new Map<string, number>();
+    for (const [id, n] of busyHolds) relaxed.set(id, n >= MAX_QUEUE + AVOID_EXTRA ? n - AVOID_EXTRA - 1 : n);
+    const plan = planDepartureOnce(airport, ac, ends, relaxed, closed, avoidEdges, marginM);
+    if (plan) return plan;
+  }
+  return undefined;
 }
+
+/** Runway (m) a departure plan keeps beyond the type's book takeoff distance. DESIGN VALUE. */
+const TAKEOFF_MARGIN_M = 50;
 
 const AVOID_EXTRA = 100;
 
@@ -256,24 +266,27 @@ function runwayQueue(graph: Airport['taxiwayGraph'], busyHolds: ReadonlyMap<stri
  * taxi route from the stand, plus `QUEUE_PENALTY_M` for every departure already queued for that runway (so a runway whose queue is much longer is not picked while another
  * is nearly as close); the order in which the configuration lists the ends decides a tie (an operator preference).
  */
-function planDepartureOnce(airport: Airport, ac: Aircraft, ends: string[], busyHolds: ReadonlyMap<string, number>, closed?: ReadonlySet<string>, avoidEdges?: ReadonlySet<string>): DeparturePlan | undefined {
+function planDepartureOnce(airport: Airport, ac: Aircraft, ends: string[], busyHolds: ReadonlyMap<string, number>, closed: ReadonlySet<string> | undefined, avoidEdges: ReadonlySet<string> | undefined, marginM: number): DeparturePlan | undefined {
   const start = taxiStartNode(airport, ac);
   if (!start) return undefined;
-  const need = ftToM(getPerformance(ac.type).takeoffDistanceFt) + 50;
+  const need = ftToM(getPerformance(ac.type).takeoffDistanceFt) + marginM;
   const graph = airport.taxiwayGraph;
   // Within one runway end the entries keep the order of `departureCandidates` (the first unoccupied full-length entry, else the first unoccupied hold, else the least crowded one).
   const perEnd = new Map<string, { plan: DeparturePlan; tier: number; n: number }>();
-  for (const { plan, fullEntry } of departureCandidates(airport, start.id, ends, need, closed, avoidEdges)) {
+  for (const { plan, fullEntry, crossesOwn } of departureCandidates(airport, start.id, ends, need, closed, avoidEdges)) {
     const n = busyHolds.get(plan.holdId) ?? 0;
-    const tier = fullEntry && n === 0 ? 0 : n === 0 ? 1 : n < MAX_QUEUE ? 2 : undefined;
+    // A hold line on the far side of the departure runway is the last resort, behind a queue of any length on the near side: the aircraft would cross the runway it departs from
+    // (a clearance, and a crossing stream on that runway) and then stand on the lane the near-side queue enters by; the departure cleared from the near side drives up to it and waits
+    // for it for good (soak, KPHL WEST seed 1: AAL2404 sent over 9R/27L to the far hold, AAL145 cleared for takeoff from the near hold stopped behind it for 4,400 s with the runway occupied).
+    const tier = crossesOwn ? (n < MAX_QUEUE ? 3 : undefined) : fullEntry && n === 0 ? 0 : n === 0 ? 1 : n < MAX_QUEUE ? 2 : undefined;
     if (tier === undefined) continue;
     const cur = perEnd.get(plan.runwayEnd);
-    if (!cur || tier < cur.tier || (tier === 2 && cur.tier === 2 && n < cur.n)) perEnd.set(plan.runwayEnd, { plan, tier, n });
+    if (!cur || tier < cur.tier || (tier >= 2 && cur.tier === tier && n < cur.n)) perEnd.set(plan.runwayEnd, { plan, tier, n });
   }
   let best: { plan: DeparturePlan; tier: number; cost: number } | undefined;
   for (const { plan, tier, n } of perEnd.values()) {
     const rid = graph.nodes[plan.holdId]?.runwayId;
-    const cost = plan.lengthM + QUEUE_PENALTY_M * (rid ? runwayQueue(graph, busyHolds, rid) : 0) + (tier === 2 ? 1e6 * n : 0);
+    const cost = plan.lengthM + QUEUE_PENALTY_M * (rid ? runwayQueue(graph, busyHolds, rid) : 0) + (tier >= 2 ? 1e6 * n : 0);
     if (!best || tier < best.tier || (tier === best.tier && cost < best.cost)) best = { plan, tier, cost };
   }
   return best?.plan;
@@ -281,6 +294,8 @@ function planDepartureOnce(airport: Airport, ac: Aircraft, ends: string[], busyH
 
 interface DepartureCandidate {
   plan: DeparturePlan;
+  /** The route crosses the departure runway itself to reach a hold line on its far side. */
+  crossesOwn: boolean;
   /** The picked hold is the entry node itself and leaves the type its full takeoff distance. */
   fullEntry: boolean;
 }
@@ -318,6 +333,7 @@ function departureCandidates(airport: Airport, startId: string, ends: string[], 
         // (the engine plans the route itself from the `via` list: a replan around some edges counts only when its own pick avoids them)
         if (avoidEdges && pick.route.edgeIds.some((id) => avoidEdges.has(id))) continue;
         out.push({
+          crossesOwn: pick.route.runwayCrossings.includes(g.runway.id),
           fullEntry: pick.hold.id === h.id && remaining >= needM,
           plan: { runwayEnd: g.end.id, via, holdShort: pick.route.runwayCrossings.filter((r) => r !== g.runway.id), holdId: pick.hold.id, lengthM: pick.route.lengthM, remainingM: pickedRemaining, nodeIds: pick.route.nodeIds },
         });
